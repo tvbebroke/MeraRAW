@@ -1,0 +1,226 @@
+//! Tone-curve LUT builder (slot 7). The GPU pass applies the LUT with the
+//! film-like constant-hue method (RawTherapee / Adobe DNG reference —
+//! curve the max & min channel, interpolate the middle by ratio).
+//!
+//! Domain: the LUT operates on shutter-compressed t = x/(1+x) ∈ [0,1) so
+//! scene-referred values >1 stay curve-addressable; the shader maps back
+//! with y/(1-y). Identity LUT ⇒ exact identity end-to-end.
+//!
+//! Composition order (pinned): base point-curve B → parametric region
+//! deltas → contrast S-curve. All steps identity at defaults.
+
+pub const LUT_SIZE: usize = 512;
+
+/// Monotonic cubic interpolation (Fritsch–Carlson) through control points.
+/// Points must have strictly increasing x in [0,1] (guard-wall enforces).
+struct MonotonicCubic {
+    xs: Vec<f32>,
+    ys: Vec<f32>,
+    ms: Vec<f32>, // tangents
+}
+
+impl MonotonicCubic {
+    fn new(mut pts: Vec<[f32; 2]>) -> Self {
+        if pts.first().map(|p| p[0] > 1e-6).unwrap_or(true) {
+            pts.insert(0, [0.0, pts.first().map(|p| p[1]).unwrap_or(0.0).min(0.0).max(0.0)]);
+        }
+        if pts.last().map(|p| p[0] < 1.0 - 1e-6).unwrap_or(true) {
+            pts.push([1.0, 1.0]);
+        }
+        let n = pts.len();
+        let xs: Vec<f32> = pts.iter().map(|p| p[0]).collect();
+        let ys: Vec<f32> = pts.iter().map(|p| p[1]).collect();
+        // secant slopes
+        let mut d = vec![0.0f32; n - 1];
+        for i in 0..n - 1 {
+            d[i] = (ys[i + 1] - ys[i]) / (xs[i + 1] - xs[i]).max(1e-6);
+        }
+        let mut ms = vec![0.0f32; n];
+        ms[0] = d[0];
+        ms[n - 1] = d[n - 2];
+        for i in 1..n - 1 {
+            ms[i] = if d[i - 1] * d[i] <= 0.0 {
+                0.0
+            } else {
+                (d[i - 1] + d[i]) * 0.5
+            };
+        }
+        // Fritsch–Carlson limiter
+        for i in 0..n - 1 {
+            if d[i].abs() < 1e-9 {
+                ms[i] = 0.0;
+                ms[i + 1] = 0.0;
+            } else {
+                let a = ms[i] / d[i];
+                let b = ms[i + 1] / d[i];
+                let s = a * a + b * b;
+                if s > 9.0 {
+                    let tau = 3.0 / s.sqrt();
+                    ms[i] = tau * a * d[i];
+                    ms[i + 1] = tau * b * d[i];
+                }
+            }
+        }
+        Self { xs, ys, ms }
+    }
+
+    fn eval(&self, x: f32) -> f32 {
+        let n = self.xs.len();
+        if x <= self.xs[0] {
+            return self.ys[0];
+        }
+        if x >= self.xs[n - 1] {
+            return self.ys[n - 1];
+        }
+        let mut i = 0;
+        while i < n - 2 && x > self.xs[i + 1] {
+            i += 1;
+        }
+        let h = (self.xs[i + 1] - self.xs[i]).max(1e-6);
+        let t = (x - self.xs[i]) / h;
+        let t2 = t * t;
+        let t3 = t2 * t;
+        let h00 = 2.0 * t3 - 3.0 * t2 + 1.0;
+        let h10 = t3 - 2.0 * t2 + t;
+        let h01 = -2.0 * t3 + 3.0 * t2;
+        let h11 = t3 - t2;
+        h00 * self.ys[i] + h10 * h * self.ms[i] + h01 * self.ys[i + 1] + h11 * h * self.ms[i + 1]
+    }
+}
+
+/// Raised-cosine region weight centered at `c` with half-width `w`.
+fn region_w(t: f32, c: f32, w: f32) -> f32 {
+    let d = (t - c).abs();
+    if d >= w {
+        0.0
+    } else {
+        0.5 * (1.0 + (std::f32::consts::PI * d / w).cos())
+    }
+}
+
+/// Contrast S-curve: blend toward a cosine ease (k>0) or its inverse (k<0).
+fn contrast_curve(v: f32, contrast: f32) -> f32 {
+    let k = (contrast / 100.0).clamp(-1.0, 1.0);
+    if k > 0.0 {
+        let ease = 0.5 - 0.5 * (std::f32::consts::PI * v).cos();
+        v + (ease - v) * k
+    } else if k < 0.0 {
+        let inv = (1.0 - 2.0 * v.clamp(0.0, 1.0)).acos() / std::f32::consts::PI;
+        v + (inv - v) * (-k)
+    } else {
+        v
+    }
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
+pub struct ToneParams {
+    pub contrast: f32,
+    pub shadows: f32,
+    pub darks: f32,
+    pub lights: f32,
+    pub highlights: f32,
+}
+
+pub fn is_identity(points: &[[f32; 2]], p: &ToneParams) -> bool {
+    points.is_empty() && *p == ToneParams::default()
+}
+
+/// Build the 512-entry LUT over t∈[0,1]. Guaranteed monotonic
+/// non-decreasing (cumulative max) and clamped to [0, 0.9995] so the
+/// shader's y/(1-y) un-compression stays finite.
+pub fn build_lut(points: &[[f32; 2]], p: &ToneParams) -> Vec<f32> {
+    let base: Option<MonotonicCubic> = if points.is_empty() {
+        None
+    } else {
+        Some(MonotonicCubic::new(points.to_vec()))
+    };
+    let mut lut = Vec::with_capacity(LUT_SIZE);
+    // parametric region deltas (pinned placement; max shift 0.12)
+    const SCALE: f32 = 0.12 / 100.0;
+    for i in 0..LUT_SIZE {
+        let t = i as f32 / (LUT_SIZE - 1) as f32;
+        let mut v = match &base {
+            Some(c) => c.eval(t).clamp(0.0, 1.0),
+            None => t,
+        };
+        v += p.shadows * SCALE * region_w(t, 0.125, 0.25)
+            + p.darks * SCALE * region_w(t, 0.30, 0.40)
+            + p.lights * SCALE * region_w(t, 0.70, 0.40)
+            + p.highlights * SCALE * region_w(t, 0.875, 0.25);
+        v = contrast_curve(v.clamp(0.0, 1.0), p.contrast);
+        lut.push(v.clamp(0.0, 0.9995));
+    }
+    // enforce monotonic non-decreasing (parametric deltas could dent it)
+    for i in 1..LUT_SIZE {
+        if lut[i] < lut[i - 1] {
+            lut[i] = lut[i - 1];
+        }
+    }
+    lut
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn identity_lut_is_exact_ramp() {
+        let lut = build_lut(&[], &ToneParams::default());
+        for (i, v) in lut.iter().enumerate() {
+            let t = i as f32 / (LUT_SIZE - 1) as f32;
+            assert!((v - t.min(0.9995)).abs() < 1e-5, "lut[{i}]={v} t={t}");
+        }
+    }
+
+    #[test]
+    fn contrast_is_s_shaped_and_monotonic() {
+        let lut = build_lut(
+            &[],
+            &ToneParams {
+                contrast: 50.0,
+                ..Default::default()
+            },
+        );
+        let at = |t: f32| lut[(t * (LUT_SIZE - 1) as f32) as usize];
+        assert!(at(0.25) < 0.25, "darks darker");
+        assert!(at(0.75) > 0.75, "lights lighter");
+        assert!((at(0.5) - 0.5).abs() < 0.01, "pivot stays");
+        for i in 1..LUT_SIZE {
+            assert!(lut[i] >= lut[i - 1], "monotonic");
+        }
+    }
+
+    #[test]
+    fn point_curve_passes_through_points() {
+        let lut = build_lut(&[[0.0, 0.0], [0.5, 0.7], [1.0, 1.0]], &ToneParams::default());
+        let mid = lut[LUT_SIZE / 2];
+        assert!((mid - 0.7).abs() < 0.01, "mid={mid}");
+    }
+
+    #[test]
+    fn parametric_highlights_lift_top_only() {
+        let lut = build_lut(
+            &[],
+            &ToneParams {
+                highlights: 100.0,
+                ..Default::default()
+            },
+        );
+        let at = |t: f32| lut[(t * (LUT_SIZE - 1) as f32) as usize];
+        assert!(at(0.9) > 0.9 + 0.04, "highlights lifted");
+        assert!((at(0.2) - 0.2).abs() < 1e-3, "shadows untouched");
+    }
+
+    #[test]
+    fn monotonic_cubic_no_overshoot() {
+        // steep step must not overshoot above 1
+        let lut = build_lut(
+            &[[0.0, 0.0], [0.4, 0.05], [0.6, 0.95], [1.0, 1.0]],
+            &ToneParams::default(),
+        );
+        assert!(lut.iter().all(|v| (0.0..=0.9995).contains(v)));
+        for i in 1..LUT_SIZE {
+            assert!(lut[i] >= lut[i - 1]);
+        }
+    }
+}

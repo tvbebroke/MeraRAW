@@ -1,0 +1,400 @@
+//! Thin #[tauri::command] handlers. Validate → EngineMsg → await oneshot →
+//! Result<T, AppError>. Never do heavy work here (contract C2).
+
+use crate::error::AppError;
+use meratech_core::engine::EngineHandle;
+use std::path::PathBuf;
+use tauri::{AppHandle, State};
+use tauri_plugin_dialog::DialogExt;
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AppInfo {
+    pub version: String,
+    pub build: String,
+    pub gpu_adapter: Option<String>,
+    pub gpu_backend: Option<String>,
+}
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FileMeta {
+    pub path: String,
+    pub exists: bool,
+    pub is_dir: bool,
+    pub size: u64,
+    pub modified_ms: Option<u64>,
+    pub ext: Option<String>,
+}
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DirEntry {
+    pub name: String,
+    pub path: String,
+    pub is_dir: bool,
+    pub size: u64,
+}
+
+#[tauri::command]
+pub async fn app_info(engine: State<'_, EngineHandle>) -> Result<AppInfo, AppError> {
+    let info = engine.info().await?;
+    Ok(AppInfo {
+        version: env!("CARGO_PKG_VERSION").to_string(),
+        build: if cfg!(debug_assertions) {
+            "debug".to_string()
+        } else {
+            "release".to_string()
+        },
+        gpu_adapter: info.gpu_adapter,
+        gpu_backend: info.gpu_backend,
+    })
+}
+
+#[tauri::command]
+pub async fn ping_engine(
+    engine: State<'_, EngineHandle>,
+) -> Result<meratech_core::message::EngineStatus, AppError> {
+    Ok(engine.ping().await?)
+}
+
+pub const IMAGE_EXTENSIONS: &[&str] = &[
+    "arw", "nef", "cr2", "cr3", "dng", "raf", "orf", "rw2", "jpg", "jpeg", "png", "tif", "tiff",
+];
+
+#[tauri::command]
+pub async fn pick_file(app: AppHandle) -> Result<Option<String>, AppError> {
+    let (tx, rx) = tokio::sync::oneshot::channel();
+    app.dialog()
+        .file()
+        .add_filter("Images", IMAGE_EXTENSIONS)
+        .pick_file(move |f| {
+            let _ = tx.send(f);
+        });
+    let picked = rx
+        .await
+        .map_err(|_| AppError::Internal("dialog dropped".into()))?;
+    Ok(picked.map(|p| p.to_string()))
+}
+
+#[tauri::command]
+pub async fn pick_folder(app: AppHandle) -> Result<Option<String>, AppError> {
+    let (tx, rx) = tokio::sync::oneshot::channel();
+    app.dialog().file().pick_folder(move |f| {
+        let _ = tx.send(f);
+    });
+    let picked = rx
+        .await
+        .map_err(|_| AppError::Internal("dialog dropped".into()))?;
+    Ok(picked.map(|p| p.to_string()))
+}
+
+#[tauri::command]
+pub async fn read_file_meta(path: String) -> Result<FileMeta, AppError> {
+    let p = PathBuf::from(&path);
+    let ext = p
+        .extension()
+        .map(|e| e.to_string_lossy().to_lowercase());
+    match tokio::fs::metadata(&p).await {
+        Ok(md) => Ok(FileMeta {
+            path,
+            exists: true,
+            is_dir: md.is_dir(),
+            size: md.len(),
+            modified_ms: md
+                .modified()
+                .ok()
+                .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+                .map(|d| d.as_millis() as u64),
+            ext,
+        }),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(FileMeta {
+            path,
+            exists: false,
+            is_dir: false,
+            size: 0,
+            modified_ms: None,
+            ext,
+        }),
+        Err(e) => Err(e.into()),
+    }
+}
+
+#[tauri::command]
+pub async fn list_dir(path: String) -> Result<Vec<DirEntry>, AppError> {
+    let mut entries = Vec::new();
+    let mut rd = tokio::fs::read_dir(&path).await?;
+    while let Some(entry) = rd.next_entry().await? {
+        let md = entry.metadata().await?;
+        entries.push(DirEntry {
+            name: entry.file_name().to_string_lossy().into_owned(),
+            path: entry.path().to_string_lossy().into_owned(),
+            is_dir: md.is_dir(),
+            size: md.len(),
+        });
+    }
+    entries.sort_by(|a, b| (b.is_dir, a.name.to_lowercase()).cmp(&(a.is_dir, b.name.to_lowercase())));
+    Ok(entries)
+}
+
+#[tauri::command]
+pub async fn open_image(
+    engine: State<'_, EngineHandle>,
+    path: String,
+) -> Result<meratech_core::raw::ImageMeta, AppError> {
+    engine
+        .open_image(PathBuf::from(path))
+        .await?
+        .map_err(AppError::from)
+}
+
+#[tauri::command]
+pub async fn request_frame(
+    engine: State<'_, EngineHandle>,
+    view: meratech_core::gpu::display::ViewParams,
+) -> Result<meratech_core::message::FrameInfo, AppError> {
+    engine.request_frame(view).await?.map_err(AppError::from)
+}
+
+#[tauri::command]
+pub async fn get_metadata(
+    engine: State<'_, EngineHandle>,
+) -> Result<Option<meratech_core::raw::ImageMeta>, AppError> {
+    Ok(engine.get_metadata().await?)
+}
+
+#[tauri::command]
+pub async fn close_image(engine: State<'_, EngineHandle>) -> Result<(), AppError> {
+    Ok(engine.close_image().await?)
+}
+
+// ---- Phase 2: ops on the canonical doc ----
+
+#[tauri::command]
+pub async fn apply_op(
+    engine: State<'_, EngineHandle>,
+    op: meratech_core::ops::Op,
+) -> Result<meratech_core::ops::DocDelta, AppError> {
+    engine.apply_op(op).await?.map_err(AppError::from)
+}
+
+#[tauri::command]
+pub async fn undo(
+    engine: State<'_, EngineHandle>,
+) -> Result<meratech_core::ops::DocDelta, AppError> {
+    engine.undo().await?.map_err(AppError::from)
+}
+
+#[tauri::command]
+pub async fn redo(
+    engine: State<'_, EngineHandle>,
+) -> Result<meratech_core::ops::DocDelta, AppError> {
+    engine.redo().await?.map_err(AppError::from)
+}
+
+#[tauri::command]
+pub async fn get_doc(
+    engine: State<'_, EngineHandle>,
+) -> Result<Option<serde_json::Value>, AppError> {
+    Ok(engine.get_doc().await?)
+}
+
+#[tauri::command]
+pub async fn get_history(engine: State<'_, EngineHandle>) -> Result<Vec<String>, AppError> {
+    Ok(engine.get_history().await?)
+}
+
+/// Registry is pure static data — no engine round-trip needed.
+#[tauri::command]
+pub fn get_registry() -> Vec<meratech_core::registry::ParamSpec> {
+    meratech_core::registry::all_specs()
+        .into_iter()
+        .cloned()
+        .collect()
+}
+
+#[tauri::command]
+pub async fn snapshot(
+    engine: State<'_, EngineHandle>,
+    name: String,
+) -> Result<(), AppError> {
+    engine.snapshot(name).await?.map_err(AppError::from)
+}
+
+#[tauri::command]
+pub async fn list_snapshots(engine: State<'_, EngineHandle>) -> Result<Vec<String>, AppError> {
+    Ok(engine.list_snapshots().await?)
+}
+
+#[tauri::command]
+pub async fn restore_snapshot(
+    engine: State<'_, EngineHandle>,
+    name: String,
+) -> Result<meratech_core::ops::DocDelta, AppError> {
+    engine.restore_snapshot(name).await?.map_err(AppError::from)
+}
+
+#[tauri::command]
+pub async fn virtual_copy(engine: State<'_, EngineHandle>) -> Result<String, AppError> {
+    engine.virtual_copy().await?.map_err(AppError::from)
+}
+
+#[tauri::command]
+pub async fn switch_doc(
+    engine: State<'_, EngineHandle>,
+    docId: String,
+) -> Result<meratech_core::ops::DocDelta, AppError> {
+    engine.switch_doc(docId).await?.map_err(AppError::from)
+}
+
+/// Dev/test hook: MERATECH_OPEN=<path> auto-opens a file on launch.
+/// Frontend polls this once at boot (deterministic, no event race).
+#[tauri::command]
+pub async fn autoopen_path() -> Result<Option<String>, AppError> {
+    Ok(std::env::var("MERATECH_OPEN").ok().filter(|s| !s.is_empty()))
+}
+
+#[tauri::command]
+pub async fn get_stats(
+    engine: State<'_, EngineHandle>,
+) -> Result<Option<meratech_core::message::FrameStats>, AppError> {
+    Ok(engine.get_stats().await?)
+}
+
+#[tauri::command]
+pub async fn wb_from_point(
+    engine: State<'_, EngineHandle>,
+    x: f32,
+    y: f32,
+) -> Result<meratech_core::ops::DocDelta, AppError> {
+    engine.wb_from_point(x, y).await?.map_err(AppError::from)
+}
+
+// ---- Phase 7: export + presets + perf ----
+
+#[tauri::command]
+pub async fn export_image(
+    engine: State<'_, EngineHandle>,
+    settings: meratech_core::export::ExportSettings,
+) -> Result<String, AppError> {
+    engine.export_image(settings).await?.map_err(AppError::from)
+}
+
+#[tauri::command]
+pub async fn save_preset(
+    engine: State<'_, EngineHandle>,
+    name: String,
+    modules: Vec<String>,
+) -> Result<(), AppError> {
+    engine
+        .save_preset_to_disk(name, modules)
+        .await?
+        .map_err(AppError::from)
+}
+
+#[tauri::command]
+pub async fn list_presets(engine: State<'_, EngineHandle>) -> Result<Vec<String>, AppError> {
+    Ok(engine.list_presets().await?)
+}
+
+#[tauri::command]
+pub async fn apply_preset(
+    engine: State<'_, EngineHandle>,
+    name: String,
+) -> Result<meratech_core::ops::DocDelta, AppError> {
+    engine
+        .apply_preset_by_name(name)
+        .await?
+        .map_err(AppError::from)
+}
+
+#[tauri::command]
+pub async fn get_perf_stats(
+    engine: State<'_, EngineHandle>,
+) -> Result<meratech_core::message::PerfStats, AppError> {
+    Ok(engine.get_perf_stats().await?)
+}
+
+// ---- Phase 5: catalog ----
+
+#[tauri::command]
+pub async fn import_folder(
+    engine: State<'_, EngineHandle>,
+    path: String,
+) -> Result<u64, AppError> {
+    engine
+        .import_folder(PathBuf::from(path))
+        .await?
+        .map_err(AppError::from)
+}
+
+#[tauri::command]
+pub async fn get_grid(
+    engine: State<'_, EngineHandle>,
+    query: meratech_core::catalog::GridQuery,
+) -> Result<Vec<meratech_core::catalog::GridItem>, AppError> {
+    engine.get_grid(query).await?.map_err(AppError::from)
+}
+
+#[tauri::command]
+pub async fn set_asset_meta(
+    engine: State<'_, EngineHandle>,
+    ids: Vec<i64>,
+    patch: meratech_core::catalog::MetaPatch,
+) -> Result<(), AppError> {
+    engine
+        .set_asset_meta(ids, patch)
+        .await?
+        .map_err(AppError::from)
+}
+
+#[tauri::command]
+pub async fn rebuild_index(engine: State<'_, EngineHandle>) -> Result<u64, AppError> {
+    engine.rebuild_index().await?.map_err(AppError::from)
+}
+
+#[tauri::command]
+pub async fn set_mask_overlay(
+    engine: State<'_, EngineHandle>,
+    id: Option<String>,
+) -> Result<(), AppError> {
+    Ok(engine.set_mask_overlay(id).await?)
+}
+
+/// Before/after: render the un-edited base while `on`.
+#[tauri::command]
+pub async fn set_preview_bypass(
+    engine: State<'_, EngineHandle>,
+    on: bool,
+) -> Result<(), AppError> {
+    Ok(engine.set_preview_bypass(on).await?)
+}
+
+#[tauri::command]
+pub async fn selftest_enabled() -> Result<bool, AppError> {
+    Ok(std::env::var("MERATECH_SELFTEST").is_ok_and(|v| !v.is_empty()))
+}
+
+#[tauri::command]
+pub async fn live_assistant_enabled() -> Result<bool, AppError> {
+    Ok(std::env::var("MERATECH_LIVE_ASSISTANT").is_ok_and(|v| !v.is_empty()))
+}
+
+#[tauri::command]
+pub async fn verify_slider_enabled() -> Result<bool, AppError> {
+    Ok(std::env::var("MERATECH_VERIFY_SLIDER").is_ok_and(|v| !v.is_empty()))
+}
+
+/// DoD item 7: intentional error → typed AppError in the frontend.
+#[tauri::command]
+pub async fn fail_on_purpose() -> Result<(), AppError> {
+    Err(AppError::Internal("intentional error probe".into()))
+}
+
+/// Webview self-report → engine log. Lets headless test runs verify the
+/// frontend booted and the frame:// path worked, by grepping dev output.
+#[tauri::command]
+pub async fn report_frontend_status(status: String) -> Result<(), AppError> {
+    tracing::info!(status = %status, "FRONTEND-REPORT");
+    Ok(())
+}
