@@ -168,7 +168,7 @@ export default function App() {
   return (
     <div className="app">
       <div className="topbar">
-        <span className="brand">Meratech</span>
+        <span className="brand">MeraRAW</span>
         <div className="topbar-tabs">
           <button
             className={mode === "library" ? "tab active" : "tab"}

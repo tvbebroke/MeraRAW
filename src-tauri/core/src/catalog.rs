@@ -23,7 +23,7 @@ pub fn data_dir() -> PathBuf {
         }
     }
     let home = std::env::var("HOME").unwrap_or_else(|_| ".".into());
-    PathBuf::from(home).join("Library/Application Support/Meratech")
+    PathBuf::from(home).join("Library/Application Support/MeraRAW")
 }
 
 #[derive(Debug, Clone, serde::Serialize)]

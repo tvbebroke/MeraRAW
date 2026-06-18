@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Meratech",
+  "productName": "MeraRAW",
   "version": "0.1.0",
   "identifier": "co.meratech.editor",
   "build": {
@@ -14,7 +14,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "Meratech",
+        "title": "MeraRAW",
         "width": 1440,
         "height": 900,
         "minWidth": 1024,

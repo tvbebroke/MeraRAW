@@ -7,7 +7,7 @@ use tauri::{AppHandle, Manager, Wry};
 use tauri_plugin_dialog::DialogExt;
 
 pub fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
-    let app_menu = SubmenuBuilder::new(app, "Meratech")
+    let app_menu = SubmenuBuilder::new(app, "MeraRAW")
         .about(None)
         .separator()
         .item(&MenuItem::with_id(
