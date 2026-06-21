@@ -125,6 +125,24 @@ pub fn is_identity(points: &[[f32; 2]], p: &ToneParams) -> bool {
     points.is_empty() && *p == ToneParams::default()
 }
 
+/// Whether the tone-curve GPU pass should run (any channel or parametric active).
+pub fn should_run(
+    rgb: &[[f32; 2]],
+    r: &[[f32; 2]],
+    g: &[[f32; 2]],
+    b: &[[f32; 2]],
+    p: &ToneParams,
+) -> bool {
+    !r.is_empty() || !g.is_empty() || !b.is_empty() || !is_identity(rgb, p)
+}
+
+/// Identity ramp for an unused LUT slot.
+pub fn identity_lut() -> Vec<f32> {
+    (0..LUT_SIZE)
+        .map(|i| i as f32 / (LUT_SIZE - 1) as f32)
+        .collect()
+}
+
 /// Build the 512-entry LUT over t∈[0,1]. Guaranteed monotonic
 /// non-decreasing (cumulative max) and clamped to [0, 0.9995] so the
 /// shader's y/(1-y) un-compression stays finite.

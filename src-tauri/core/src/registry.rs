@@ -144,12 +144,29 @@ fn build_registry() -> BTreeMap<&'static str, ParamSpec> {
         default: ParamValue::Curve(vec![]),
         enum_values: None,
         ui: UiHint {
-            label: "Curve",
+            label: "Curve RGB",
             step: 0.01,
             scale: "linear",
             group: "Tone",
         },
     });
+    for (key, label) in [("points_r", "Curve Red"), ("points_g", "Curve Green"), ("points_b", "Curve Blue")] {
+        let path: &'static str = Box::leak(format!("tone_curve.{key}").into_boxed_str());
+        specs.push(ParamSpec {
+            path,
+            ty: ParamType::Curve,
+            min: 0.0,
+            max: 1.0,
+            default: ParamValue::Curve(vec![]),
+            enum_values: None,
+            ui: UiHint {
+                label,
+                step: 0.01,
+                scale: "linear",
+                group: "Tone",
+            },
+        });
+    }
     // ---- slot 6: hsl — 8 bands × hue/sat/lum (schema §3.6) ----
     const BANDS: &[(&str, &str)] = &[
         ("red", "Red"),

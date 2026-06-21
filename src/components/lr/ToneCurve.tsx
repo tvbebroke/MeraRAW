@@ -1,17 +1,36 @@
-// Draggable tone-curve editor bound to tone_curve.points (ty:"curve").
-// Reads the curve from the doc mirror, renders + lets you drag/add/remove
-// control points, commits via setParam (debounced) — one op per edit.
+// Draggable tone-curve editor — RGB luma + per-channel R/G/B curves.
+// Right-click point: delete · right-click curve: reset menu · channel tabs.
 import { useCallback, useEffect, useRef, useState } from "react";
 import { setParam } from "../../ipc/commands";
 import { useDocStore } from "../../state/docStore";
 
-type Pt = [number, number]; // x,y in [0,1]
+type Pt = [number, number];
+type Channel = "rgb" | "r" | "g" | "b";
+
 const SIZE = 248;
 const PAD = 10;
+
+const CHANNELS: { key: Channel; label: string; color: string; path: string }[] = [
+  { key: "rgb", label: "RGB", color: "#d4d4d4", path: "tone_curve.points" },
+  { key: "r", label: "R", color: "#e0564f", path: "tone_curve.points_r" },
+  { key: "g", label: "G", color: "#6db86d", path: "tone_curve.points_g" },
+  { key: "b", label: "B", color: "#5a8fe0", path: "tone_curve.points_b" },
+];
+
+const IDENTITY: Pt[] = [
+  [0, 0],
+  [1, 1],
+];
+
+type MenuState =
+  | { kind: "point"; x: number; y: number; index: number }
+  | { kind: "curve"; x: number; y: number }
+  | null;
 
 function toCanvas(p: Pt): [number, number] {
   return [PAD + p[0] * (SIZE - 2 * PAD), SIZE - PAD - p[1] * (SIZE - 2 * PAD)];
 }
+
 function toNorm(cx: number, cy: number): Pt {
   return [
     Math.min(1, Math.max(0, (cx - PAD) / (SIZE - 2 * PAD))),
@@ -19,7 +38,6 @@ function toNorm(cx: number, cy: number): Pt {
   ];
 }
 
-/** Monotone-ish Catmull-Rom sampling for the rendered curve line. */
 function sampleCurve(pts: Pt[]): Pt[] {
   if (pts.length < 2) return pts;
   const out: Pt[] = [];
@@ -45,55 +63,83 @@ function sampleCurve(pts: Pt[]): Pt[] {
   return out;
 }
 
+function readChannelPts(
+  doc: ReturnType<typeof useDocStore.getState>["doc"],
+  ch: Channel,
+): Pt[] {
+  const mod = doc?.modules?.tone_curve as Record<string, unknown> | undefined;
+  const key =
+    ch === "rgb" ? "points" : ch === "r" ? "points_r" : ch === "g" ? "points_g" : "points_b";
+  const raw = mod?.[key] as Pt[] | undefined;
+  return raw && raw.length >= 2 ? raw : IDENTITY;
+}
+
+function isIdentityPayload(pts: Pt[]): boolean {
+  return (
+    pts.length === 2 &&
+    pts[0][0] === 0 &&
+    pts[0][1] === 0 &&
+    pts[1][0] === 1 &&
+    pts[1][1] === 1
+  );
+}
+
+function flattenPts(pts: Pt[]): Pt[] {
+  if (pts.length <= 2) return [pts[0], pts[pts.length - 1]];
+  return [pts[0], pts[pts.length - 1]];
+}
+
 export function ToneCurve() {
   const doc = useDocStore((s) => s.doc);
   const reconcile = useDocStore((s) => s.reconcile);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const drag = useRef<number | null>(null);
   const commitTimer = useRef<number | null>(null);
+  const [channel, setChannel] = useState<Channel>("rgb");
+  const [menu, setMenu] = useState<MenuState>(null);
+  const [pts, setPts] = useState<Pt[]>(IDENTITY);
 
-  // points from the doc, defaulting to identity endpoints
-  const docPts = (doc?.modules?.tone_curve?.points as Pt[] | undefined) ?? [];
-  const [pts, setPts] = useState<Pt[]>(
-    docPts.length >= 2 ? docPts : [[0, 0], [1, 1]],
-  );
+  const active = CHANNELS.find((c) => c.key === channel)!;
 
-  // reconcile external doc changes (undo/redo/preset/AI) into local points
   useEffect(() => {
-    const next = (doc?.modules?.tone_curve?.points as Pt[] | undefined) ?? [];
     if (drag.current === null) {
-      setPts(next.length >= 2 ? next : [[0, 0], [1, 1]]);
+      setPts(readChannelPts(doc, channel));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [doc?.modules?.tone_curve?.points]);
+  }, [doc?.modules?.tone_curve, channel]);
+
+  const commitPath = useCallback(
+    (path: string, next: Pt[]) => {
+      const payload = isIdentityPayload(next) ? [] : next;
+      return setParam(path, payload).then(reconcile).catch(() => {});
+    },
+    [reconcile],
+  );
 
   const commit = useCallback(
     (next: Pt[]) => {
       if (commitTimer.current) window.clearTimeout(commitTimer.current);
       commitTimer.current = window.setTimeout(() => {
-        // identity (just endpoints) → send empty = identity
-        const isIdentity =
-          next.length === 2 &&
-          next[0][0] === 0 &&
-          next[0][1] === 0 &&
-          next[1][0] === 1 &&
-          next[1][1] === 1;
-        setParam("tone_curve.points", isIdentity ? [] : next)
-          .then(reconcile)
-          .catch(() => {});
+        commitPath(active.path, next);
       }, 120);
     },
-    [reconcile],
+    [active.path, commitPath],
   );
 
-  // draw
+  const applyPts = useCallback(
+    (next: Pt[]) => {
+      setPts(next);
+      commit(next);
+    },
+    [commit],
+  );
+
   useEffect(() => {
     const c = canvasRef.current;
     if (!c) return;
     const ctx = c.getContext("2d");
     if (!ctx) return;
     ctx.clearRect(0, 0, SIZE, SIZE);
-    // grid
     ctx.strokeStyle = "rgba(255,255,255,0.06)";
     ctx.lineWidth = 1;
     for (let i = 1; i < 4; i++) {
@@ -105,7 +151,6 @@ export function ToneCurve() {
       ctx.lineTo(SIZE - PAD, g);
       ctx.stroke();
     }
-    // diagonal reference
     ctx.strokeStyle = "rgba(255,255,255,0.12)";
     ctx.beginPath();
     const a = toCanvas([0, 0]);
@@ -113,9 +158,8 @@ export function ToneCurve() {
     ctx.moveTo(a[0], a[1]);
     ctx.lineTo(b[0], b[1]);
     ctx.stroke();
-    // curve
     const curve = sampleCurve(pts);
-    ctx.strokeStyle = "#d4d4d4";
+    ctx.strokeStyle = active.color;
     ctx.lineWidth = 1.6;
     ctx.beginPath();
     curve.forEach((p, i) => {
@@ -124,10 +168,9 @@ export function ToneCurve() {
       else ctx.lineTo(x, y);
     });
     ctx.stroke();
-    // points
     pts.forEach((p) => {
       const [x, y] = toCanvas(p);
-      ctx.fillStyle = "#e8e8e8";
+      ctx.fillStyle = active.color;
       ctx.strokeStyle = "#1c1c1c";
       ctx.lineWidth = 1.5;
       ctx.beginPath();
@@ -135,7 +178,7 @@ export function ToneCurve() {
       ctx.fill();
       ctx.stroke();
     });
-  }, [pts]);
+  }, [pts, active.color]);
 
   function hit(cx: number, cy: number): number | null {
     for (let i = 0; i < pts.length; i++) {
@@ -145,13 +188,36 @@ export function ToneCurve() {
     return null;
   }
 
+  const resetCurve = () => {
+    applyPts(IDENTITY);
+    setMenu(null);
+  };
+
+  const resetAll = async () => {
+    setPts(IDENTITY);
+    setMenu(null);
+    await Promise.all(CHANNELS.map((ch) => commitPath(ch.path, IDENTITY)));
+  };
+
+  const flattenCurve = () => {
+    applyPts(flattenPts(pts));
+    setMenu(null);
+  };
+
+  const deletePoint = (index: number) => {
+    if (index === 0 || index === pts.length - 1) return;
+    applyPts(pts.filter((_, k) => k !== index));
+    setMenu(null);
+  };
+
   const onDown = (e: React.PointerEvent) => {
+    if (e.button !== 0) return;
+    setMenu(null);
     const r = canvasRef.current!.getBoundingClientRect();
     const cx = ((e.clientX - r.left) / r.width) * SIZE;
     const cy = ((e.clientY - r.top) / r.height) * SIZE;
     let i = hit(cx, cy);
     if (i === null) {
-      // add a point at this x
       const np = toNorm(cx, cy);
       const next = [...pts, np].sort((p, q) => p[0] - q[0]);
       i = next.findIndex((p) => p === np);
@@ -160,6 +226,7 @@ export function ToneCurve() {
     drag.current = i;
     (e.target as Element).setPointerCapture(e.pointerId);
   };
+
   const onMove = (e: React.PointerEvent) => {
     if (drag.current === null) return;
     const r = canvasRef.current!.getBoundingClientRect();
@@ -168,48 +235,111 @@ export function ToneCurve() {
     const np = toNorm(cx, cy);
     const i = drag.current;
     const next = pts.slice();
-    // endpoints keep their x pinned; interior points clamp between neighbors
     if (i === 0) np[0] = 0;
     else if (i === next.length - 1) np[0] = 1;
     else {
-      np[0] = Math.min(
-        next[i + 1][0] - 0.01,
-        Math.max(next[i - 1][0] + 0.01, np[0]),
-      );
+      np[0] = Math.min(next[i + 1][0] - 0.01, Math.max(next[i - 1][0] + 0.01, np[0]));
     }
     next[i] = np;
     setPts(next);
     commit(next);
   };
+
   const onUp = () => {
     drag.current = null;
   };
-  const onDouble = (e: React.MouseEvent) => {
+
+  const onContextMenu = (e: React.MouseEvent) => {
+    e.preventDefault();
     const r = canvasRef.current!.getBoundingClientRect();
     const cx = ((e.clientX - r.left) / r.width) * SIZE;
     const cy = ((e.clientY - r.top) / r.height) * SIZE;
     const i = hit(cx, cy);
     if (i !== null && i !== 0 && i !== pts.length - 1) {
-      const next = pts.filter((_, k) => k !== i);
-      setPts(next);
-      commit(next);
+      setMenu({ kind: "point", x: e.clientX, y: e.clientY, index: i });
+    } else {
+      setMenu({ kind: "curve", x: e.clientX, y: e.clientY });
     }
+  };
+
+  useEffect(() => {
+    if (!menu) return;
+    const close = () => setMenu(null);
+    window.addEventListener("pointerdown", close);
+    window.addEventListener("scroll", close, true);
+    return () => {
+      window.removeEventListener("pointerdown", close);
+      window.removeEventListener("scroll", close, true);
+    };
+  }, [menu]);
+
+  const channelEdited = (ch: Channel) => {
+    const raw = readChannelPts(doc, ch);
+    return !isIdentityPayload(raw);
   };
 
   return (
     <div className="tone-curve">
-      <canvas
-        ref={canvasRef}
-        width={SIZE}
-        height={SIZE}
-        style={{ width: "100%", aspectRatio: "1", touchAction: "none" }}
-        onPointerDown={onDown}
-        onPointerMove={onMove}
-        onPointerUp={onUp}
-        onDoubleClick={onDouble}
-      />
+      <div className="curve-channels">
+        {CHANNELS.map((ch) => (
+          <button
+            key={ch.key}
+            type="button"
+            className={`curve-channel ${channel === ch.key ? "active" : ""}`}
+            style={{ color: ch.color, borderColor: channel === ch.key ? ch.color : undefined }}
+            title={`Edit ${ch.label} channel`}
+            onClick={() => {
+              setMenu(null);
+              setChannel(ch.key);
+            }}
+          >
+            {ch.label}
+            {channelEdited(ch.key) && <span className="curve-channel-dot" />}
+          </button>
+        ))}
+      </div>
+      <div className="tone-curve-canvas-wrap">
+        <canvas
+          ref={canvasRef}
+          width={SIZE}
+          height={SIZE}
+          style={{ width: "100%", aspectRatio: "1", touchAction: "none" }}
+          onPointerDown={onDown}
+          onPointerMove={onMove}
+          onPointerUp={onUp}
+          onContextMenu={onContextMenu}
+        />
+        {menu?.kind === "point" && (
+          <div
+            className="curve-menu"
+            style={{ left: menu.x, top: menu.y }}
+            onPointerDown={(e) => e.stopPropagation()}
+          >
+            <button type="button" onClick={() => deletePoint(menu.index)}>
+              Delete Control Point
+            </button>
+          </div>
+        )}
+        {menu?.kind === "curve" && (
+          <div
+            className="curve-menu"
+            style={{ left: menu.x, top: menu.y }}
+            onPointerDown={(e) => e.stopPropagation()}
+          >
+            <button type="button" onClick={resetCurve}>
+              Reset Curve
+            </button>
+            <button type="button" onClick={resetAll}>
+              Reset All
+            </button>
+            <button type="button" onClick={flattenCurve}>
+              Flatten
+            </button>
+          </div>
+        )}
+      </div>
       <div className="muted" style={{ fontSize: 10 }}>
-        click to add · drag to shape · double-click a point to remove
+        click to add · drag to shape · right-click point to delete · right-click curve to reset
       </div>
     </div>
   );

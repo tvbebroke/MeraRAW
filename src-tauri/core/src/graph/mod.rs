@@ -458,7 +458,7 @@ impl RenderGraph {
         let node_uniforms = NODES.iter().map(|(n, _)| mk_uniform(512, n)).collect();
         let lut_buffer = gpu.device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("tone-lut"),
-            size: (crate::curve::LUT_SIZE * 4) as u64,
+            size: (crate::curve::LUT_SIZE * 4 * 4) as u64,
             usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
@@ -532,7 +532,7 @@ impl RenderGraph {
             self.lut_pool
                 .push(gpu.device.create_buffer(&wgpu::BufferDescriptor {
                     label: Some("mask-pool-lut"),
-                    size: (crate::curve::LUT_SIZE * 4) as u64,
+                    size: (crate::curve::LUT_SIZE * 4 * 4) as u64,
                     usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
                     mapped_at_creation: false,
                 }));

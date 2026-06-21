@@ -127,7 +127,8 @@ struct CurveU {
     width: u32,
     height: u32,
     lut_size: u32,
-    _pad: u32,
+    /// bit0=luma (RGB+parametric), bit1=R, bit2=G, bit3=B
+    flags: u32,
 }
 
 #[repr(C)]
@@ -414,9 +415,21 @@ pub fn node_configs(doc: &EditDoc, as_shot_cct: f32, w: u32, h: u32) -> Vec<Node
         }
     }
 
-    // tone_curve
+    // tone_curve — RGB luma + optional per-channel R/G/B point curves
     {
-        let points: Vec<[f32; 2]> = match doc.get("tone_curve", "points") {
+        let rgb: Vec<[f32; 2]> = match doc.get("tone_curve", "points") {
+            Some(ParamValue::Curve(p)) => p.clone(),
+            _ => vec![],
+        };
+        let r_pts: Vec<[f32; 2]> = match doc.get("tone_curve", "points_r") {
+            Some(ParamValue::Curve(p)) => p.clone(),
+            _ => vec![],
+        };
+        let g_pts: Vec<[f32; 2]> = match doc.get("tone_curve", "points_g") {
+            Some(ParamValue::Curve(p)) => p.clone(),
+            _ => vec![],
+        };
+        let b_pts: Vec<[f32; 2]> = match doc.get("tone_curve", "points_b") {
             Some(ParamValue::Curve(p)) => p.clone(),
             _ => vec![],
         };
@@ -427,20 +440,53 @@ pub fn node_configs(doc: &EditDoc, as_shot_cct: f32, w: u32, h: u32) -> Vec<Node
             lights: eff(doc, "tone_curve", "lights"),
             highlights: eff(doc, "tone_curve", "highlights"),
         };
-        if curve::is_identity(&points, &tp) {
-            out.push(NodeConfig::Skip);
-        } else {
-            let lut = curve::build_lut(&points, &tp);
+        if curve::should_run(&rgb, &r_pts, &g_pts, &b_pts, &tp) {
+            let luma = curve::build_lut(&rgb, &tp);
+            let r_lut = if r_pts.is_empty() {
+                curve::identity_lut()
+            } else {
+                curve::build_lut(&r_pts, &ToneParams::default())
+            };
+            let g_lut = if g_pts.is_empty() {
+                curve::identity_lut()
+            } else {
+                curve::build_lut(&g_pts, &ToneParams::default())
+            };
+            let b_lut = if b_pts.is_empty() {
+                curve::identity_lut()
+            } else {
+                curve::build_lut(&b_pts, &ToneParams::default())
+            };
+            let mut packed = Vec::with_capacity(curve::LUT_SIZE * 4);
+            packed.extend(luma);
+            packed.extend(r_lut);
+            packed.extend(g_lut);
+            packed.extend(b_lut);
+            let mut flags = 0u32;
+            if !curve::is_identity(&rgb, &tp) {
+                flags |= 1;
+            }
+            if !r_pts.is_empty() {
+                flags |= 2;
+            }
+            if !g_pts.is_empty() {
+                flags |= 4;
+            }
+            if !b_pts.is_empty() {
+                flags |= 8;
+            }
             out.push(NodeConfig::Run {
                 uniforms: bytemuck::bytes_of(&CurveU {
                     width: w,
                     height: h,
                     lut_size: curve::LUT_SIZE as u32,
-                    _pad: 0,
+                    flags,
                 })
                 .to_vec(),
-                lut: Some(lut),
+                lut: Some(packed),
             });
+        } else {
+            out.push(NodeConfig::Skip);
         }
     }
 
