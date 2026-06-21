@@ -4,6 +4,7 @@ mod assistant;
 mod commands;
 mod error;
 mod events;
+mod license;
 mod menu;
 mod protocol;
 
@@ -113,6 +114,10 @@ fn main() {
             commands::verify_slider_enabled,
             commands::fail_on_purpose,
             commands::report_frontend_status,
+            license::license_check_local,
+            license::license_save_token,
+            license::license_clear_token,
+            license::license_verify_token_locally,
         ])
         .setup(move |app| {
             // The window-state plugin can restore a position on a monitor

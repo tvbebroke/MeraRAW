@@ -515,3 +515,67 @@ details summary {
 .meta-row { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; }
 .meta-label { color: var(--text-dim); flex-shrink: 0; }
 .meta-value { text-align: right; word-break: break-word; }
+
+/* ---------- license gate ---------- */
+.license-screen {
+  height: 100%;
+  display: grid;
+  place-items: center;
+  background: radial-gradient(ellipse at 50% 0%, #2a3344 0%, var(--bg) 55%);
+  padding: 24px;
+}
+.license-card {
+  width: min(420px, 100%);
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 28px 24px;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.35);
+}
+.license-brand {
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: #bdbdbd;
+  margin-bottom: 8px;
+}
+.license-card h1 {
+  margin: 0 0 8px;
+  font-size: 20px;
+  font-weight: 600;
+}
+.license-card a { color: var(--accent); }
+.license-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 18px;
+}
+.license-form label { display: flex; flex-direction: column; gap: 4px; }
+.license-form input { width: 100%; padding: 8px 10px; }
+.license-submit {
+  margin-top: 4px;
+  justify-content: center;
+  padding: 8px 12px;
+  background: var(--accent);
+  border-color: #3a7bc8;
+  color: #fff;
+}
+.license-submit:hover:not(:disabled) { background: #5a9ee8; }
+.license-error {
+  padding: 8px 10px;
+  border-radius: 4px;
+  background: rgba(224, 108, 117, 0.12);
+  border: 1px solid rgba(224, 108, 117, 0.35);
+  color: var(--error);
+  font-size: 12px;
+}
+.license-foot { margin: 16px 0 0; }
+.license-signout {
+  position: fixed;
+  right: 12px;
+  bottom: 28px;
+  z-index: 1000;
+  opacity: 0.55;
+  font-size: 11px;
+}
+.license-signout:hover { opacity: 1; }
