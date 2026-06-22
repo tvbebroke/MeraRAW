@@ -169,7 +169,10 @@ export default function App() {
   return (
     <div className="app">
       <div className="topbar">
-        <span className="brand">MeraRAW</span>
+        <span className="brand">
+          <img src="/logo.png" alt="" className="brand-logo" aria-hidden="true" />
+          MeraRAW
+        </span>
         <span
           className="beta-badge"
           title="Beta — the full version is coming soon. Built by a solo dev who's passionate about color grading."

@@ -98,7 +98,10 @@ export function LicenseGate({ children }: { children: React.ReactNode }) {
   return (
     <div className="license-screen">
       <div className="license-card">
-        <div className="license-brand">MeraRAW</div>
+        <div className="license-brand">
+          <img src="/logo.png" alt="" className="license-logo" aria-hidden="true" />
+          MeraRAW
+        </div>
         <h1>Sign in to activate</h1>
         <p className="muted">
           Use the same account you purchased with on{" "}
