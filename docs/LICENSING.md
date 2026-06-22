@@ -16,7 +16,7 @@ Two independent locks: **gated download** (website) and **in-app activation** (D
 | `R2_ACCESS_KEY_ID` | R2 API token |
 | `R2_SECRET_ACCESS_KEY` | R2 API token |
 | `R2_BUCKET_NAME` | e.g. `meraraw-releases` |
-| `R2_OBJECT_KEY` | e.g. `MeraRAW_0.1.0_aarch64.dmg` |
+| `R2_OBJECT_KEY` | e.g. `MeraRAW Beta 0.1.0.dmg` |
 | `R2_SIGNED_URL_TTL` | Optional, default `300` (5 min) |
 | `LICENSE_SIGNING_PRIVATE_KEY` | ES256 private key PEM (see below) |
 
