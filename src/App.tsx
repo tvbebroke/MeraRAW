@@ -26,6 +26,7 @@ import { LeftPanel } from "./components/lr/LeftPanel";
 import { ViewportToolbar } from "./components/lr/Toolbar";
 import { Icon } from "./components/lr/widgets";
 import { Filmstrip, Library } from "./components/Library";
+import { ReportProblem } from "./components/ReportProblem";
 import { useDocStore } from "./state/docStore";
 
 // window-level: survives React StrictMode double-mount AND module reloads
@@ -169,6 +170,12 @@ export default function App() {
     <div className="app">
       <div className="topbar">
         <span className="brand">MeraRAW</span>
+        <span
+          className="beta-badge"
+          title="Beta — the full version is coming soon. Built by a solo dev who's passionate about color grading."
+        >
+          BETA
+        </span>
         <div className="topbar-tabs">
           <button
             className={mode === "library" ? "tab active" : "tab"}
@@ -228,6 +235,8 @@ export default function App() {
       </div>
 
       {showExport && <ExportDialog onClose={() => setShowExport(false)} />}
+
+      <ReportProblem />
     </div>
   );
 }

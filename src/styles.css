@@ -59,7 +59,14 @@ code { background: #222; padding: 1px 4px; border-radius: 3px; }
 .app {
   display: grid;
   grid-template-rows: 36px 1fr 22px;
-  height: 100%;
+  /* Proportional UI scale on small windows. A resize listener (App.tsx) sets
+     --app-zoom; the app lays out at a fixed design width, then scales down to
+     fit — so panels shrink together instead of the right side cropping. The
+     calc() sizing + top-left origin make the scaled app fill the viewport. */
+  width: calc(100% / var(--app-zoom, 1));
+  height: calc(100% / var(--app-zoom, 1));
+  transform: scale(var(--app-zoom, 1));
+  transform-origin: top left;
 }
 
 .topbar {
@@ -71,6 +78,19 @@ code { background: #222; padding: 1px 4px; border-radius: 3px; }
   border-bottom: 1px solid #111;
 }
 .brand { font-weight: 600; letter-spacing: 0.04em; color: #bdbdbd; }
+.beta-badge {
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  color: #9cc1ef;
+  background: #2c3340;
+  border: 1px solid #3a4660;
+  border-radius: 3px;
+  padding: 1px 5px;
+  margin-left: -8px;
+  cursor: default;
+  user-select: none;
+}
 .topbar-tabs { display: flex; gap: 2px; }
 .topbar-right { margin-left: auto; display: flex; gap: 6px; }
 .tab {
@@ -108,7 +128,9 @@ code { background: #222; padding: 1px 4px; border-radius: 3px; }
 }
 .develop {
   display: grid;
-  grid-template-columns: 232px 1fr 320px;
+  /* Panels shrink with the window instead of one falling off the right edge.
+     Center (image) absorbs shrink first, then panels scale toward their mins. */
+  grid-template-columns: minmax(150px, 232px) minmax(0, 1fr) minmax(200px, 320px);
   flex: 1;
   min-height: 0;
 }
@@ -335,6 +357,60 @@ code { background: #222; padding: 1px 4px; border-radius: 3px; }
 .ai-accept { border-color: var(--ok) !important; }
 .ai-revert { border-color: var(--error) !important; }
 
+/* AI grader — not-in-beta state */
+.ai-soon { display: flex; flex-direction: column; gap: 5px; }
+.ai-soon-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #9cc1ef;
+}
+
+/* ---------- report a problem ---------- */
+.report-fab {
+  position: fixed;
+  left: 12px;
+  bottom: 28px;
+  z-index: 1000;
+  opacity: 0.6;
+  font-size: 11px;
+}
+.report-fab:hover { opacity: 1; }
+.report-modal { width: 420px; }
+.report-modal p { margin: 0 0 12px; }
+.report-text {
+  width: 100%;
+  min-height: 120px;
+  resize: vertical;
+  background: #222;
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 8px 9px;
+  font-family: inherit;
+  font-size: 12px;
+  margin-bottom: 8px;
+}
+.report-from { width: 100%; }
+.report-note {
+  color: #9cc1ef;
+  background: #262c38;
+  border: 1px solid #333b4a;
+  border-radius: 4px;
+  padding: 7px 9px;
+  margin: 0 0 12px;
+}
+.report-error {
+  margin-top: 8px;
+  padding: 6px 9px;
+  border-radius: 4px;
+  font-size: 11px;
+  color: var(--error);
+  background: rgba(224, 108, 117, 0.12);
+  border: 1px solid rgba(224, 108, 117, 0.35);
+}
+
 /* ---------- color grading wheels ---------- */
 .cg { display: flex; flex-direction: column; gap: 4px; }
 .cg-row { display: flex; justify-content: space-between; gap: 6px; margin-bottom: 6px; }
@@ -475,6 +551,13 @@ code { background: #222; padding: 1px 4px; border-radius: 3px; }
   align-items: center;
 }
 .modal-grid label { color: var(--text-dim); font-size: 12px; }
+.modal-grid label.export-check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text);
+}
+.modal-grid label.export-check input { width: auto; }
 .modal-grid select, .modal-grid input { width: 100%; }
 .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
 .modal-actions .primary { border-color: var(--accent); background: #2e4763; }

@@ -108,6 +108,7 @@ fn main() {
             commands::rebuild_index,
             assistant::assistant_available,
             assistant::assistant_send,
+            commands::report_problem,
             commands::autoopen_path,
             commands::selftest_enabled,
             commands::live_assistant_enabled,

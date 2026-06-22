@@ -398,3 +398,45 @@ pub async fn report_frontend_status(status: String) -> Result<(), AppError> {
     tracing::info!(status = %status, "FRONTEND-REPORT");
     Ok(())
 }
+
+/// Where beta problem reports / creator messages are sent.
+const FEEDBACK_EMAIL: &str = "kaimaimeratech@gmail.com";
+
+/// Percent-encode for a mailto query (RFC 3986 unreserved set kept as-is).
+fn pct_encode(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    for b in s.bytes() {
+        match b {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
+                out.push(b as char)
+            }
+            _ => out.push_str(&format!("%{b:02X}")),
+        }
+    }
+    out
+}
+
+/// "Report a problem / talk to the creator": opens the user's mail client with
+/// a pre-filled message to the creator. No server, no third-party service.
+#[tauri::command]
+pub async fn report_problem(message: String, from: Option<String>) -> Result<(), AppError> {
+    let message = message.trim();
+    if message.is_empty() {
+        return Err(AppError::Internal("Message is empty.".into()));
+    }
+    let body = match from.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
+        Some(f) => format!("From: {f}\n\n{message}"),
+        None => message.to_string(),
+    };
+    let url = format!(
+        "mailto:{FEEDBACK_EMAIL}?subject={}&body={}",
+        pct_encode("MeraRAW beta — problem report"),
+        pct_encode(&body),
+    );
+    // macOS: hand the mailto URL to the default mail handler.
+    std::process::Command::new("/usr/bin/open")
+        .arg(&url)
+        .spawn()
+        .map_err(|e| AppError::Internal(format!("open mail client: {e}")))?;
+    Ok(())
+}

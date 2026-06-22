@@ -119,11 +119,17 @@ export function AiGrader() {
     await setPreviewBypass(next).catch(() => {});
   }
 
+  // Not in the beta yet. Keep it warm but clearly "coming soon".
   if (available === false) {
     return (
-      <div className="muted" style={{ fontSize: 11 }}>
-        Set <code>ANTHROPIC_API_KEY</code> (in <code>.env</code>) to enable.
-        Your full RAW never leaves the machine — only a small preview travels.
+      <div className="ai-soon">
+        <div className="ai-soon-title">
+          <Icon.Sparkles size={13} /> Not available yet
+        </div>
+        <div className="muted sm">
+          The AI Color Grader isn&apos;t available in the beta yet — I&apos;m
+          still figuring this one out. Coming soon.
+        </div>
       </div>
     );
   }

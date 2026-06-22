@@ -9,8 +9,13 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
   const [maxDim, setMaxDim] = useState(2560);
   const [quality, setQuality] = useState(90);
   const [sharpen, setSharpen] = useState(30);
+  const [stripMetadata, setStripMetadata] = useState(false);
+  const [copyright, setCopyright] = useState("");
   const [status, setStatus] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  // quality applies to the lossy encoders
+  const lossy = format === "jpeg" || format === "heic";
 
   async function run() {
     setBusy(true);
@@ -23,6 +28,8 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
         maxDim: maxDim || null,
         sharpen,
         destDir: "",
+        stripMetadata,
+        copyright: copyright.trim() ? copyright.trim() : null,
       });
       setStatus(`✓ ${path}`);
     } catch (e) {
@@ -42,12 +49,14 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
             <option value="jpeg">JPEG</option>
             <option value="png">PNG</option>
             <option value="tiff16">TIFF 16-bit</option>
+            <option value="heic">HEIC</option>
           </select>
           <label>Color space</label>
           <select value={target} onChange={(e) => setTarget(e.target.value)}>
             <option value="srgb">sRGB (web)</option>
             <option value="display-p3">Display P3</option>
             <option value="adobe-rgb">Adobe RGB (print)</option>
+            <option value="prophoto">ProPhoto (wide gamut)</option>
           </select>
           <label>Long edge</label>
           <select
@@ -59,7 +68,7 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
             <option value={4096}>4096 px</option>
             <option value={0}>Full resolution</option>
           </select>
-          {format === "jpeg" && (
+          {lossy && (
             <>
               <label>Quality</label>
               <input
@@ -78,6 +87,23 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
             max={100}
             value={sharpen}
             onChange={(e) => setSharpen(parseInt(e.target.value, 10))}
+          />
+          <label>Metadata</label>
+          <label className="export-check">
+            <input
+              type="checkbox"
+              checked={stripMetadata}
+              onChange={(e) => setStripMetadata(e.target.checked)}
+            />
+            Strip EXIF (privacy)
+          </label>
+          <label>Copyright</label>
+          <input
+            type="text"
+            value={copyright}
+            disabled={stripMetadata}
+            placeholder="© Your Name"
+            onChange={(e) => setCopyright(e.target.value)}
           />
         </div>
         {status && (

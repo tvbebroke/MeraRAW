@@ -1488,7 +1488,7 @@ impl Engine {
         reply: oneshot::Sender<Result<String, CoreError>>,
     ) {
         const TILE: u32 = 1024;
-        let result: Result<(Vec<f32>, u32, u32, String, bool), CoreError> = (|| {
+        let result: Result<(Vec<f32>, u32, u32, String, bool, ImageMeta), CoreError> = (|| {
             self.ensure_segmentations();
             let cur = self.current.as_ref().ok_or(CoreError::NoImage)?;
             let source_path = cur.path.to_string_lossy().into_owned();
@@ -1546,14 +1546,14 @@ impl Engine {
                 h,
                 "export render (tiled) done"
             );
-            Ok((full, w, h, source_path, graph.look()))
+            Ok((full, w, h, source_path, graph.look(), cur.meta.clone()))
         })();
 
         match result {
             Err(e) => {
                 let _ = reply.send(Err(e));
             }
-            Ok((full, w, h, source_path, camera_look)) => {
+            Ok((full, w, h, source_path, camera_look, meta)) => {
                 // CPU-heavy half on a worker; reply when written
                 std::thread::Builder::new()
                     .name("export-worker".into())
@@ -1582,7 +1582,7 @@ impl Engine {
                                     settings.sharpen,
                                 );
                             }
-                            crate::export::encode_and_write(&enc, &settings, &source_path)
+                            crate::export::encode_and_write(&enc, &settings, &source_path, &meta)
                                 .map(|p| p.to_string_lossy().into_owned())
                         })();
                         tracing::info!(

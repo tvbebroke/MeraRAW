@@ -26,7 +26,9 @@ export function LicenseGate({ children }: { children: React.ReactNode }) {
           setState("locked");
         }
       } catch {
-        if (!cancelled) setState("locked");
+        // No Tauri backend (e.g. browser preview during dev) — unlock so the
+        // UI can be worked on outside the desktop shell. Never in prod builds.
+        if (!cancelled) setState(import.meta.env.DEV ? "unlocked" : "locked");
       }
     })();
     return () => {
