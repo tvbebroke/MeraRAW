@@ -24,9 +24,14 @@ RELEASE_DIR="release"
 echo "→ Building signed DMG (notarizes when APPLE_* env vars are set)…"
 npm run tauri build
 
-BUILT="$(ls -1 "${BUNDLE_DIR}"/*.dmg 2>/dev/null | head -1)"
+BUILT=""
+for root in "src-tauri/target" "${CARGO_TARGET_DIR:-}"; do
+  [[ -z "${root}" || ! -d "${root}" ]] && continue
+  BUILT="$(find "${root}" -path '*/bundle/dmg/*.dmg' -type f 2>/dev/null | head -1)"
+  [[ -n "${BUILT}" ]] && break
+done
 if [[ -z "${BUILT}" ]]; then
-  echo "error: no DMG found in ${BUNDLE_DIR}" >&2
+  echo "error: no DMG found under src-tauri/target (or CARGO_TARGET_DIR)" >&2
   exit 1
 fi
 
