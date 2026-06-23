@@ -102,13 +102,14 @@ export function LicenseGate({ children }: { children: React.ReactNode }) {
           <img src="/logo.png" alt="" className="license-logo" aria-hidden="true" />
           MeraRAW
         </div>
-        <h1>Sign in to activate</h1>
+        <h1>Sign in to activate beta</h1>
         <p className="muted">
-          Use the same account you purchased with on{" "}
+          Use your free{" "}
           <a href={PURCHASE_URL} target="_blank" rel="noreferrer">
             meratech.co
-          </a>
-          . Activation checks online once, then works offline.
+          </a>{" "}
+          account (sign up there first if you haven&apos;t). Activation checks online once,
+          then works offline.
         </p>
 
         <form className="license-form" onSubmit={handleSignIn}>
@@ -139,9 +140,9 @@ export function LicenseGate({ children }: { children: React.ReactNode }) {
         </form>
 
         <p className="muted sm license-foot">
-          No license yet?{" "}
+          No account yet?{" "}
           <a href={PURCHASE_URL} target="_blank" rel="noreferrer">
-            Buy MeraRAW
+            Sign up free on meratech.co
           </a>
         </p>
       </div>

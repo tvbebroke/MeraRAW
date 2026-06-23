@@ -12,6 +12,16 @@ export function getSupabase(): SupabaseClient {
 }
 
 export async function activateLicense(session: Session): Promise<void> {
+  // Ensure free beta row exists (same as meratech.co sign-in flow).
+  try {
+    await fetch(`${SUPABASE_URL}/functions/v1/grant-beta-license`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${session.access_token}` },
+    });
+  } catch {
+    // verify-license will surface a clear error if license is still missing
+  }
+
   const res = await fetch(`${SUPABASE_URL}/functions/v1/verify-license`, {
     method: "POST",
     headers: { Authorization: `Bearer ${session.access_token}` },
