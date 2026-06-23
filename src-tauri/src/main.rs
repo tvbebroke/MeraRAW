@@ -119,6 +119,7 @@ fn main() {
             license::license_save_token,
             license::license_clear_token,
             license::license_verify_token_locally,
+            license::license_sign_in_and_activate,
         ])
         .setup(move |app| {
             // The window-state plugin can restore a position on a monitor

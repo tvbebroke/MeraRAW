@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { activateLicense, PURCHASE_URL, signIn, signOutAndClearLicense } from "./auth";
-import { supabaseConfigured } from "../config";
+import { PURCHASE_URL } from "../config";
 
 type GateState = "checking" | "locked" | "unlocked";
 
@@ -41,15 +40,18 @@ export function LicenseGate({ children }: { children: React.ReactNode }) {
     setError("");
     setBusy(true);
     try {
-      if (!supabaseConfigured()) {
-        throw new Error("Supabase is not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.");
-      }
-      const session = await signIn(email.trim(), password);
-      await activateLicense(session);
-      setUserId(session.user.id);
+      const userId = await invoke<string>("license_sign_in_and_activate", {
+        email: email.trim(),
+        password,
+      });
+      setUserId(userId || null);
       setState("unlocked");
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      const msg =
+        typeof err === "object" && err !== null && "message" in err
+          ? String((err as { message: unknown }).message)
+          : String(err);
+      setError(msg);
     } finally {
       setBusy(false);
     }
@@ -58,7 +60,7 @@ export function LicenseGate({ children }: { children: React.ReactNode }) {
   async function handleSignOut() {
     setBusy(true);
     try {
-      await signOutAndClearLicense();
+      await invoke("license_clear_token");
       setUserId(null);
       setState("locked");
     } catch (err) {
