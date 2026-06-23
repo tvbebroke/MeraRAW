@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 # Build, sign, notarize, and optionally upload the MeraRAW Beta DMG.
 #
-# Required for notarization (export before running):
+# Required for notarization (export before running; one line each, no trailing comments):
 #   export APPLE_ID="you@example.com"
-#   export APPLE_PASSWORD="xxxx-xxxx-xxxx-xxxx"   # app-specific password
+#   export APPLE_PASSWORD="xxxx-xxxx-xxxx-xxxx"
 #   export APPLE_TEAM_ID="ZJP5CXC3FS"
+# APPLE_PASSWORD is an app-specific password from appleid.apple.com — not your Apple ID password.
 #
 # Optional R2 upload (private bucket):
 #   export R2_ENDPOINT="https://<account_id>.r2.cloudflarestorage.com"
