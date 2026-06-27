@@ -94,6 +94,7 @@ impl Rig {
                 AS_SHOT,
                 &Default::default(),
                 None,
+                None,
             )
             .unwrap();
         center(&frame)

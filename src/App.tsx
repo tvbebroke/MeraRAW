@@ -68,6 +68,7 @@ export default function App() {
       setMeta(m);
       setImage({ w: m.width, h: m.height });
       setLastOpenedPath(path);
+      setStatus("decoding…");
       const { getDoc } = await import("./ipc/commands");
       const doc = await getDoc();
       if (doc) useDocStore.getState().setDoc(doc);

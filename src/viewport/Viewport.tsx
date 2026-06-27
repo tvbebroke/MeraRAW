@@ -1,6 +1,5 @@
-// Draws frames served by the Rust core over the frame:// protocol.
-// View state (zoom/pan/fit) lives here (uiStore-adjacent); the engine
-// renders exactly what we ask for via request_frame.
+// Main develop preview — same transport as the filmstrip: frame:// JPEG in an
+// <img>. Raw RGBA fetch remains available for the navigator + selftest.
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   applyOp,
@@ -8,97 +7,128 @@ import {
   requestFrame,
   wbFromPoint,
 } from "../ipc/commands";
-import { onFrameReady, onImageReady } from "../ipc/events";
+import { onFrameReady } from "../ipc/events";
 import { useDocStore } from "../state/docStore";
 import { useUiStore } from "../state/uiStore";
 
-// macOS/Linux custom-scheme URL form. Windows would be http://frame.localhost/.
 const FRAME_BASE = "frame://localhost";
 
-export function frameUrl(version: number): string {
-  return `${FRAME_BASE}/current?v=${version}`;
+function appZoom(): number {
+  return (
+    parseFloat(
+      getComputedStyle(document.documentElement).getPropertyValue("--app-zoom"),
+    ) || 1
+  );
+}
+
+function measureWrap(wrap: HTMLElement) {
+  const layoutW = wrap.clientWidth;
+  const layoutH = wrap.clientHeight;
+  if (layoutW < 8 || layoutH < 8) return null;
+  const zoom = appZoom();
+  const dpr = window.devicePixelRatio || 1;
+  const clamp = (n: number) => Math.min(8192, Math.max(1, Math.round(n)));
+  return {
+    layoutW,
+    layoutH,
+    outW: clamp(layoutW * zoom * dpr),
+    outH: clamp(layoutH * zoom * dpr),
+  };
+}
+
+function isCustomView(v: ViewState): boolean {
+  return v.scale !== null || v.centerX !== 0.5 || v.centerY !== 0.5;
+}
+
+export function frameUrl(version: number, fmt?: "jpeg"): string {
+  const q = fmt === "jpeg" ? "&fmt=jpeg" : "";
+  return `${FRAME_BASE}/current?v=${version}${q}`;
 }
 
 interface ViewState {
-  /** Output px per image px; null = fit. */
   scale: number | null;
   centerX: number;
   centerY: number;
 }
 
 export function Viewport() {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
+  const [displaySrc, setDisplaySrc] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const imageOpen = useUiStore((s) => s.imageOpen);
   const imageDims = useUiStore((s) => s.imageDims);
+  const decodeState = useUiStore((s) => s.decodeState);
+  const lastOpenedPath = useUiStore((s) => s.lastOpenedPath);
   const setZoomLabel = useUiStore((s) => s.setZoomLabel);
 
   const view = useRef<ViewState>({ scale: null, centerX: 0.5, centerY: 0.5 });
+  const shownVer = useRef(0);
+  const pendingVer = useRef(0);
   const inFlight = useRef(false);
   const pending = useRef(false);
   const dragging = useRef<{ x: number; y: number } | null>(null);
-  const effScale = useRef(1); // last effective output-px-per-image-px
+  const effScale = useRef(1);
   const brushPoints = useRef<[number, number][]>([]);
 
-  const drawVersion = useCallback(async (version: number) => {
-    const res = await fetch(frameUrl(version));
-    if (!res.ok) throw new Error(`frame fetch ${res.status}`);
-    const width = parseInt(res.headers.get("X-Frame-Width") ?? "0", 10);
-    const height = parseInt(res.headers.get("X-Frame-Height") ?? "0", 10);
-    if (!width || !height) throw new Error("frame missing dimension headers");
-    const buf = new Uint8ClampedArray(await res.arrayBuffer());
-    if (buf.length !== width * height * 4) {
-      throw new Error(`frame size mismatch ${buf.length} vs ${width * height * 4}`);
-    }
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    canvas.width = width;
-    canvas.height = height;
-    // crisp on retina: CSS size = device px / dpr
-    canvas.style.width = `${width / window.devicePixelRatio}px`;
-    canvas.style.height = `${height / window.devicePixelRatio}px`;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) throw new Error("no 2d context");
-    ctx.putImageData(new ImageData(buf, width, height), 0, 0);
-    setError(null);
-  }, []);
+  const updateZoomLabel = useCallback(() => {
+    const dims = useUiStore.getState().imageDims;
+    const wrap = wrapRef.current;
+    const m = wrap && dims ? measureWrap(wrap) : null;
+    if (!dims || !m) return;
+    const v = view.current;
+    const fit = Math.min(m.outW / dims.w, m.outH / dims.h);
+    effScale.current = v.scale ?? fit;
+    setZoomLabel(v.scale === null ? "fit" : `${Math.round(v.scale * 100)}%`);
+  }, [setZoomLabel]);
 
-  /** Ask the engine for a fresh render of the current view, then draw it. */
+  const showFrame = useCallback(
+    (version: number) => {
+      if (version <= shownVer.current) return;
+      pendingVer.current = version;
+      const url = frameUrl(version, "jpeg");
+      const probe = new Image();
+      probe.onload = () => {
+        if (pendingVer.current !== version) return;
+        shownVer.current = version;
+        setDisplaySrc(url);
+        setError(null);
+        requestAnimationFrame(() => updateZoomLabel());
+      };
+      probe.onerror = () => {
+        if (pendingVer.current === version) setError("frame transport failed");
+      };
+      probe.src = url;
+    },
+    [updateZoomLabel],
+  );
+
   const refresh = useCallback(async () => {
-    if (!wrapRef.current) return;
+    if (useUiStore.getState().decodeState !== "ready") return;
+    const wrap = wrapRef.current;
+    if (!wrap) return;
+    const m = measureWrap(wrap);
+    if (!m) return;
     if (inFlight.current) {
       pending.current = true;
       return;
     }
     inFlight.current = true;
     try {
-      const dpr = window.devicePixelRatio;
-      const rect = wrapRef.current.getBoundingClientRect();
       const v = view.current;
-      // clamp request to a sane ceiling (guards transient huge measurements
-      // and the GPU texture limit)
-      const clamp = (n: number) => Math.min(8192, Math.max(1, Math.round(n)));
+      if (!isCustomView(v) && shownVer.current > 0) {
+        updateZoomLabel();
+        return;
+      }
       const info = await requestFrame({
-        outW: clamp(rect.width * dpr),
-        outH: clamp(rect.height * dpr),
+        outW: m.outW,
+        outH: m.outH,
         scale: v.scale,
         centerX: v.centerX,
         centerY: v.centerY,
       });
-      // track effective scale for pan math + zoom label
-      const dims = useUiStore.getState().imageDims;
-      if (dims) {
-        const fit = Math.min(
-          (rect.width * dpr) / dims.w,
-          (rect.height * dpr) / dims.h,
-        );
-        effScale.current = v.scale ?? fit;
-        setZoomLabel(v.scale === null ? "fit" : `${Math.round(v.scale * 100)}%`);
-      }
-      await drawVersion(info.version);
-    } catch (e) {
-      // NoImage during preview phase is expected; ignore quietly
+      showFrame(info.version);
+    } catch {
+      // preview phase — ignore
     } finally {
       inFlight.current = false;
       if (pending.current) {
@@ -106,47 +136,48 @@ export function Viewport() {
         void refresh();
       }
     }
-  }, [drawVersion, setZoomLabel]);
+  }, [showFrame, updateZoomLabel]);
 
-  // engine-pushed frames (preview swap-in, decode-complete render)
   useEffect(() => {
-    const un1 = onFrameReady((version) => {
-      drawVersion(version).catch((e) =>
-        setError(e instanceof Error ? e.message : String(e)),
-      );
-    });
-    const un2 = onImageReady(() => {
-      // full decode landed — re-render at exact viewport size + view
-      void refresh();
-    });
+    view.current = { scale: null, centerX: 0.5, centerY: 0.5 };
+    shownVer.current = 0;
+    pendingVer.current = 0;
+    setDisplaySrc(null);
+  }, [lastOpenedPath]);
+
+  useEffect(() => {
+    const un = onFrameReady((version) => showFrame(version));
     return () => {
-      un1.then((f) => f());
-      un2.then((f) => f());
+      un.then((f) => f());
     };
-  }, [drawVersion, refresh]);
+  }, [showFrame]);
 
-  // P0 transport proof on mount (test pattern until an image opens)
   useEffect(() => {
-    drawVersion(0)
-      .then(() => reportFrontendStatus("frame-transport-ok"))
-      .catch((e) => {
-        const msg = e instanceof Error ? e.message : String(e);
-        setError(msg);
-        reportFrontendStatus(`frame-transport-failed: ${msg}`).catch(() => {});
-      });
-  }, [drawVersion]);
+    const probe = new Image();
+    probe.onload = () => reportFrontendStatus("frame-transport-ok");
+    probe.onerror = () => {
+      setError("frame transport failed");
+      reportFrontendStatus("frame-transport-failed").catch(() => {});
+    };
+    probe.src = frameUrl(0, "jpeg");
+  }, []);
 
-  // resize → re-render
   useEffect(() => {
     if (!wrapRef.current) return;
+    let t: ReturnType<typeof setTimeout> | undefined;
     const obs = new ResizeObserver(() => {
-      if (imageOpen) void refresh();
+      if (!imageOpen || decodeState !== "ready") return;
+      if (!isCustomView(view.current)) return;
+      if (t) clearTimeout(t);
+      t = setTimeout(() => void refresh(), 50);
     });
     obs.observe(wrapRef.current);
-    return () => obs.disconnect();
-  }, [imageOpen, refresh]);
+    return () => {
+      obs.disconnect();
+      if (t) clearTimeout(t);
+    };
+  }, [imageOpen, decodeState, refresh]);
 
-  // view-command channel (toolbar / navigator)
   const viewCmdNonce = useUiStore((s) => s.viewCmdNonce);
   useEffect(() => {
     if (viewCmdNonce === 0 || !imageOpen) return;
@@ -161,21 +192,18 @@ export function Viewport() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [viewCmdNonce]);
 
-  // interactions: wheel zoom, drag pan, double-click fit/100%
   const onWheel = useCallback(
     (e: React.WheelEvent) => {
       if (!imageOpen || !imageDims) return;
       e.preventDefault();
       const cur = effScale.current;
       const factor = Math.exp(-e.deltaY * 0.0015);
-      const next = Math.min(8, Math.max(0.02, cur * factor));
-      view.current.scale = next;
+      view.current.scale = Math.min(8, Math.max(0.02, cur * factor));
       void refresh();
     },
     [imageOpen, imageDims, refresh],
   );
 
-  /** Map a pointer event → normalized image coords via the current view. */
   const toImageCoords = useCallback(
     (e: { clientX: number; clientY: number }): [number, number] | null => {
       const ui = useUiStore.getState();
@@ -207,7 +235,6 @@ export function Viewport() {
         return;
       }
       if (ui.tool === "wb" && ui.imageDims && wrapRef.current) {
-        // map click → normalized image coords using current view math
         const rect = wrapRef.current.getBoundingClientRect();
         const dpr = window.devicePixelRatio;
         const px = (e.clientX - rect.left) * dpr;
@@ -216,10 +243,8 @@ export function Viewport() {
         const outH = rect.height * dpr;
         const s = effScale.current;
         const v = view.current;
-        const imgX =
-          v.centerX * ui.imageDims.w + (px - outW / 2) / s;
-        const imgY =
-          v.centerY * ui.imageDims.h + (py - outH / 2) / s;
+        const imgX = v.centerX * ui.imageDims.w + (px - outW / 2) / s;
+        const imgY = v.centerY * ui.imageDims.h + (py - outH / 2) / s;
         const nx = imgX / ui.imageDims.w;
         const ny = imgY / ui.imageDims.h;
         if (nx >= 0 && nx <= 1 && ny >= 0 && ny <= 1) {
@@ -233,7 +258,7 @@ export function Viewport() {
       dragging.current = { x: e.clientX, y: e.clientY };
       (e.target as Element).setPointerCapture(e.pointerId);
     },
-    [],
+    [toImageCoords],
   );
 
   const onPointerMove = useCallback(
@@ -256,14 +281,13 @@ export function Viewport() {
       view.current.centerY = Math.min(1, Math.max(0, view.current.centerY));
       void refresh();
     },
-    [imageOpen, imageDims, refresh],
+    [imageOpen, imageDims, refresh, toImageCoords],
   );
 
   const onPointerUp = useCallback(() => {
     dragging.current = null;
     const ui = useUiStore.getState();
     if (ui.tool === "brush" && ui.selectedMask && brushPoints.current.length > 0) {
-      // append the stroke to the brush mask's source (undoable op)
       const pts = brushPoints.current;
       brushPoints.current = [];
       const doc = useDocStore.getState().doc;
@@ -287,11 +311,8 @@ export function Viewport() {
 
   const onDoubleClick = useCallback(() => {
     if (!imageOpen) return;
-    if (view.current.scale === null) {
-      view.current.scale = 1; // 1:1
-    } else {
-      view.current = { scale: null, centerX: 0.5, centerY: 0.5 }; // fit
-    }
+    if (view.current.scale === null) view.current.scale = 1;
+    else view.current = { scale: null, centerX: 0.5, centerY: 0.5 };
     void refresh();
   }, [imageOpen, refresh]);
 
@@ -305,10 +326,18 @@ export function Viewport() {
       onPointerUp={onPointerUp}
       onDoubleClick={onDoubleClick}
     >
-      <canvas ref={canvasRef} className="viewport-canvas" />
+      {displaySrc && (
+        <img
+          src={displaySrc}
+          className="viewport-img"
+          alt=""
+          draggable={false}
+          onError={() => setError("frame transport failed")}
+        />
+      )}
       {error && (
         <div style={{ position: "absolute", color: "var(--error)" }}>
-          frame transport failed: {error}
+          {error}
         </div>
       )}
     </div>

@@ -13,6 +13,7 @@ pub const LUT_SIZE: usize = 512;
 
 /// Monotonic cubic interpolation (Fritsch–Carlson) through control points.
 /// Points must have strictly increasing x in [0,1] (guard-wall enforces).
+#[derive(Clone, Debug)]
 struct MonotonicCubic {
     xs: Vec<f32>,
     ys: Vec<f32>,
@@ -109,6 +110,59 @@ fn contrast_curve(v: f32, contrast: f32) -> f32 {
         v + (inv - v) * (-k)
     } else {
         v
+    }
+}
+
+/// DCP ProfileToneCurve — cubic spline through linear (input, output) pairs.
+#[derive(Debug, Clone)]
+pub struct ProfileToneCurve {
+    spline: MonotonicCubic,
+    pub embedded: bool,
+}
+
+impl ProfileToneCurve {
+    pub fn from_points(pts: Vec<[f32; 2]>) -> Self {
+        Self {
+            spline: MonotonicCubic::new(pts),
+            embedded: true,
+        }
+    }
+
+    /// Adobe Camera Raw default curve (used when a profile omits ProfileToneCurve).
+    pub fn adobe_default() -> Self {
+        Self {
+            spline: MonotonicCubic::new(vec![
+                [0.0, 0.0],
+                [0.014539, 0.015553],
+                [0.051668, 0.105943],
+                [0.117937, 0.314067],
+                [0.217703, 0.564130],
+                [0.354594, 0.763154],
+                [0.531769, 0.884435],
+                [0.752050, 0.947136],
+                [1.0, 1.0],
+            ]),
+            embedded: false,
+        }
+    }
+
+    pub fn eval(&self, x: f32) -> f32 {
+        if x <= 0.0 {
+            return 0.0;
+        }
+        if x >= 1.0 {
+            // Preserve scene headroom above 1.0 (linear extension from white point).
+            return self.spline.eval(1.0) + (x - 1.0);
+        }
+        self.spline.eval(x).max(0.0)
+    }
+
+    pub fn apply_rgb(&self, rgb: [f32; 3]) -> [f32; 3] {
+        [
+            self.eval(rgb[0]),
+            self.eval(rgb[1]),
+            self.eval(rgb[2]),
+        ]
     }
 }
 

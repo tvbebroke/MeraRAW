@@ -14,6 +14,7 @@ use crate::message::{
     DecodedPayload, EngineEvent, EngineInfo, EngineMsg, EngineStatus, Frame, FrameInfo,
 };
 use crate::ops::{self, DocDelta, History, Op};
+use crate::profile::DcpProfile;
 use crate::raw::{Decoder, ImageMeta, RawlerDecoder};
 use crate::sidecar;
 use std::path::PathBuf;
@@ -200,6 +201,12 @@ impl EngineHandle {
             .await
     }
 
+    pub async fn list_folders(
+        &self,
+    ) -> Result<Result<Vec<crate::catalog::FolderItem>, CoreError>, EngineError> {
+        self.request(|reply| EngineMsg::ListFolders { reply }).await
+    }
+
     pub async fn set_asset_meta(
         &self,
         ids: Vec<i64>,
@@ -305,6 +312,8 @@ pub fn spawn() -> EngineHandle {
 struct CurrentImage {
     path: PathBuf,
     meta: ImageMeta,
+    /// Parsed DCP for viewport look application (matrix is baked in at decode).
+    dcp_profile: Option<std::sync::Arc<DcpProfile>>,
     /// (texture, view, w, h) — the working master (contract A4).
     working: Option<(wgpu::Texture, wgpu::TextureView, u32, u32)>,
     /// Retained downsized CPU copy (histogram / segmentation / fallback).
@@ -709,6 +718,9 @@ impl Engine {
                         .and_then(|c| c.grid(&query)),
                 );
             }
+            EngineMsg::ListFolders { reply } => {
+                let _ = reply.send(self.catalog_mut().and_then(|c| c.list_folders()));
+            }
             EngineMsg::SetAssetMeta { ids, patch, reply } => {
                 let _ = reply.send(self.set_asset_meta(&ids, &patch));
             }
@@ -1025,13 +1037,40 @@ impl Engine {
             ))));
             return;
         }
-        let meta = match self.decoder.metadata(&path) {
+        let mut meta = match self.decoder.metadata(&path) {
             Ok(m) => m,
             Err(e) => {
                 let _ = reply.send(Err(e));
                 return;
             }
         };
+
+        let index = crate::profile::ProfileIndex::embedded();
+        let available = crate::profile::resolve_profiles(&meta, &index);
+        let camera_key = crate::profile::matched_camera_key(&meta, &index);
+        meta.available_profiles = available
+            .iter()
+            .map(|p| {
+                crate::profile::profile_display_name(
+                    &p.file,
+                    camera_key.as_deref().unwrap_or(""),
+                )
+            })
+            .collect();
+        let profile_path = match crate::profile::autoload_profile(&meta, &index) {
+            Ok(Some(ap)) => {
+                meta.camera_profile = Some(ap.name.clone());
+                Some(crate::profile::profile_path(&ap.file))
+            }
+            _ => None,
+        };
+
+        let dcp_profile = profile_path.as_ref().and_then(|p| {
+            DcpProfile::load(p)
+                .ok()
+                .filter(|d| d.matches_camera(&meta.camera_make, &meta.camera_model))
+                .map(std::sync::Arc::new)
+        });
 
         // sidecar = canonical for edits; else fresh doc
         let doc = match sidecar::load_sidecar(&path) {
@@ -1049,6 +1088,7 @@ impl Engine {
         self.current = Some(CurrentImage {
             path: path.clone(),
             meta: meta.clone(),
+            dcp_profile,
             working: None,
             small_cpu: None,
             docs: vec![doc],
@@ -1065,7 +1105,7 @@ impl Engine {
         }
         let _ = reply.send(Ok(meta));
 
-        // fast path: embedded preview
+        // fast path: embedded preview (camera JPEG — replaced when decode finishes)
         {
             let tx = self.self_tx.clone();
             let path = path.clone();
@@ -1091,13 +1131,15 @@ impl Engine {
         // full decode
         {
             let tx = self.self_tx.clone();
+            let profile_path = profile_path.clone();
             std::thread::Builder::new()
                 .name("decode-worker".into())
                 .spawn(move || {
+                    use crate::raw::Decoder;
                     let dec = RawlerDecoder::default();
                     let started = Instant::now();
                     let result = dec
-                        .decode(&path)
+                        .decode_with_profile(&path, profile_path.as_deref())
                         .map(|img| Box::new(DecodedPayload::from_decoded(img)));
                     tracing::info!(
                         elapsed_ms = started.elapsed().as_millis() as u64,
@@ -1120,12 +1162,17 @@ impl Engine {
         let tex = upload_working_texture(gpu, &payload.rgba_f16, payload.width, payload.height);
         let view = tex.create_view(&Default::default());
         if let Some(cur) = &mut self.current {
+            let camera_profile = cur.meta.camera_profile.clone();
+            let available_profiles = cur.meta.available_profiles.clone();
             cur.working = Some((tex, view, payload.width, payload.height));
             cur.small_cpu = Some(payload.small_cpu);
             cur.meta = payload.meta;
+            cur.meta.camera_profile = camera_profile;
+            cur.meta.available_profiles = available_profiles;
         }
         let vw = self
             .last_view
+            .filter(|v| v.out_w >= 64 && v.out_h >= 64)
             .map(|v| (v.out_w, v.out_h))
             .unwrap_or((1440, 860));
         let fit = ViewParams::fit(vw.0, vw.1);
@@ -1430,6 +1477,7 @@ impl Engine {
             cur.doc()
         };
         let as_shot_cct = cur.as_shot_cct();
+        let dcp = cur.dcp_profile.clone();
         let started = Instant::now();
         let rgba = {
             let graph = self.graph.as_mut().unwrap();
@@ -1443,6 +1491,7 @@ impl Engine {
                 as_shot_cct,
                 &seg_views,
                 self.overlay_mask.as_deref(),
+                dcp.as_deref(),
             )?
         };
         let elapsed = started.elapsed();
@@ -1665,6 +1714,7 @@ impl Engine {
             cur.as_shot_cct(),
             &seg_views,
             None,
+            cur.dcp_profile.as_deref(),
         )?;
         let rgb: Vec<u8> = rgba.chunks_exact(4).flat_map(|p| [p[0], p[1], p[2]]).collect();
         let img = image::RgbImage::from_raw(view.out_w, view.out_h, rgb)

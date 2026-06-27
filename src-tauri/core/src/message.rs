@@ -201,6 +201,9 @@ pub enum EngineMsg {
         query: crate::catalog::GridQuery,
         reply: oneshot::Sender<Result<Vec<crate::catalog::GridItem>, CoreError>>,
     },
+    ListFolders {
+        reply: oneshot::Sender<Result<Vec<crate::catalog::FolderItem>, CoreError>>,
+    },
     SetAssetMeta {
         ids: Vec<i64>,
         patch: crate::catalog::MetaPatch,

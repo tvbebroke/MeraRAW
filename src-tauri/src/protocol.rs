@@ -70,21 +70,48 @@ pub fn handle_frame_request<R: Runtime>(
         };
         match frame {
             Ok(frame) => {
-                let resp = http::Response::builder()
-                    .status(200)
-                    .header("Content-Type", "application/octet-stream")
-                    .header("X-Frame-Width", frame.width.to_string())
-                    .header("X-Frame-Height", frame.height.to_string())
-                    .header("X-Frame-Version", frame.version.to_string())
-                    .header("Cache-Control", "no-store")
-                    .header("Access-Control-Allow-Origin", "*")
-                    .header(
-                        "Access-Control-Expose-Headers",
-                        "X-Frame-Width, X-Frame-Height, X-Frame-Version",
-                    )
-                    .body(frame.rgba)
-                    .expect("frame response build");
-                responder.respond(resp);
+                let resp = if uri.contains("fmt=jpeg") {
+                    match meratech_core::image::rgba8_to_jpeg(
+                        &frame.rgba,
+                        frame.width,
+                        frame.height,
+                        88,
+                    ) {
+                        Ok(bytes) => http::Response::builder()
+                            .status(200)
+                            .header("Content-Type", "image/jpeg")
+                            .header("X-Frame-Width", frame.width.to_string())
+                            .header("X-Frame-Height", frame.height.to_string())
+                            .header("X-Frame-Version", frame.version.to_string())
+                            .header("Cache-Control", "no-store")
+                            .header("Access-Control-Allow-Origin", "*")
+                            .body(bytes),
+                        Err(e) => {
+                            tracing::error!(error = %e, "frame jpeg encode failed");
+                            http::Response::builder()
+                                .status(500)
+                                .header("Access-Control-Allow-Origin", "*")
+                                .body(e.to_string().into_bytes())
+                        }
+                    }
+                } else {
+                    http::Response::builder()
+                        .status(200)
+                        .header("Content-Type", "application/octet-stream")
+                        .header("X-Frame-Width", frame.width.to_string())
+                        .header("X-Frame-Height", frame.height.to_string())
+                        .header("X-Frame-Version", frame.version.to_string())
+                        .header("Cache-Control", "no-store")
+                        .header("Access-Control-Allow-Origin", "*")
+                        .header(
+                            "Access-Control-Expose-Headers",
+                            "X-Frame-Width, X-Frame-Height, X-Frame-Version",
+                        )
+                        .body(frame.rgba)
+                };
+                if let Ok(resp) = resp {
+                    responder.respond(resp);
+                }
             }
             Err(e) => {
                 tracing::error!(error = %e, "frame render failed");

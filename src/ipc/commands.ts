@@ -129,6 +129,10 @@ export function getGrid(
   return invoke("get_grid", { query });
 }
 
+export function listFolders(): Promise<import("./types").FolderItem[]> {
+  return invoke("list_folders");
+}
+
 export function setAssetMeta(
   ids: number[],
   patch: import("./types").MetaPatch,

@@ -8,6 +8,7 @@ use super::{DecodedImage, Decoder, ImageMeta};
 use crate::color::{mat_vec, CameraCalibration};
 use crate::error::CoreError;
 use crate::image::RgbF32Buf;
+use crate::profile::dcp::DcpProfile;
 use rawler::decoders::RawDecodeParams;
 use rawler::imgop::develop::{Intermediate, ProcessingStep, RawDevelop};
 use rawler::rawsource::RawSource;
@@ -96,6 +97,8 @@ impl RawlerDecoder {
             orientation: format!("{:?}", effective_orientation(raw, md)),
             as_shot_wb: [raw.wb_coeffs[0], raw.wb_coeffs[1], raw.wb_coeffs[2]],
             estimated_cct: cct,
+            camera_profile: None,
+            available_profiles: Vec::new(),
         }
     }
 }
@@ -159,6 +162,14 @@ impl Decoder for RawlerDecoder {
     }
 
     fn decode(&self, path: &Path) -> Result<DecodedImage, CoreError> {
+        self.decode_with_profile(path, None)
+    }
+
+    fn decode_with_profile(
+        &self,
+        path: &Path,
+        profile_path: Option<&Path>,
+    ) -> Result<DecodedImage, CoreError> {
         let source = RawSource::new(path).map_err(dec_err)?;
         let decoder = self.loader.get_decoder(&source).map_err(dec_err)?;
         let params = RawDecodeParams::default();
@@ -212,12 +223,50 @@ impl Decoder for RawlerDecoder {
 
         let cal = CameraCalibration::from_rawler(&raw.color_matrix);
         let cct = cal.estimate_cct(&raw.wb_coeffs);
-        let cam2rec = cal.cam_to_rec2020(&raw.wb_coeffs).ok_or_else(|| {
-            CoreError::Decode(format!(
-                "no usable color matrix for {} {}",
-                md.make, md.model
-            ))
-        })?;
+        let dcp = profile_path.and_then(|p| DcpProfile::load(p).ok());
+        let cam2rec = if let Some(ref dcp) = dcp {
+            if dcp.matches_camera(&md.make, &md.model) {
+                dcp.cam_to_rec2020(&raw.wb_coeffs, &cal).unwrap_or_else(|| {
+                    tracing::warn!(
+                        file = ?profile_path,
+                        "DCP matrix failed; falling back to rawler calibration"
+                    );
+                    cal.cam_to_rec2020(&raw.wb_coeffs).unwrap_or([
+                        [1.0, 0.0, 0.0],
+                        [0.0, 1.0, 0.0],
+                        [0.0, 0.0, 1.0],
+                    ])
+                })
+            } else {
+                tracing::warn!(
+                    profile = %dcp.unique_camera_model,
+                    make = %md.make,
+                    model = %md.model,
+                    "DCP camera mismatch; using rawler calibration"
+                );
+                cal.cam_to_rec2020(&raw.wb_coeffs).ok_or_else(|| {
+                    CoreError::Decode(format!(
+                        "no usable color matrix for {} {}",
+                        md.make, md.model
+                    ))
+                })?
+            }
+        } else if profile_path.is_some() {
+            tracing::warn!(file = ?profile_path, "DCP load failed; using rawler calibration");
+            cal.cam_to_rec2020(&raw.wb_coeffs).ok_or_else(|| {
+                CoreError::Decode(format!(
+                    "no usable color matrix for {} {}",
+                    md.make, md.model
+                ))
+            })?
+        } else {
+            cal.cam_to_rec2020(&raw.wb_coeffs).ok_or_else(|| {
+                CoreError::Decode(format!(
+                    "no usable color matrix for {} {}",
+                    md.make, md.model
+                ))
+            })?
+        };
 
         let mut data = vec![0.0f32; w * h * 3];
         for (i, px) in cam_rgb.iter().enumerate() {

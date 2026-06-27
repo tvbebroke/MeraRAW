@@ -30,6 +30,12 @@ pub struct ImageMeta {
     pub as_shot_wb: [f32; 3],
     /// Estimated as-shot correlated color temperature (Kelvin).
     pub estimated_cct: Option<f32>,
+    /// Autoloaded DCP profile name, if any.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub camera_profile: Option<String>,
+    /// All matched DCP profiles for this camera (for UI picker).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub available_profiles: Vec<String>,
 }
 
 /// Full decode result: working buffer is linear Rec.2020 scene-referred,
@@ -52,5 +58,14 @@ pub trait Decoder: Send + Sync {
         max_dim: u32,
     ) -> Result<Option<(Vec<u8>, u32, u32)>, CoreError>;
     /// Full decode → scene-referred linear Rec.2020 working buffer.
-    fn decode(&self, path: &Path) -> Result<DecodedImage, CoreError>;
+    fn decode(&self, path: &Path) -> Result<DecodedImage, CoreError> {
+        self.decode_with_profile(path, None)
+    }
+
+    /// Full decode with an optional DCP camera profile for the base matrix.
+    fn decode_with_profile(
+        &self,
+        path: &Path,
+        profile_path: Option<&Path>,
+    ) -> Result<DecodedImage, CoreError>;
 }

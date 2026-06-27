@@ -337,6 +337,13 @@ pub async fn get_grid(
 }
 
 #[tauri::command]
+pub async fn list_folders(
+    engine: State<'_, EngineHandle>,
+) -> Result<Vec<meratech_core::catalog::FolderItem>, AppError> {
+    engine.list_folders().await?.map_err(AppError::from)
+}
+
+#[tauri::command]
 pub async fn set_asset_meta(
     engine: State<'_, EngineHandle>,
     ids: Vec<i64>,

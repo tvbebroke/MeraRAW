@@ -24,13 +24,24 @@ export const useDocStore = create<DocState>((set) => ({
   lastLabel: null,
   history: [],
   reconcile: (delta) =>
-    set((s) => ({
-      doc: delta.doc,
-      docVersion: s.docVersion + 1,
-      undoDepth: delta.undoDepth,
-      redoDepth: delta.redoDepth,
-      lastLabel: delta.label,
-    })),
+    set((s) => {
+      // Ignore out-of-order setParam responses (live throttle vs commit).
+      // Undo increases redoDepth, so it still passes this guard.
+      if (
+        s.doc !== null &&
+        delta.undoDepth < s.undoDepth &&
+        delta.redoDepth <= s.redoDepth
+      ) {
+        return s;
+      }
+      return {
+        doc: delta.doc,
+        docVersion: s.docVersion + 1,
+        undoDepth: delta.undoDepth,
+        redoDepth: delta.redoDepth,
+        lastLabel: delta.label,
+      };
+    }),
   setDoc: (doc) => set((s) => ({ doc, docVersion: s.docVersion + 1 })),
   setHistory: (labels) => set({ history: labels }),
   clear: () =>

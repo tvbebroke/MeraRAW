@@ -129,7 +129,7 @@ fn main() {
 
         graph.invalidate_all();
         let frame = graph
-            .render(&gpu, &tv, w, h, &view, &doc, cct, &seg, None)
+            .render(&gpu, &tv, w, h, &view, &doc, cct, &seg, None, None)
             .expect("render");
         let rgb: Vec<u8> = frame.chunks_exact(4).flat_map(|p| [p[0], p[1], p[2]]).collect();
         let p = format!("{out_dir}/frame_{i:03}.png");

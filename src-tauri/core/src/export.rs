@@ -670,6 +670,8 @@ mod tests {
             orientation: "Normal".into(),
             as_shot_wb: [1.0, 1.0, 1.0],
             estimated_cct: Some(5200.0),
+            camera_profile: None,
+            available_profiles: Vec::new(),
         }
     }
 

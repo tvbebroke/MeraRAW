@@ -28,6 +28,17 @@ pub fn data_dir() -> PathBuf {
 
 #[derive(Debug, Clone, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct FolderItem {
+    pub root: String,
+    /// Last path component for display (e.g. "2024-Graduation").
+    pub name: String,
+    pub photo_count: i64,
+    /// False when the import root is missing (e.g. external drive unmounted).
+    pub accessible: bool,
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct GridItem {
     pub id: i64,
     pub path: String,
@@ -42,6 +53,8 @@ pub struct GridItem {
     pub camera_model: Option<String>,
     pub blur_score: Option<f64>,
     pub has_thumb: bool,
+    /// False when the original file is not reachable on disk.
+    pub accessible: bool,
 }
 
 #[derive(Debug, Clone, Default, serde::Deserialize)]
@@ -171,6 +184,36 @@ impl Catalog {
             .query_map([], |r| r.get::<_, String>(0))
             .map_err(db_err)?;
         Ok(rows.filter_map(|r| r.ok()).collect())
+    }
+
+    /// Imported roots with counts and live volume availability.
+    pub fn list_folders(&self) -> Result<Vec<FolderItem>, CoreError> {
+        let mut out = Vec::new();
+        for root in self.folders()? {
+            let root_trim = root.trim_end_matches('/').to_string();
+            let like = format!("{root_trim}/%");
+            let photo_count: i64 = self
+                .conn
+                .query_row(
+                    "SELECT COUNT(*) FROM assets WHERE path = ?1 OR path LIKE ?2",
+                    rusqlite::params![root_trim, like],
+                    |r| r.get(0),
+                )
+                .unwrap_or(0);
+            let accessible = Path::new(&root_trim).exists();
+            let name = Path::new(&root_trim)
+                .file_name()
+                .map(|s| s.to_string_lossy().into_owned())
+                .filter(|s| !s.is_empty())
+                .unwrap_or_else(|| root_trim.clone());
+            out.push(FolderItem {
+                root: root_trim,
+                name,
+                photo_count,
+                accessible,
+            });
+        }
+        Ok(out)
     }
 
     /// Roots recorded in folders.json (survives DB deletion).
@@ -327,8 +370,10 @@ impl Catalog {
             params.push(Box::new(h as i64));
         }
         if let Some(f) = q.folder.as_ref().filter(|f| !f.is_empty()) {
-            sql.push_str(" AND folder = ?");
-            params.push(Box::new(f.clone()));
+            let root = f.trim_end_matches('/');
+            sql.push_str(" AND (path = ? OR path LIKE ?)");
+            params.push(Box::new(root.to_string()));
+            params.push(Box::new(format!("{root}/%")));
         }
         if q.blurry_only {
             sql.push_str(" AND blur_score IS NOT NULL AND blur_score < 35.0");
@@ -351,9 +396,10 @@ impl Catalog {
         let mut stmt = self.conn.prepare(&sql).map_err(db_err)?;
         let rows = stmt
             .query_map(rusqlite::params_from_iter(params.iter().map(|p| p.as_ref())), |r| {
+                let path: String = r.get(1)?;
                 Ok(GridItem {
                     id: r.get(0)?,
-                    path: r.get(1)?,
+                    path: path.clone(),
                     filename: r.get(2)?,
                     width: r.get::<_, Option<u32>>(3)?.unwrap_or(0),
                     height: r.get::<_, Option<u32>>(4)?.unwrap_or(0),
@@ -365,6 +411,7 @@ impl Catalog {
                     camera_model: r.get(10)?,
                     blur_score: r.get(11)?,
                     has_thumb: r.get::<_, i64>(12)? != 0,
+                    accessible: Path::new(&path).exists(),
                 })
             })
             .map_err(db_err)?;
@@ -623,6 +670,8 @@ mod tests {
             orientation: "Normal".into(),
             as_shot_wb: [2.0, 1.0, 1.5],
             estimated_cct: Some(5200.0),
+            camera_profile: None,
+            available_profiles: Vec::new(),
         }
     }
 

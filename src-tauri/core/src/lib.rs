@@ -13,6 +13,7 @@ pub mod graph;
 pub mod image;
 pub mod message;
 pub mod ops;
+pub mod profile;
 pub mod raw;
 pub mod registry;
 pub mod segment;

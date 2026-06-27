@@ -71,6 +71,15 @@ function Basic({ meta }: { meta: ImageMeta | null }) {
       </div>
       <ParamSlider specs={specs} path="white_balance.temp" label="Temp" meta={meta} />
       <ParamSlider specs={specs} path="white_balance.tint" label="Tint" meta={meta} />
+      {meta?.cameraProfile ? (
+        <div className="lr-profile-badge muted" title="Autoloaded camera color profile">
+          Profile: {meta.cameraProfile}
+        </div>
+      ) : meta ? (
+        <div className="lr-profile-badge muted">
+          No camera profile for {meta.cameraMake} {meta.cameraModel}
+        </div>
+      ) : null}
       <div className="lr-subhead">
         <span>Tone</span>
       </div>

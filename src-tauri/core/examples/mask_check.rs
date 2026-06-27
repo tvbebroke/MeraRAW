@@ -111,6 +111,7 @@ fn main() {
             payload.meta.estimated_cct.unwrap_or(5200.0),
             &seg,
             None,
+            None,
         )
         .expect("render");
     println!(

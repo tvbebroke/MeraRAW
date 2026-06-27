@@ -17,6 +17,7 @@ use crate::doc::EditDoc;
 use crate::error::CoreError;
 use crate::gpu::display::ViewParams;
 use crate::gpu::GpuContext;
+use crate::profile::DcpProfile;
 use std::collections::HashMap;
 
 /// Index of the mask-composite stage (after the global nodes).
@@ -287,6 +288,50 @@ pub fn upload_small_mask(
         },
     );
     tex
+}
+
+fn upload_rgba16f(
+    gpu: &GpuContext,
+    tex: &wgpu::Texture,
+    out_w: u32,
+    out_h: u32,
+    pixels: &[f32],
+) {
+    let bytes: Vec<u8> = pixels
+        .iter()
+        .flat_map(|v| half::f16::from_f32(*v).to_le_bytes())
+        .collect();
+    gpu.queue.write_texture(
+        wgpu::TexelCopyTextureInfo {
+            texture: tex,
+            mip_level: 0,
+            origin: wgpu::Origin3d::ZERO,
+            aspect: wgpu::TextureAspect::All,
+        },
+        &bytes,
+        wgpu::TexelCopyBufferLayout {
+            offset: 0,
+            bytes_per_row: Some(out_w * 8),
+            rows_per_image: Some(out_h),
+        },
+        wgpu::Extent3d {
+            width: out_w,
+            height: out_h,
+            depth_or_array_layers: 1,
+        },
+    );
+}
+
+fn apply_dcp_look_f16(pixels: &mut [f32], dcp: &DcpProfile, cct: f32) {
+    for chunk in pixels.chunks_mut(4) {
+        if chunk.len() < 3 {
+            break;
+        }
+        let rgb = dcp.apply_look([chunk[0], chunk[1], chunk[2]], cct);
+        chunk[0] = rgb[0];
+        chunk[1] = rgb[1];
+        chunk[2] = rgb[2];
+    }
 }
 
 #[derive(Clone, Copy, PartialEq)]
@@ -560,6 +605,7 @@ impl RenderGraph {
         as_shot_cct: f32,
         seg_masks: &HashMap<String, wgpu::TextureView>,
         overlay_mask: Option<&str>,
+        dcp_profile: Option<&DcpProfile>,
     ) -> Result<Vec<u8>, CoreError> {
         self.last_passes_run.clear();
         // clamp to a safe texture size — never exceed the GPU 2D limit (the
@@ -678,6 +724,22 @@ impl RenderGraph {
             pass.set_bind_group(0, &bind, &[]);
             pass.dispatch_workgroups(out_w.div_ceil(16), out_h.div_ceil(16), 1);
             self.last_passes_run.push("extract".into());
+        }
+
+        // DCP hue/sat + look table on the extracted viewport buffer (not full-res decode).
+        if run_extract {
+            if let Some(dcp) = dcp_profile.filter(|d| d.has_look()) {
+                gpu.queue.submit([encoder.finish()]);
+                let mut px = self.readback_f16(gpu, extract_tex, out_w, out_h)?;
+                apply_dcp_look_f16(&mut px, dcp, as_shot_cct);
+                upload_rgba16f(gpu, extract_tex, out_w, out_h, &px);
+                self.last_passes_run.push("dcp_look".into());
+                encoder = gpu
+                    .device
+                    .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                        label: Some("graph-encoder-post-dcp"),
+                    });
+            }
         }
 
         // ---- global module chain ----
@@ -1060,6 +1122,7 @@ impl RenderGraph {
             doc,
             as_shot_cct,
             seg_masks,
+            None,
             None,
         )?;
         // …then read the LINEAR texture that fed present: the last

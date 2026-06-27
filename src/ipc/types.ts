@@ -44,6 +44,8 @@ export interface ImageMeta {
   orientation: string;
   asShotWb: [number, number, number];
   estimatedCct: number | null;
+  cameraProfile: string | null;
+  availableProfiles: string[];
 }
 
 export interface ViewParams {
@@ -130,6 +132,14 @@ export interface GridItem {
   cameraModel: string | null;
   blurScore: number | null;
   hasThumb: boolean;
+  accessible: boolean;
+}
+
+export interface FolderItem {
+  root: string;
+  name: string;
+  photoCount: number;
+  accessible: boolean;
 }
 
 export interface GridQuery {
@@ -137,6 +147,7 @@ export interface GridQuery {
   ratingMin?: number;
   flag?: string;
   hasEdits?: boolean;
+  folder?: string;
   blurryOnly?: boolean;
   dupesOnly?: boolean;
   sort?: string;

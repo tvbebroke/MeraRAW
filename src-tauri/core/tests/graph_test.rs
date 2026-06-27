@@ -74,7 +74,7 @@ async fn graph_identity_cache_and_exposure_math() {
 
     // 1) default doc → identity modules skipped entirely
     let frame = graph
-        .render(&gpu, &tex_view, W, H, &view(), &doc, AS_SHOT, &Default::default(), None)
+        .render(&gpu, &tex_view, W, H, &view(), &doc, AS_SHOT, &Default::default(), None, None)
         .unwrap();
     assert_eq!(
         graph.last_passes_run,
@@ -101,7 +101,7 @@ async fn graph_identity_cache_and_exposure_math() {
     .unwrap();
     graph.invalidate_from_module("exposure");
     let frame = graph
-        .render(&gpu, &tex_view, W, H, &view(), &doc, AS_SHOT, &Default::default(), None)
+        .render(&gpu, &tex_view, W, H, &view(), &doc, AS_SHOT, &Default::default(), None, None)
         .unwrap();
     assert!(
         graph.last_passes_run.contains(&"exposure".to_string()),
@@ -129,7 +129,7 @@ async fn graph_identity_cache_and_exposure_math() {
     .unwrap();
     graph.invalidate_from_module("white_balance");
     let frame = graph
-        .render(&gpu, &tex_view, W, H, &view(), &doc, AS_SHOT, &Default::default(), None)
+        .render(&gpu, &tex_view, W, H, &view(), &doc, AS_SHOT, &Default::default(), None, None)
         .unwrap();
     assert!(
         !graph.last_passes_run.contains(&"exposure".to_string()),
@@ -152,7 +152,7 @@ async fn graph_identity_cache_and_exposure_math() {
     // 4) cache must not change output vs full recompute (correctness)
     graph.invalidate_all();
     let full = graph
-        .render(&gpu, &tex_view, W, H, &view(), &doc, AS_SHOT, &Default::default(), None)
+        .render(&gpu, &tex_view, W, H, &view(), &doc, AS_SHOT, &Default::default(), None, None)
         .unwrap();
     assert_eq!(
         graph.last_passes_run,

@@ -107,6 +107,35 @@ impl RgbF32Buf {
     }
 }
 
+/// Encode an RGBA8 viewport frame as JPEG for the webview `frame://` img transport.
+pub fn rgba8_to_jpeg(
+    rgba: &[u8],
+    width: u32,
+    height: u32,
+    quality: u8,
+) -> Result<Vec<u8>, crate::error::CoreError> {
+    use image::{ImageBuffer, Rgba};
+    let expected = (width as usize)
+        .checked_mul(height as usize)
+        .and_then(|n| n.checked_mul(4))
+        .ok_or_else(|| crate::error::CoreError::Io("frame size overflow".into()))?;
+    if rgba.len() != expected {
+        return Err(crate::error::CoreError::Io(format!(
+            "rgba len {} != expected {expected}",
+            rgba.len()
+        )));
+    }
+    let img: ImageBuffer<Rgba<u8>, _> =
+        ImageBuffer::from_raw(width, height, rgba.to_vec()).ok_or_else(|| {
+            crate::error::CoreError::Io("rgba buffer dimensions mismatch".into())
+        })?;
+    let mut out = Vec::new();
+    image::codecs::jpeg::JpegEncoder::new_with_quality(&mut out, quality.clamp(1, 100))
+        .encode_image(&img)
+        .map_err(|e| crate::error::CoreError::Io(format!("jpeg encode: {e}")))?;
+    Ok(out)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

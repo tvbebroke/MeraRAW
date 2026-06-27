@@ -50,6 +50,21 @@ fn main() {
         .init();
 
     // Engine actor up before the window — owns GPU + heavy state.
+    let profiles_dir = std::env::var("MERARAW_PROFILES_DIR")
+        .map(std::path::PathBuf::from)
+        .ok()
+        .filter(|p| p.is_dir())
+        .or_else(|| {
+            let dev = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .join("../meraraw-derivatives");
+            dev.is_dir().then_some(dev)
+        });
+    if let Some(dir) = profiles_dir {
+        meratech_core::profile::set_profiles_dir(dir);
+        tracing::info!(dir = %meratech_core::profile::profiles_dir().display(), "camera profiles dir");
+    } else {
+        tracing::warn!("meraraw-derivatives not found; camera profiles disabled");
+    }
     let (event_tx, mut event_rx) =
         tokio::sync::mpsc::unbounded_channel::<meratech_core::message::EngineEvent>();
     let engine = meratech_core::engine::spawn_with_events(Some(event_tx));
@@ -104,6 +119,7 @@ fn main() {
             commands::set_preview_bypass,
             commands::import_folder,
             commands::get_grid,
+            commands::list_folders,
             commands::set_asset_meta,
             commands::rebuild_index,
             assistant::assistant_available,

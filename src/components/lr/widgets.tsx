@@ -168,24 +168,42 @@ export function useParam(spec: ParamSpec, meta?: ImageMeta | null): ParamHandle 
   const [drag, setDrag] = useState<number | null>(null);
   const value = drag ?? docVal ?? fallback;
   const throttle = useRef(0);
+  /** Bumps on each outbound setParam; stale responses are ignored. */
+  const opSeq = useRef(0);
+
+  const sendParam = useCallback(
+    (v: number, clearDragOnSuccess: boolean) => {
+      const seq = ++opSeq.current;
+      return setParam(targetPath, v)
+        .then((delta) => {
+          if (seq !== opSeq.current) return;
+          reconcile(delta);
+          if (clearDragOnSuccess) setDrag(null);
+        })
+        .catch(() => {
+          if (clearDragOnSuccess) setDrag(null);
+        });
+    },
+    [targetPath, reconcile],
+  );
 
   const setLive = useCallback(
     (v: number) => {
       setDrag(v);
       const now = performance.now();
-      if (now - throttle.current > 55) {
+      if (now - throttle.current > 16) {
         throttle.current = now;
-        setParam(targetPath, v).then(reconcile).catch(() => {});
+        void sendParam(v, false);
       }
     },
-    [targetPath, reconcile],
+    [sendParam],
   );
   const commit = useCallback(
     (v: number) => {
-      setDrag(null);
-      setParam(targetPath, v).then(reconcile).catch(() => {});
+      throttle.current = performance.now();
+      void sendParam(v, true);
     },
-    [targetPath, reconcile],
+    [sendParam],
   );
   const reset = useCallback(() => commit(fallback), [commit, fallback]);
 
