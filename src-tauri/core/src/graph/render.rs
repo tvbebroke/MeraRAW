@@ -155,7 +155,13 @@ impl RenderGraph {
 
         // ---- extract ----
         let extract_tex = self.extract_tex.as_ref().unwrap();
-        let run_extract = view_changed || self.dirty_from == 0;
+        // Extract + dcp_look depend ONLY on the view (their inputs are the
+        // working master + view params, never the doc). So they re-run on a
+        // view change — which `invalidate_all` also forces via last_view_key =
+        // None. Gating on `dirty_from == 0` was wrong: editing module 0
+        // (exposure) sets dirty_from = 0 and needlessly re-ran the ~1.3s CPU
+        // dcp_look every slider tick.
+        let run_extract = view_changed;
         if run_extract {
             let u = ExtractUniforms {
                 out_w,
