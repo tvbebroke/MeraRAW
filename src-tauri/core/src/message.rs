@@ -91,6 +91,14 @@ pub enum EngineEvent {
     ImportDone { total: u64 },
     /// Catalog rows changed (ratings/flags/imports) — grids should refresh.
     CatalogChanged,
+    /// Tiled export progress (phase: "render" | "encode", done/total tiles or 1/1).
+    ExportProgress {
+        phase: String,
+        done: u32,
+        total: u32,
+    },
+    /// Engine thread recovered from a panic; UI should prompt restart.
+    EngineCrashed { message: String },
 }
 
 pub enum EngineMsg {
@@ -276,6 +284,8 @@ pub enum EngineMsg {
     ImportFinished {
         import_id: u64,
     },
+    /// Continue incremental tiled export (one tile per actor tick).
+    ExportStep,
 }
 
 /// Carried from the decode worker thread: f16-packed working master +

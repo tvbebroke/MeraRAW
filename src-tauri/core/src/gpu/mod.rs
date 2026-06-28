@@ -2,6 +2,7 @@
 //! graph (see gpu-memory-texture-lifecycle.md before extending).
 
 pub mod display;
+pub mod texture_io;
 
 pub struct GpuContext {
     pub device: wgpu::Device,

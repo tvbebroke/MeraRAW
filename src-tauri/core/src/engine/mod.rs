@@ -1,0 +1,897 @@
+//! Engine actor: dedicated thread + current-thread tokio runtime owning all
+//! heavy state (GPU, images, the canonical EditDoc). Single owner. Commands
+//! talk via mpsc + oneshot; decode runs on worker threads posting results
+//! back as internal messages; renders are debounced (op storms coalesce —
+//! latest doc wins) and sidecar writes happen on settle.
+
+use crate::doc::EditDoc;
+use crate::error::CoreError;
+use crate::gpu::display::{upload_working_texture, ViewParams};
+use crate::gpu::GpuContext;
+use crate::graph::RenderGraph;
+use crate::image::RgbF32Buf;
+use crate::message::{
+    DecodedPayload, EngineEvent, EngineInfo, EngineMsg, EngineStatus, Frame, FrameInfo,
+};
+use crate::ops::{self, DocDelta, History, Op};
+use crate::profile::DcpProfile;
+use crate::raw::{Decoder, ImageMeta, RawlerDecoder};
+use crate::sidecar;
+use std::path::PathBuf;
+use std::time::{Duration, Instant};
+use tokio::sync::{mpsc, oneshot};
+
+mod catalog_ops;
+mod decode;
+mod doc_ops;
+mod export;
+mod render;
+
+use doc_ops::{list_presets, load_preset};
+
+const RENDER_DEBOUNCE: Duration = Duration::from_millis(8);
+const SETTLE_DEBOUNCE: Duration = Duration::from_millis(600);
+
+#[derive(Debug, thiserror::Error)]
+pub enum EngineError {
+    #[error("engine channel closed")]
+    ChannelClosed,
+    #[error("engine dropped reply")]
+    ReplyDropped,
+}
+
+#[derive(Clone)]
+pub struct EngineHandle {
+    tx: mpsc::Sender<EngineMsg>,
+}
+
+impl EngineHandle {
+    async fn request<T>(
+        &self,
+        build: impl FnOnce(oneshot::Sender<T>) -> EngineMsg,
+    ) -> Result<T, EngineError> {
+        let (tx, rx) = oneshot::channel();
+        self.tx
+            .send(build(tx))
+            .await
+            .map_err(|_| EngineError::ChannelClosed)?;
+        rx.await.map_err(|_| EngineError::ReplyDropped)
+    }
+
+    pub async fn ping(&self) -> Result<EngineStatus, EngineError> {
+        self.request(|reply| EngineMsg::Ping { reply }).await
+    }
+
+    pub async fn info(&self) -> Result<EngineInfo, EngineError> {
+        self.request(|reply| EngineMsg::Info { reply }).await
+    }
+
+    pub async fn test_frame(&self, width: u32, height: u32) -> Result<Frame, EngineError> {
+        self.request(|reply| EngineMsg::TestFrame {
+            width,
+            height,
+            reply,
+        })
+        .await
+    }
+
+    pub async fn open_image(
+        &self,
+        path: PathBuf,
+    ) -> Result<Result<ImageMeta, CoreError>, EngineError> {
+        self.request(|reply| EngineMsg::OpenImage { path, reply })
+            .await
+    }
+
+    pub async fn request_frame(
+        &self,
+        view: ViewParams,
+    ) -> Result<Result<FrameInfo, CoreError>, EngineError> {
+        self.request(|reply| EngineMsg::RequestFrame { view, reply })
+            .await
+    }
+
+    pub async fn get_frame(&self) -> Result<Option<Frame>, EngineError> {
+        self.request(|reply| EngineMsg::GetFrame { reply }).await
+    }
+
+    pub async fn get_metadata(&self) -> Result<Option<ImageMeta>, EngineError> {
+        self.request(|reply| EngineMsg::GetMetadata { reply }).await
+    }
+
+    pub async fn close_image(&self) -> Result<(), EngineError> {
+        self.request(|reply| EngineMsg::CloseImage { reply }).await
+    }
+
+    pub async fn apply_op(&self, op: Op) -> Result<Result<DocDelta, CoreError>, EngineError> {
+        self.request(|reply| EngineMsg::ApplyOp { op, reply }).await
+    }
+
+    pub async fn undo(&self) -> Result<Result<DocDelta, CoreError>, EngineError> {
+        self.request(|reply| EngineMsg::Undo { reply }).await
+    }
+
+    pub async fn redo(&self) -> Result<Result<DocDelta, CoreError>, EngineError> {
+        self.request(|reply| EngineMsg::Redo { reply }).await
+    }
+
+    pub async fn get_doc(&self) -> Result<Option<serde_json::Value>, EngineError> {
+        self.request(|reply| EngineMsg::GetDoc { reply }).await
+    }
+
+    pub async fn get_history(&self) -> Result<Vec<String>, EngineError> {
+        self.request(|reply| EngineMsg::GetHistory { reply }).await
+    }
+
+    pub async fn snapshot(&self, name: String) -> Result<Result<(), CoreError>, EngineError> {
+        self.request(|reply| EngineMsg::Snapshot { name, reply })
+            .await
+    }
+
+    pub async fn list_snapshots(&self) -> Result<Vec<String>, EngineError> {
+        self.request(|reply| EngineMsg::ListSnapshots { reply })
+            .await
+    }
+
+    pub async fn restore_snapshot(
+        &self,
+        name: String,
+    ) -> Result<Result<DocDelta, CoreError>, EngineError> {
+        self.request(|reply| EngineMsg::RestoreSnapshot { name, reply })
+            .await
+    }
+
+    pub async fn virtual_copy(&self) -> Result<Result<String, CoreError>, EngineError> {
+        self.request(|reply| EngineMsg::VirtualCopy { reply }).await
+    }
+
+    pub async fn switch_doc(
+        &self,
+        doc_id: String,
+    ) -> Result<Result<DocDelta, CoreError>, EngineError> {
+        self.request(|reply| EngineMsg::SwitchDoc { doc_id, reply })
+            .await
+    }
+
+    pub async fn save_preset(
+        &self,
+        modules: Vec<String>,
+    ) -> Result<Result<serde_json::Value, CoreError>, EngineError> {
+        self.request(|reply| EngineMsg::SavePreset { modules, reply })
+            .await
+    }
+
+    pub async fn flush_sidecar(&self) -> Result<Result<(), CoreError>, EngineError> {
+        self.request(|reply| EngineMsg::FlushSidecar { reply })
+            .await
+    }
+
+    pub async fn get_stats(
+        &self,
+    ) -> Result<Option<crate::message::FrameStats>, EngineError> {
+        self.request(|reply| EngineMsg::GetStats { reply }).await
+    }
+
+    pub async fn wb_from_point(
+        &self,
+        x: f32,
+        y: f32,
+    ) -> Result<Result<DocDelta, CoreError>, EngineError> {
+        self.request(|reply| EngineMsg::WbFromPoint { x, y, reply })
+            .await
+    }
+
+    pub async fn set_mask_overlay(&self, id: Option<String>) -> Result<(), EngineError> {
+        self.request(|reply| EngineMsg::SetMaskOverlay { id, reply })
+            .await
+    }
+
+    pub async fn set_preview_bypass(&self, on: bool) -> Result<(), EngineError> {
+        self.request(|reply| EngineMsg::SetPreviewBypass { on, reply })
+            .await
+    }
+
+    // ---- Phase 5: catalog ----
+
+    pub async fn import_folder(
+        &self,
+        path: PathBuf,
+    ) -> Result<Result<u64, CoreError>, EngineError> {
+        self.request(|reply| EngineMsg::ImportFolder { path, reply })
+            .await
+    }
+
+    pub async fn get_grid(
+        &self,
+        query: crate::catalog::GridQuery,
+    ) -> Result<Result<Vec<crate::catalog::GridItem>, CoreError>, EngineError> {
+        self.request(|reply| EngineMsg::GetGrid { query, reply })
+            .await
+    }
+
+    pub async fn list_folders(
+        &self,
+    ) -> Result<Result<Vec<crate::catalog::FolderItem>, CoreError>, EngineError> {
+        self.request(|reply| EngineMsg::ListFolders { reply }).await
+    }
+
+    pub async fn set_asset_meta(
+        &self,
+        ids: Vec<i64>,
+        patch: crate::catalog::MetaPatch,
+    ) -> Result<Result<(), CoreError>, EngineError> {
+        self.request(|reply| EngineMsg::SetAssetMeta { ids, patch, reply })
+            .await
+    }
+
+    pub async fn rebuild_index(&self) -> Result<Result<u64, CoreError>, EngineError> {
+        self.request(|reply| EngineMsg::RebuildIndex { reply })
+            .await
+    }
+
+    pub async fn get_preview_file(
+        &self,
+        id: i64,
+        tier: String,
+    ) -> Result<Option<PathBuf>, EngineError> {
+        self.request(|reply| EngineMsg::GetPreviewFile { id, tier, reply })
+            .await
+    }
+
+    // ---- Phase 6: assistant eyes ----
+
+    pub async fn render_preview_jpeg(
+        &self,
+        max_dim: u32,
+    ) -> Result<Result<Vec<u8>, CoreError>, EngineError> {
+        self.request(|reply| EngineMsg::RenderPreviewJpeg { max_dim, reply })
+            .await
+    }
+
+    pub async fn sample_color(
+        &self,
+        x: f32,
+        y: f32,
+    ) -> Result<Result<crate::message::SampledColor, CoreError>, EngineError> {
+        self.request(|reply| EngineMsg::SampleColor { x, y, reply })
+            .await
+    }
+
+    // ---- Phase 7 ----
+
+    pub async fn export_image(
+        &self,
+        settings: crate::export::ExportSettings,
+    ) -> Result<Result<String, CoreError>, EngineError> {
+        self.request(|reply| EngineMsg::ExportImage { settings, reply })
+            .await
+    }
+
+    pub async fn save_preset_to_disk(
+        &self,
+        name: String,
+        modules: Vec<String>,
+    ) -> Result<Result<(), CoreError>, EngineError> {
+        self.request(|reply| EngineMsg::SavePresetToDisk {
+            name,
+            modules,
+            reply,
+        })
+        .await
+    }
+
+    pub async fn list_presets(&self) -> Result<Vec<String>, EngineError> {
+        self.request(|reply| EngineMsg::ListPresets { reply }).await
+    }
+
+    pub async fn apply_preset_by_name(
+        &self,
+        name: String,
+    ) -> Result<Result<DocDelta, CoreError>, EngineError> {
+        self.request(|reply| EngineMsg::ApplyPresetByName { name, reply })
+            .await
+    }
+
+    pub async fn get_perf_stats(&self) -> Result<crate::message::PerfStats, EngineError> {
+        self.request(|reply| EngineMsg::GetPerfStats { reply }).await
+    }
+}
+
+pub fn spawn_with_events(events: Option<mpsc::UnboundedSender<EngineEvent>>) -> EngineHandle {
+    let (tx, rx) = mpsc::channel::<EngineMsg>(256);
+    let self_tx = tx.clone();
+    std::thread::Builder::new()
+        .name("meratech-engine".into())
+        .spawn(move || {
+            let rt = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .expect("engine runtime");
+            rt.block_on(run(rx, self_tx, events));
+        })
+        .expect("spawn engine thread");
+    EngineHandle { tx }
+}
+
+pub fn spawn() -> EngineHandle {
+    spawn_with_events(None)
+}
+
+struct CurrentImage {
+    path: PathBuf,
+    meta: ImageMeta,
+    /// Parsed DCP for viewport look application (matrix is baked in at decode).
+    dcp_profile: Option<std::sync::Arc<DcpProfile>>,
+    /// (texture, view, w, h) — the working master (contract A4).
+    working: Option<(wgpu::Texture, wgpu::TextureView, u32, u32)>,
+    /// Retained downsized CPU copy (histogram / segmentation / fallback).
+    small_cpu: Option<std::sync::Arc<RgbF32Buf>>,
+    /// All docs for this image: [0] = primary, rest = virtual copies.
+    docs: Vec<EditDoc>,
+    active_doc: usize,
+    history: History,
+    snapshots: Vec<(String, EditDoc)>,
+    doc_dirty: bool, // unsaved sidecar changes (primary doc only)
+    /// Segmentation cache: mask id → (source hash, uploaded small mask).
+    masks_gpu: std::collections::HashMap<String, (u64, wgpu::Texture)>,
+    pending_segments: std::collections::HashSet<String>,
+}
+
+impl CurrentImage {
+    fn doc(&self) -> &EditDoc {
+        &self.docs[self.active_doc]
+    }
+    fn doc_mut(&mut self) -> &mut EditDoc {
+        &mut self.docs[self.active_doc]
+    }
+    fn as_shot_cct(&self) -> f32 {
+        self.meta.estimated_cct.unwrap_or(5200.0)
+    }
+    fn delta(&self, label: String, new_mask_id: Option<String>) -> DocDelta {
+        let (u, r) = self.history.depths();
+        DocDelta {
+            doc: self.doc().to_json(),
+            label,
+            undo_depth: u,
+            redo_depth: r,
+            new_mask_id,
+        }
+    }
+}
+
+struct Engine {
+    gpu: Option<GpuContext>,
+    graph: Option<RenderGraph>,
+    decoder: RawlerDecoder,
+    events: Option<mpsc::UnboundedSender<EngineEvent>>,
+    self_tx: mpsc::Sender<EngineMsg>,
+    current: Option<CurrentImage>,
+    latest_frame: Option<Frame>,
+    frame_version: u64,
+    generation: u64,
+    last_view: Option<ViewParams>,
+    render_at: Option<Instant>,
+    settle_at: Option<Instant>,
+    overlay_mask: Option<String>,
+    catalog: Option<crate::catalog::Catalog>,
+    import_state: Option<ImportState>,
+    /// Before/after: when true, render the un-edited base.
+    preview_bypass: bool,
+    /// Dedicated graph for assistant previews (own small caches — never
+    /// thrashes the viewport graph).
+    preview_graph: Option<RenderGraph>,
+    /// Dedicated graph for tiled export (tile-sized caches).
+    export_graph: Option<RenderGraph>,
+    export_job: Option<export::ExportJob>,
+    perf: crate::message::PerfStats,
+}
+
+struct ImportState {
+    id: u64,
+    total: u64,
+    done: u64,
+    /// further roots to import once this one finishes (rebuild path)
+    queued_roots: Vec<PathBuf>,
+}
+
+async fn run(
+    mut rx: mpsc::Receiver<EngineMsg>,
+    self_tx: mpsc::Sender<EngineMsg>,
+    events: Option<mpsc::UnboundedSender<EngineEvent>>,
+) {
+    let gpu = match GpuContext::init().await {
+        Ok(g) => {
+            tracing::info!(adapter = %g.adapter_name(), backend = %g.backend_name(), "gpu ready");
+            Some(g)
+        }
+        Err(e) => {
+            tracing::error!(error = %e, "gpu init failed; engine continues without gpu");
+            None
+        }
+    };
+    let mut engine = Engine {
+        gpu,
+        graph: None,
+        decoder: RawlerDecoder::default(),
+        events,
+        self_tx,
+        current: None,
+        latest_frame: None,
+        frame_version: 0,
+        generation: 0,
+        last_view: None,
+        render_at: None,
+        settle_at: None,
+        overlay_mask: None,
+        catalog: None,
+        import_state: None,
+        preview_bypass: false,
+        preview_graph: None,
+        export_graph: None,
+        export_job: None,
+        perf: Default::default(),
+    };
+    tracing::info!("engine actor up");
+
+    loop {
+        let next_deadline = [engine.render_at, engine.settle_at]
+            .into_iter()
+            .flatten()
+            .min();
+        tokio::select! {
+            msg = rx.recv() => {
+                match msg {
+                    Some(m) => {
+                        let crashed = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                            engine.handle(m);
+                        }))
+                        .is_err();
+                        if crashed {
+                            tracing::error!("engine panic during message handling");
+                            engine.export_job = None;
+                            engine.emit(EngineEvent::EngineCrashed {
+                                message: "GPU/render panic — restart the app".into(),
+                            });
+                        }
+                    }
+                    None => break,
+                }
+            }
+            _ = deadline_sleep(next_deadline) => {
+                let now = Instant::now();
+                if engine.render_at.is_some_and(|t| t <= now) {
+                    engine.render_at = None;
+                    engine.render_now();
+                }
+                if engine.settle_at.is_some_and(|t| t <= now) {
+                    engine.settle_at = None;
+                    engine.on_settle();
+                }
+            }
+        }
+    }
+    tracing::info!("engine actor shut down");
+}
+
+async fn deadline_sleep(deadline: Option<Instant>) {
+    match deadline {
+        Some(t) => tokio::time::sleep_until(tokio::time::Instant::from_std(t)).await,
+        None => std::future::pending().await,
+    }
+}
+
+impl Engine {
+    pub(super) fn emit(&self, ev: EngineEvent) {
+        if let Some(tx) = &self.events {
+            let _ = tx.send(ev);
+        }
+    }
+
+    pub(super) fn next_version(&mut self) -> u64 {
+        self.frame_version += 1;
+        self.frame_version
+    }
+
+    pub(super) fn schedule_render(&mut self) {
+        self.render_at = Some(Instant::now() + RENDER_DEBOUNCE);
+    }
+
+    pub(super) fn schedule_settle(&mut self) {
+        self.settle_at = Some(Instant::now() + SETTLE_DEBOUNCE);
+    }
+
+    pub(super) fn handle(&mut self, msg: EngineMsg) {
+        match msg {
+            EngineMsg::Ping { reply } => {
+                let _ = reply.send(EngineStatus {
+                    alive: true,
+                    gpu_ready: self.gpu.is_some(),
+                    adapter: self.gpu.as_ref().map(|g| g.adapter_name()),
+                });
+            }
+            EngineMsg::Info { reply } => {
+                let _ = reply.send(EngineInfo {
+                    gpu_adapter: self.gpu.as_ref().map(|g| g.adapter_name()),
+                    gpu_backend: self.gpu.as_ref().map(|g| g.backend_name()),
+                });
+            }
+            EngineMsg::TestFrame {
+                width,
+                height,
+                reply,
+            } => {
+                let v = self.frame_version;
+                let _ = reply.send(render_test_frame(width, height, v));
+            }
+            EngineMsg::OpenImage { path, reply } => self.open_image(path, reply),
+            EngineMsg::PreviewDone {
+                generation,
+                rgba,
+                width,
+                height,
+            } => {
+                if generation != self.generation {
+                    return;
+                }
+                if self
+                    .current
+                    .as_ref()
+                    .map(|c| c.working.is_some())
+                    .unwrap_or(true)
+                {
+                    return;
+                }
+                let version = self.next_version();
+                self.latest_frame = Some(Frame {
+                    width,
+                    height,
+                    rgba,
+                    version,
+                });
+                tracing::info!(version, width, height, "preview frame ready");
+                self.emit(EngineEvent::PreviewReady { version });
+                self.emit(EngineEvent::FrameReady { version });
+            }
+            EngineMsg::DecodeDone { generation, result } => {
+                if generation != self.generation {
+                    return;
+                }
+                match result {
+                    Ok(payload) => self.finish_decode(*payload),
+                    Err(e) => {
+                        tracing::error!(error = %e, "decode failed");
+                        self.emit(EngineEvent::DecodeError {
+                            message: e.to_string(),
+                        });
+                    }
+                }
+            }
+            EngineMsg::RequestFrame { view, reply } => {
+                self.last_view = Some(view);
+                let _ = reply.send(self.render_view(view));
+            }
+            EngineMsg::GetFrame { reply } => {
+                let _ = reply.send(self.latest_frame.clone());
+            }
+            EngineMsg::GetMetadata { reply } => {
+                let _ = reply.send(self.current.as_ref().map(|c| c.meta.clone()));
+            }
+            EngineMsg::CloseImage { reply } => {
+                self.flush_sidecar_now();
+                self.generation += 1;
+                self.current = None;
+                self.latest_frame = None;
+                self.render_at = None;
+                self.settle_at = None;
+                if let Some(g) = &mut self.graph {
+                    g.invalidate_all();
+                }
+                let _ = reply.send(());
+            }
+            // ---- ops ----
+            EngineMsg::ApplyOp { op, reply } => {
+                let result = self.do_apply_op(op);
+                if let Ok(delta) = &result {
+                    self.emit(EngineEvent::DocUpdated {
+                        delta: serde_json::to_value(delta).unwrap_or_default(),
+                    });
+                }
+                let _ = reply.send(result);
+            }
+            EngineMsg::Undo { reply } => {
+                let _ = reply.send(self.do_undo(true));
+            }
+            EngineMsg::Redo { reply } => {
+                let _ = reply.send(self.do_undo(false));
+            }
+            EngineMsg::GetDoc { reply } => {
+                let _ = reply.send(self.current.as_ref().map(|c| c.doc().to_json()));
+            }
+            EngineMsg::GetHistory { reply } => {
+                let _ = reply.send(
+                    self.current
+                        .as_ref()
+                        .map(|c| c.history.labels())
+                        .unwrap_or_default(),
+                );
+            }
+            EngineMsg::Snapshot { name, reply } => {
+                let _ = reply.send(match &mut self.current {
+                    Some(c) => {
+                        let doc = c.doc().clone();
+                        c.snapshots.retain(|(n, _)| *n != name);
+                        c.snapshots.push((name, doc));
+                        Ok(())
+                    }
+                    None => Err(CoreError::NoImage),
+                });
+            }
+            EngineMsg::ListSnapshots { reply } => {
+                let _ = reply.send(
+                    self.current
+                        .as_ref()
+                        .map(|c| c.snapshots.iter().map(|(n, _)| n.clone()).collect())
+                        .unwrap_or_default(),
+                );
+            }
+            EngineMsg::RestoreSnapshot { name, reply } => {
+                let result = (|| {
+                    let c = self.current.as_mut().ok_or(CoreError::NoImage)?;
+                    let snap = c
+                        .snapshots
+                        .iter()
+                        .find(|(n, _)| *n == name)
+                        .map(|(_, d)| d.clone())
+                        .ok_or_else(|| CoreError::InvalidOp(format!("no snapshot '{name}'")))?;
+                    let before = c.doc().clone();
+                    c.history.record(before, format!("restore '{name}'"));
+                    *c.doc_mut() = snap;
+                    c.doc_dirty = true;
+                    Ok(c.delta(format!("restore '{name}'"), None))
+                })();
+                if result.is_ok() {
+                    self.full_redraw();
+                }
+                if let Ok(delta) = &result {
+                    self.emit(EngineEvent::DocUpdated {
+                        delta: serde_json::to_value(delta).unwrap_or_default(),
+                    });
+                }
+                let _ = reply.send(result);
+            }
+            EngineMsg::VirtualCopy { reply } => {
+                let _ = reply.send(match &mut self.current {
+                    Some(c) => {
+                        let mut copy = c.doc().clone();
+                        copy.doc_id = format!("vc-{}", c.docs.len());
+                        let id = copy.doc_id.clone();
+                        c.docs.push(copy); // shares the decoded base buffer
+                        Ok(id)
+                    }
+                    None => Err(CoreError::NoImage),
+                });
+            }
+            EngineMsg::SwitchDoc { doc_id, reply } => {
+                let result = (|| {
+                    let c = self.current.as_mut().ok_or(CoreError::NoImage)?;
+                    let idx = c
+                        .docs
+                        .iter()
+                        .position(|d| d.doc_id == doc_id)
+                        .ok_or_else(|| CoreError::InvalidOp(format!("no doc {doc_id}")))?;
+                    c.active_doc = idx;
+                    c.history.clear();
+                    Ok(c.delta(format!("switch to {doc_id}"), None))
+                })();
+                if result.is_ok() {
+                    self.full_redraw();
+                }
+                let _ = reply.send(result);
+            }
+            EngineMsg::SavePreset { modules, reply } => {
+                let _ = reply.send(match &self.current {
+                    Some(c) => {
+                        let mut partial = crate::doc::PartialDoc {
+                            modules: Default::default(),
+                        };
+                        for m in modules {
+                            if let Some(params) = c.doc().modules.get(&m) {
+                                partial.modules.insert(m, params.clone());
+                            }
+                        }
+                        serde_json::to_value(&partial)
+                            .map_err(|e| CoreError::Engine(e.to_string()))
+                    }
+                    None => Err(CoreError::NoImage),
+                });
+            }
+            EngineMsg::FlushSidecar { reply } => {
+                self.flush_sidecar_now();
+                let _ = reply.send(Ok(()));
+            }
+            EngineMsg::GetStats { reply } => {
+                let _ = reply.send(self.compute_stats());
+            }
+            EngineMsg::SetMaskOverlay { id, reply } => {
+                self.overlay_mask = id;
+                if let Some(g) = &mut self.graph {
+                    g.invalidate_from_module("masks");
+                }
+                self.schedule_render();
+                let _ = reply.send(());
+            }
+            EngineMsg::SetPreviewBypass { on, reply } => {
+                if self.preview_bypass != on {
+                    self.preview_bypass = on;
+                    if let Some(g) = &mut self.graph {
+                        g.invalidate_all();
+                    }
+                    self.render_now();
+                }
+                let _ = reply.send(());
+            }
+            // ---- Phase 5: catalog ----
+            EngineMsg::ImportFolder { path, reply } => {
+                let _ = reply.send(self.start_import(path));
+            }
+            EngineMsg::GetGrid { query, reply } => {
+                let _ = reply.send(
+                    self.catalog_mut()
+                        .and_then(|c| c.grid(&query)),
+                );
+            }
+            EngineMsg::ListFolders { reply } => {
+                let _ = reply.send(self.catalog_mut().and_then(|c| c.list_folders()));
+            }
+            EngineMsg::SetAssetMeta { ids, patch, reply } => {
+                let _ = reply.send(self.set_asset_meta(&ids, &patch));
+            }
+            EngineMsg::RebuildIndex { reply } => {
+                let _ = reply.send(self.rebuild_index());
+            }
+            EngineMsg::GetPreviewFile { id, tier, reply } => {
+                let p = self.catalog_mut().ok().map(|c| {
+                    if tier == "p" {
+                        c.preview_path(id)
+                    } else {
+                        c.thumb_path(id)
+                    }
+                });
+                let _ = reply.send(p.filter(|p| p.exists()));
+            }
+            EngineMsg::ImportFileDone { import_id, file } => {
+                self.import_file_done(import_id, *file);
+            }
+            EngineMsg::ImportFinished { import_id } => {
+                if let Some(st) = &self.import_state {
+                    if st.id == import_id {
+                        let total = st.done;
+                        let queued = self.import_state.take().unwrap().queued_roots;
+                        tracing::info!(total, "import finished");
+                        self.emit(EngineEvent::ImportDone { total });
+                        self.emit(EngineEvent::CatalogChanged);
+                        // continue a multi-root rebuild
+                        if let Some(next) = queued.first().cloned() {
+                            match self.start_import(next) {
+                                Ok(_) => {
+                                    if let Some(st) = &mut self.import_state {
+                                        st.queued_roots = queued[1..].to_vec();
+                                    }
+                                }
+                                Err(e) => tracing::error!(error = %e, "queued import failed"),
+                            }
+                        }
+                    }
+                }
+            }
+            // ---- Phase 7 ----
+            EngineMsg::ExportImage { settings, reply } => {
+                self.export_image(settings, reply);
+            }
+            EngineMsg::ExportStep => {
+                self.export_step();
+            }
+            EngineMsg::SavePresetToDisk {
+                name,
+                modules,
+                reply,
+            } => {
+                let _ = reply.send(self.save_preset_to_disk(&name, &modules));
+            }
+            EngineMsg::ListPresets { reply } => {
+                let _ = reply.send(list_presets());
+            }
+            EngineMsg::ApplyPresetByName { name, reply } => {
+                let result = (|| {
+                    let partial = load_preset(&name)?;
+                    self.do_apply_op(Op::ApplyPreset { preset: partial })
+                })();
+                if let Ok(delta) = &result {
+                    self.emit(EngineEvent::DocUpdated {
+                        delta: serde_json::to_value(delta).unwrap_or_default(),
+                    });
+                }
+                let _ = reply.send(result);
+            }
+            EngineMsg::GetPerfStats { reply } => {
+                let _ = reply.send(self.perf.clone());
+            }
+            // ---- Phase 6: assistant eyes ----
+            EngineMsg::RenderPreviewJpeg { max_dim, reply } => {
+                let _ = reply.send(self.render_preview_jpeg(max_dim));
+            }
+            EngineMsg::SampleColor { x, y, reply } => {
+                let _ = reply.send(self.sample_color(x, y));
+            }
+            EngineMsg::SegmentDone {
+                generation,
+                mask_id,
+                source_hash,
+                result,
+            } => {
+                if generation != self.generation {
+                    return;
+                }
+                let Some(cur) = &mut self.current else { return };
+                cur.pending_segments.remove(&mask_id);
+                match result {
+                    Ok(mask) => {
+                        let Some(gpu) = &self.gpu else { return };
+                        let tex = crate::graph::upload_small_mask(
+                            gpu,
+                            &mask.data,
+                            mask.width as u32,
+                            mask.height as u32,
+                        );
+                        cur.masks_gpu.insert(mask_id.clone(), (source_hash, tex));
+                        if let Some(g) = &mut self.graph {
+                            g.invalidate_from_module("masks");
+                        }
+                        self.schedule_render();
+                        self.emit(EngineEvent::MaskReady { id: mask_id });
+                    }
+                    Err(e) => {
+                        tracing::error!(error = %e, mask_id, "segmentation failed");
+                    }
+                }
+            }
+            EngineMsg::WbFromPoint { x, y, reply } => {
+                let result = self.wb_from_point(x, y);
+                if let Ok(delta) = &result {
+                    self.emit(EngineEvent::DocUpdated {
+                        delta: serde_json::to_value(delta).unwrap_or_default(),
+                    });
+                }
+                let _ = reply.send(result);
+            }
+        }
+    }
+}
+
+fn render_test_frame(width: u32, height: u32, version: u64) -> Frame {
+    let (w, h) = (width.max(1), height.max(1));
+    let mut rgba = vec![0u8; (w * h * 4) as usize];
+    for y in 0..h {
+        for x in 0..w {
+            let i = ((y * w + x) * 4) as usize;
+            let fx = x as f32 / w as f32;
+            let fy = y as f32 / h as f32;
+            rgba[i] = (fx * 200.0) as u8 + 20;
+            rgba[i + 1] = 40;
+            rgba[i + 2] = (fy * 200.0) as u8 + 35;
+            rgba[i + 3] = 255;
+            let (cx, cy) = (w / 2, h / 2);
+            if (x == cx && y.abs_diff(cy) < 40) || (y == cy && x.abs_diff(cx) < 40) {
+                rgba[i] = 255;
+                rgba[i + 1] = 255;
+                rgba[i + 2] = 255;
+            }
+        }
+    }
+    Frame {
+        width: w,
+        height: h,
+        rgba,
+        version,
+    }
+}

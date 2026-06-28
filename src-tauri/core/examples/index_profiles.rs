@@ -48,12 +48,17 @@ fn main() {
     }
 
     for profiles in cameras.values_mut() {
-        profiles.sort_by(|a, b| a.name.cmp(&b.name));
+        profiles.sort_by(|a, b| a.file.cmp(&b.file));
     }
 
-    let index = ProfileIndex { cameras };
+    let mut slim: BTreeMap<String, Vec<String>> = BTreeMap::new();
+    for (camera, refs) in cameras {
+        slim.insert(camera, refs.into_iter().map(|r| r.file).collect());
+    }
+
     let out = Path::new(env!("CARGO_MANIFEST_DIR")).join("models/profile_index.json");
-    let json = serde_json::to_string_pretty(&index).expect("serialize index");
+    let json = serde_json::to_string_pretty(&serde_json::json!({ "cameras": slim }))
+        .expect("serialize index");
     std::fs::write(&out, json).expect("write index");
     eprintln!(
         "wrote {} ({} profiles indexed, {} skipped)",

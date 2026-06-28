@@ -33,6 +33,60 @@ pub fn load_sidecar(source: &Path) -> Result<Option<EditDoc>, CoreError> {
     Ok(Some(doc))
 }
 
+/// Adobe Lightroom / Camera Raw `.xmp` sidecar next to the RAW (same stem).
+/// Used when no `.mrt.json` exists. Maps common `crs:*` develop sliders only.
+pub fn load_from_xmp(source: &Path) -> Result<Option<EditDoc>, CoreError> {
+    let path = source.with_extension("xmp");
+    if !path.exists() {
+        return Ok(None);
+    }
+    let text = std::fs::read_to_string(&path)?;
+    if !text.contains("crs:") {
+        return Ok(None);
+    }
+
+    use crate::doc::ParamValue;
+    let mut doc = EditDoc::new(&source.to_string_lossy().to_string());
+    let mut any = false;
+
+    let mut map = |module: &str, param: &str, xmp: &str| {
+        if let Some(v) = parse_xmp_f32(&text, xmp) {
+            doc.set(module, param, ParamValue::F32(v));
+            any = true;
+        }
+    };
+
+    map("exposure", "stops", "crs:Exposure2012");
+    map("white_balance", "temp", "crs:Temperature");
+    map("white_balance", "tint", "crs:Tint");
+    map("tone_curve", "contrast", "crs:Contrast2012");
+    map("tone_curve", "shadows", "crs:Shadows2012");
+    map("tone_curve", "highlights", "crs:Highlights2012");
+    map("detail", "sharpen_amount", "crs:Sharpness");
+
+    Ok(if any { Some(doc) } else { None })
+}
+
+/// Load edits: `.mrt.json` wins; else try Adobe `.xmp` sidecar.
+pub fn load_edits(source: &Path) -> Result<Option<EditDoc>, CoreError> {
+    if let Some(doc) = load_sidecar(source)? {
+        return Ok(Some(doc));
+    }
+    load_from_xmp(source)
+}
+
+fn parse_xmp_f32(text: &str, attr: &str) -> Option<f32> {
+    let needle = format!("{attr}=\"");
+    let start = text.find(&needle)? + needle.len();
+    let rest = &text[start..];
+    let end = rest.find('"')?;
+    let raw = rest[..end].trim();
+    if raw.is_empty() || raw.eq_ignore_ascii_case("false") {
+        return None;
+    }
+    raw.parse().ok()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -76,5 +130,56 @@ mod tests {
         assert_eq!(doc.get("exposure", "stops"), Some(&ParamValue::F32(0.2)));
         assert_eq!(doc.meta.rating, 0);
         assert!(doc.masks.is_empty());
+    }
+
+    #[test]
+    fn adobe_xmp_maps_common_sliders() {
+        let dir = std::env::temp_dir().join("meratech-xmp-test");
+        std::fs::create_dir_all(&dir).unwrap();
+        let src = dir.join("DSC0001.ARW");
+        std::fs::write(&src, b"fake").unwrap();
+        std::fs::write(
+            dir.join("DSC0001.xmp"),
+            r#"<x:xmpmeta xmlns:crs="http://ns.adobe.com/camera-raw-settings/1.0/">
+  <rdf:Description crs:Exposure2012="+0.75" crs:Temperature="5800" crs:Tint="+12"
+    crs:Contrast2012="+15" crs:Shadows2012="-20" crs:Highlights2012="-35"/>
+</x:xmpmeta>"#,
+        )
+        .unwrap();
+
+        let doc = load_from_xmp(&src).unwrap().expect("xmp parsed");
+        assert_eq!(doc.get("exposure", "stops"), Some(&ParamValue::F32(0.75)));
+        assert_eq!(
+            doc.get("white_balance", "temp"),
+            Some(&ParamValue::F32(5800.0))
+        );
+        assert_eq!(doc.get("white_balance", "tint"), Some(&ParamValue::F32(12.0)));
+        assert_eq!(
+            doc.get("tone_curve", "contrast"),
+            Some(&ParamValue::F32(15.0))
+        );
+
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn mrt_json_wins_over_xmp() {
+        let dir = std::env::temp_dir().join("meratech-edits-priority");
+        std::fs::create_dir_all(&dir).unwrap();
+        let src = dir.join("IMG.ARW");
+        std::fs::write(&src, b"fake").unwrap();
+        std::fs::write(
+            dir.join("IMG.xmp"),
+            r#"<rdf:Description crs:Exposure2012="+2.0"/>"#,
+        )
+        .unwrap();
+        let mut doc = EditDoc::new(src.to_str().unwrap());
+        doc.set("exposure", "stops", ParamValue::F32(0.5));
+        write_sidecar(&doc).unwrap();
+
+        let loaded = load_edits(&src).unwrap().expect("edits");
+        assert_eq!(loaded.get("exposure", "stops"), Some(&ParamValue::F32(0.5)));
+
+        std::fs::remove_dir_all(&dir).ok();
     }
 }

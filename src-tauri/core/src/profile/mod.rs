@@ -10,7 +10,7 @@ use crate::error::CoreError;
 use crate::raw::ImageMeta;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
 
 static PROFILES_DIR: OnceLock<PathBuf> = OnceLock::new();
@@ -53,14 +53,63 @@ pub fn camera_model_key(make: &str, model: &str) -> String {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProfileRef {
+    #[serde(default)]
     pub name: String,
     pub file: String,
 }
 
+fn profile_name_from_file(file: &str) -> String {
+    Path::new(file)
+        .file_stem()
+        .map(|s| s.to_string_lossy().into_owned())
+        .unwrap_or_else(|| file.to_string())
+}
+
+fn profile_ref_from_value(v: serde_json::Value) -> Result<ProfileRef, String> {
+    if let Some(s) = v.as_str() {
+        return Ok(ProfileRef {
+            name: profile_name_from_file(s),
+            file: s.to_string(),
+        });
+    }
+    if let Some(obj) = v.as_object() {
+        let file = obj
+            .get("file")
+            .and_then(|f| f.as_str())
+            .ok_or("profile entry missing file")?
+            .to_string();
+        let name = obj
+            .get("name")
+            .and_then(|n| n.as_str())
+            .map(|s| s.trim_end_matches('\0').trim().to_string())
+            .filter(|s| !s.is_empty())
+            .unwrap_or_else(|| profile_name_from_file(&file));
+        return Ok(ProfileRef { name, file });
+    }
+    Err("invalid profile entry".into())
+}
+
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct ProfileIndex {
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_cameras")]
     pub cameras: BTreeMap<String, Vec<ProfileRef>>,
+}
+
+fn deserialize_cameras<'de, D>(deserializer: D) -> Result<BTreeMap<String, Vec<ProfileRef>>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let raw: BTreeMap<String, Vec<serde_json::Value>> =
+        BTreeMap::deserialize(deserializer)?;
+    raw.into_iter()
+        .map(|(k, vals)| {
+            let refs = vals
+                .into_iter()
+                .map(|v| profile_ref_from_value(v).map_err(serde::de::Error::custom))
+                .collect::<Result<Vec<_>, _>>()?;
+            Ok((k, refs))
+        })
+        .collect()
 }
 
 impl ProfileIndex {

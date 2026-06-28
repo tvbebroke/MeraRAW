@@ -14,7 +14,7 @@ import {
   onImportDone,
   onImportProgress,
 } from "../ipc/events";
-import type { FolderItem, GridItem, GridQuery, MetaPatch } from "../ipc/types";
+import { formatAppError, type FolderItem, type GridItem, type GridQuery, type MetaPatch } from "../ipc/types";
 
 const FLAG_ICON: Record<string, string> = { pick: "✓", reject: "✕", none: "" };
 
@@ -105,7 +105,7 @@ export function Library({ onOpen }: { onOpen: (path: string) => void }) {
       if (queued === 0) setImportStatus("nothing new");
       else setSelectedFolder(folder);
     } catch (e) {
-      setImportStatus(`import failed: ${String(e)}`);
+      setImportStatus(`import failed: ${formatAppError(e)}`);
     }
   }
 
@@ -168,7 +168,9 @@ export function Library({ onOpen }: { onOpen: (path: string) => void }) {
         <button
           onClick={() => {
             setImportStatus("rebuilding…");
-            rebuildIndex().catch((e) => setImportStatus(String(e)));
+            rebuildIndex().catch((e) =>
+              setImportStatus(`rebuild failed: ${formatAppError(e)}`),
+            );
           }}
           title="Rebuild the index from folders + sidecars"
         >

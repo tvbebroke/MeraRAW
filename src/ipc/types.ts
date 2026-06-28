@@ -173,6 +173,23 @@ export interface FrameStats {
   clipLowPct: number;
 }
 
+export interface ExportSettings {
+  format: "jpeg" | "png" | "tiff16" | "heic";
+  target: "srgb" | "display-p3" | "adobe-rgb" | "prophoto";
+  quality: number;
+  maxDim: number | null;
+  sharpen: number;
+  destDir: string;
+  stripMetadata?: boolean;
+  copyright?: string | null;
+}
+
+export interface ExportProgress {
+  phase: "render" | "encode" | string;
+  done: number;
+  total: number;
+}
+
 /** Serialized form of Rust AppError: #[serde(tag = "kind", content = "message")] */
 export interface AppError {
   kind:
@@ -193,4 +210,23 @@ export function isAppError(e: unknown): e is AppError {
     "kind" in e &&
     "message" in e
   );
+}
+
+/** Human-readable Tauri invoke error (handles AppError + legacy tagged shapes). */
+export function formatAppError(e: unknown): string {
+  if (typeof e === "string") return e;
+  if (e instanceof Error) return e.message;
+  if (isAppError(e)) return `${e.kind}: ${e.message}`;
+  if (e && typeof e === "object") {
+    const o = e as Record<string, unknown>;
+    if (typeof o.message === "string") return o.message;
+    const kind = Object.keys(o)[0];
+    if (kind && typeof o[kind] === "string") return `${kind}: ${o[kind]}`;
+    try {
+      return JSON.stringify(e);
+    } catch {
+      /* fall through */
+    }
+  }
+  return String(e);
 }

@@ -52,6 +52,10 @@ VITE_SUPABASE_ANON_KEY=sb_publishable_...
 
 **Launch flow:**
 
+**MeraRAW Beta 0.1.0** ships without the in-app license gate — download and open, no sign-in.
+
+For the future full release:
+
 1. Rust checks saved JWT in Application Support (`license_check_local`)
 2. Valid signature → unlock (offline OK)
 3. Missing/invalid → login screen → `verify-license` → save token → unlock

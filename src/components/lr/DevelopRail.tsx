@@ -1,5 +1,4 @@
-// Right rail — Lightroom-order develop panels. Controls are registry-driven
-// (ParamSlider resolves by path; renders nothing if a param is absent).
+// Right rail — tabbed develop panels (Basic / Color / Detail / AI).
 import { useState } from "react";
 import type { ImageMeta } from "../../ipc/types";
 import { useUiStore } from "../../state/uiStore";
@@ -10,6 +9,8 @@ import { ColorGrading } from "./ColorGrading";
 import { HslPicker } from "./HslPicker";
 import { ToneCurve } from "./ToneCurve";
 import { Icon, Panel, ParamSlider, useRegistry } from "./widgets";
+
+type RailTab = "basic" | "color" | "detail" | "ai";
 
 function ToolStrip() {
   const tool = useUiStore((s) => s.tool);
@@ -123,32 +124,65 @@ function GroupPanel({
 
 export function DevelopRail({ meta }: { meta: ImageMeta | null }) {
   const specs = useRegistry();
+  const [tab, setTab] = useState<RailTab>("basic");
+
   return (
     <div className="lr-right">
       <div className="lr-histogram-pin">
         <Histogram />
       </div>
       <ToolStrip />
-      <Panel title="AI Color Grader" className="ai-panel">
-        <AiGrader />
-      </Panel>
-      <Basic meta={meta} />
-      <Panel title="Tone Curve" defaultOpen={false}>
-        <ToneCurve />
-        <div className="lr-divider" />
-        <ParamSlider specs={specs} path="tone_curve.highlights" label="Highlights" meta={meta} />
-        <ParamSlider specs={specs} path="tone_curve.lights" label="Lights" meta={meta} />
-        <ParamSlider specs={specs} path="tone_curve.darks" label="Darks" meta={meta} />
-        <ParamSlider specs={specs} path="tone_curve.shadows" label="Shadows" meta={meta} />
-      </Panel>
-      <Panel title="HSL / Color" defaultOpen={false}>
-        <HslPicker specs={specs} meta={meta} />
-      </Panel>
-      <Panel title="Color Grading" defaultOpen={false}>
-        <ColorGrading specs={specs} meta={meta} />
-      </Panel>
-      <GroupPanel title="Detail" group="Detail" meta={meta} />
-      <GroupPanel title="Calibration" group="Calibration" meta={meta} />
+      <div className="lr-rail-tabs">
+        {(
+          [
+            ["basic", "Basic"],
+            ["color", "Color"],
+            ["detail", "Detail"],
+            ["ai", "AI"],
+          ] as const
+        ).map(([id, label]) => (
+          <button
+            key={id}
+            type="button"
+            className={`lr-rail-tab ${tab === id ? "active" : ""}`}
+            onClick={() => setTab(id)}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+      <div className="lr-rail-tab-body">
+        {tab === "basic" && <Basic meta={meta} />}
+        {tab === "color" && (
+          <>
+            <Panel title="Tone Curve" defaultOpen>
+              <ToneCurve />
+              <div className="lr-divider" />
+              <ParamSlider specs={specs} path="tone_curve.highlights" label="Highlights" meta={meta} />
+              <ParamSlider specs={specs} path="tone_curve.lights" label="Lights" meta={meta} />
+              <ParamSlider specs={specs} path="tone_curve.darks" label="Darks" meta={meta} />
+              <ParamSlider specs={specs} path="tone_curve.shadows" label="Shadows" meta={meta} />
+            </Panel>
+            <Panel title="HSL / Color" defaultOpen>
+              <HslPicker specs={specs} meta={meta} />
+            </Panel>
+            <Panel title="Color Grading" defaultOpen={false}>
+              <ColorGrading specs={specs} meta={meta} />
+            </Panel>
+          </>
+        )}
+        {tab === "detail" && (
+          <>
+            <GroupPanel title="Detail" group="Detail" meta={meta} defaultOpen />
+            <GroupPanel title="Calibration" group="Calibration" meta={meta} defaultOpen />
+          </>
+        )}
+        {tab === "ai" && (
+          <Panel title="AI Color Grader" className="ai-panel" defaultOpen>
+            <AiGrader />
+          </Panel>
+        )}
+      </div>
     </div>
   );
 }

@@ -1,8 +1,11 @@
 node_modules/
 dist/
+release/
 src-tauri/target/
+src-tauri/core/target/
 src-tauri/gen/schemas/
 *.log
+*.mrt.json.tmp
 .DS_Store
 .env
 .env.local

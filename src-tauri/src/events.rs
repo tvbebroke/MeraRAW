@@ -3,7 +3,6 @@
 use tauri::{AppHandle, Emitter};
 
 pub const ENGINE_READY: &str = "engine-ready";
-#[allow(dead_code)]
 pub const LOG: &str = "log";
 pub const FILE_OPENED: &str = "file-opened";
 pub const FOLDER_OPENED: &str = "folder-opened";
@@ -16,6 +15,8 @@ pub const MASK_READY: &str = "mask-ready";
 pub const IMPORT_PROGRESS: &str = "import-progress";
 pub const IMPORT_DONE: &str = "import-done";
 pub const CATALOG_CHANGED: &str = "catalog-changed";
+pub const EXPORT_PROGRESS: &str = "export-progress";
+pub const ENGINE_CRASHED: &str = "engine-crashed";
 
 /// Forward core EngineEvents to the webview as named events (contract C3).
 pub fn forward_engine_event(app: &AppHandle, ev: meratech_core::message::EngineEvent) {
@@ -32,6 +33,11 @@ pub fn forward_engine_event(app: &AppHandle, ev: meratech_core::message::EngineE
         }
         E::ImportDone { total } => app.emit(IMPORT_DONE, total),
         E::CatalogChanged => app.emit(CATALOG_CHANGED, ()),
+        E::ExportProgress { phase, done, total } => app.emit(
+            EXPORT_PROGRESS,
+            serde_json::json!({"phase": phase, "done": done, "total": total}),
+        ),
+        E::EngineCrashed { message } => app.emit(ENGINE_CRASHED, message.clone()),
     };
     if let Err(e) = result {
         tracing::error!(error = %e, "forward engine event failed");

@@ -131,6 +131,7 @@ fn main() {
             commands::verify_slider_enabled,
             commands::fail_on_purpose,
             commands::report_frontend_status,
+            commands::reveal_in_finder,
             license::license_check_local,
             license::license_save_token,
             license::license_clear_token,

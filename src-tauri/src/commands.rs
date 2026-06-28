@@ -274,9 +274,22 @@ pub async fn wb_from_point(
 
 #[tauri::command]
 pub async fn export_image(
+    app: AppHandle,
     engine: State<'_, EngineHandle>,
-    settings: meratech_core::export::ExportSettings,
+    mut settings: meratech_core::export::ExportSettings,
 ) -> Result<String, AppError> {
+    if settings.dest_dir.trim().is_empty() {
+        let (tx, rx) = tokio::sync::oneshot::channel();
+        app.dialog().file().pick_folder(move |f| {
+            let _ = tx.send(f);
+        });
+        let picked = rx
+            .await
+            .map_err(|_| AppError::Internal("dialog dropped".into()))?;
+        settings.dest_dir = picked
+            .map(|p| p.to_string())
+            .ok_or_else(|| AppError::InvalidOp("export cancelled".into()))?;
+    }
     engine.export_image(settings).await?.map_err(AppError::from)
 }
 
@@ -403,6 +416,39 @@ pub async fn fail_on_purpose() -> Result<(), AppError> {
 #[tauri::command]
 pub async fn report_frontend_status(status: String) -> Result<(), AppError> {
     tracing::info!(status = %status, "FRONTEND-REPORT");
+    Ok(())
+}
+
+/// Reveal an exported file in Finder (macOS) or the system file manager.
+#[tauri::command]
+pub async fn reveal_in_finder(path: String) -> Result<(), AppError> {
+    let p = PathBuf::from(&path);
+    if !p.exists() {
+        return Err(AppError::NotFound(path));
+    }
+    #[cfg(target_os = "macos")]
+    {
+        std::process::Command::new("open")
+            .args(["-R", &path])
+            .spawn()
+            .map_err(|e| AppError::Internal(e.to_string()))?;
+    }
+    #[cfg(target_os = "windows")]
+    {
+        std::process::Command::new("explorer")
+            .args(["/select,", &path])
+            .spawn()
+            .map_err(|e| AppError::Internal(e.to_string()))?;
+    }
+    #[cfg(all(unix, not(target_os = "macos")))]
+    {
+        if let Some(parent) = p.parent() {
+            std::process::Command::new("xdg-open")
+                .arg(parent)
+                .spawn()
+                .map_err(|e| AppError::Internal(e.to_string()))?;
+        }
+    }
     Ok(())
 }
 

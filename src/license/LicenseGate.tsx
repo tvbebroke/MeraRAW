@@ -4,6 +4,18 @@ import { PURCHASE_URL } from "../config";
 
 type GateState = "checking" | "locked" | "unlocked";
 
+/** Tauri AppError serializes as `{ Internal: "message" }`, not `{ message }`. */
+function formatInvokeError(err: unknown): string {
+  if (typeof err === "string") return err;
+  if (err && typeof err === "object") {
+    const o = err as Record<string, unknown>;
+    if (typeof o.message === "string") return o.message;
+    const kind = Object.keys(o)[0];
+    if (kind && typeof o[kind] === "string") return o[kind] as string;
+  }
+  return String(err);
+}
+
 export function LicenseGate({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<GateState>("checking");
   const [email, setEmail] = useState("");
@@ -47,11 +59,7 @@ export function LicenseGate({ children }: { children: React.ReactNode }) {
       setUserId(userId || null);
       setState("unlocked");
     } catch (err) {
-      const msg =
-        typeof err === "object" && err !== null && "message" in err
-          ? String((err as { message: unknown }).message)
-          : String(err);
-      setError(msg);
+      setError(formatInvokeError(err));
     } finally {
       setBusy(false);
     }
@@ -135,7 +143,20 @@ export function LicenseGate({ children }: { children: React.ReactNode }) {
               required
             />
           </label>
-          {error ? <div className="license-error">{error}</div> : null}
+          {error ? (
+            <div className="license-error">
+              {error}
+              {error === "Load failed" ? (
+                <p className="muted sm" style={{ marginTop: 8 }}>
+                  This usually means an older build is installed. Quit the app, install the
+                  latest DMG from{" "}
+                  <code style={{ fontSize: 11 }}>release/MeraRAW Beta 0.1.0.dmg</code> after{" "}
+                  <code style={{ fontSize: 11 }}>git pull && ./scripts/release-beta.sh</code>, or
+                  run <code style={{ fontSize: 11 }}>npm run tauri dev</code> from the repo.
+                </p>
+              ) : null}
+            </div>
+          ) : null}
           <button type="submit" className="license-submit" disabled={busy}>
             {busy ? "Activating…" : "Sign in & activate"}
           </button>
@@ -146,6 +167,8 @@ export function LicenseGate({ children }: { children: React.ReactNode }) {
           <a href={PURCHASE_URL} target="_blank" rel="noreferrer">
             Sign up free on meratech.co
           </a>
+          <br />
+          <span style={{ opacity: 0.6 }}>Build 0.1.0 · native sign-in</span>
         </p>
       </div>
     </div>

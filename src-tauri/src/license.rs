@@ -13,7 +13,9 @@ const TOKEN_FILE: &str = "license.jwt";
 struct LicenseClaims {
     sub: String,
     status: String,
+    #[allow(dead_code)]
     exp: i64,
+    #[allow(dead_code)]
     iat: i64,
 }
 
@@ -48,11 +50,10 @@ fn verify_token(token: &str) -> Result<LicenseClaims, AppError> {
 
 #[tauri::command]
 pub fn license_check_local(app: AppHandle) -> LicenseCheckResult {
-    #[cfg(debug_assertions)]
     if std::env::var("MERARAW_SKIP_LICENSE").ok().as_deref() == Some("1") {
         return LicenseCheckResult {
             licensed: true,
-            user_id: Some("dev-skip".into()),
+            user_id: Some("beta-skip".into()),
             reason: None,
         };
     }

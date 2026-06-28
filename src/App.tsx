@@ -14,6 +14,7 @@ import {
 import {
   onDecodeError,
   onDocUpdated,
+  onEngineCrashed,
   onEngineReady,
   onFileOpened,
   onImageReady,
@@ -82,27 +83,19 @@ export default function App() {
     const unlistens = [
       onEngineReady((p) => setEngineReady(p.adapter)),
       onFileOpened((path) => void open(path)),
-      onPreviewReady(() => setStatus("preview (decoding…)")),
+      onPreviewReady(() => setStatus("preview · decoding…")),
       onImageReady((version) => {
         setDecodeState("ready");
-        setStatus("ready");
+        setStatus("ready · export OK");
         reportFrontendStatus("image-ready-drawn").catch(() => {});
         if (!window.__meratechRan) {
           window.__meratechRan = true;
-          void (async () => {
-            const { invoke } = await import("@tauri-apps/api/core");
-            if (await invoke<boolean>("selftest_enabled")) {
-              const { runSelfTest } = await import("./selftest");
-              void runSelfTest(version);
-            } else if (await invoke<boolean>("live_assistant_enabled")) {
-              const { runLiveAssistant } = await import("./liveassistant");
-              void runLiveAssistant();
-            } else if (await invoke<boolean>("verify_slider_enabled").catch(() => false)) {
-              const { verifySlider } = await import("./verifyslider");
-              void verifySlider();
-            }
-          })();
+          void import("./devHarness").then(({ runDevHarness }) => runDevHarness(version));
         }
+      }),
+      onEngineCrashed((m) => {
+        setDecodeState("error");
+        setStatus(`engine crashed — restart app (${m})`);
       }),
       onDecodeError((m) => {
         setDecodeState("error");

@@ -6,6 +6,7 @@ import type {
   DocDelta,
   EditDocMirror,
   EngineStatus,
+  ExportSettings,
   FileMeta,
   FrameInfo,
   ImageMeta,
@@ -156,8 +157,12 @@ export function setPreviewBypass(on: boolean): Promise<void> {
 
 // ---- Phase 7: export + presets ----
 
-export function exportImage(settings: unknown): Promise<string> {
+export function exportImage(settings: ExportSettings): Promise<string> {
   return invoke<string>("export_image", { settings });
+}
+
+export function revealInFinder(path: string): Promise<void> {
+  return invoke<void>("reveal_in_finder", { path });
 }
 
 export function listPresets(): Promise<string[]> {

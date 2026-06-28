@@ -14,7 +14,7 @@ A complete map of the current React/TypeScript UI: component tree, state, the IP
 - Plain CSS with CSS variables (no framework). Dark, neutral theme (must not bias color judgement).
 - Custom URI protocols for binary pixels: `frame://` (viewport) and `thumb://` (grid).
 
-No component library, no router, no CSS-in-JS. ~17 source files.
+No component library, no router, no CSS-in-JS. ~25 source files under `src/`.
 
 ---
 
@@ -39,7 +39,7 @@ No component library, no router, no CSS-in-JS. ~17 source files.
 
 Two top-level modes (`App.tsx` local `mode` state): **Library** (lighttable) and **Develop**.
 The Develop view is a 3-column grid: `[220px file] [1fr viewport+filmstrip] [280px right rail]`.
-The **right rail** stacks, top to bottom: Histogram · Info · Assistant · Masks · Develop sliders · Export & Presets. (This rail is the most crowded surface and the prime candidate for redesign — see §9.)
+The **right rail** uses tabs (Basic · Color · Detail · AI) with histogram + tool strip always visible.
 
 ---
 
@@ -52,15 +52,17 @@ App.tsx ............. mode switch, open-image flow, event wiring, status bar
 │   │                keyboard culling (0-5 rate, P pick, X reject, ⏎ develop)
 │   └─ <Filmstrip>   horizontal strip shown under the Develop viewport
 ├─ viewport/Viewport.tsx
-│                    canvas; draws frame:// bytes; wheel-zoom, drag-pan,
+│                    frame:// JPEG preview; wheel-zoom, drag-pan,
 │                    dbl-click fit/1:1; WB-eyedropper + brush-paint pointer modes
-├─ components/Histogram.tsx   RGB histogram canvas + clip % (settle-driven)
-├─ components/AssistantPanel.tsx  chat: text input, Auto, Explain; tool-call ticker
-├─ components/MasksPanel.tsx  create (subject/bg/sky/radial/linear/brush),
-│                             select, overlay (👁), opacity/feather/invert, delete
-├─ components/DevelopPanel.tsx  registry-driven sliders grouped in <details>;
-│                               undo/redo; WB eyedropper toggle; history list
-└─ components/ExportPanel.tsx  format/space/size, Export, save/apply presets
+├─ components/lr/DevelopRail.tsx   tabbed panels: Basic, Color, Detail, AI
+│   ├─ Histogram (pinned)
+│   ├─ ToolStrip + MasksPanel (toggle)
+│   ├─ Basic sliders (registry-driven ParamSlider)
+│   ├─ ToneCurve, HslPicker, ColorGrading
+│   └─ AiGrader (Claude assistant)
+├─ components/lr/LeftPanel.tsx     presets, snapshots, history
+├─ components/lr/ExportDialog.tsx modal export (format/space/size + progress)
+└─ components/lr/Toolbar.tsx       viewport toolbar
 ```
 
 State + IPC live outside components:
@@ -136,6 +138,8 @@ Grouped by concern. All are `async`, return typed results, throw typed `AppError
 | `import-progress` | {done,total} | progress text |
 | `import-done` | total | refresh grid |
 | `catalog-changed` | — | refresh grid/filmstrip |
+| `export-progress` | {phase,done,total} | export dialog progress bar |
+| `engine-crashed` | message | status bar error; restart app |
 | `file-opened`/`folder-opened` | path | menu-driven open |
 | `assistant-progress` | {kind,label} | tool-call ticker (kind: "tool"\|"text"\|"done") |
 
@@ -181,7 +185,7 @@ FrameStats  { bins, r[], g[], b[], luma[], clipHighPct, clipLowPct }
 
 ## 8. The registry-driven control pattern (important to preserve)
 
-`DevelopPanel` does **not** hard-code sliders. On mount it calls `getRegistry()` → `ParamSpec[]`, groups by `ui.group`, and renders one `<SliderControl>` per `f32` spec. Each slider:
+`DevelopRail` / `ParamSlider` (in `components/lr/widgets.tsx`) do **not** hard-code every slider. On mount `useRegistry()` calls `getRegistry()` → `ParamSpec[]`. Each `ParamSlider` resolves one path from the registry.
 1. reads its effective value from the doc mirror (or registry default, or as-shot for WB temp),
 2. on change dispatches `setParam(path, value)` → `DocDelta` → `reconcile`,
 3. when a mask is selected, the path is rewritten to `mask.<id>.<param>` — the **same sliders edit mask-scoped params** (one code path, global and local).
@@ -219,7 +223,8 @@ Candid list — this is where a UI pass would add the most:
 ## 10. Files to read when implementing
 
 - `src/App.tsx` — composition, mode switch, event wiring
-- `src/components/DevelopPanel.tsx` — the registry→sliders pattern (the model to follow)
+- `src/components/lr/DevelopRail.tsx` — tabbed develop rail
+- `src/components/lr/widgets.tsx` — registry→ParamSlider pattern (the model to follow)
 - `src/state/docStore.ts` + `src/ipc/events.ts` — the reconcile loop
 - `src/ipc/commands.ts` + `src/ipc/types.ts` — the full callable surface + shapes
 - `src/viewport/Viewport.tsx` — canvas, view math, pointer tools

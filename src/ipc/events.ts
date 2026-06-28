@@ -12,6 +12,8 @@ export const EVENTS = {
   decodeError: "decode-error",
   docUpdated: "doc-updated",
   maskReady: "mask-ready",
+  exportProgress: "export-progress",
+  engineCrashed: "engine-crashed",
 } as const;
 
 export function onMaskReady(cb: (id: string) => void): Promise<UnlistenFn> {
@@ -48,6 +50,18 @@ export function onFrameReady(cb: (version: number) => void): Promise<UnlistenFn>
 
 export function onDecodeError(cb: (message: string) => void): Promise<UnlistenFn> {
   return listen<string>(EVENTS.decodeError, (e) => cb(e.payload));
+}
+
+export function onExportProgress(
+  cb: (p: import("./types").ExportProgress) => void,
+): Promise<UnlistenFn> {
+  return listen<import("./types").ExportProgress>(EVENTS.exportProgress, (e) =>
+    cb(e.payload),
+  );
+}
+
+export function onEngineCrashed(cb: (message: string) => void): Promise<UnlistenFn> {
+  return listen<string>(EVENTS.engineCrashed, (e) => cb(e.payload));
 }
 
 export function onDocUpdated(

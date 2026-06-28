@@ -42,6 +42,8 @@ cargo run -p meratech-core --release --example mask_check    -- <raw>   # P4 sub
 cargo run -p meratech-core --release --example export_check  -- <raw>   # P7 ICC export
 ```
 
+Diagnostic-only examples (import probe, DCP index, etc.): see [docs/dev-tools.md](docs/dev-tools.md).
+
 Assistant: set `ANTHROPIC_API_KEY` (and optionally `ANTHROPIC_MODEL`) — or `MERATECH_ASSISTANT_MOCK=1` for the offline canned loop.
 
 ## Architecture spine (the four frozen contracts)
@@ -51,7 +53,9 @@ Assistant: set `ANTHROPIC_API_KEY` (and optionally `ANTHROPIC_MODEL`) — or `ME
 - **Ops + guard-wall** (`core/src/ops.rs`) — the ONLY write path to the doc; UI and Claude use identical ops; undo = doc-state capture.
 - **Working texture** — linear Rec.2020 scene-referred RGBA16F, orientation baked, headroom preserved.
 
-Render graph (`core/src/graph/`): extract (view region @ viewport res) → exposure → white_balance → calibration → noise → color_grade → hsl → tone_curve → sharpen → mask stage (scoped stacks + blend) → present (pinned neutral view transform). Cache-the-chain re-runs only from the first dirty stage. Export runs the same chain tiled at full res and reads LINEAR output for the real delivery transform.
+Render graph (`core/src/graph/`): extract (view region @ viewport res) → exposure → white_balance → calibration → noise → color_grade → hsl → tone_curve → sharpen → mask stage (scoped stacks + blend) → present (pinned neutral view transform). Cache-the-chain re-runs only from the first dirty stage. Export runs the same chain tiled at full res, applies bundled **DCP camera look** per tile, then the delivery transform.
+
+Sidecar priority: `<name>.mrt.json` (canonical) → Adobe `<name>.xmp` (basic Lightroom sliders) → fresh doc.
 
 ## Pinned deviations from the specs (all noted at decision time)
 
@@ -59,7 +63,7 @@ Render graph (`core/src/graph/`): extract (view region @ viewport res) → expos
 - Perceptual space = **Oklab**, not Yrg/JzAzBz (reference §9 forbids from-memory constants; same constant-hue class, constants verified).
 - Sky segmentation = spectral heuristic; object-by-point = region-grow (placeholders behind the `Segmenter` trait; u2netp subject is the real model).
 - Undo via doc snapshots (docs ~KB) instead of op inverses.
-- Catalog search = indexed LIKE (FTS5 swap-in ready); collections + XMP preset import deferred.
+- Catalog search = indexed LIKE (FTS5 swap-in ready); collections deferred.
 - ICC embed implemented for JPEG (system ColorSync profiles); PNG/TIFF written in-space without embedded profile.
-- `dcp_look` module deferred (no DCP file available in this environment).
+- Adobe XMP sidecar import = basic develop sliders only (exposure, WB, tone, sharpen); full Lightroom stacks not supported.
 - Full-res settle render: interactive chain runs at viewport res (per-pixel modules are resolution-exact; spatial noise/sharpen approximate at fit zoom — exact at 1:1 and in export).
