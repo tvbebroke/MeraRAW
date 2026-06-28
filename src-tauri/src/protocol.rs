@@ -4,10 +4,31 @@
 //! test frame; Phase 1/2 swap in real render output.
 
 use meratech_core::engine::EngineHandle;
+use std::sync::{Mutex, OnceLock};
 use tauri::{http, Manager, Runtime, UriSchemeContext, UriSchemeResponder};
 
 const TEST_FRAME_W: u32 = 960;
 const TEST_FRAME_H: u32 = 600;
+
+/// Last JPEG-encoded frame, keyed by version — so the same render isn't
+/// re-encoded on a repeat fetch (startup probe, remount, etc.).
+fn jpeg_cache() -> &'static Mutex<Option<(u64, Vec<u8>)>> {
+    static C: OnceLock<Mutex<Option<(u64, Vec<u8>)>>> = OnceLock::new();
+    C.get_or_init(|| Mutex::new(None))
+}
+
+/// Return the cached JPEG for `version`, or encode + cache it now.
+fn frame_jpeg(frame: &meratech_core::message::Frame) -> Result<Vec<u8>, String> {
+    if let Some((v, bytes)) = jpeg_cache().lock().unwrap().as_ref() {
+        if *v == frame.version {
+            return Ok(bytes.clone());
+        }
+    }
+    let bytes = meratech_core::image::rgba8_to_jpeg(&frame.rgba, frame.width, frame.height, 88)
+        .map_err(|e| e.to_string())?;
+    *jpeg_cache().lock().unwrap() = Some((frame.version, bytes.clone()));
+    Ok(bytes)
+}
 
 /// thumb://localhost/<asset_id>?tier=t|p → preview JPEG bytes (contract C5
 /// sibling for the P5 grid).
@@ -71,12 +92,7 @@ pub fn handle_frame_request<R: Runtime>(
         match frame {
             Ok(frame) => {
                 let resp = if uri.contains("fmt=jpeg") {
-                    match meratech_core::image::rgba8_to_jpeg(
-                        &frame.rgba,
-                        frame.width,
-                        frame.height,
-                        88,
-                    ) {
+                    match frame_jpeg(&frame) {
                         Ok(bytes) => http::Response::builder()
                             .status(200)
                             .header("Content-Type", "image/jpeg")

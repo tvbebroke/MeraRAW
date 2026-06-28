@@ -57,12 +57,16 @@ export function closeImage(): Promise<void> {
 
 // ---- Phase 2: doc ops ----
 
-export function applyOp(op: Op): Promise<DocDelta> {
-  return invoke<DocDelta>("apply_op", { op });
+export function applyOp(op: Op, live = false): Promise<DocDelta> {
+  return invoke<DocDelta>("apply_op", { op, live });
 }
 
-export function setParam(path: string, value: unknown): Promise<DocDelta> {
-  return applyOp({ op: "set_param", path, value });
+export function setParam(
+  path: string,
+  value: unknown,
+  live = false,
+): Promise<DocDelta> {
+  return applyOp({ op: "set_param", path, value }, live);
 }
 
 export function undo(): Promise<DocDelta> {

@@ -2,12 +2,22 @@ use super::Engine;
 use super::*;
 
 impl Engine {
-    pub(super) fn do_apply_op(&mut self, op: Op) -> Result<DocDelta, CoreError> {
+    pub(super) fn do_apply_op(&mut self, op: Op, live: bool) -> Result<DocDelta, CoreError> {
         let c = self.current.as_mut().ok_or(CoreError::NoImage)?;
         let before = c.doc().clone();
         let new_mask_id = ops::apply_op(c.doc_mut(), &op)?;
         let label = op.label();
-        c.history.record(before, label.clone());
+        // Undo coalescing: a live drag records nothing per-tick — it just stashes
+        // the pre-gesture state once. The committing (non-live) op folds the whole
+        // gesture into a single undo entry from that stashed state.
+        if live {
+            if c.gesture_before.is_none() {
+                c.gesture_before = Some(before);
+            }
+        } else {
+            let base = c.gesture_before.take().unwrap_or(before);
+            c.history.record(base, label.clone());
+        }
         c.doc_dirty = true;
         let delta = c.delta(label, new_mask_id);
         match op.affected_module() {

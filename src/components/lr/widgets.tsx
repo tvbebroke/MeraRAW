@@ -167,14 +167,17 @@ export function useParam(spec: ParamSpec, meta?: ImageMeta | null): ParamHandle 
 
   const [drag, setDrag] = useState<number | null>(null);
   const value = drag ?? docVal ?? fallback;
-  const throttle = useRef(0);
   /** Bumps on each outbound setParam; stale responses are ignored. */
   const opSeq = useRef(0);
+  /** Latest value waiting to be sent while a request is in flight. */
+  const pendingLive = useRef<number | null>(null);
+  const inFlight = useRef(false);
 
   const sendParam = useCallback(
     (v: number, clearDragOnSuccess: boolean) => {
       const seq = ++opSeq.current;
-      return setParam(targetPath, v)
+      // live during the drag (coalesced to one undo step); commit on release
+      return setParam(targetPath, v, !clearDragOnSuccess)
         .then((delta) => {
           if (seq !== opSeq.current) return;
           reconcile(delta);
@@ -187,20 +190,32 @@ export function useParam(spec: ParamSpec, meta?: ImageMeta | null): ParamHandle 
     [targetPath, reconcile],
   );
 
+  // In-flight coalescing: send the newest value immediately; while one is
+  // outstanding, keep only the latest and fire it the moment the previous
+  // resolves. No fixed throttle delay, never drops the final value, and the
+  // send rate self-limits to whatever the engine can keep up with.
+  const pumpLive = useCallback(() => {
+    if (inFlight.current || pendingLive.current === null) return;
+    const v = pendingLive.current;
+    pendingLive.current = null;
+    inFlight.current = true;
+    void sendParam(v, false).finally(() => {
+      inFlight.current = false;
+      pumpLive();
+    });
+  }, [sendParam]);
+
   const setLive = useCallback(
     (v: number) => {
       setDrag(v);
-      const now = performance.now();
-      if (now - throttle.current > 16) {
-        throttle.current = now;
-        void sendParam(v, false);
-      }
+      pendingLive.current = v;
+      pumpLive();
     },
-    [sendParam],
+    [pumpLive],
   );
   const commit = useCallback(
     (v: number) => {
-      throttle.current = performance.now();
+      pendingLive.current = null; // supersede any queued live value
       void sendParam(v, true);
     },
     [sendParam],

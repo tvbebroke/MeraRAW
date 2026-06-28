@@ -29,7 +29,9 @@ mod render;
 
 use doc_ops::{list_presets, load_preset};
 
-const RENDER_DEBOUNCE: Duration = Duration::from_millis(8);
+// Small enough to feel immediate on a slider drag, large enough to still
+// coalesce op storms (the timer resets on each op, so a burst renders once).
+const RENDER_DEBOUNCE: Duration = Duration::from_millis(3);
 const SETTLE_DEBOUNCE: Duration = Duration::from_millis(600);
 
 #[derive(Debug, thiserror::Error)]
@@ -104,7 +106,15 @@ impl EngineHandle {
     }
 
     pub async fn apply_op(&self, op: Op) -> Result<Result<DocDelta, CoreError>, EngineError> {
-        self.request(|reply| EngineMsg::ApplyOp { op, reply }).await
+        self.request(|reply| EngineMsg::ApplyOp { op, live: false, reply })
+            .await
+    }
+
+    /// Live (interactive drag) variant — coalesced into one undo entry per
+    /// gesture; the committing `apply_op` closes the gesture.
+    pub async fn apply_op_live(&self, op: Op) -> Result<Result<DocDelta, CoreError>, EngineError> {
+        self.request(|reply| EngineMsg::ApplyOp { op, live: true, reply })
+            .await
     }
 
     pub async fn undo(&self) -> Result<Result<DocDelta, CoreError>, EngineError> {
@@ -331,6 +341,9 @@ struct CurrentImage {
     active_doc: usize,
     history: History,
     snapshots: Vec<(String, EditDoc)>,
+    /// Doc state at the start of an interactive (live) gesture; on commit it
+    /// becomes the single undo entry for the whole drag. None when idle.
+    gesture_before: Option<EditDoc>,
     doc_dirty: bool, // unsaved sidecar changes (primary doc only)
     /// Segmentation cache: mask id → (source hash, uploaded small mask).
     masks_gpu: std::collections::HashMap<String, (u64, wgpu::Texture)>,
@@ -589,8 +602,8 @@ impl Engine {
                 let _ = reply.send(());
             }
             // ---- ops ----
-            EngineMsg::ApplyOp { op, reply } => {
-                let result = self.do_apply_op(op);
+            EngineMsg::ApplyOp { op, live, reply } => {
+                let result = self.do_apply_op(op, live);
                 if let Ok(delta) = &result {
                     self.emit(EngineEvent::DocUpdated {
                         delta: serde_json::to_value(delta).unwrap_or_default(),
@@ -804,7 +817,7 @@ impl Engine {
             EngineMsg::ApplyPresetByName { name, reply } => {
                 let result = (|| {
                     let partial = load_preset(&name)?;
-                    self.do_apply_op(Op::ApplyPreset { preset: partial })
+                    self.do_apply_op(Op::ApplyPreset { preset: partial }, false)
                 })();
                 if let Ok(delta) = &result {
                     self.emit(EngineEvent::DocUpdated {

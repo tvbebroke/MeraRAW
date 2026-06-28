@@ -174,8 +174,14 @@ pub async fn close_image(engine: State<'_, EngineHandle>) -> Result<(), AppError
 pub async fn apply_op(
     engine: State<'_, EngineHandle>,
     op: meratech_core::ops::Op,
+    live: Option<bool>,
 ) -> Result<meratech_core::ops::DocDelta, AppError> {
-    engine.apply_op(op).await?.map_err(AppError::from)
+    let res = if live.unwrap_or(false) {
+        engine.apply_op_live(op).await
+    } else {
+        engine.apply_op(op).await
+    };
+    res?.map_err(AppError::from)
 }
 
 #[tauri::command]

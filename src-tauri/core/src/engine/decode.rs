@@ -76,6 +76,7 @@ impl Engine {
             active_doc: 0,
             history: History::default(),
             snapshots: Vec::new(),
+            gesture_before: None,
             doc_dirty: false,
             masks_gpu: Default::default(),
             pending_segments: Default::default(),

@@ -64,6 +64,7 @@ export function Viewport() {
   const view = useRef<ViewState>({ scale: null, centerX: 0.5, centerY: 0.5 });
   const shownVer = useRef(0);
   const pendingVer = useRef(0);
+  const objUrl = useRef<string | null>(null);
   const inFlight = useRef(false);
   const pending = useRef(false);
   const dragging = useRef<{ x: number; y: number } | null>(null);
@@ -85,19 +86,39 @@ export function Viewport() {
     (version: number) => {
       if (version <= shownVer.current) return;
       pendingVer.current = version;
-      const url = frameUrl(version, "jpeg");
-      const probe = new Image();
-      probe.onload = () => {
-        if (pendingVer.current !== version) return;
-        shownVer.current = version;
-        setDisplaySrc(url);
-        setError(null);
-        requestAnimationFrame(() => updateZoomLabel());
-      };
-      probe.onerror = () => {
-        if (pendingVer.current === version) setError("frame transport failed");
-      };
-      probe.src = url;
+      // Single network round-trip: fetch the frame once, hold it as an
+      // in-memory blob, and display that. The <img> reads from the object URL
+      // (memory) instead of hitting frame:// a second time — which would
+      // re-run get_frame + JPEG encode. Preload from the blob keeps the swap
+      // flash-free.
+      fetch(frameUrl(version, "jpeg"))
+        .then((r) => (r.ok ? r.blob() : Promise.reject(new Error(`http ${r.status}`))))
+        .then((blob) => {
+          if (pendingVer.current !== version) return; // a newer frame won
+          const obj = URL.createObjectURL(blob);
+          const probe = new Image();
+          probe.onload = () => {
+            if (pendingVer.current !== version) {
+              URL.revokeObjectURL(obj);
+              return;
+            }
+            shownVer.current = version;
+            const prev = objUrl.current;
+            objUrl.current = obj;
+            setDisplaySrc(obj);
+            if (prev) URL.revokeObjectURL(prev);
+            setError(null);
+            requestAnimationFrame(() => updateZoomLabel());
+          };
+          probe.onerror = () => {
+            URL.revokeObjectURL(obj);
+            if (pendingVer.current === version) setError("frame transport failed");
+          };
+          probe.src = obj; // in-memory, no network
+        })
+        .catch(() => {
+          if (pendingVer.current === version) setError("frame transport failed");
+        });
     },
     [updateZoomLabel],
   );
@@ -143,6 +164,10 @@ export function Viewport() {
     shownVer.current = 0;
     pendingVer.current = 0;
     setDisplaySrc(null);
+    if (objUrl.current) {
+      URL.revokeObjectURL(objUrl.current);
+      objUrl.current = null;
+    }
   }, [lastOpenedPath]);
 
   useEffect(() => {

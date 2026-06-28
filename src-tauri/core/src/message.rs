@@ -135,6 +135,8 @@ pub enum EngineMsg {
     // ---- Phase 2: ops on the canonical doc ----
     ApplyOp {
         op: crate::ops::Op,
+        /// true during an interactive drag — coalesce into one undo entry.
+        live: bool,
         reply: oneshot::Sender<Result<crate::ops::DocDelta, CoreError>>,
     },
     Undo {
