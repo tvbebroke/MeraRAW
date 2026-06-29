@@ -16,7 +16,7 @@ mod resources;
 pub use config::NODES;
 pub use resources::upload_small_mask;
 
-use resources::PassResources;
+use resources::{DcpMeta, PassResources};
 use std::collections::HashMap;
 
 /// Index of the mask-composite stage (after the global nodes).
@@ -57,6 +57,18 @@ pub struct RenderGraph {
     last_final: FinalTag,
     /// Display look: 0 = Neutral, 1 = Camera (punchy).
     look: u32,
+
+    // ---- DCP look (GPU port; replaces the CPU readback pass) ----
+    dcp_look: PassResources,
+    dcp_look_uniforms: wgpu::Buffer,
+    /// Looked extract, persisted across renders (only re-run on view change).
+    look_tex: Option<wgpu::Texture>,
+    /// HSV delta tables (map1|map2|look concatenated) + tone LUT, uploaded once
+    /// per profile; `dcp_sig` keys the cache, `dcp_meta` holds offsets/dims.
+    dcp_tables_buf: Option<wgpu::Buffer>,
+    dcp_tone_buf: Option<wgpu::Buffer>,
+    dcp_sig: Option<String>,
+    dcp_meta: Option<DcpMeta>,
 }
 
 #[derive(Clone, Copy)]

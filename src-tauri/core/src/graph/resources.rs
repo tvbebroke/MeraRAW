@@ -75,6 +75,40 @@ pub(super) struct BlendUniforms {
     pub _p1: u32,
 }
 
+/// Per-render uniform for the DCP look pass — field order matches `struct U`
+/// in dcp_look.wgsl exactly (20 scalars, 80 bytes).
+#[repr(C)]
+#[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
+pub(super) struct DcpLookUniforms {
+    pub width: u32,
+    pub height: u32,
+    pub has_map1: u32,
+    pub has_map2: u32,
+    pub has_look: u32,
+    pub tone_size: u32,
+    pub cct_weight: f32,
+    pub baseline_gain: f32,
+    pub m1: [u32; 4], // off, hue_div, sat_div, val_div
+    pub m2: [u32; 4],
+    pub lk: [u32; 4],
+}
+
+/// Profile-dependent look constants, cached with the uploaded tables. Only
+/// width/height/cct_weight vary per render; the rest come from here.
+#[derive(Clone)]
+pub(super) struct DcpMeta {
+    pub has_map1: u32,
+    pub has_map2: u32,
+    pub has_look: u32,
+    pub tone_size: u32,
+    pub baseline_gain: f32,
+    pub t1: f32,
+    pub t2: f32,
+    pub m1: [u32; 4],
+    pub m2: [u32; 4],
+    pub lk: [u32; 4],
+}
+
 pub(super) struct PassResources {
     pub pipeline: wgpu::ComputePipeline,
     pub layout: wgpu::BindGroupLayout,
@@ -380,6 +414,19 @@ impl RenderGraph {
             ],
         );
 
+        let dcp_look = make_pass(
+            gpu,
+            "dcp-look",
+            include_str!("dcp_look.wgsl"),
+            &[
+                bgl_tex(0, false),
+                bgl_storage_tex(1, wgpu::TextureFormat::Rgba16Float),
+                bgl_uniform(2),
+                bgl_storage_buf(3),
+                bgl_storage_buf(4),
+            ],
+        );
+
         let sampler = gpu.device.create_sampler(&wgpu::SamplerDescriptor {
             label: Some("graph-sampler"),
             mag_filter: wgpu::FilterMode::Linear,
@@ -432,6 +479,16 @@ impl RenderGraph {
             last_passes_run: Vec::new(),
             last_final: FinalTag::Extract,
             look: 0,
+            dcp_look,
+            dcp_look_uniforms: mk_uniform(
+                std::mem::size_of::<DcpLookUniforms>() as u64,
+                "dcp-look-u",
+            ),
+            look_tex: None,
+            dcp_tables_buf: None,
+            dcp_tone_buf: None,
+            dcp_sig: None,
+            dcp_meta: None,
         }
     }
 }

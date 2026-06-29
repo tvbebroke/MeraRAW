@@ -3,21 +3,76 @@
 use super::config::{mask_node_configs, node_configs, NodeConfig};
 use super::mask_stage_index;
 use super::resources::{
-    make_chain_tex, make_mask_tex, make_tex, BlendUniforms, ExtractUniforms, MaskGeomUniforms,
-    MaskSampleUniforms, PassResources, PresentUniforms, PipeKind, MAX_STROKE_POINTS, NODE_PIPES,
+    make_chain_tex, make_mask_tex, make_tex, BlendUniforms, DcpLookUniforms, DcpMeta,
+    ExtractUniforms, MaskGeomUniforms, MaskSampleUniforms, PassResources, PresentUniforms,
+    PipeKind, MAX_STROKE_POINTS, NODE_PIPES,
 };
 use super::{FinalTag, RenderGraph, NODES};
 use crate::doc::EditDoc;
 use crate::error::CoreError;
 use crate::gpu::display::ViewParams;
-use crate::gpu::texture_io::{
-    apply_dcp_look_f16, readback_rgba16f_from_texture, rgb_f32_to_rgba_f32, upload_rgba16f,
-};
 use crate::gpu::GpuContext;
+use crate::profile::hue_sat_map::cct_weight;
 use crate::profile::DcpProfile;
 use std::collections::HashMap;
 
 impl RenderGraph {
+    /// Upload the DCP look's HSV delta tables (map1|map2|look, concatenated)
+    /// and tone LUT once per profile. cct only affects the per-render blend
+    /// weight (a uniform), so it is NOT part of the cache key.
+    fn ensure_dcp_tables(&mut self, gpu: &GpuContext, dcp: &DcpProfile) {
+        let sig = format!("{}|{}", dcp.unique_camera_model, dcp.profile_name);
+        if self.dcp_sig.as_deref() == Some(sig.as_str()) {
+            return;
+        }
+        fn pack(
+            tables: &mut Vec<[f32; 4]>,
+            m: &Option<(u32, u32, u32, Vec<[f32; 4]>)>,
+        ) -> (u32, [u32; 4]) {
+            match m {
+                Some((hd, sd, vd, deltas)) => {
+                    let off = tables.len() as u32;
+                    tables.extend_from_slice(deltas);
+                    (1, [off, *hd, *sd, *vd])
+                }
+                None => (0, [0, 0, 0, 0]),
+            }
+        }
+        let data = dcp.look_data();
+        let mut tables: Vec<[f32; 4]> = Vec::new();
+        let (has1, m1) = pack(&mut tables, &data.map1);
+        let (has2, m2) = pack(&mut tables, &data.map2);
+        let (hasl, lk) = pack(&mut tables, &data.look);
+        if tables.is_empty() {
+            tables.push([0.0; 4]); // storage buffers must be non-empty
+        }
+        let make_storage = |label: &str, bytes: &[u8]| -> wgpu::Buffer {
+            let buf = gpu.device.create_buffer(&wgpu::BufferDescriptor {
+                label: Some(label),
+                size: bytes.len() as u64,
+                usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+                mapped_at_creation: false,
+            });
+            gpu.queue.write_buffer(&buf, 0, bytes);
+            buf
+        };
+        self.dcp_tables_buf = Some(make_storage("dcp-tables", bytemuck::cast_slice(&tables)));
+        self.dcp_tone_buf = Some(make_storage("dcp-tone", bytemuck::cast_slice(&data.tone_lut)));
+        self.dcp_meta = Some(DcpMeta {
+            has_map1: has1,
+            has_map2: if has1 == 1 { has2 } else { 0 },
+            has_look: hasl,
+            tone_size: data.tone_lut.len() as u32,
+            baseline_gain: data.baseline_gain,
+            t1: data.ill1_cct,
+            t2: data.ill2_cct,
+            m1,
+            m2,
+            lk,
+        });
+        self.dcp_sig = Some(sig);
+    }
+
     /// Set the display look (false = Neutral, true = Camera/punchy).
     pub fn set_look(&mut self, camera: bool) {
         self.look = camera as u32;
@@ -107,6 +162,7 @@ impl RenderGraph {
 
         if self.cache_size != Some((out_w, out_h)) {
             self.extract_tex = Some(make_chain_tex(gpu, out_w, out_h, "extract-out"));
+            self.look_tex = Some(make_chain_tex(gpu, out_w, out_h, "dcp-look-out"));
             for (i, slot) in self.node_tex.iter_mut().enumerate() {
                 *slot = Some(make_chain_tex(gpu, out_w, out_h, NODES[i].0));
             }
@@ -147,6 +203,14 @@ impl RenderGraph {
         );
 
         let configs = node_configs(doc, as_shot_cct, out_w, out_h);
+
+        // Upload the DCP look tables once per profile (cheap signature check).
+        if view_changed {
+            if let Some(dcp) = dcp_profile.filter(|d| d.has_look()) {
+                self.ensure_dcp_tables(gpu, dcp);
+            }
+        }
+
         let mut encoder = gpu
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
@@ -209,25 +273,78 @@ impl RenderGraph {
             self.last_passes_run.push("extract".into());
         }
 
-        // DCP hue/sat + look table on the extracted viewport buffer (not full-res decode).
-        if run_extract {
-            if let Some(dcp) = dcp_profile.filter(|d| d.has_look()) {
-                gpu.queue.submit([encoder.finish()]);
-                let rgb = readback_rgba16f_from_texture(gpu, extract_tex, out_w, out_h)?;
-                let mut rgba = rgb_f32_to_rgba_f32(&rgb);
-                apply_dcp_look_f16(&mut rgba, dcp, as_shot_cct);
-                upload_rgba16f(gpu, extract_tex, out_w, out_h, &rgba);
-                self.last_passes_run.push("dcp_look".into());
-                encoder = gpu
-                    .device
-                    .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                        label: Some("graph-encoder-post-dcp"),
-                    });
+        // DCP look on the extracted viewport, on the GPU (no readback). Mirrors
+        // the CPU apply_look; runs only on a view change, result persists in
+        // look_tex. Stays in the same encoder — the extract→look read hazard is
+        // handled by the compute-pass boundary.
+        let dcp_active = dcp_profile.filter(|d| d.has_look()).is_some() && self.dcp_meta.is_some();
+        if run_extract && dcp_active {
+            let meta = self.dcp_meta.clone().unwrap();
+            let look_tex = self.look_tex.as_ref().unwrap();
+            let u = DcpLookUniforms {
+                width: out_w,
+                height: out_h,
+                has_map1: meta.has_map1,
+                has_map2: meta.has_map2,
+                has_look: meta.has_look,
+                tone_size: meta.tone_size,
+                cct_weight: cct_weight(as_shot_cct, meta.t1, meta.t2),
+                baseline_gain: meta.baseline_gain,
+                m1: meta.m1,
+                m2: meta.m2,
+                lk: meta.lk,
+            };
+            gpu.queue
+                .write_buffer(&self.dcp_look_uniforms, 0, bytemuck::bytes_of(&u));
+            let bind = gpu.device.create_bind_group(&wgpu::BindGroupDescriptor {
+                label: Some("dcp-look-bind"),
+                layout: &self.dcp_look.layout,
+                entries: &[
+                    wgpu::BindGroupEntry {
+                        binding: 0,
+                        resource: wgpu::BindingResource::TextureView(
+                            &extract_tex.create_view(&Default::default()),
+                        ),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 1,
+                        resource: wgpu::BindingResource::TextureView(
+                            &look_tex.create_view(&Default::default()),
+                        ),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 2,
+                        resource: self.dcp_look_uniforms.as_entire_binding(),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 3,
+                        resource: self.dcp_tables_buf.as_ref().unwrap().as_entire_binding(),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 4,
+                        resource: self.dcp_tone_buf.as_ref().unwrap().as_entire_binding(),
+                    },
+                ],
+            });
+            {
+                let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
+                    label: Some("dcp-look"),
+                    timestamp_writes: None,
+                });
+                pass.set_pipeline(&self.dcp_look.pipeline);
+                pass.set_bind_group(0, &bind, &[]);
+                pass.dispatch_workgroups(out_w.div_ceil(16), out_h.div_ceil(16), 1);
             }
+            self.last_passes_run.push("dcp_look".into());
         }
 
         // ---- global module chain ----
-        let mut upstream: &wgpu::Texture = extract_tex;
+        // When the profile has a look, the chain reads the looked extract.
+        let mut upstream: &wgpu::Texture = if dcp_active {
+            self.look_tex.as_ref().unwrap()
+        } else {
+            extract_tex
+        };
         let mut final_tag = FinalTag::Extract;
         for (i, cfg) in configs.iter().enumerate() {
             let NodeConfig::Run { uniforms, lut } = cfg else {
@@ -767,5 +884,158 @@ fn parse_geometry(
             (2, [0.0; 2], [0.0; 2], 0.0, pts)
         }
         _ => (0, [0.5, 0.5], [0.0, 0.0], 0.0, vec![]),
+    }
+}
+
+#[cfg(test)]
+impl RenderGraph {
+    /// Run only the DCP look pass on a provided RGBA buffer and read it back as
+    /// RGB f32. Used by the GPU-vs-CPU equivalence test.
+    pub fn run_dcp_look_test(
+        &mut self,
+        gpu: &GpuContext,
+        dcp: &DcpProfile,
+        cct: f32,
+        rgba_in: &[f32],
+        w: u32,
+        h: u32,
+    ) -> Vec<f32> {
+        use crate::gpu::texture_io::{readback_rgba16f_from_texture, upload_rgba16f};
+        self.ensure_dcp_tables(gpu, dcp);
+        let meta = self.dcp_meta.clone().unwrap();
+        let in_tex = make_chain_tex(gpu, w, h, "test-dcp-in");
+        let out_tex = make_chain_tex(gpu, w, h, "test-dcp-out");
+        upload_rgba16f(gpu, &in_tex, w, h, rgba_in);
+        let u = DcpLookUniforms {
+            width: w,
+            height: h,
+            has_map1: meta.has_map1,
+            has_map2: meta.has_map2,
+            has_look: meta.has_look,
+            tone_size: meta.tone_size,
+            cct_weight: cct_weight(cct, meta.t1, meta.t2),
+            baseline_gain: meta.baseline_gain,
+            m1: meta.m1,
+            m2: meta.m2,
+            lk: meta.lk,
+        };
+        gpu.queue
+            .write_buffer(&self.dcp_look_uniforms, 0, bytemuck::bytes_of(&u));
+        let bind = gpu.device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("test-dcp-bind"),
+            layout: &self.dcp_look.layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: wgpu::BindingResource::TextureView(
+                        &in_tex.create_view(&Default::default()),
+                    ),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::TextureView(
+                        &out_tex.create_view(&Default::default()),
+                    ),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 2,
+                    resource: self.dcp_look_uniforms.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 3,
+                    resource: self.dcp_tables_buf.as_ref().unwrap().as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 4,
+                    resource: self.dcp_tone_buf.as_ref().unwrap().as_entire_binding(),
+                },
+            ],
+        });
+        let mut encoder = gpu
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
+        {
+            let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
+                label: Some("test-dcp-look"),
+                timestamp_writes: None,
+            });
+            pass.set_pipeline(&self.dcp_look.pipeline);
+            pass.set_bind_group(0, &bind, &[]);
+            pass.dispatch_workgroups(w.div_ceil(16), h.div_ceil(16), 1);
+        }
+        gpu.queue.submit([encoder.finish()]);
+        readback_rgba16f_from_texture(gpu, &out_tex, w, h).unwrap()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::profile::DcpProfile;
+
+    /// The GPU look pass must reproduce the CPU `apply_look` to within f16 +
+    /// LUT-interp tolerance, across a spread of colors including HDR (>1).
+    #[test]
+    fn gpu_dcp_look_matches_cpu() {
+        // find any profile that actually exercises the HSV tables
+        let dir = crate::profile::profiles_dir();
+        let Ok(entries) = std::fs::read_dir(&dir) else {
+            eprintln!("skip: no profiles dir");
+            return;
+        };
+        let mut chosen = None;
+        for e in entries.flatten() {
+            let p = e.path();
+            if p.extension().and_then(|s| s.to_str()) != Some("dcp") {
+                continue;
+            }
+            if let Ok(dcp) = DcpProfile::load(&p) {
+                let d = dcp.look_data();
+                if d.map1.is_some() || d.look.is_some() {
+                    chosen = Some(dcp);
+                    break;
+                }
+            }
+        }
+        let Some(dcp) = chosen else {
+            eprintln!("skip: no profile with HSV maps");
+            return;
+        };
+
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        let gpu = match rt.block_on(GpuContext::init()) {
+            Ok(g) => g,
+            Err(e) => {
+                eprintln!("skip: no GPU: {e}");
+                return;
+            }
+        };
+        let mut graph = RenderGraph::new(&gpu);
+
+        let cct = 5200.0;
+        let samples = [0.02f32, 0.1, 0.18, 0.45, 0.8, 1.25];
+        let mut rgba = Vec::new();
+        let mut cpu: Vec<[f32; 3]> = Vec::new();
+        for &r in &samples {
+            for &g in &samples {
+                for &b in &samples {
+                    rgba.extend_from_slice(&[r, g, b, 1.0]);
+                    cpu.push(dcp.apply_look([r, g, b], cct));
+                }
+            }
+        }
+        let w = cpu.len() as u32;
+        let out = graph.run_dcp_look_test(&gpu, &dcp, cct, &rgba, w, 1);
+
+        let mut max_err = 0f32;
+        for (i, exp) in cpu.iter().enumerate() {
+            for c in 0..3 {
+                max_err = max_err.max((out[i * 3 + c] - exp[c]).abs());
+            }
+        }
+        assert!(max_err < 0.01, "GPU vs CPU dcp_look max abs err = {max_err}");
     }
 }

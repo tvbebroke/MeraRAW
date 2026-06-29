@@ -216,7 +216,7 @@ pub fn apply_look_table(rec2020: [f32; 3], table: &HueSatMap) -> [f32; 3] {
     mat_vec(&PROPHOTO_TO_REC2020, pro)
 }
 
-fn cct_weight(cct: f32, t1: f32, t2: f32) -> f32 {
+pub fn cct_weight(cct: f32, t1: f32, t2: f32) -> f32 {
     if (t1 - t2).abs() < 1.0 {
         return 1.0;
     }

@@ -210,6 +210,19 @@ pub struct DcpProfile {
     baseline_exposure_offset: f32,
 }
 
+/// GPU-upload-ready view of a profile's look (see `DcpProfile::look_data`).
+/// Each map is `(hue_div, sat_div, val_div, deltas)` with deltas packed RGBA.
+pub struct DcpLookData {
+    pub map1: Option<(u32, u32, u32, Vec<[f32; 4]>)>,
+    pub map2: Option<(u32, u32, u32, Vec<[f32; 4]>)>,
+    pub look: Option<(u32, u32, u32, Vec<[f32; 4]>)>,
+    /// tone curve evaluated at LUT_SIZE points over [0,1]
+    pub tone_lut: Vec<f32>,
+    pub baseline_gain: f32,
+    pub ill1_cct: f32,
+    pub ill2_cct: f32,
+}
+
 impl DcpProfile {
     pub fn load(path: &Path) -> Result<Self, CoreError> {
         let data = std::fs::read(path)?;
@@ -382,6 +395,34 @@ impl DcpProfile {
 
     pub fn has_look(&self) -> bool {
         true
+    }
+
+    /// Everything the GPU look pass needs, pulled out of the private fields:
+    /// the (valid) HSV delta tables as RGBA, the tone curve baked to a 1D LUT,
+    /// the baseline-EV gain, and the two illuminant CCTs for the map blend.
+    pub fn look_data(&self) -> DcpLookData {
+        let conv = |m: &HueSatMap| {
+            (
+                m.hue_div,
+                m.sat_div,
+                m.val_div,
+                m.deltas.iter().map(|d| [d[0], d[1], d[2], 0.0]).collect::<Vec<[f32; 4]>>(),
+            )
+        };
+        let valid = |m: &Option<HueSatMap>| m.as_ref().filter(|x| x.is_valid()).map(conv);
+        let n = crate::curve::LUT_SIZE;
+        let tone_lut = (0..n)
+            .map(|i| self.tone_curve.eval(i as f32 / (n - 1) as f32))
+            .collect();
+        DcpLookData {
+            map1: valid(&self.hue_sat_map1),
+            map2: valid(&self.hue_sat_map2),
+            look: valid(&self.look_table),
+            tone_lut,
+            baseline_gain: 2f32.powf(self.baseline_exposure_offset),
+            ill1_cct: self.ill1_cct,
+            ill2_cct: self.ill2_cct,
+        }
     }
 
     /// White-balanced camera RGB → linear Rec.2020 (D65).
