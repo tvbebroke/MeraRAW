@@ -93,11 +93,14 @@ fn main() {
             max_dim: Some(2048),
             sharpen: 35.0,
             dest_dir: format!("{out_dir}/{name}"),
+            strip_metadata: false,
+            copyright: None,
         };
         let (lin, rw, rh) = resize_linear(full.clone(), w, h, 2048);
         let mut enc = output_transform(&lin, rw, rh, target, false, false);
         output_sharpen8(&mut enc.rgb8, rw, rh, settings.sharpen);
-        let p = encode_and_write(&enc, &settings, &path.to_string_lossy()).expect("write");
+        let p = encode_and_write(&enc, &settings, &path.to_string_lossy(), &payload.meta)
+            .expect("write");
         let bytes = std::fs::read(&p).unwrap();
         let has_icc = bytes.windows(12).any(|w| w == b"ICC_PROFILE\0");
         println!(
