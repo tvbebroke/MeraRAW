@@ -17,7 +17,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-VERSION="0.1.0"
+VERSION="0.1.1"
 DMG_NAME="MeraRAW Beta ${VERSION}.dmg"
 BUNDLE_DIR="src-tauri/target/release/bundle/dmg"
 RELEASE_DIR="release"
