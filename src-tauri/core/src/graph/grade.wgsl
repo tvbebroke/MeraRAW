@@ -93,7 +93,13 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
   let h_cos = select(a / c, 1.0, c < 1e-6);
   let h_sin = select(b / c, 0.0, c < 1e-6);
   c *= 1.0 + u.ranges.z * 0.01;
-  let percep = 1.0 + u.ranges.w * 0.01 * (1.0 - min(c / 0.25, 1.0));
+  // Skin guard: warm tones (faces) sit ~1.0 rad in Oklab hue. Ease the
+  // perceptual-saturation push there so portraits don't go orange/plastic —
+  // a vibrance-style skin protect, but constant-hue in Oklab (no hue shift).
+  // Soft + conservative (keeps 60% of the push on skin); SKIN_HUE tuned by eye.
+  let hue = atan2(b, a);
+  let skin_guard = mix(0.6, 1.0, smoothstep(0.0, 0.6, abs(hue - 1.0)));
+  let percep = 1.0 + u.ranges.w * 0.01 * (1.0 - min(c / 0.25, 1.0)) * skin_guard;
   c = max(c * percep, 0.0);
   a = c * h_cos;
   b = c * h_sin;
