@@ -9,7 +9,11 @@ impl Engine {
         Ok(self.catalog.as_mut().unwrap())
     }
 
-    pub(super) fn start_import(&mut self, root: PathBuf) -> Result<u64, CoreError> {
+    pub(super) fn start_import(
+        &mut self,
+        root: PathBuf,
+        only_paths: Option<Vec<PathBuf>>,
+    ) -> Result<u64, CoreError> {
         if !root.exists() {
             return Err(CoreError::Io(format!("folder not found: {}", root.display())));
         }
@@ -31,11 +35,17 @@ impl Engine {
         }
 
         let cat = self.catalog_mut()?;
-        let files = crate::catalog::scan_folder(&root);
-        // incremental: skip files already imported at the same mtime
+        let selected_only = only_paths.is_some();
+        let files = only_paths.unwrap_or_else(|| crate::catalog::scan_folder(&root));
         let todo: Vec<PathBuf> = files
             .into_iter()
             .filter(|p| {
+                if !p.exists() {
+                    return false;
+                }
+                if selected_only {
+                    return true;
+                }
                 let m = std::fs::metadata(p)
                     .ok()
                     .and_then(|m| m.modified().ok())
@@ -178,7 +188,7 @@ impl Engine {
         let Some(first) = iter.next() else {
             return Ok(0);
         };
-        let queued = self.start_import(PathBuf::from(first))?;
+        let queued = self.start_import(PathBuf::from(first), None)?;
         if let Some(st) = &mut self.import_state {
             st.queued_roots = iter.map(PathBuf::from).collect();
         }

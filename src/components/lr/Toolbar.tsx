@@ -1,13 +1,27 @@
-// Thin toolbar under the viewport: zoom (fit / 1:1 / ± / %), before/after,
-// loupe. Drives the viewport via the uiStore view-command channel.
+// Thin toolbar under the viewport: zoom (fit / 1:1 / ± / %), display look,
+// before/after, loupe. Drives the viewport via the uiStore view-command channel.
+import { useState } from "react";
 import { useUiStore } from "../../state/uiStore";
+import { setDisplayLook } from "../../ipc/commands";
 import { Icon } from "./widgets";
+
+const LOOKS: [string, number, string][] = [
+  ["Neutral", 0, "Flat scene-referred view"],
+  ["Camera", 1, "Punchy JPEG-like view"],
+  ["Filmic", 2, "AgX — filmic highlight rolloff"],
+];
 
 export function ViewportToolbar() {
   const zoomLabel = useUiStore((s) => s.zoomLabel);
   const sendViewCmd = useUiStore((s) => s.sendViewCmd);
   const before = useUiStore((s) => s.beforeAfter);
   const setBefore = useUiStore((s) => s.setBeforeAfter);
+  const [look, setLook] = useState(1); // matches engine default (Camera)
+
+  function pickLook(l: number) {
+    setLook(l);
+    void setDisplayLook(l).catch(() => {});
+  }
 
   return (
     <div className="vp-toolbar">
@@ -25,6 +39,18 @@ export function ViewportToolbar() {
         +
       </button>
       <div className="vp-spacer" />
+      <div className="vp-look" title="Display look">
+        {LOOKS.map(([label, l, tip]) => (
+          <button
+            key={l}
+            className={look === l ? "active" : ""}
+            title={tip}
+            onClick={() => pickLook(l)}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
       <button
         className={before ? "active" : ""}
         title="Before / After (\)"

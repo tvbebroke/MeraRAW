@@ -36,6 +36,9 @@ pub struct ImageMeta {
     /// All matched DCP profiles for this camera (for UI picker).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub available_profiles: Vec<String>,
+    /// Parallel to `available_profiles` — DCP filenames for switching.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub available_profile_files: Vec<String>,
 }
 
 /// Full decode result: working buffer is linear Rec.2020 scene-referred,

@@ -73,9 +73,9 @@ impl RenderGraph {
         self.dcp_sig = Some(sig);
     }
 
-    /// Set the display look (false = Neutral, true = Camera/punchy).
-    pub fn set_look(&mut self, camera: bool) {
-        self.look = camera as u32;
+    /// Set the display look (0 = Neutral, 1 = Camera/punchy, 2 = Filmic/AgX).
+    pub fn set_look(&mut self, look: u32) {
+        self.look = look;
     }
 
     pub fn look(&self) -> bool {

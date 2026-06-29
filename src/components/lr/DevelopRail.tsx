@@ -1,101 +1,140 @@
-// Right rail — tabbed develop panels (Basic / Color / Detail / AI).
-import { useState } from "react";
-import type { ImageMeta } from "../../ipc/types";
+// Right rail — Edit tab: Profile → Light → Color → Effects → Detail (+ histogram, AI).
+import { applyParamBatch, getStats, setCameraProfile, setParam } from "../../ipc/commands";
+import type { ImageMeta, ParamSpec } from "../../ipc/types";
+import { useDocStore } from "../../state/docStore";
 import { useUiStore } from "../../state/uiStore";
 import { Histogram } from "../Histogram";
-import { MasksPanel } from "../MasksPanel";
 import { AiGrader } from "./AiGrader";
 import { ColorGrading } from "./ColorGrading";
 import { HslPicker } from "./HslPicker";
 import { ToneCurve } from "./ToneCurve";
 import { Icon, Panel, ParamSlider, useRegistry } from "./widgets";
 
-type RailTab = "basic" | "color" | "detail" | "ai";
-
-function ToolStrip() {
-  const tool = useUiStore((s) => s.tool);
-  const setTool = useUiStore((s) => s.setTool);
-  const [masking, setMasking] = useState(false);
-
+function ProfilePanel({
+  meta,
+  onProfileChange,
+}: {
+  meta: ImageMeta | null;
+  onProfileChange: (m: ImageMeta) => void;
+}) {
+  if (!meta) {
+    return (
+      <Panel title="Profile" defaultOpen>
+        <p className="muted sm">Open a RAW file to choose a camera profile.</p>
+      </Panel>
+    );
+  }
+  const files = meta.availableProfileFiles ?? [];
+  const names = meta.availableProfiles ?? [];
+  if (files.length === 0) {
+    return (
+      <Panel title="Profile" defaultOpen>
+        <p className="muted sm">
+          No DCP profiles for {meta.cameraMake} {meta.cameraModel}.
+        </p>
+      </Panel>
+    );
+  }
+  const currentIdx = names.findIndex((n) => n === meta.cameraProfile);
   return (
-    <div className="tool-strip-wrap">
-      <div className="tool-strip">
-        <button title="Crop (R) — coming soon" disabled>
-          <Icon.Crop size={16} />
-        </button>
-        <button
-          className={masking ? "active" : ""}
-          title="Masking (M)"
-          onClick={() => setMasking((m) => !m)}
-        >
-          <Icon.Mask size={16} />
-        </button>
-        <button
-          className={tool === "wb" ? "active" : ""}
-          title="White balance eyedropper"
-          onClick={() => setTool(tool === "wb" ? "pan" : "wb")}
-        >
-          <Icon.Eyedropper size={16} />
-        </button>
-        <button
-          className={tool === "brush" ? "active" : ""}
-          title="Brush (paint the selected brush mask)"
-          onClick={() => setTool(tool === "brush" ? "pan" : "brush")}
-        >
-          <Icon.Brush size={16} />
-        </button>
-      </div>
-      {masking && (
-        <div className="tool-strip-body">
-          <MasksPanel />
-        </div>
-      )}
-    </div>
+    <Panel title="Profile" defaultOpen>
+      <p className="muted sm">
+        Base color rendering before sliders. Switching profile does not change your edits.
+      </p>
+      <select
+        value={files[currentIdx >= 0 ? currentIdx : 0] ?? files[0]}
+        onChange={(e) => {
+          const file = e.target.value;
+          setCameraProfile(file)
+            .then(onProfileChange)
+            .catch(console.error);
+        }}
+      >
+        {files.map((file, i) => (
+          <option key={file} value={file}>
+            {names[i] ?? file}
+          </option>
+        ))}
+      </select>
+    </Panel>
   );
 }
 
-function Basic({ meta }: { meta: ImageMeta | null }) {
-  const specs = useRegistry();
-  const tool = useUiStore((s) => s.tool);
-  const setTool = useUiStore((s) => s.setTool);
+function LightPanel({
+  meta,
+  specs,
+}: {
+  meta: ImageMeta | null;
+  specs: ParamSpec[];
+}) {
   return (
-    <Panel title="Basic">
-      <div className="lr-subhead">
-        <span>White Balance</span>
-        <button
-          className={`lr-mini-btn ${tool === "wb" ? "active" : ""}`}
-          title="Eyedropper: click a neutral area"
-          onClick={() => setTool(tool === "wb" ? "pan" : "wb")}
-        >
-          <Icon.Eyedropper size={12} />
-        </button>
-      </div>
-      <ParamSlider specs={specs} path="white_balance.temp" label="Temp" meta={meta} />
-      <ParamSlider specs={specs} path="white_balance.tint" label="Tint" meta={meta} />
-      {meta?.cameraProfile ? (
-        <div className="lr-profile-badge muted" title="Autoloaded camera color profile">
-          Profile: {meta.cameraProfile}
-        </div>
-      ) : meta ? (
-        <div className="lr-profile-badge muted">
-          No camera profile for {meta.cameraMake} {meta.cameraModel}
-        </div>
-      ) : null}
-      <div className="lr-subhead">
-        <span>Tone</span>
-      </div>
+    <Panel title="Light" defaultOpen>
       <ParamSlider specs={specs} path="exposure.stops" label="Exposure" meta={meta} />
       <ParamSlider specs={specs} path="tone_curve.contrast" label="Contrast" meta={meta} />
       <ParamSlider specs={specs} path="tone_curve.highlights" label="Highlights" meta={meta} />
       <ParamSlider specs={specs} path="tone_curve.shadows" label="Shadows" meta={meta} />
       <ParamSlider specs={specs} path="tone_curve.lights" label="Whites" meta={meta} />
       <ParamSlider specs={specs} path="tone_curve.darks" label="Blacks" meta={meta} />
-      <div className="lr-subhead">
-        <span>Presence</span>
-      </div>
-      <ParamSlider specs={specs} path="color_grade.perceptual_sat" label="Vibrance" meta={meta} />
-      <ParamSlider specs={specs} path="color_grade.global_chroma" label="Saturation" meta={meta} />
     </Panel>
+  );
+}
+
+function ColorPanel({
+  meta,
+  specs,
+  tool,
+  setTool,
+}: {
+  meta: ImageMeta | null;
+  specs: ParamSpec[];
+  tool: string;
+  setTool: (t: "pan" | "wb" | "brush") => void;
+}) {
+  return (
+    <>
+      <Panel title="White Balance" defaultOpen>
+        <div className="lr-subhead">
+          <span>White Balance</span>
+          <button
+            type="button"
+            className={`lr-mini-btn ${tool === "wb" ? "active" : ""}`}
+            title="Eyedropper: click a neutral area"
+            onClick={() => setTool(tool === "wb" ? "pan" : "wb")}
+          >
+            <Icon.Eyedropper size={12} />
+          </button>
+        </div>
+        <ParamSlider specs={specs} path="white_balance.temp" label="Temp" meta={meta} />
+        <ParamSlider specs={specs} path="white_balance.tint" label="Tint" meta={meta} />
+      </Panel>
+      <Panel title="Color" defaultOpen>
+        <ParamSlider specs={specs} path="color_grade.perceptual_sat" label="Vibrance" meta={meta} />
+        <ParamSlider specs={specs} path="color_grade.global_chroma" label="Saturation" meta={meta} />
+      </Panel>
+      <Panel title="Tone Curve" defaultOpen={false}>
+        <ToneCurve />
+      </Panel>
+      <Panel title="HSL / Color Mix" defaultOpen>
+        <HslPicker specs={specs} meta={meta} />
+      </Panel>
+    </>
+  );
+}
+
+function EffectsPanel({ meta }: { meta: ImageMeta | null }) {
+  return (
+    <>
+      <Panel title="Split Toning" defaultOpen>
+        <p className="muted sm">Separate hue and saturation for shadows and highlights.</p>
+        <ColorGrading specs={useRegistry()} meta={meta} />
+      </Panel>
+      <Panel title="Clarity & Dehaze" defaultOpen={false}>
+        <p className="muted sm">Local contrast and haze controls — coming in a future build.</p>
+      </Panel>
+      <Panel title="Vignette" defaultOpen={false}>
+        <p className="muted sm">Post-crop vignette — coming in a future build.</p>
+      </Panel>
+    </>
   );
 }
 
@@ -122,66 +161,82 @@ function GroupPanel({
   );
 }
 
-export function DevelopRail({ meta }: { meta: ImageMeta | null }) {
+export function DevelopRail({
+  meta,
+  onMetaChange,
+}: {
+  meta: ImageMeta | null;
+  onMetaChange?: (m: ImageMeta) => void;
+}) {
   const specs = useRegistry();
-  const [tab, setTab] = useState<RailTab>("basic");
+  const reconcile = useDocStore((s) => s.reconcile);
+  const tool = useUiStore((s) => s.tool);
+  const setTool = useUiStore((s) => s.setTool);
+
+  async function autoTone() {
+    const stats = await getStats().catch(() => null);
+    const clipHigh = stats?.clipHighPct ?? 0;
+    const clipLow = stats?.clipLowPct ?? 0;
+    const exposure = clipHigh > 2 ? -0.35 : clipLow > 2 ? 0.35 : 0;
+    await applyParamBatch({
+      exposure: { stops: exposure },
+      tone_curve: {
+        contrast: 8,
+        highlights: clipHigh > 1 ? -18 : 0,
+        shadows: clipLow > 1 ? 22 : 0,
+        lights: 0,
+        darks: 0,
+      },
+      color_grade: { perceptual_sat: 6, global_chroma: 4 },
+    }).then(reconcile);
+  }
+
+  function setBw(on: boolean) {
+    setParam("color_grade.global_chroma", on ? -100 : 0)
+      .then(reconcile)
+      .catch(console.error);
+    setParam("color_grade.perceptual_sat", on ? -100 : 0)
+      .then(reconcile)
+      .catch(console.error);
+  }
 
   return (
-    <div className="lr-right">
+    <div className="lr-rail-panel lr-edit-panel">
+      <header className="lr-rail-panel-head lr-edit-head">
+        <h2>Edit</h2>
+        <div className="lr-edit-quick">
+          <button type="button" className="lr-mini-btn" onClick={() => void autoTone()}>
+            Auto
+          </button>
+          <button type="button" className="lr-mini-btn" onClick={() => setBw(true)}>
+            B&amp;W
+          </button>
+        </div>
+      </header>
       <div className="lr-histogram-pin">
         <Histogram />
       </div>
-      <ToolStrip />
-      <div className="lr-rail-tabs">
-        {(
-          [
-            ["basic", "Basic"],
-            ["color", "Color"],
-            ["detail", "Detail"],
-            ["ai", "AI"],
-          ] as const
-        ).map(([id, label]) => (
-          <button
-            key={id}
-            type="button"
-            className={`lr-rail-tab ${tab === id ? "active" : ""}`}
-            onClick={() => setTab(id)}
-          >
-            {label}
-          </button>
-        ))}
+      <div className="lr-ai-pin">
+        <Panel title="AI Color Grader" className="ai-panel" defaultOpen>
+          <AiGrader />
+        </Panel>
       </div>
-      <div className="lr-rail-tab-body">
-        {tab === "basic" && <Basic meta={meta} />}
-        {tab === "color" && (
-          <>
-            <Panel title="Tone Curve" defaultOpen>
-              <ToneCurve />
-              <div className="lr-divider" />
-              <ParamSlider specs={specs} path="tone_curve.highlights" label="Highlights" meta={meta} />
-              <ParamSlider specs={specs} path="tone_curve.lights" label="Lights" meta={meta} />
-              <ParamSlider specs={specs} path="tone_curve.darks" label="Darks" meta={meta} />
-              <ParamSlider specs={specs} path="tone_curve.shadows" label="Shadows" meta={meta} />
-            </Panel>
-            <Panel title="HSL / Color" defaultOpen>
-              <HslPicker specs={specs} meta={meta} />
-            </Panel>
-            <Panel title="Color Grading" defaultOpen={false}>
-              <ColorGrading specs={specs} meta={meta} />
-            </Panel>
-          </>
-        )}
-        {tab === "detail" && (
-          <>
-            <GroupPanel title="Detail" group="Detail" meta={meta} defaultOpen />
-            <GroupPanel title="Calibration" group="Calibration" meta={meta} defaultOpen />
-          </>
-        )}
-        {tab === "ai" && (
-          <Panel title="AI Color Grader" className="ai-panel" defaultOpen>
-            <AiGrader />
-          </Panel>
-        )}
+      <div className="lr-rail-scroll">
+        <ProfilePanel
+          meta={meta}
+          onProfileChange={(m) => onMetaChange?.(m)}
+        />
+        <LightPanel meta={meta} specs={specs} />
+        <ColorPanel meta={meta} specs={specs} tool={tool} setTool={setTool} />
+        <EffectsPanel meta={meta} />
+        <GroupPanel title="Detail" group="Detail" meta={meta} defaultOpen />
+        <GroupPanel title="Calibration" group="Calibration" meta={meta} defaultOpen={false} />
+        <Panel title="Optics" defaultOpen={false}>
+          <p className="muted sm">Lens corrections and chromatic aberration — coming soon.</p>
+        </Panel>
+        <Panel title="Geometry" defaultOpen={false}>
+          <p className="muted sm">Upright transforms — coming soon.</p>
+        </Panel>
       </div>
     </div>
   );

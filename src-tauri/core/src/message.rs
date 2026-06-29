@@ -202,10 +202,53 @@ pub enum EngineMsg {
         on: bool,
         reply: oneshot::Sender<()>,
     },
+    /// Display look: 0 = Neutral, 1 = Camera/punchy, 2 = Filmic/AgX.
+    SetDisplayLook {
+        look: u32,
+        reply: oneshot::Sender<()>,
+    },
     // ---- Phase 5: catalog ----
     ImportFolder {
         path: PathBuf,
         reply: oneshot::Sender<Result<u64, CoreError>>,
+    },
+    ScanImportFolder {
+        path: PathBuf,
+        reply: oneshot::Sender<Result<Vec<crate::catalog::ImportCandidate>, CoreError>>,
+    },
+    ImportSelected {
+        root: PathBuf,
+        paths: Vec<PathBuf>,
+        reply: oneshot::Sender<Result<u64, CoreError>>,
+    },
+    GetAssetDetail {
+        id: i64,
+        reply: oneshot::Sender<Result<Option<crate::catalog::AssetDetail>, CoreError>>,
+    },
+    ListAlbums {
+        reply: oneshot::Sender<Result<Vec<crate::catalog::AlbumItem>, CoreError>>,
+    },
+    CreateAlbum {
+        name: String,
+        reply: oneshot::Sender<Result<i64, CoreError>>,
+    },
+    DeleteAlbum {
+        id: i64,
+        reply: oneshot::Sender<Result<(), CoreError>>,
+    },
+    AddToAlbum {
+        album_id: i64,
+        asset_ids: Vec<i64>,
+        reply: oneshot::Sender<Result<(), CoreError>>,
+    },
+    RemoveFromAlbum {
+        album_id: i64,
+        asset_ids: Vec<i64>,
+        reply: oneshot::Sender<Result<(), CoreError>>,
+    },
+    SetCameraProfile {
+        profile_file: String,
+        reply: oneshot::Sender<Result<ImageMeta, CoreError>>,
     },
     GetGrid {
         query: crate::catalog::GridQuery,

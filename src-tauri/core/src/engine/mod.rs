@@ -201,6 +201,11 @@ impl EngineHandle {
             .await
     }
 
+    pub async fn set_display_look(&self, look: u32) -> Result<(), EngineError> {
+        self.request(|reply| EngineMsg::SetDisplayLook { look, reply })
+            .await
+    }
+
     // ---- Phase 5: catalog ----
 
     pub async fn import_folder(
@@ -209,6 +214,86 @@ impl EngineHandle {
     ) -> Result<Result<u64, CoreError>, EngineError> {
         self.request(|reply| EngineMsg::ImportFolder { path, reply })
             .await
+    }
+
+    pub async fn scan_import_folder(
+        &self,
+        path: PathBuf,
+    ) -> Result<Result<Vec<crate::catalog::ImportCandidate>, CoreError>, EngineError> {
+        self.request(|reply| EngineMsg::ScanImportFolder { path, reply })
+            .await
+    }
+
+    pub async fn import_selected(
+        &self,
+        root: PathBuf,
+        paths: Vec<PathBuf>,
+    ) -> Result<Result<u64, CoreError>, EngineError> {
+        self.request(|reply| EngineMsg::ImportSelected { root, paths, reply })
+            .await
+    }
+
+    pub async fn get_asset_detail(
+        &self,
+        id: i64,
+    ) -> Result<Result<Option<crate::catalog::AssetDetail>, CoreError>, EngineError> {
+        self.request(|reply| EngineMsg::GetAssetDetail { id, reply })
+            .await
+    }
+
+    pub async fn list_albums(
+        &self,
+    ) -> Result<Result<Vec<crate::catalog::AlbumItem>, CoreError>, EngineError> {
+        self.request(|reply| EngineMsg::ListAlbums { reply }).await
+    }
+
+    pub async fn create_album(
+        &self,
+        name: String,
+    ) -> Result<Result<i64, CoreError>, EngineError> {
+        self.request(|reply| EngineMsg::CreateAlbum { name, reply })
+            .await
+    }
+
+    pub async fn delete_album(&self, id: i64) -> Result<Result<(), CoreError>, EngineError> {
+        self.request(|reply| EngineMsg::DeleteAlbum { id, reply }).await
+    }
+
+    pub async fn add_to_album(
+        &self,
+        album_id: i64,
+        asset_ids: Vec<i64>,
+    ) -> Result<Result<(), CoreError>, EngineError> {
+        self.request(|reply| EngineMsg::AddToAlbum {
+            album_id,
+            asset_ids,
+            reply,
+        })
+        .await
+    }
+
+    pub async fn remove_from_album(
+        &self,
+        album_id: i64,
+        asset_ids: Vec<i64>,
+    ) -> Result<Result<(), CoreError>, EngineError> {
+        self.request(|reply| EngineMsg::RemoveFromAlbum {
+            album_id,
+            asset_ids,
+            reply,
+        })
+        .await
+    }
+
+    pub async fn set_camera_profile(
+        &self,
+        profile_file: String,
+    ) -> Result<Result<ImageMeta, CoreError>, EngineError> {
+        self.request(|reply| EngineMsg::SetCameraProfile {
+            profile_file,
+            reply,
+        })
+        .await
     }
 
     pub async fn get_grid(
@@ -390,6 +475,8 @@ struct Engine {
     import_state: Option<ImportState>,
     /// Before/after: when true, render the un-edited base.
     preview_bypass: bool,
+    /// Display look applied to preview + export: 0 Neutral, 1 Camera, 2 AgX.
+    display_look: u32,
     /// Dedicated graph for assistant previews (own small caches — never
     /// thrashes the viewport graph).
     preview_graph: Option<RenderGraph>,
@@ -439,6 +526,7 @@ async fn run(
         catalog: None,
         import_state: None,
         preview_bypass: false,
+        display_look: 1, // Camera by default (matches export; preview now WYSIWYG)
         preview_graph: None,
         export_graph: None,
         export_job: None,
@@ -743,9 +831,84 @@ impl Engine {
                 }
                 let _ = reply.send(());
             }
+            EngineMsg::SetDisplayLook { look, reply } => {
+                if self.display_look != look {
+                    self.display_look = look;
+                    // present is terminal — re-render is enough (no chain invalidation)
+                    self.render_now();
+                }
+                let _ = reply.send(());
+            }
             // ---- Phase 5: catalog ----
             EngineMsg::ImportFolder { path, reply } => {
-                let _ = reply.send(self.start_import(path));
+                let _ = reply.send(self.start_import(path, None));
+            }
+            EngineMsg::ScanImportFolder { path, reply } => {
+                let result = self
+                    .catalog_mut()
+                    .and_then(|c| c.scan_import_candidates(&path));
+                let _ = reply.send(result);
+            }
+            EngineMsg::ImportSelected { root, paths, reply } => {
+                let _ = reply.send(self.start_import(root, Some(paths)));
+            }
+            EngineMsg::GetAssetDetail { id, reply } => {
+                let _ = reply.send(
+                    self.catalog_mut()
+                        .and_then(|c| c.asset_detail(id)),
+                );
+            }
+            EngineMsg::ListAlbums { reply } => {
+                let _ = reply.send(self.catalog_mut().and_then(|c| c.list_albums()));
+            }
+            EngineMsg::CreateAlbum { name, reply } => {
+                let result = self.catalog_mut().and_then(|c| {
+                    let id = c.create_album(&name)?;
+                    Ok(id)
+                });
+                if result.is_ok() {
+                    self.emit(EngineEvent::CatalogChanged);
+                }
+                let _ = reply.send(result);
+            }
+            EngineMsg::DeleteAlbum { id, reply } => {
+                let result = self.catalog_mut().and_then(|c| c.delete_album(id));
+                if result.is_ok() {
+                    self.emit(EngineEvent::CatalogChanged);
+                }
+                let _ = reply.send(result);
+            }
+            EngineMsg::AddToAlbum {
+                album_id,
+                asset_ids,
+                reply,
+            } => {
+                let result = self
+                    .catalog_mut()
+                    .and_then(|c| c.add_to_album(album_id, &asset_ids));
+                if result.is_ok() {
+                    self.emit(EngineEvent::CatalogChanged);
+                }
+                let _ = reply.send(result);
+            }
+            EngineMsg::RemoveFromAlbum {
+                album_id,
+                asset_ids,
+                reply,
+            } => {
+                let result = self
+                    .catalog_mut()
+                    .and_then(|c| c.remove_from_album(album_id, &asset_ids));
+                if result.is_ok() {
+                    self.emit(EngineEvent::CatalogChanged);
+                }
+                let _ = reply.send(result);
+            }
+            EngineMsg::SetCameraProfile {
+                profile_file,
+                reply,
+            } => {
+                self.set_camera_profile(profile_file, reply);
             }
             EngineMsg::GetGrid { query, reply } => {
                 let _ = reply.send(
@@ -785,7 +948,7 @@ impl Engine {
                         self.emit(EngineEvent::CatalogChanged);
                         // continue a multi-root rebuild
                         if let Some(next) = queued.first().cloned() {
-                            match self.start_import(next) {
+                            match self.start_import(next, None) {
                                 Ok(_) => {
                                     if let Some(st) = &mut self.import_state {
                                         st.queued_roots = queued[1..].to_vec();

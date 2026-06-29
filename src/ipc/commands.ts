@@ -2,6 +2,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import type {
   AppInfo,
+  BrowseRoot,
   DirEntry,
   DocDelta,
   EditDocMirror,
@@ -33,6 +34,10 @@ export function pickFolder(): Promise<string | null> {
 
 export function readFileMeta(path: string): Promise<FileMeta> {
   return invoke<FileMeta>("read_file_meta", { path });
+}
+
+export function browseRoots(): Promise<BrowseRoot[]> {
+  return invoke<BrowseRoot[]>("browse_roots");
 }
 
 export function listDir(path: string): Promise<DirEntry[]> {
@@ -128,6 +133,51 @@ export function importFolder(path: string): Promise<number> {
   return invoke<number>("import_folder", { path });
 }
 
+export function scanImportFolder(
+  path: string,
+): Promise<import("./types").ImportCandidate[]> {
+  return invoke("scan_import_folder", { path });
+}
+
+export function importSelected(root: string, paths: string[]): Promise<number> {
+  return invoke<number>("import_selected", { root, paths });
+}
+
+export function getAssetDetail(
+  id: number,
+): Promise<import("./types").AssetDetail | null> {
+  return invoke("get_asset_detail", { id });
+}
+
+export function listAlbums(): Promise<import("./types").AlbumItem[]> {
+  return invoke("list_albums");
+}
+
+export function createAlbum(name: string): Promise<number> {
+  return invoke<number>("create_album", { name });
+}
+
+export function deleteAlbum(id: number): Promise<void> {
+  return invoke<void>("delete_album", { id });
+}
+
+export function addToAlbum(albumId: number, assetIds: number[]): Promise<void> {
+  return invoke<void>("add_to_album", { albumId, assetIds });
+}
+
+export function removeFromAlbum(
+  albumId: number,
+  assetIds: number[],
+): Promise<void> {
+  return invoke<void>("remove_from_album", { albumId, assetIds });
+}
+
+export function setCameraProfile(
+  profileFile: string,
+): Promise<ImageMeta> {
+  return invoke<ImageMeta>("set_camera_profile", { profileFile });
+}
+
 export function getGrid(
   query: import("./types").GridQuery,
 ): Promise<import("./types").GridItem[]> {
@@ -157,6 +207,11 @@ export function setMaskOverlay(id: string | null): Promise<void> {
 /** Before/after: render the un-edited base while on. */
 export function setPreviewBypass(on: boolean): Promise<void> {
   return invoke<void>("set_preview_bypass", { on });
+}
+
+/** Display look: 0 = Neutral, 1 = Camera, 2 = Filmic (AgX). */
+export function setDisplayLook(look: number): Promise<void> {
+  return invoke<void>("set_display_look", { look });
 }
 
 // ---- Phase 7: export + presets ----

@@ -1,0 +1,3748 @@
+{
+  "source": "Lightroom Classic keyboard shortcuts (helpx, 2025-10-30)",
+  "note": "Key->action mappings are factual reference; descriptions are original.",
+  "scopes": [
+    "global",
+    "module:library",
+    "module:develop",
+    "secondary",
+    "module:book",
+    "module:slideshow",
+    "module:print",
+    "module:map",
+    "module:web"
+  ],
+  "bindings": [
+    {
+      "id": "panels---chrome:show-hide-side-panels",
+      "section": "Panels & chrome",
+      "action": "Show/hide side panels",
+      "keys": {
+        "windows": "Tab",
+        "macos": "Tab"
+      },
+      "scope": "global",
+      "relevance": "core",
+      "description": "Collapse/expand both side panel columns to maximize the image area.",
+      "note": ""
+    },
+    {
+      "id": "panels---chrome:show-hide-all-panels",
+      "section": "Panels & chrome",
+      "action": "Show/hide all panels",
+      "keys": {
+        "windows": "Shift+Tab",
+        "macos": "Shift+Tab"
+      },
+      "scope": "global",
+      "relevance": "core",
+      "description": "Hide every panel (side, filmstrip, module bar) for a clean canvas.",
+      "note": ""
+    },
+    {
+      "id": "panels---chrome:show-hide-toolbar",
+      "section": "Panels & chrome",
+      "action": "Show/hide toolbar",
+      "keys": {
+        "windows": "T",
+        "macos": "T"
+      },
+      "scope": "global",
+      "relevance": "core",
+      "description": "Toggle the contextual toolbar under the image.",
+      "note": ""
+    },
+    {
+      "id": "panels---chrome:show-hide-module-picker",
+      "section": "Panels & chrome",
+      "action": "Show/hide module picker",
+      "keys": {
+        "windows": "F5",
+        "macos": "F5"
+      },
+      "scope": "global",
+      "relevance": "optional",
+      "description": "Toggle the top module-switcher bar.",
+      "note": "Module concept; map to your top nav."
+    },
+    {
+      "id": "panels---chrome:show-hide-filmstrip",
+      "section": "Panels & chrome",
+      "action": "Show/hide filmstrip",
+      "keys": {
+        "windows": "F6",
+        "macos": "F6"
+      },
+      "scope": "global",
+      "relevance": "core",
+      "description": "Toggle the bottom filmstrip strip of thumbnails.",
+      "note": ""
+    },
+    {
+      "id": "panels---chrome:show-hide-left-panels",
+      "section": "Panels & chrome",
+      "action": "Show/hide left panels",
+      "keys": {
+        "windows": "F7",
+        "macos": "F7"
+      },
+      "scope": "global",
+      "relevance": "core",
+      "description": "Toggle the left panel column only.",
+      "note": ""
+    },
+    {
+      "id": "panels---chrome:show-hide-right-panels",
+      "section": "Panels & chrome",
+      "action": "Show/hide right panels",
+      "keys": {
+        "windows": "F8",
+        "macos": "F8"
+      },
+      "scope": "global",
+      "relevance": "core",
+      "description": "Toggle the right panel column only.",
+      "note": ""
+    },
+    {
+      "id": "panels---chrome:toggle-solo-mode",
+      "section": "Panels & chrome",
+      "action": "Toggle solo mode",
+      "keys": {
+        "windows": "Alt-click panel",
+        "macos": "Option-click panel"
+      },
+      "scope": "global",
+      "relevance": "optional",
+      "description": "Solo mode auto-collapses other panels when one is opened.",
+      "note": "Click-modifier, not a keychord."
+    },
+    {
+      "id": "panels---chrome:open-panel-without-closing-soloed-panel",
+      "section": "Panels & chrome",
+      "action": "Open panel without closing soloed panel",
+      "keys": {
+        "windows": "Shift-click panel",
+        "macos": "Shift-click panel"
+      },
+      "scope": "global",
+      "relevance": "optional",
+      "description": "Open an extra panel while solo mode is on.",
+      "note": "Click-modifier."
+    },
+    {
+      "id": "panels---chrome:open-close-all-panels",
+      "section": "Panels & chrome",
+      "action": "Open/close all panels",
+      "keys": {
+        "windows": "Ctrl-click panel",
+        "macos": "Cmd-click panel"
+      },
+      "scope": "global",
+      "relevance": "optional",
+      "description": "Expand or collapse every panel in the column at once.",
+      "note": "Click-modifier."
+    },
+    {
+      "id": "panels---chrome:open-close-left-panels-top-bottom",
+      "section": "Panels & chrome",
+      "action": "Open/close left panels top\u2192bottom",
+      "keys": {
+        "windows": "Ctrl+Shift+0\u20135",
+        "macos": "Cmd+Ctrl+0\u20135"
+      },
+      "scope": "global",
+      "relevance": "optional",
+      "description": "Toggle individual left panels by index.",
+      "note": "Numeric index \u2192 panel."
+    },
+    {
+      "id": "panels---chrome:open-close-right-panels--library-develop",
+      "section": "Panels & chrome",
+      "action": "Open/close right panels (Library/Develop)",
+      "keys": {
+        "windows": "Ctrl+0\u20139",
+        "macos": "Cmd+0\u20139"
+      },
+      "scope": "module:library,module:develop",
+      "relevance": "core",
+      "description": "Toggle individual right panels by index.",
+      "note": "Index map differs per module."
+    },
+    {
+      "id": "panels---chrome:redo",
+      "section": "Panels & chrome",
+      "action": "Redo",
+      "keys": {
+        "windows": "Ctrl+Shift+Z",
+        "macos": "Cmd+Shift+Z"
+      },
+      "scope": "global",
+      "relevance": "core",
+      "description": "Re-apply the last undone action.",
+      "note": ""
+    },
+    {
+      "id": "panels---chrome:redo--windows-only",
+      "section": "Panels & chrome",
+      "action": "Redo (Windows only)",
+      "keys": {
+        "windows": "Ctrl+Y",
+        "macos": "n/a"
+      },
+      "scope": "global",
+      "relevance": "core",
+      "description": "Windows alternate redo binding.",
+      "note": "Win-only alias."
+    },
+    {
+      "id": "panels---chrome:undo",
+      "section": "Panels & chrome",
+      "action": "Undo",
+      "keys": {
+        "windows": "Ctrl+Z",
+        "macos": "Cmd+Z"
+      },
+      "scope": "global",
+      "relevance": "core",
+      "description": "Revert the last action; LrC undo is unlimited within a session.",
+      "note": ""
+    },
+    {
+      "id": "module-navigation:go-to-library",
+      "section": "Module navigation",
+      "action": "Go to Library",
+      "keys": {
+        "windows": "Ctrl+Alt+1",
+        "macos": "Cmd+Opt+1"
+      },
+      "scope": "global",
+      "relevance": "core",
+      "description": "Jump to the browse/cull workspace.",
+      "note": ""
+    },
+    {
+      "id": "module-navigation:go-to-develop",
+      "section": "Module navigation",
+      "action": "Go to Develop",
+      "keys": {
+        "windows": "Ctrl+Alt+2",
+        "macos": "Cmd+Opt+2"
+      },
+      "scope": "global",
+      "relevance": "core",
+      "description": "Jump to the edit workspace.",
+      "note": ""
+    },
+    {
+      "id": "module-navigation:go-to-map",
+      "section": "Module navigation",
+      "action": "Go to Map",
+      "keys": {
+        "windows": "Ctrl+Alt+3",
+        "macos": "Cmd+Opt+3"
+      },
+      "scope": "global",
+      "relevance": "out_of_scope",
+      "description": "Geotagging workspace.",
+      "note": "Skip unless you add maps."
+    },
+    {
+      "id": "module-navigation:go-to-book",
+      "section": "Module navigation",
+      "action": "Go to Book",
+      "keys": {
+        "windows": "Ctrl+Alt+4",
+        "macos": "Cmd+Opt+4"
+      },
+      "scope": "global",
+      "relevance": "out_of_scope",
+      "description": "Photo-book layout workspace.",
+      "note": "Output module."
+    },
+    {
+      "id": "module-navigation:go-to-slideshow",
+      "section": "Module navigation",
+      "action": "Go to Slideshow",
+      "keys": {
+        "windows": "Ctrl+Alt+5",
+        "macos": "Cmd+Opt+5"
+      },
+      "scope": "global",
+      "relevance": "out_of_scope",
+      "description": "Slideshow workspace.",
+      "note": "Output module."
+    },
+    {
+      "id": "module-navigation:go-to-print",
+      "section": "Module navigation",
+      "action": "Go to Print",
+      "keys": {
+        "windows": "Ctrl+Alt+6",
+        "macos": "Cmd+Opt+6"
+      },
+      "scope": "global",
+      "relevance": "out_of_scope",
+      "description": "Print layout workspace.",
+      "note": "Output module."
+    },
+    {
+      "id": "module-navigation:go-to-web",
+      "section": "Module navigation",
+      "action": "Go to Web",
+      "keys": {
+        "windows": "Ctrl+Alt+7",
+        "macos": "Cmd+Opt+7"
+      },
+      "scope": "global",
+      "relevance": "out_of_scope",
+      "description": "Web-gallery workspace.",
+      "note": "Output module."
+    },
+    {
+      "id": "module-navigation:go-back---forward",
+      "section": "Module navigation",
+      "action": "Go back / forward",
+      "keys": {
+        "windows": "Ctrl+Alt+Left / Ctrl+Alt+Right",
+        "macos": "Cmd+Opt+Left / Cmd+Opt+Right"
+      },
+      "scope": "global",
+      "relevance": "core",
+      "description": "Navigate module history backward/forward.",
+      "note": ""
+    },
+    {
+      "id": "module-navigation:go-back-to-previous-module",
+      "section": "Module navigation",
+      "action": "Go back to previous module",
+      "keys": {
+        "windows": "Ctrl+Alt+Up",
+        "macos": "Cmd+Opt+Up"
+      },
+      "scope": "global",
+      "relevance": "core",
+      "description": "Return to the last module used.",
+      "note": ""
+    },
+    {
+      "id": "views---screen-modes:enter-loupe-view",
+      "section": "Views & screen modes",
+      "action": "Enter Loupe view",
+      "keys": {
+        "windows": "E",
+        "macos": "E"
+      },
+      "scope": "module:library",
+      "relevance": "core",
+      "description": "Single large photo view.",
+      "note": ""
+    },
+    {
+      "id": "views---screen-modes:enter-grid-view",
+      "section": "Views & screen modes",
+      "action": "Enter Grid view",
+      "keys": {
+        "windows": "G",
+        "macos": "G"
+      },
+      "scope": "module:library",
+      "relevance": "core",
+      "description": "Thumbnail grid of the catalog/folder.",
+      "note": ""
+    },
+    {
+      "id": "views---screen-modes:enter-compare-view",
+      "section": "Views & screen modes",
+      "action": "Enter Compare view",
+      "keys": {
+        "windows": "C",
+        "macos": "C"
+      },
+      "scope": "module:library",
+      "relevance": "core",
+      "description": "Side-by-side select-vs-candidate comparison.",
+      "note": ""
+    },
+    {
+      "id": "views---screen-modes:enter-survey-view",
+      "section": "Views & screen modes",
+      "action": "Enter Survey view",
+      "keys": {
+        "windows": "N",
+        "macos": "N"
+      },
+      "scope": "module:library",
+      "relevance": "core",
+      "description": "Multi-photo survey to narrow a selection.",
+      "note": ""
+    },
+    {
+      "id": "views---screen-modes:open-selected-photo-in-develop",
+      "section": "Views & screen modes",
+      "action": "Open selected photo in Develop",
+      "keys": {
+        "windows": "D",
+        "macos": "D"
+      },
+      "scope": "module:library",
+      "relevance": "core",
+      "description": "Send the active photo to the edit workspace.",
+      "note": ""
+    },
+    {
+      "id": "views---screen-modes:cycle-lights-out-modes",
+      "section": "Views & screen modes",
+      "action": "Cycle Lights Out modes",
+      "keys": {
+        "windows": "L / Shift+L",
+        "macos": "L / Shift+L"
+      },
+      "scope": "global",
+      "relevance": "optional",
+      "description": "Dim/black-out the UI around the photo; Shift reverses.",
+      "note": ""
+    },
+    {
+      "id": "views---screen-modes:toggle-lights-dim",
+      "section": "Views & screen modes",
+      "action": "Toggle Lights Dim",
+      "keys": {
+        "windows": "Ctrl+Shift+L",
+        "macos": "Cmd+Shift+L"
+      },
+      "scope": "global",
+      "relevance": "optional",
+      "description": "Jump straight to the dim state.",
+      "note": ""
+    },
+    {
+      "id": "views---screen-modes:cycle-screen-modes",
+      "section": "Views & screen modes",
+      "action": "Cycle screen modes",
+      "keys": {
+        "windows": "F",
+        "macos": "F"
+      },
+      "scope": "global",
+      "relevance": "core",
+      "description": "Cycle normal/full-screen window modes.",
+      "note": ""
+    },
+    {
+      "id": "views---screen-modes:previous-screen-mode",
+      "section": "Views & screen modes",
+      "action": "Previous screen mode",
+      "keys": {
+        "windows": "Shift+F",
+        "macos": "Shift+F"
+      },
+      "scope": "global",
+      "relevance": "optional",
+      "description": "Step back through screen modes (macOS).",
+      "note": "macOS-listed."
+    },
+    {
+      "id": "views---screen-modes:normal-full-screen--hide-panels",
+      "section": "Views & screen modes",
+      "action": "Normal/full-screen, hide panels",
+      "keys": {
+        "windows": "Ctrl+Shift+F",
+        "macos": "Cmd+Shift+F"
+      },
+      "scope": "global",
+      "relevance": "optional",
+      "description": "Full-screen with panels hidden.",
+      "note": ""
+    },
+    {
+      "id": "views---screen-modes:go-to-normal-screen-mode",
+      "section": "Views & screen modes",
+      "action": "Go to Normal screen mode",
+      "keys": {
+        "windows": "Ctrl+Alt+F",
+        "macos": "Cmd+Opt+F"
+      },
+      "scope": "global",
+      "relevance": "optional",
+      "description": "Force the standard windowed mode.",
+      "note": ""
+    },
+    {
+      "id": "views---screen-modes:cycle-info-overlay",
+      "section": "Views & screen modes",
+      "action": "Cycle info overlay",
+      "keys": {
+        "windows": "I",
+        "macos": "I"
+      },
+      "scope": "global",
+      "relevance": "core",
+      "description": "Cycle the on-image info overlay sets.",
+      "note": ""
+    },
+    {
+      "id": "views---screen-modes:show-hide-info-overlay",
+      "section": "Views & screen modes",
+      "action": "Show/hide info overlay",
+      "keys": {
+        "windows": "Ctrl+I",
+        "macos": "Cmd+I"
+      },
+      "scope": "global",
+      "relevance": "core",
+      "description": "Toggle the on-image metadata overlay.",
+      "note": ""
+    },
+    {
+      "id": "views---screen-modes:open-reference-view",
+      "section": "Views & screen modes",
+      "action": "Open Reference view",
+      "keys": {
+        "windows": "Shift+R",
+        "macos": "Shift+R"
+      },
+      "scope": "module:develop",
+      "relevance": "core",
+      "description": "Pin a reference photo beside the one being edited.",
+      "note": ""
+    },
+    {
+      "id": "views---screen-modes:enable-loupe-overlay",
+      "section": "Views & screen modes",
+      "action": "Enable loupe overlay",
+      "keys": {
+        "windows": "Ctrl+Alt+O",
+        "macos": "Cmd+Opt+O"
+      },
+      "scope": "module:library",
+      "relevance": "optional",
+      "description": "Show layout/guide overlay over the loupe.",
+      "note": ""
+    },
+    {
+      "id": "views---screen-modes:enable---choose-loupe-overlay",
+      "section": "Views & screen modes",
+      "action": "Enable & choose loupe overlay",
+      "keys": {
+        "windows": "Ctrl+Shift+Alt+O",
+        "macos": "Cmd+Shift+Opt+O"
+      },
+      "scope": "module:library",
+      "relevance": "optional",
+      "description": "Pick which loupe overlay to display.",
+      "note": ""
+    },
+    {
+      "id": "views---screen-modes:show-grid-view-styles",
+      "section": "Views & screen modes",
+      "action": "Show Grid view styles",
+      "keys": {
+        "windows": "Ctrl+Shift+X",
+        "macos": "Cmd+Shift+X"
+      },
+      "scope": "module:library",
+      "relevance": "optional",
+      "description": "Cycle compact/expanded grid cell styles.",
+      "note": ""
+    },
+    {
+      "id": "views---screen-modes:zoom-to-100",
+      "section": "Views & screen modes",
+      "action": "Zoom to 100%",
+      "keys": {
+        "windows": "Ctrl+Alt+0",
+        "macos": "Cmd+Opt+0"
+      },
+      "scope": "global",
+      "relevance": "core",
+      "description": "Jump to 1:1 pixel zoom.",
+      "note": ""
+    },
+    {
+      "id": "views---screen-modes:open-people-view",
+      "section": "Views & screen modes",
+      "action": "Open People View",
+      "keys": {
+        "windows": "O",
+        "macos": "O"
+      },
+      "scope": "module:library",
+      "relevance": "optional",
+      "description": "Face-recognition grouping view.",
+      "note": "Collides with Develop O (overlay)."
+    },
+    {
+      "id": "views---screen-modes:toggle-hdr-view",
+      "section": "Views & screen modes",
+      "action": "Toggle HDR view",
+      "keys": {
+        "windows": "Shift+H",
+        "macos": "Shift+H"
+      },
+      "scope": "global",
+      "relevance": "optional",
+      "description": "Toggle HDR preview rendering.",
+      "note": "Requires HDR pipeline."
+    },
+    {
+      "id": "secondary-window:open-secondary-window",
+      "section": "Secondary window",
+      "action": "Open secondary window",
+      "keys": {
+        "windows": "F11",
+        "macos": "Cmd+F11"
+      },
+      "scope": "global",
+      "relevance": "optional",
+      "description": "Open a second display window.",
+      "note": "Same as Library shortcuts + Shift."
+    },
+    {
+      "id": "secondary-window:enter-grid--secondary",
+      "section": "Secondary window",
+      "action": "Enter Grid (secondary)",
+      "keys": {
+        "windows": "Shift+G",
+        "macos": "Shift+G"
+      },
+      "scope": "secondary",
+      "relevance": "optional",
+      "description": "Grid view on the secondary window.",
+      "note": ""
+    },
+    {
+      "id": "secondary-window:enter-loupe--secondary",
+      "section": "Secondary window",
+      "action": "Enter Loupe (secondary)",
+      "keys": {
+        "windows": "Shift+E",
+        "macos": "Shift+E"
+      },
+      "scope": "secondary",
+      "relevance": "optional",
+      "description": "Normal loupe on the secondary window.",
+      "note": ""
+    },
+    {
+      "id": "secondary-window:enter-locked-loupe--secondary",
+      "section": "Secondary window",
+      "action": "Enter locked Loupe (secondary)",
+      "keys": {
+        "windows": "Ctrl+Shift+Enter",
+        "macos": "Cmd+Shift+Return"
+      },
+      "scope": "secondary",
+      "relevance": "optional",
+      "description": "Lock the loupe to the current photo.",
+      "note": ""
+    },
+    {
+      "id": "secondary-window:enter-compare--secondary",
+      "section": "Secondary window",
+      "action": "Enter Compare (secondary)",
+      "keys": {
+        "windows": "Shift+C",
+        "macos": "Shift+C"
+      },
+      "scope": "secondary",
+      "relevance": "optional",
+      "description": "Compare view on secondary window.",
+      "note": ""
+    },
+    {
+      "id": "secondary-window:enter-survey--secondary",
+      "section": "Secondary window",
+      "action": "Enter Survey (secondary)",
+      "keys": {
+        "windows": "Shift+N",
+        "macos": "Shift+N"
+      },
+      "scope": "secondary",
+      "relevance": "optional",
+      "description": "Survey view on secondary window.",
+      "note": ""
+    },
+    {
+      "id": "secondary-window:enter-slideshow--secondary",
+      "section": "Secondary window",
+      "action": "Enter Slideshow (secondary)",
+      "keys": {
+        "windows": "Ctrl+Alt+Shift+Enter",
+        "macos": "Cmd+Opt+Shift+Return"
+      },
+      "scope": "secondary",
+      "relevance": "out_of_scope",
+      "description": "Slideshow on secondary window.",
+      "note": ""
+    },
+    {
+      "id": "secondary-window:full-screen-secondary",
+      "section": "Secondary window",
+      "action": "Full-screen secondary",
+      "keys": {
+        "windows": "Shift+F11",
+        "macos": "Cmd+Shift+F11"
+      },
+      "scope": "secondary",
+      "relevance": "optional",
+      "description": "Full-screen the second display.",
+      "note": "Needs 2nd monitor."
+    },
+    {
+      "id": "secondary-window:show-hide-filter-bar--secondary",
+      "section": "Secondary window",
+      "action": "Show/hide filter bar (secondary)",
+      "keys": {
+        "windows": "Shift+\\",
+        "macos": "Shift+\\"
+      },
+      "scope": "secondary",
+      "relevance": "optional",
+      "description": "Toggle filter bar on secondary.",
+      "note": ""
+    },
+    {
+      "id": "secondary-window:zoom-in-out--secondary",
+      "section": "Secondary window",
+      "action": "Zoom in/out (secondary)",
+      "keys": {
+        "windows": "Ctrl+Shift+= / Ctrl+Shift+-",
+        "macos": "Cmd+Shift+= / Cmd+Shift+-"
+      },
+      "scope": "secondary",
+      "relevance": "optional",
+      "description": "Zoom the secondary window.",
+      "note": ""
+    },
+    {
+      "id": "photos---catalog-management:import-photos-from-disk",
+      "section": "Photos & catalog management",
+      "action": "Import photos from disk",
+      "keys": {
+        "windows": "Ctrl+Shift+I",
+        "macos": "Cmd+Shift+I"
+      },
+      "scope": "global",
+      "relevance": "core",
+      "description": "Open the import dialog.",
+      "note": ""
+    },
+    {
+      "id": "photos---catalog-management:open-catalog",
+      "section": "Photos & catalog management",
+      "action": "Open catalog",
+      "keys": {
+        "windows": "Ctrl+O",
+        "macos": "Cmd+Shift+O"
+      },
+      "scope": "global",
+      "relevance": "optional",
+      "description": "Open a different catalog.",
+      "note": "Catalog concept; map to library/db."
+    },
+    {
+      "id": "photos---catalog-management:open-preferences",
+      "section": "Photos & catalog management",
+      "action": "Open Preferences",
+      "keys": {
+        "windows": "Ctrl+,",
+        "macos": "Cmd+,"
+      },
+      "scope": "global",
+      "relevance": "core",
+      "description": "Application preferences.",
+      "note": ""
+    },
+    {
+      "id": "photos---catalog-management:open-catalog-settings",
+      "section": "Photos & catalog management",
+      "action": "Open Catalog Settings",
+      "keys": {
+        "windows": "Ctrl+Alt+,",
+        "macos": "Cmd+Opt+,"
+      },
+      "scope": "global",
+      "relevance": "optional",
+      "description": "Per-catalog settings.",
+      "note": ""
+    },
+    {
+      "id": "photos---catalog-management:new-subfolder--tethered",
+      "section": "Photos & catalog management",
+      "action": "New subfolder (tethered)",
+      "keys": {
+        "windows": "Ctrl+Shift+T",
+        "macos": "Cmd+Shift+T"
+      },
+      "scope": "module:library",
+      "relevance": "out_of_scope",
+      "description": "Segment tethered capture into a subfolder.",
+      "note": "Tethering-specific."
+    },
+    {
+      "id": "photos---catalog-management:hide-show-tether-bar",
+      "section": "Photos & catalog management",
+      "action": "Hide/show tether bar",
+      "keys": {
+        "windows": "Ctrl+T",
+        "macos": "Cmd+T"
+      },
+      "scope": "module:library",
+      "relevance": "out_of_scope",
+      "description": "Toggle the tethered-capture bar.",
+      "note": "Tethering-specific."
+    },
+    {
+      "id": "photos---catalog-management:create-new-folder",
+      "section": "Photos & catalog management",
+      "action": "Create new folder",
+      "keys": {
+        "windows": "Ctrl+Shift+N",
+        "macos": "Cmd+Shift+N"
+      },
+      "scope": "module:library",
+      "relevance": "core",
+      "description": "Make a new folder on disk in the library tree.",
+      "note": ""
+    },
+    {
+      "id": "photos---catalog-management:create-virtual-copy",
+      "section": "Photos & catalog management",
+      "action": "Create virtual copy",
+      "keys": {
+        "windows": "Ctrl+'",
+        "macos": "Cmd+'"
+      },
+      "scope": "module:library,module:develop",
+      "relevance": "core",
+      "description": "Create a non-destructive virtual duplicate for alternate edits.",
+      "note": ""
+    },
+    {
+      "id": "photos---catalog-management:show-in-explorer-finder",
+      "section": "Photos & catalog management",
+      "action": "Show in Explorer/Finder",
+      "keys": {
+        "windows": "Ctrl+R",
+        "macos": "Cmd+R"
+      },
+      "scope": "module:library,module:develop",
+      "relevance": "core",
+      "description": "Reveal the original file in the OS file manager.",
+      "note": "Collides with Book/Print/Web Ctrl+R."
+    },
+    {
+      "id": "photos---catalog-management:next-previous-photo-in-filmstrip",
+      "section": "Photos & catalog management",
+      "action": "Next/previous photo in filmstrip",
+      "keys": {
+        "windows": "Right / Left",
+        "macos": "Right / Left"
+      },
+      "scope": "global",
+      "relevance": "core",
+      "description": "Step through the filmstrip selection.",
+      "note": ""
+    },
+    {
+      "id": "photos---catalog-management:select-multiple-folders-collections",
+      "section": "Photos & catalog management",
+      "action": "Select multiple folders/collections",
+      "keys": {
+        "windows": "Shift-click / Ctrl-click",
+        "macos": "Shift-click / Cmd-click"
+      },
+      "scope": "module:library",
+      "relevance": "core",
+      "description": "Range or discrete multi-select in the source tree.",
+      "note": "Click-modifier."
+    },
+    {
+      "id": "photos---catalog-management:rename-photo",
+      "section": "Photos & catalog management",
+      "action": "Rename photo",
+      "keys": {
+        "windows": "F2",
+        "macos": "F2"
+      },
+      "scope": "module:library",
+      "relevance": "core",
+      "description": "Rename the selected file.",
+      "note": ""
+    },
+    {
+      "id": "photos---catalog-management:delete-selected-photo-s",
+      "section": "Photos & catalog management",
+      "action": "Delete selected photo(s)",
+      "keys": {
+        "windows": "Backspace or Delete",
+        "macos": "Delete"
+      },
+      "scope": "module:library",
+      "relevance": "core",
+      "description": "Remove from catalog (prompts for disk delete).",
+      "note": "DESTRUCTIVE \u2014 confirm dialog required."
+    },
+    {
+      "id": "photos---catalog-management:remove-from-catalog",
+      "section": "Photos & catalog management",
+      "action": "Remove from catalog",
+      "keys": {
+        "windows": "Alt+Backspace",
+        "macos": "Opt+Delete"
+      },
+      "scope": "module:library",
+      "relevance": "core",
+      "description": "Remove the reference but keep the file on disk.",
+      "note": ""
+    },
+    {
+      "id": "photos---catalog-management:delete---move-to-recycle-trash",
+      "section": "Photos & catalog management",
+      "action": "Delete & move to Recycle/Trash",
+      "keys": {
+        "windows": "Ctrl+Alt+Shift+Backspace",
+        "macos": "Cmd+Opt+Shift+Delete"
+      },
+      "scope": "module:library",
+      "relevance": "core",
+      "description": "Remove from catalog and send file to OS trash.",
+      "note": "DESTRUCTIVE."
+    },
+    {
+      "id": "photos---catalog-management:delete-rejected-photo-s",
+      "section": "Photos & catalog management",
+      "action": "Delete rejected photo(s)",
+      "keys": {
+        "windows": "Ctrl+Backspace",
+        "macos": "Cmd+Delete"
+      },
+      "scope": "module:library",
+      "relevance": "core",
+      "description": "Purge all photos flagged as reject.",
+      "note": "DESTRUCTIVE \u2014 batch."
+    },
+    {
+      "id": "photos---catalog-management:edit-in-photoshop",
+      "section": "Photos & catalog management",
+      "action": "Edit in Photoshop",
+      "keys": {
+        "windows": "Ctrl+E",
+        "macos": "Cmd+E"
+      },
+      "scope": "module:library,module:develop",
+      "relevance": "optional",
+      "description": "Hand off to an external pixel editor.",
+      "note": "External-editor hook."
+    },
+    {
+      "id": "photos---catalog-management:open-in-other-editor",
+      "section": "Photos & catalog management",
+      "action": "Open in other editor",
+      "keys": {
+        "windows": "Ctrl+Alt+E",
+        "macos": "Cmd+Opt+E"
+      },
+      "scope": "module:library,module:develop",
+      "relevance": "optional",
+      "description": "Hand off to a secondary external editor.",
+      "note": ""
+    },
+    {
+      "id": "photos---catalog-management:export-selected-photo-s",
+      "section": "Photos & catalog management",
+      "action": "Export selected photo(s)",
+      "keys": {
+        "windows": "Ctrl+Shift+E",
+        "macos": "Cmd+Shift+E"
+      },
+      "scope": "global",
+      "relevance": "core",
+      "description": "Open the export dialog.",
+      "note": ""
+    },
+    {
+      "id": "photos---catalog-management:export-with-previous-settings",
+      "section": "Photos & catalog management",
+      "action": "Export with previous settings",
+      "keys": {
+        "windows": "Ctrl+Alt+Shift+E",
+        "macos": "Cmd+Opt+Shift+E"
+      },
+      "scope": "global",
+      "relevance": "core",
+      "description": "Re-run export with the last-used settings, no dialog.",
+      "note": ""
+    },
+    {
+      "id": "photos---catalog-management:open-plug-in-manager",
+      "section": "Photos & catalog management",
+      "action": "Open plug-in manager",
+      "keys": {
+        "windows": "Ctrl+Alt+Shift+,",
+        "macos": "Cmd+Opt+Shift+,"
+      },
+      "scope": "global",
+      "relevance": "optional",
+      "description": "Manage installed plug-ins.",
+      "note": ""
+    },
+    {
+      "id": "photos---catalog-management:print-selected-photo",
+      "section": "Photos & catalog management",
+      "action": "Print selected photo",
+      "keys": {
+        "windows": "Ctrl+P",
+        "macos": "Cmd+P"
+      },
+      "scope": "global",
+      "relevance": "out_of_scope",
+      "description": "Send to print.",
+      "note": "Output module."
+    },
+    {
+      "id": "photos---catalog-management:open-page-setup",
+      "section": "Photos & catalog management",
+      "action": "Open Page Setup",
+      "keys": {
+        "windows": "Ctrl+Shift+P",
+        "macos": "Cmd+Shift+P"
+      },
+      "scope": "global",
+      "relevance": "out_of_scope",
+      "description": "Printer page setup.",
+      "note": "Output module."
+    },
+    {
+      "id": "photos---catalog-management:go-to-next-image",
+      "section": "Photos & catalog management",
+      "action": "Go to next image",
+      "keys": {
+        "windows": "Ctrl+Right",
+        "macos": "Cmd+Right"
+      },
+      "scope": "global",
+      "relevance": "core",
+      "description": "Advance selection (catalog order).",
+      "note": ""
+    },
+    {
+      "id": "photos---catalog-management:go-to-previous-image",
+      "section": "Photos & catalog management",
+      "action": "Go to previous image",
+      "keys": {
+        "windows": "Ctrl+Left",
+        "macos": "Cmd+Left"
+      },
+      "scope": "global",
+      "relevance": "core",
+      "description": "Step selection back.",
+      "note": ""
+    },
+    {
+      "id": "photos---catalog-management:tethered-capture",
+      "section": "Photos & catalog management",
+      "action": "Tethered capture",
+      "keys": {
+        "windows": "F12",
+        "macos": "F12"
+      },
+      "scope": "global",
+      "relevance": "out_of_scope",
+      "description": "Trigger a tethered shutter capture.",
+      "note": "Tethering-specific."
+    },
+    {
+      "id": "photos---catalog-management:headless-enhance",
+      "section": "Photos & catalog management",
+      "action": "Headless enhance",
+      "keys": {
+        "windows": "Ctrl+Alt+Shift+I",
+        "macos": "Ctrl+Alt+Shift+I"
+      },
+      "scope": "global",
+      "relevance": "core",
+      "description": "Run Enhance (Denoise/Super Res) with last settings, no dialog.",
+      "note": "AI/ML feature."
+    },
+    {
+      "id": "photos---catalog-management:open-enhance-dialog",
+      "section": "Photos & catalog management",
+      "action": "Open enhance dialog",
+      "keys": {
+        "windows": "Ctrl+Alt+I",
+        "macos": "Ctrl+Alt+I"
+      },
+      "scope": "global",
+      "relevance": "core",
+      "description": "Open the Enhance dialog (Denoise/Super Resolution/Raw Details).",
+      "note": "AI/ML feature."
+    },
+    {
+      "id": "photos---catalog-management:hdr-merge",
+      "section": "Photos & catalog management",
+      "action": "HDR merge",
+      "keys": {
+        "windows": "Ctrl+H",
+        "macos": "Ctrl+H"
+      },
+      "scope": "global",
+      "relevance": "optional",
+      "description": "Merge selected exposures into an HDR DNG.",
+      "note": ""
+    },
+    {
+      "id": "photos---catalog-management:headless-hdr-merge",
+      "section": "Photos & catalog management",
+      "action": "Headless HDR merge",
+      "keys": {
+        "windows": "Ctrl+Shift+H",
+        "macos": "Ctrl+Shift+H"
+      },
+      "scope": "global",
+      "relevance": "optional",
+      "description": "HDR merge with last settings, no dialog.",
+      "note": "Collides w/ Develop 'always show overlay'."
+    },
+    {
+      "id": "photos---catalog-management:pano-merge",
+      "section": "Photos & catalog management",
+      "action": "Pano merge",
+      "keys": {
+        "windows": "Ctrl+M",
+        "macos": "Ctrl+M"
+      },
+      "scope": "global",
+      "relevance": "optional",
+      "description": "Stitch selected frames into a panorama DNG.",
+      "note": ""
+    },
+    {
+      "id": "photos---catalog-management:headless-pano-merge",
+      "section": "Photos & catalog management",
+      "action": "Headless pano merge",
+      "keys": {
+        "windows": "Ctrl+Shift+M",
+        "macos": "Ctrl+Shift+M"
+      },
+      "scope": "global",
+      "relevance": "optional",
+      "description": "Pano merge with last settings, no dialog.",
+      "note": ""
+    },
+    {
+      "id": "photos---catalog-management:open-as-smart-object-in-ps",
+      "section": "Photos & catalog management",
+      "action": "Open as Smart Object in PS",
+      "keys": {
+        "windows": "Ctrl+Alt+X",
+        "macos": "Cmd+Opt+X"
+      },
+      "scope": "global",
+      "relevance": "optional",
+      "description": "Send to Photoshop as a Smart Object.",
+      "note": "External-editor hook."
+    },
+    {
+      "id": "photos---catalog-management:e-mail-photos",
+      "section": "Photos & catalog management",
+      "action": "E-mail photos",
+      "keys": {
+        "windows": "n/a",
+        "macos": "Cmd+Shift+M"
+      },
+      "scope": "global",
+      "relevance": "optional",
+      "description": "Email selected photos (macOS).",
+      "note": "macOS-only; collides w/ pano on mac."
+    },
+    {
+      "id": "comparing---selecting--library:switch-to-loupe",
+      "section": "Comparing & selecting (Library)",
+      "action": "Switch to Loupe",
+      "keys": {
+        "windows": "E or Enter",
+        "macos": "E or Return"
+      },
+      "scope": "module:library",
+      "relevance": "core",
+      "description": "Go to single-photo view.",
+      "note": ""
+    },
+    {
+      "id": "comparing---selecting--library:switch-to-grid",
+      "section": "Comparing & selecting (Library)",
+      "action": "Switch to Grid",
+      "keys": {
+        "windows": "G or Esc",
+        "macos": "G or Esc"
+      },
+      "scope": "module:library",
+      "relevance": "core",
+      "description": "Go to thumbnail grid.",
+      "note": ""
+    },
+    {
+      "id": "comparing---selecting--library:switch-to-compare",
+      "section": "Comparing & selecting (Library)",
+      "action": "Switch to Compare",
+      "keys": {
+        "windows": "C",
+        "macos": "C"
+      },
+      "scope": "module:library",
+      "relevance": "core",
+      "description": "Select-vs-candidate comparison.",
+      "note": ""
+    },
+    {
+      "id": "comparing---selecting--library:switch-to-survey",
+      "section": "Comparing & selecting (Library)",
+      "action": "Switch to Survey",
+      "keys": {
+        "windows": "N",
+        "macos": "N"
+      },
+      "scope": "module:library",
+      "relevance": "core",
+      "description": "Multi-photo survey.",
+      "note": ""
+    },
+    {
+      "id": "comparing---selecting--library:grid-loupe",
+      "section": "Comparing & selecting (Library)",
+      "action": "Grid\u2192Loupe",
+      "keys": {
+        "windows": "Spacebar or E",
+        "macos": "Spacebar or E"
+      },
+      "scope": "module:library",
+      "relevance": "core",
+      "description": "Open the focused thumbnail in loupe.",
+      "note": ""
+    },
+    {
+      "id": "comparing---selecting--library:swap-select---candidate--compare",
+      "section": "Comparing & selecting (Library)",
+      "action": "Swap select & candidate (Compare)",
+      "keys": {
+        "windows": "Down",
+        "macos": "Down"
+      },
+      "scope": "module:library",
+      "relevance": "core",
+      "description": "Promote the candidate to select.",
+      "note": ""
+    },
+    {
+      "id": "comparing---selecting--library:next-select---candidate--compare",
+      "section": "Comparing & selecting (Library)",
+      "action": "Next select & candidate (Compare)",
+      "keys": {
+        "windows": "Up",
+        "macos": "Up"
+      },
+      "scope": "module:library",
+      "relevance": "core",
+      "description": "Advance the comparison pair.",
+      "note": ""
+    },
+    {
+      "id": "comparing---selecting--library:toggle-zoom",
+      "section": "Comparing & selecting (Library)",
+      "action": "Toggle Zoom",
+      "keys": {
+        "windows": "Z",
+        "macos": "Z"
+      },
+      "scope": "global",
+      "relevance": "core",
+      "description": "Toggle between fit and zoomed preview.",
+      "note": ""
+    },
+    {
+      "id": "comparing---selecting--library:zoom-in-out--loupe",
+      "section": "Comparing & selecting (Library)",
+      "action": "Zoom in/out (Loupe)",
+      "keys": {
+        "windows": "Ctrl+= / Ctrl+-",
+        "macos": "Cmd+= / Cmd+-"
+      },
+      "scope": "module:library",
+      "relevance": "core",
+      "description": "Step zoom level in loupe.",
+      "note": ""
+    },
+    {
+      "id": "comparing---selecting--library:scroll-zoomed-photo",
+      "section": "Comparing & selecting (Library)",
+      "action": "Scroll zoomed photo",
+      "keys": {
+        "windows": "Page Up / Page Down",
+        "macos": "Page Up / Page Down"
+      },
+      "scope": "global",
+      "relevance": "optional",
+      "description": "Pan a zoomed image vertically.",
+      "note": "Also Develop/Web."
+    },
+    {
+      "id": "comparing---selecting--library:go-to-start-end-of-grid",
+      "section": "Comparing & selecting (Library)",
+      "action": "Go to start/end of grid",
+      "keys": {
+        "windows": "Home / End",
+        "macos": "Home / End"
+      },
+      "scope": "module:library",
+      "relevance": "core",
+      "description": "Jump to first/last thumbnail.",
+      "note": ""
+    },
+    {
+      "id": "comparing---selecting--library:play-impromptu-slideshow",
+      "section": "Comparing & selecting (Library)",
+      "action": "Play impromptu slideshow",
+      "keys": {
+        "windows": "Ctrl+Enter",
+        "macos": "Cmd+Return"
+      },
+      "scope": "global",
+      "relevance": "optional",
+      "description": "Quick full-screen slideshow of the selection.",
+      "note": ""
+    },
+    {
+      "id": "comparing---selecting--library:rotate-right--cw",
+      "section": "Comparing & selecting (Library)",
+      "action": "Rotate right (CW)",
+      "keys": {
+        "windows": "Ctrl+]",
+        "macos": "Cmd+]"
+      },
+      "scope": "global",
+      "relevance": "core",
+      "description": "Rotate the photo 90\u00b0 clockwise.",
+      "note": ""
+    },
+    {
+      "id": "comparing---selecting--library:rotate-left--ccw",
+      "section": "Comparing & selecting (Library)",
+      "action": "Rotate left (CCW)",
+      "keys": {
+        "windows": "Ctrl+[",
+        "macos": "Cmd+["
+      },
+      "scope": "global",
+      "relevance": "core",
+      "description": "Rotate the photo 90\u00b0 counter-clockwise.",
+      "note": ""
+    },
+    {
+      "id": "comparing---selecting--library:increase-decrease-thumbnail-size",
+      "section": "Comparing & selecting (Library)",
+      "action": "Increase/decrease thumbnail size",
+      "keys": {
+        "windows": "= / -",
+        "macos": "= / -"
+      },
+      "scope": "module:library",
+      "relevance": "core",
+      "description": "Grow/shrink grid thumbnails.",
+      "note": ""
+    },
+    {
+      "id": "comparing---selecting--library:scroll-grid-thumbnails",
+      "section": "Comparing & selecting (Library)",
+      "action": "Scroll grid thumbnails",
+      "keys": {
+        "windows": "Page Up / Page Down",
+        "macos": "Page Up / Page Down"
+      },
+      "scope": "module:library",
+      "relevance": "optional",
+      "description": "Page through the grid.",
+      "note": ""
+    },
+    {
+      "id": "comparing---selecting--library:toggle-cell-extras",
+      "section": "Comparing & selecting (Library)",
+      "action": "Toggle cell extras",
+      "keys": {
+        "windows": "Ctrl+Shift+H",
+        "macos": "Cmd+Shift+H"
+      },
+      "scope": "module:library",
+      "relevance": "optional",
+      "description": "Show/hide grid cell info badges/extras.",
+      "note": ""
+    },
+    {
+      "id": "comparing---selecting--library:show-hide-badges",
+      "section": "Comparing & selecting (Library)",
+      "action": "Show/hide badges",
+      "keys": {
+        "windows": "Ctrl+Alt+Shift+H",
+        "macos": "Cmd+Opt+Shift+H"
+      },
+      "scope": "module:library",
+      "relevance": "optional",
+      "description": "Toggle thumbnail badge icons.",
+      "note": ""
+    },
+    {
+      "id": "comparing---selecting--library:cycle-grid-views",
+      "section": "Comparing & selecting (Library)",
+      "action": "Cycle Grid views",
+      "keys": {
+        "windows": "J",
+        "macos": "J"
+      },
+      "scope": "module:library",
+      "relevance": "optional",
+      "description": "Cycle compact/expanded/none grid styles.",
+      "note": ""
+    },
+    {
+      "id": "comparing---selecting--library:open-library-view-options",
+      "section": "Comparing & selecting (Library)",
+      "action": "Open Library view options",
+      "keys": {
+        "windows": "Ctrl+J",
+        "macos": "Cmd+J"
+      },
+      "scope": "module:library",
+      "relevance": "optional",
+      "description": "Grid/loupe view option dialog.",
+      "note": ""
+    },
+    {
+      "id": "comparing---selecting--library:select-multiple-discrete",
+      "section": "Comparing & selecting (Library)",
+      "action": "Select multiple discrete",
+      "keys": {
+        "windows": "Ctrl-click",
+        "macos": "Cmd-click"
+      },
+      "scope": "module:library",
+      "relevance": "core",
+      "description": "Add/remove individual photos to selection.",
+      "note": "Click-modifier."
+    },
+    {
+      "id": "comparing---selecting--library:select-multiple-contiguous",
+      "section": "Comparing & selecting (Library)",
+      "action": "Select multiple contiguous",
+      "keys": {
+        "windows": "Shift-click",
+        "macos": "Shift-click"
+      },
+      "scope": "module:library",
+      "relevance": "core",
+      "description": "Range-select photos.",
+      "note": "Click-modifier."
+    },
+    {
+      "id": "comparing---selecting--library:select-all",
+      "section": "Comparing & selecting (Library)",
+      "action": "Select all",
+      "keys": {
+        "windows": "Ctrl+A",
+        "macos": "Cmd+A"
+      },
+      "scope": "module:library",
+      "relevance": "core",
+      "description": "Select every photo in the view.",
+      "note": ""
+    },
+    {
+      "id": "comparing---selecting--library:deselect-all",
+      "section": "Comparing & selecting (Library)",
+      "action": "Deselect all",
+      "keys": {
+        "windows": "Ctrl+D",
+        "macos": "Cmd+D / Cmd+Shift+A"
+      },
+      "scope": "module:library",
+      "relevance": "core",
+      "description": "Clear the selection.",
+      "note": ""
+    },
+    {
+      "id": "comparing---selecting--library:select-only-active-photo",
+      "section": "Comparing & selecting (Library)",
+      "action": "Select only active photo",
+      "keys": {
+        "windows": "Ctrl+Shift+D",
+        "macos": "Cmd+Shift+D"
+      },
+      "scope": "module:library",
+      "relevance": "core",
+      "description": "Reduce selection to the active photo.",
+      "note": ""
+    },
+    {
+      "id": "comparing---selecting--library:deselect-active-photo",
+      "section": "Comparing & selecting (Library)",
+      "action": "Deselect active photo",
+      "keys": {
+        "windows": "/",
+        "macos": "/"
+      },
+      "scope": "module:library",
+      "relevance": "optional",
+      "description": "Drop the active photo from a multi-selection.",
+      "note": ""
+    },
+    {
+      "id": "comparing---selecting--library:add-prev-next-to-selection",
+      "section": "Comparing & selecting (Library)",
+      "action": "Add prev/next to selection",
+      "keys": {
+        "windows": "Shift+Left / Shift+Right",
+        "macos": "Shift+Left / Shift+Right"
+      },
+      "scope": "module:library",
+      "relevance": "core",
+      "description": "Extend selection by one in either direction.",
+      "note": ""
+    },
+    {
+      "id": "comparing---selecting--library:select-flagged-photos",
+      "section": "Comparing & selecting (Library)",
+      "action": "Select flagged photos",
+      "keys": {
+        "windows": "Ctrl+Alt+A",
+        "macos": "Cmd+Opt+A"
+      },
+      "scope": "module:library",
+      "relevance": "core",
+      "description": "Select all picks.",
+      "note": ""
+    },
+    {
+      "id": "comparing---selecting--library:deselect-unflagged-photos",
+      "section": "Comparing & selecting (Library)",
+      "action": "Deselect unflagged photos",
+      "keys": {
+        "windows": "Ctrl+Alt+Shift+D",
+        "macos": "Cmd+Opt+Shift+D"
+      },
+      "scope": "module:library",
+      "relevance": "optional",
+      "description": "Trim selection to flagged only.",
+      "note": ""
+    },
+    {
+      "id": "comparing---selecting--library:group-into-stack",
+      "section": "Comparing & selecting (Library)",
+      "action": "Group into stack",
+      "keys": {
+        "windows": "Ctrl+G",
+        "macos": "Cmd+G"
+      },
+      "scope": "module:library",
+      "relevance": "optional",
+      "description": "Stack the selected photos.",
+      "note": ""
+    },
+    {
+      "id": "comparing---selecting--library:unstack",
+      "section": "Comparing & selecting (Library)",
+      "action": "Unstack",
+      "keys": {
+        "windows": "Ctrl+Shift+G",
+        "macos": "Cmd+Shift+G"
+      },
+      "scope": "module:library",
+      "relevance": "optional",
+      "description": "Break the current stack apart.",
+      "note": ""
+    },
+    {
+      "id": "comparing---selecting--library:toggle-stack",
+      "section": "Comparing & selecting (Library)",
+      "action": "Toggle stack",
+      "keys": {
+        "windows": "S",
+        "macos": "S"
+      },
+      "scope": "module:library",
+      "relevance": "optional",
+      "description": "Collapse/expand a stack.",
+      "note": "Collides w/ Develop soft-proof S."
+    },
+    {
+      "id": "comparing---selecting--library:move-to-top-of-stack",
+      "section": "Comparing & selecting (Library)",
+      "action": "Move to top of stack",
+      "keys": {
+        "windows": "Shift+S",
+        "macos": "Shift+S"
+      },
+      "scope": "module:library",
+      "relevance": "optional",
+      "description": "Promote photo to stack top.",
+      "note": ""
+    },
+    {
+      "id": "comparing---selecting--library:move-up-in-stack",
+      "section": "Comparing & selecting (Library)",
+      "action": "Move up in stack",
+      "keys": {
+        "windows": "Shift+[",
+        "macos": "Shift+["
+      },
+      "scope": "module:library",
+      "relevance": "optional",
+      "description": "Reorder within a stack.",
+      "note": ""
+    },
+    {
+      "id": "comparing---selecting--library:move-down-in-stack",
+      "section": "Comparing & selecting (Library)",
+      "action": "Move down in stack",
+      "keys": {
+        "windows": "Shift+]",
+        "macos": "Shift+]"
+      },
+      "scope": "module:library",
+      "relevance": "optional",
+      "description": "Reorder within a stack.",
+      "note": ""
+    },
+    {
+      "id": "rating--flagging---filtering:set-star-rating",
+      "section": "Rating, flagging & filtering",
+      "action": "Set star rating",
+      "keys": {
+        "windows": "1\u20135",
+        "macos": "1\u20135"
+      },
+      "scope": "global",
+      "relevance": "core",
+      "description": "Apply 1\u20135 star rating to the selection.",
+      "note": ""
+    },
+    {
+      "id": "rating--flagging---filtering:set-rating---advance",
+      "section": "Rating, flagging & filtering",
+      "action": "Set rating & advance",
+      "keys": {
+        "windows": "Shift+1\u20135",
+        "macos": "Shift+1\u20135"
+      },
+      "scope": "global",
+      "relevance": "core",
+      "description": "Rate then auto-advance to next photo (fast culling).",
+      "note": ""
+    },
+    {
+      "id": "rating--flagging---filtering:remove-star-rating",
+      "section": "Rating, flagging & filtering",
+      "action": "Remove star rating",
+      "keys": {
+        "windows": "0",
+        "macos": "0"
+      },
+      "scope": "global",
+      "relevance": "core",
+      "description": "Clear the star rating.",
+      "note": ""
+    },
+    {
+      "id": "rating--flagging---filtering:remove-rating---advance",
+      "section": "Rating, flagging & filtering",
+      "action": "Remove rating & advance",
+      "keys": {
+        "windows": "Shift+0",
+        "macos": "Shift+0"
+      },
+      "scope": "global",
+      "relevance": "optional",
+      "description": "Clear rating then advance.",
+      "note": ""
+    },
+    {
+      "id": "rating--flagging---filtering:increase-decrease-rating",
+      "section": "Rating, flagging & filtering",
+      "action": "Increase/decrease rating",
+      "keys": {
+        "windows": "] / [",
+        "macos": "] / ["
+      },
+      "scope": "global",
+      "relevance": "core",
+      "description": "Bump rating up/down by one star.",
+      "note": "Collides w/ brush-size in Develop."
+    },
+    {
+      "id": "rating--flagging---filtering:assign-red-label",
+      "section": "Rating, flagging & filtering",
+      "action": "Assign red label",
+      "keys": {
+        "windows": "6",
+        "macos": "6"
+      },
+      "scope": "global",
+      "relevance": "optional",
+      "description": "Apply red color label.",
+      "note": ""
+    },
+    {
+      "id": "rating--flagging---filtering:assign-yellow-label",
+      "section": "Rating, flagging & filtering",
+      "action": "Assign yellow label",
+      "keys": {
+        "windows": "7",
+        "macos": "7"
+      },
+      "scope": "global",
+      "relevance": "optional",
+      "description": "Apply yellow color label.",
+      "note": ""
+    },
+    {
+      "id": "rating--flagging---filtering:assign-green-label",
+      "section": "Rating, flagging & filtering",
+      "action": "Assign green label",
+      "keys": {
+        "windows": "8",
+        "macos": "8"
+      },
+      "scope": "global",
+      "relevance": "optional",
+      "description": "Apply green color label.",
+      "note": ""
+    },
+    {
+      "id": "rating--flagging---filtering:assign-blue-label",
+      "section": "Rating, flagging & filtering",
+      "action": "Assign blue label",
+      "keys": {
+        "windows": "9",
+        "macos": "9"
+      },
+      "scope": "global",
+      "relevance": "optional",
+      "description": "Apply blue color label.",
+      "note": ""
+    },
+    {
+      "id": "rating--flagging---filtering:assign-label---advance",
+      "section": "Rating, flagging & filtering",
+      "action": "Assign label & advance",
+      "keys": {
+        "windows": "Shift+6\u20139",
+        "macos": "Shift+6\u20139"
+      },
+      "scope": "global",
+      "relevance": "optional",
+      "description": "Label then advance.",
+      "note": ""
+    },
+    {
+      "id": "rating--flagging---filtering:flag-as-pick",
+      "section": "Rating, flagging & filtering",
+      "action": "Flag as pick",
+      "keys": {
+        "windows": "P",
+        "macos": "P"
+      },
+      "scope": "global",
+      "relevance": "core",
+      "description": "Mark as pick.",
+      "note": ""
+    },
+    {
+      "id": "rating--flagging---filtering:flag-as-pick---advance",
+      "section": "Rating, flagging & filtering",
+      "action": "Flag as pick & advance",
+      "keys": {
+        "windows": "Shift+P",
+        "macos": "Shift+P"
+      },
+      "scope": "global",
+      "relevance": "core",
+      "description": "Pick then advance (culling).",
+      "note": ""
+    },
+    {
+      "id": "rating--flagging---filtering:flag-as-reject",
+      "section": "Rating, flagging & filtering",
+      "action": "Flag as reject",
+      "keys": {
+        "windows": "X",
+        "macos": "X"
+      },
+      "scope": "global",
+      "relevance": "core",
+      "description": "Mark as reject.",
+      "note": "Collides w/ Develop crop-orientation X."
+    },
+    {
+      "id": "rating--flagging---filtering:flag-as-reject---advance",
+      "section": "Rating, flagging & filtering",
+      "action": "Flag as reject & advance",
+      "keys": {
+        "windows": "Shift+X",
+        "macos": "Shift+X"
+      },
+      "scope": "global",
+      "relevance": "core",
+      "description": "Reject then advance.",
+      "note": ""
+    },
+    {
+      "id": "rating--flagging---filtering:unflag",
+      "section": "Rating, flagging & filtering",
+      "action": "Unflag",
+      "keys": {
+        "windows": "U",
+        "macos": "U"
+      },
+      "scope": "global",
+      "relevance": "core",
+      "description": "Clear the pick/reject flag.",
+      "note": ""
+    },
+    {
+      "id": "rating--flagging---filtering:unflag---advance",
+      "section": "Rating, flagging & filtering",
+      "action": "Unflag & advance",
+      "keys": {
+        "windows": "Shift+U",
+        "macos": "Shift+U"
+      },
+      "scope": "global",
+      "relevance": "optional",
+      "description": "Unflag then advance.",
+      "note": ""
+    },
+    {
+      "id": "rating--flagging---filtering:increase-decrease-flag-status",
+      "section": "Rating, flagging & filtering",
+      "action": "Increase/decrease flag status",
+      "keys": {
+        "windows": "Ctrl+Up / Ctrl+Down",
+        "macos": "Cmd+Up / Cmd+Down"
+      },
+      "scope": "global",
+      "relevance": "optional",
+      "description": "Step pick\u2194unflagged\u2194reject.",
+      "note": ""
+    },
+    {
+      "id": "rating--flagging---filtering:cycle-flag-settings",
+      "section": "Rating, flagging & filtering",
+      "action": "Cycle flag settings",
+      "keys": {
+        "windows": "` (back quote)",
+        "macos": "` (back quote)"
+      },
+      "scope": "global",
+      "relevance": "optional",
+      "description": "Cycle through flag states.",
+      "note": ""
+    },
+    {
+      "id": "rating--flagging---filtering:refine-photos",
+      "section": "Rating, flagging & filtering",
+      "action": "Refine photos",
+      "keys": {
+        "windows": "Ctrl+Alt+R",
+        "macos": "Cmd+Opt+R"
+      },
+      "scope": "module:library",
+      "relevance": "optional",
+      "description": "Promote picks/reset flags to refine a cull.",
+      "note": "Collides w/ Develop reset-crop."
+    },
+    {
+      "id": "rating--flagging---filtering:show-hide-filter-bar",
+      "section": "Rating, flagging & filtering",
+      "action": "Show/hide Filter bar",
+      "keys": {
+        "windows": "\\",
+        "macos": "\\"
+      },
+      "scope": "module:library",
+      "relevance": "core",
+      "description": "Toggle the Library filter bar.",
+      "note": ""
+    },
+    {
+      "id": "rating--flagging---filtering:open-multiple-filters",
+      "section": "Rating, flagging & filtering",
+      "action": "Open multiple filters",
+      "keys": {
+        "windows": "Shift-click labels",
+        "macos": "Shift-click labels"
+      },
+      "scope": "module:library",
+      "relevance": "optional",
+      "description": "Combine filter criteria.",
+      "note": "Click-modifier."
+    },
+    {
+      "id": "rating--flagging---filtering:toggle-filters-on-off",
+      "section": "Rating, flagging & filtering",
+      "action": "Toggle filters on/off",
+      "keys": {
+        "windows": "Ctrl+L",
+        "macos": "Cmd+L"
+      },
+      "scope": "module:library",
+      "relevance": "core",
+      "description": "Enable/disable active filters.",
+      "note": ""
+    },
+    {
+      "id": "rating--flagging---filtering:find-photo",
+      "section": "Rating, flagging & filtering",
+      "action": "Find photo",
+      "keys": {
+        "windows": "Ctrl+F",
+        "macos": "Cmd+F"
+      },
+      "scope": "module:library",
+      "relevance": "core",
+      "description": "Focus the text search field.",
+      "note": ""
+    },
+    {
+      "id": "collections---quick-collection:create-new-collection",
+      "section": "Collections / Quick Collection",
+      "action": "Create new collection",
+      "keys": {
+        "windows": "Ctrl+N",
+        "macos": "Cmd+N"
+      },
+      "scope": "module:library",
+      "relevance": "optional",
+      "description": "Make a saved collection.",
+      "note": "Collides w/ Develop new-snapshot."
+    },
+    {
+      "id": "collections---quick-collection:add-to-quick-collection",
+      "section": "Collections / Quick Collection",
+      "action": "Add to Quick Collection",
+      "keys": {
+        "windows": "B",
+        "macos": "B"
+      },
+      "scope": "global",
+      "relevance": "optional",
+      "description": "Toss the photo into the temporary Quick Collection.",
+      "note": ""
+    },
+    {
+      "id": "collections---quick-collection:add-to-quick-collection---advance",
+      "section": "Collections / Quick Collection",
+      "action": "Add to Quick Collection & advance",
+      "keys": {
+        "windows": "Shift+B",
+        "macos": "Shift+B"
+      },
+      "scope": "global",
+      "relevance": "optional",
+      "description": "Add then advance.",
+      "note": ""
+    },
+    {
+      "id": "collections---quick-collection:show-quick-collection",
+      "section": "Collections / Quick Collection",
+      "action": "Show Quick Collection",
+      "keys": {
+        "windows": "Ctrl+B",
+        "macos": "Cmd+B"
+      },
+      "scope": "module:library",
+      "relevance": "optional",
+      "description": "View the Quick Collection contents.",
+      "note": ""
+    },
+    {
+      "id": "collections---quick-collection:save-quick-collection",
+      "section": "Collections / Quick Collection",
+      "action": "Save Quick Collection",
+      "keys": {
+        "windows": "Ctrl+Alt+B",
+        "macos": "Cmd+Opt+B"
+      },
+      "scope": "module:library",
+      "relevance": "optional",
+      "description": "Persist Quick Collection as a saved collection.",
+      "note": ""
+    },
+    {
+      "id": "collections---quick-collection:clear-quick-collection",
+      "section": "Collections / Quick Collection",
+      "action": "Clear Quick Collection",
+      "keys": {
+        "windows": "Ctrl+Shift+B",
+        "macos": "Cmd+Shift+B"
+      },
+      "scope": "module:library",
+      "relevance": "optional",
+      "description": "Empty the Quick Collection.",
+      "note": ""
+    },
+    {
+      "id": "collections---quick-collection:set-as-target-collection",
+      "section": "Collections / Quick Collection",
+      "action": "Set as target collection",
+      "keys": {
+        "windows": "Ctrl+Alt+Shift+B",
+        "macos": "Cmd+Opt+Shift+B"
+      },
+      "scope": "module:library",
+      "relevance": "optional",
+      "description": "Choose which collection B adds to.",
+      "note": ""
+    },
+    {
+      "id": "metadata---keywords--library:add-keywords",
+      "section": "Metadata & keywords (Library)",
+      "action": "Add keywords",
+      "keys": {
+        "windows": "Ctrl+K",
+        "macos": "Cmd+K"
+      },
+      "scope": "module:library",
+      "relevance": "core",
+      "description": "Focus the keyword entry field.",
+      "note": ""
+    },
+    {
+      "id": "metadata---keywords--library:edit-keywords",
+      "section": "Metadata & keywords (Library)",
+      "action": "Edit keywords",
+      "keys": {
+        "windows": "Ctrl+Shift+K",
+        "macos": "Cmd+Shift+K"
+      },
+      "scope": "module:library",
+      "relevance": "optional",
+      "description": "Open the keywording panel for editing.",
+      "note": ""
+    },
+    {
+      "id": "metadata---keywords--library:set-a-keyword-shortcut",
+      "section": "Metadata & keywords (Library)",
+      "action": "Set a keyword shortcut",
+      "keys": {
+        "windows": "Ctrl+Alt+Shift+K",
+        "macos": "Cmd+Opt+Shift+K"
+      },
+      "scope": "module:library",
+      "relevance": "optional",
+      "description": "Define the one-tap keyword.",
+      "note": ""
+    },
+    {
+      "id": "metadata---keywords--library:add-remove-keyword-shortcut",
+      "section": "Metadata & keywords (Library)",
+      "action": "Add/remove keyword shortcut",
+      "keys": {
+        "windows": "Shift+K",
+        "macos": "Shift+K"
+      },
+      "scope": "module:library",
+      "relevance": "optional",
+      "description": "Toggle the shortcut keyword on the selection.",
+      "note": ""
+    },
+    {
+      "id": "metadata---keywords--library:enable-painting",
+      "section": "Metadata & keywords (Library)",
+      "action": "Enable painting",
+      "keys": {
+        "windows": "Ctrl+Alt+K",
+        "macos": "Cmd+Opt+K"
+      },
+      "scope": "module:library",
+      "relevance": "optional",
+      "description": "Painter tool to brush metadata onto thumbnails.",
+      "note": ""
+    },
+    {
+      "id": "metadata---keywords--library:add-keyword-from-set",
+      "section": "Metadata & keywords (Library)",
+      "action": "Add keyword from set",
+      "keys": {
+        "windows": "Alt+1\u20139",
+        "macos": "Opt+1\u20139"
+      },
+      "scope": "module:library",
+      "relevance": "optional",
+      "description": "Apply a keyword from the active keyword set.",
+      "note": ""
+    },
+    {
+      "id": "metadata---keywords--library:cycle-keyword-sets",
+      "section": "Metadata & keywords (Library)",
+      "action": "Cycle keyword sets",
+      "keys": {
+        "windows": "Alt+0 / Alt+Shift+0",
+        "macos": "Opt+0 / Opt+Shift+0"
+      },
+      "scope": "module:library",
+      "relevance": "optional",
+      "description": "Switch active keyword set.",
+      "note": ""
+    },
+    {
+      "id": "metadata---keywords--library:copy-paste-metadata",
+      "section": "Metadata & keywords (Library)",
+      "action": "Copy/paste metadata",
+      "keys": {
+        "windows": "Ctrl+Alt+Shift+C / +V",
+        "macos": "Cmd+Opt+Shift+C / +V"
+      },
+      "scope": "module:library",
+      "relevance": "core",
+      "description": "Copy metadata from one photo and paste to others.",
+      "note": ""
+    },
+    {
+      "id": "metadata---keywords--library:save-metadata-to-file",
+      "section": "Metadata & keywords (Library)",
+      "action": "Save metadata to file",
+      "keys": {
+        "windows": "Ctrl+S",
+        "macos": "Cmd+S"
+      },
+      "scope": "module:library",
+      "relevance": "core",
+      "description": "Write metadata/edits to XMP sidecar or file header.",
+      "note": "Ties to XMP/ACR sidecar model."
+    },
+    {
+      "id": "metadata---keywords--library:open-spelling-dialog",
+      "section": "Metadata & keywords (Library)",
+      "action": "Open Spelling dialog",
+      "keys": {
+        "windows": "n/a",
+        "macos": "Cmd+:"
+      },
+      "scope": "module:library",
+      "relevance": "out_of_scope",
+      "description": "Spell-check (macOS).",
+      "note": "macOS text service."
+    },
+    {
+      "id": "metadata---keywords--library:check-spelling",
+      "section": "Metadata & keywords (Library)",
+      "action": "Check spelling",
+      "keys": {
+        "windows": "n/a",
+        "macos": "Cmd+;"
+      },
+      "scope": "module:library",
+      "relevance": "out_of_scope",
+      "description": "Spell-check (macOS).",
+      "note": "macOS text service."
+    },
+    {
+      "id": "metadata---keywords--library:open-character-palette",
+      "section": "Metadata & keywords (Library)",
+      "action": "Open Character palette",
+      "keys": {
+        "windows": "n/a",
+        "macos": "Cmd+Opt+T"
+      },
+      "scope": "module:library",
+      "relevance": "out_of_scope",
+      "description": "System character palette (macOS).",
+      "note": "macOS text service."
+    },
+    {
+      "id": "metadata---keywords--library:visual-search",
+      "section": "Metadata & keywords (Library)",
+      "action": "Visual Search",
+      "keys": {
+        "windows": "Ctrl+Alt+Shift+F",
+        "macos": "Cmd+Opt+Shift+F"
+      },
+      "scope": "module:library",
+      "relevance": "optional",
+      "description": "Search by visual similarity.",
+      "note": "AI/ML feature."
+    },
+    {
+      "id": "metadata---keywords--library:edit-face-name",
+      "section": "Metadata & keywords (Library)",
+      "action": "Edit Face name",
+      "keys": {
+        "windows": "Shift+O",
+        "macos": "Shift+O"
+      },
+      "scope": "module:library",
+      "relevance": "optional",
+      "description": "Name a detected face in People view.",
+      "note": ""
+    },
+    {
+      "id": "develop-module---global-edit-ops:toggle-use-generative-ai",
+      "section": "Develop module \u2014 global edit ops",
+      "action": "Toggle Use Generative AI",
+      "keys": {
+        "windows": "Alt+Shift+G",
+        "macos": "Opt+Shift+G"
+      },
+      "scope": "module:develop",
+      "relevance": "optional",
+      "description": "Switch the Remove tool to generative fill mode.",
+      "note": "AI/ML feature."
+    },
+    {
+      "id": "develop-module---global-edit-ops:toggle-detect-aware",
+      "section": "Develop module \u2014 global edit ops",
+      "action": "Toggle Detect Aware",
+      "keys": {
+        "windows": "Alt+Shift+O",
+        "macos": "Opt+Shift+O"
+      },
+      "scope": "module:develop",
+      "relevance": "optional",
+      "description": "Toggle content-aware detection for Remove.",
+      "note": "AI/ML feature."
+    },
+    {
+      "id": "develop-module---global-edit-ops:cycle-generative-remove-variations",
+      "section": "Develop module \u2014 global edit ops",
+      "action": "Cycle Generative Remove variations",
+      "keys": {
+        "windows": "Alt+Side arrows",
+        "macos": "Opt+Side arrows"
+      },
+      "scope": "module:develop",
+      "relevance": "optional",
+      "description": "Step through generated fill candidates.",
+      "note": "AI/ML feature."
+    },
+    {
+      "id": "develop-module---global-edit-ops:convert-to-grayscale",
+      "section": "Develop module \u2014 global edit ops",
+      "action": "Convert to grayscale",
+      "keys": {
+        "windows": "V",
+        "macos": "V"
+      },
+      "scope": "module:develop",
+      "relevance": "core",
+      "description": "Toggle B&W treatment.",
+      "note": ""
+    },
+    {
+      "id": "develop-module---global-edit-ops:auto-tone",
+      "section": "Develop module \u2014 global edit ops",
+      "action": "Auto tone",
+      "keys": {
+        "windows": "Ctrl+U",
+        "macos": "Cmd+U"
+      },
+      "scope": "module:develop",
+      "relevance": "core",
+      "description": "Apply automatic tone (exposure/contrast/etc.).",
+      "note": "ML auto."
+    },
+    {
+      "id": "develop-module---global-edit-ops:auto-white-balance",
+      "section": "Develop module \u2014 global edit ops",
+      "action": "Auto white balance",
+      "keys": {
+        "windows": "Ctrl+Shift+U",
+        "macos": "Cmd+Shift+U"
+      },
+      "scope": "module:develop",
+      "relevance": "core",
+      "description": "Apply automatic white balance.",
+      "note": "ML auto."
+    },
+    {
+      "id": "develop-module---global-edit-ops:copy-paste-develop-settings",
+      "section": "Develop module \u2014 global edit ops",
+      "action": "Copy/paste Develop settings",
+      "keys": {
+        "windows": "Ctrl+Shift+C / +V",
+        "macos": "Cmd+Shift+C / +V"
+      },
+      "scope": "module:develop",
+      "relevance": "core",
+      "description": "Copy a recipe of edits and paste onto other photos.",
+      "note": ""
+    },
+    {
+      "id": "develop-module---global-edit-ops:paste-settings-from-previous",
+      "section": "Develop module \u2014 global edit ops",
+      "action": "Paste settings from previous",
+      "keys": {
+        "windows": "Ctrl+Alt+V",
+        "macos": "Cmd+Opt+V"
+      },
+      "scope": "module:develop",
+      "relevance": "core",
+      "description": "Apply the immediately previous photo's settings.",
+      "note": ""
+    },
+    {
+      "id": "develop-module---global-edit-ops:copy-after-before",
+      "section": "Develop module \u2014 global edit ops",
+      "action": "Copy After\u2192Before",
+      "keys": {
+        "windows": "Ctrl+Alt+Shift+Left",
+        "macos": "Cmd+Opt+Shift+Left"
+      },
+      "scope": "module:develop",
+      "relevance": "optional",
+      "description": "Set the before state to the current edit.",
+      "note": ""
+    },
+    {
+      "id": "develop-module---global-edit-ops:copy-before-after",
+      "section": "Develop module \u2014 global edit ops",
+      "action": "Copy Before\u2192After",
+      "keys": {
+        "windows": "Ctrl+Alt+Shift+Right",
+        "macos": "Cmd+Opt+Shift+Right"
+      },
+      "scope": "module:develop",
+      "relevance": "optional",
+      "description": "Reset the edit to the before state.",
+      "note": ""
+    },
+    {
+      "id": "develop-module---global-edit-ops:swap-before-after",
+      "section": "Develop module \u2014 global edit ops",
+      "action": "Swap Before/After",
+      "keys": {
+        "windows": "Ctrl+Alt+Shift+Up",
+        "macos": "Cmd+Opt+Shift+Up"
+      },
+      "scope": "module:develop",
+      "relevance": "optional",
+      "description": "Exchange before and after states.",
+      "note": ""
+    },
+    {
+      "id": "develop-module---global-edit-ops:nudge-slider--small",
+      "section": "Develop module \u2014 global edit ops",
+      "action": "Nudge slider (small)",
+      "keys": {
+        "windows": "Up / Down or + / -",
+        "macos": "Up / Down or + / -"
+      },
+      "scope": "module:develop",
+      "relevance": "core",
+      "description": "Fine adjust the focused slider.",
+      "note": ""
+    },
+    {
+      "id": "develop-module---global-edit-ops:nudge-slider--large",
+      "section": "Develop module \u2014 global edit ops",
+      "action": "Nudge slider (large)",
+      "keys": {
+        "windows": "Shift+Up / Shift+Down",
+        "macos": "Shift+Up / Shift+Down"
+      },
+      "scope": "module:develop",
+      "relevance": "core",
+      "description": "Coarse adjust the focused slider.",
+      "note": ""
+    },
+    {
+      "id": "develop-module---global-edit-ops:cycle-basic-panel-settings",
+      "section": "Develop module \u2014 global edit ops",
+      "action": "Cycle Basic panel settings",
+      "keys": {
+        "windows": "./ ,",
+        "macos": "./ ,"
+      },
+      "scope": "module:develop",
+      "relevance": "core",
+      "description": "Move focus forward/back through Basic sliders.",
+      "note": ""
+    },
+    {
+      "id": "develop-module---global-edit-ops:reset-a-slider",
+      "section": "Develop module \u2014 global edit ops",
+      "action": "Reset a slider",
+      "keys": {
+        "windows": "Double-click slider name",
+        "macos": "Double-click slider name"
+      },
+      "scope": "module:develop",
+      "relevance": "core",
+      "description": "Return one slider to default.",
+      "note": "Click action."
+    },
+    {
+      "id": "develop-module---global-edit-ops:reset-a-group-of-sliders",
+      "section": "Develop module \u2014 global edit ops",
+      "action": "Reset a group of sliders",
+      "keys": {
+        "windows": "Alt-click group name",
+        "macos": "Opt-click group name"
+      },
+      "scope": "module:develop",
+      "relevance": "core",
+      "description": "Reset a whole panel section.",
+      "note": "Click-modifier."
+    },
+    {
+      "id": "develop-module---global-edit-ops:reset-all-settings",
+      "section": "Develop module \u2014 global edit ops",
+      "action": "Reset all settings",
+      "keys": {
+        "windows": "Ctrl+Shift+R",
+        "macos": "Cmd+Shift+R"
+      },
+      "scope": "module:develop",
+      "relevance": "core",
+      "description": "Revert the photo to defaults.",
+      "note": ""
+    },
+    {
+      "id": "develop-module---global-edit-ops:sync-settings",
+      "section": "Develop module \u2014 global edit ops",
+      "action": "Sync settings",
+      "keys": {
+        "windows": "Ctrl+Shift+S",
+        "macos": "Cmd+Shift+S"
+      },
+      "scope": "module:develop",
+      "relevance": "core",
+      "description": "Sync chosen settings across selected photos (with dialog).",
+      "note": ""
+    },
+    {
+      "id": "develop-module---global-edit-ops:sync--no-dialog",
+      "section": "Develop module \u2014 global edit ops",
+      "action": "Sync (no dialog)",
+      "keys": {
+        "windows": "Ctrl+Alt+S",
+        "macos": "Cmd+Opt+S"
+      },
+      "scope": "module:develop",
+      "relevance": "core",
+      "description": "Sync using the last sync selections.",
+      "note": ""
+    },
+    {
+      "id": "develop-module---global-edit-ops:toggle-auto-sync",
+      "section": "Develop module \u2014 global edit ops",
+      "action": "Toggle Auto Sync",
+      "keys": {
+        "windows": "Ctrl-click Sync",
+        "macos": "Cmd-click Sync"
+      },
+      "scope": "module:develop",
+      "relevance": "optional",
+      "description": "Make slider changes apply live to all selected.",
+      "note": "Click-modifier."
+    },
+    {
+      "id": "develop-module---global-edit-ops:enable-auto-sync",
+      "section": "Develop module \u2014 global edit ops",
+      "action": "Enable Auto Sync",
+      "keys": {
+        "windows": "Ctrl+Alt+Shift+A",
+        "macos": "Cmd+Opt+Shift+A"
+      },
+      "scope": "module:develop",
+      "relevance": "optional",
+      "description": "Turn on auto-sync mode.",
+      "note": ""
+    },
+    {
+      "id": "develop-module---global-edit-ops:match-total-exposures",
+      "section": "Develop module \u2014 global edit ops",
+      "action": "Match total exposures",
+      "keys": {
+        "windows": "Ctrl+Alt+Shift+M",
+        "macos": "Cmd+Opt+Shift+M"
+      },
+      "scope": "module:develop",
+      "relevance": "optional",
+      "description": "Normalize exposure across a selection.",
+      "note": ""
+    },
+    {
+      "id": "develop-module---tools:white-balance-tool",
+      "section": "Develop module \u2014 tools",
+      "action": "White Balance tool",
+      "keys": {
+        "windows": "W",
+        "macos": "W"
+      },
+      "scope": "global",
+      "relevance": "core",
+      "description": "Eyedropper to set neutral white balance.",
+      "note": ""
+    },
+    {
+      "id": "develop-module---tools:crop-tool",
+      "section": "Develop module \u2014 tools",
+      "action": "Crop tool",
+      "keys": {
+        "windows": "R",
+        "macos": "R"
+      },
+      "scope": "global",
+      "relevance": "core",
+      "description": "Enter crop/straighten.",
+      "note": ""
+    },
+    {
+      "id": "develop-module---tools:constrain-aspect-ratio--crop",
+      "section": "Develop module \u2014 tools",
+      "action": "Constrain aspect ratio (crop)",
+      "keys": {
+        "windows": "A",
+        "macos": "A"
+      },
+      "scope": "module:develop",
+      "relevance": "core",
+      "description": "Lock the crop aspect ratio.",
+      "note": ""
+    },
+    {
+      "id": "develop-module---tools:crop-to-previous-ratio",
+      "section": "Develop module \u2014 tools",
+      "action": "Crop to previous ratio",
+      "keys": {
+        "windows": "Shift+A",
+        "macos": "Shift+A"
+      },
+      "scope": "module:develop",
+      "relevance": "optional",
+      "description": "Reuse the last crop ratio.",
+      "note": ""
+    },
+    {
+      "id": "develop-module---tools:crop-from-center",
+      "section": "Develop module \u2014 tools",
+      "action": "Crop from center",
+      "keys": {
+        "windows": "Alt-drag",
+        "macos": "Opt-drag"
+      },
+      "scope": "module:develop",
+      "relevance": "optional",
+      "description": "Grow the crop symmetrically from center.",
+      "note": "Click-modifier."
+    },
+    {
+      "id": "develop-module---tools:cycle-crop-grid-overlay",
+      "section": "Develop module \u2014 tools",
+      "action": "Cycle crop grid overlay",
+      "keys": {
+        "windows": "O",
+        "macos": "O"
+      },
+      "scope": "module:develop",
+      "relevance": "optional",
+      "description": "Cycle thirds/golden/etc. crop guides.",
+      "note": "Collides w/ Library People view."
+    },
+    {
+      "id": "develop-module---tools:cycle-crop-overlay-orientation",
+      "section": "Develop module \u2014 tools",
+      "action": "Cycle crop overlay orientation",
+      "keys": {
+        "windows": "Shift+O",
+        "macos": "Shift+O"
+      },
+      "scope": "module:develop",
+      "relevance": "optional",
+      "description": "Rotate the crop guide orientation.",
+      "note": ""
+    },
+    {
+      "id": "develop-module---tools:toggle-crop-orientation",
+      "section": "Develop module \u2014 tools",
+      "action": "Toggle crop orientation",
+      "keys": {
+        "windows": "X",
+        "macos": "X"
+      },
+      "scope": "module:develop",
+      "relevance": "core",
+      "description": "Swap crop between portrait/landscape.",
+      "note": "Collides w/ Library reject."
+    },
+    {
+      "id": "develop-module---tools:reset-crop",
+      "section": "Develop module \u2014 tools",
+      "action": "Reset crop",
+      "keys": {
+        "windows": "Ctrl+Alt+R",
+        "macos": "Cmd+Opt+R"
+      },
+      "scope": "module:develop",
+      "relevance": "core",
+      "description": "Clear the crop.",
+      "note": "Collides w/ Library refine."
+    },
+    {
+      "id": "develop-module---tools:guided-upright-tool",
+      "section": "Develop module \u2014 tools",
+      "action": "Guided Upright tool",
+      "keys": {
+        "windows": "Shift+T",
+        "macos": "Shift+T"
+      },
+      "scope": "module:develop",
+      "relevance": "optional",
+      "description": "Draw guides to correct perspective.",
+      "note": "Context-overloaded Shift+T (see conflicts)."
+    },
+    {
+      "id": "develop-module---tools:spot-removal-tool",
+      "section": "Develop module \u2014 tools",
+      "action": "Spot Removal tool",
+      "keys": {
+        "windows": "Q",
+        "macos": "Q"
+      },
+      "scope": "module:develop",
+      "relevance": "core",
+      "description": "Heal/clone blemishes and dust.",
+      "note": ""
+    },
+    {
+      "id": "develop-module---tools:toggle-clone-heal",
+      "section": "Develop module \u2014 tools",
+      "action": "Toggle Clone/Heal",
+      "keys": {
+        "windows": "Shift+T",
+        "macos": "Shift+T"
+      },
+      "scope": "module:develop",
+      "relevance": "core",
+      "description": "Switch Spot Removal between clone and heal.",
+      "note": "Same key, tool-dependent."
+    },
+    {
+      "id": "develop-module---tools:adjustment-brush",
+      "section": "Develop module \u2014 tools",
+      "action": "Adjustment Brush",
+      "keys": {
+        "windows": "K",
+        "macos": "K"
+      },
+      "scope": "global",
+      "relevance": "core",
+      "description": "Freehand local-adjustment brush.",
+      "note": ""
+    },
+    {
+      "id": "develop-module---tools:graduated-filter",
+      "section": "Develop module \u2014 tools",
+      "action": "Graduated Filter",
+      "keys": {
+        "windows": "M",
+        "macos": "M"
+      },
+      "scope": "module:develop",
+      "relevance": "core",
+      "description": "Linear gradient local adjustment.",
+      "note": ""
+    },
+    {
+      "id": "develop-module---tools:toggle-mask-edit-brush",
+      "section": "Develop module \u2014 tools",
+      "action": "Toggle Mask Edit/Brush",
+      "keys": {
+        "windows": "Shift+T",
+        "macos": "Shift+T"
+      },
+      "scope": "module:develop",
+      "relevance": "core",
+      "description": "Switch gradient/radial mask between edit and brush.",
+      "note": "Same key, tool-dependent."
+    },
+    {
+      "id": "develop-module---tools:increase-decrease-brush-size",
+      "section": "Develop module \u2014 tools",
+      "action": "Increase/decrease brush size",
+      "keys": {
+        "windows": "] / [",
+        "macos": "] / ["
+      },
+      "scope": "module:develop",
+      "relevance": "core",
+      "description": "Resize the active brush.",
+      "note": ""
+    },
+    {
+      "id": "develop-module---tools:increase-decrease-brush-feather",
+      "section": "Develop module \u2014 tools",
+      "action": "Increase/decrease brush feather",
+      "keys": {
+        "windows": "Shift+] / Shift+[",
+        "macos": "Shift+] / Shift+["
+      },
+      "scope": "module:develop",
+      "relevance": "core",
+      "description": "Soften/harden the brush edge.",
+      "note": ""
+    },
+    {
+      "id": "develop-module---tools:switch-brush-a-b",
+      "section": "Develop module \u2014 tools",
+      "action": "Switch brush A/B",
+      "keys": {
+        "windows": "/",
+        "macos": "/"
+      },
+      "scope": "module:develop",
+      "relevance": "core",
+      "description": "Toggle the two brush presets.",
+      "note": ""
+    },
+    {
+      "id": "develop-module---tools:temporary-eraser",
+      "section": "Develop module \u2014 tools",
+      "action": "Temporary eraser",
+      "keys": {
+        "windows": "Alt-drag",
+        "macos": "Opt-drag"
+      },
+      "scope": "module:develop",
+      "relevance": "core",
+      "description": "Erase mask while held.",
+      "note": "Click-modifier."
+    },
+    {
+      "id": "develop-module---tools:paint-straight-line",
+      "section": "Develop module \u2014 tools",
+      "action": "Paint straight line",
+      "keys": {
+        "windows": "Shift-drag",
+        "macos": "Shift-drag"
+      },
+      "scope": "module:develop",
+      "relevance": "optional",
+      "description": "Constrain a brush stroke to horizontal/vertical.",
+      "note": "Click-modifier."
+    },
+    {
+      "id": "develop-module---tools:adjust-amount-via-pin",
+      "section": "Develop module \u2014 tools",
+      "action": "Adjust Amount via pin",
+      "keys": {
+        "windows": "Drag pin right/left",
+        "macos": "Drag pin right/left"
+      },
+      "scope": "module:develop",
+      "relevance": "optional",
+      "description": "Scale the local adjustment by dragging its pin.",
+      "note": "Drag action."
+    },
+    {
+      "id": "develop-module---tools:show-hide-local-pin",
+      "section": "Develop module \u2014 tools",
+      "action": "Show/hide local pin",
+      "keys": {
+        "windows": "H",
+        "macos": "H"
+      },
+      "scope": "module:develop",
+      "relevance": "core",
+      "description": "Toggle the adjustment pin marker.",
+      "note": "Also 'never show overlay'."
+    },
+    {
+      "id": "develop-module---tools:show-hide-mask-overlay",
+      "section": "Develop module \u2014 tools",
+      "action": "Show/hide mask overlay",
+      "keys": {
+        "windows": "O",
+        "macos": "O"
+      },
+      "scope": "module:develop",
+      "relevance": "core",
+      "description": "Toggle the colored mask overlay.",
+      "note": ""
+    },
+    {
+      "id": "develop-module---tools:cycle-mask-overlay-color",
+      "section": "Develop module \u2014 tools",
+      "action": "Cycle mask overlay color",
+      "keys": {
+        "windows": "Shift+O",
+        "macos": "Shift+O"
+      },
+      "scope": "module:develop",
+      "relevance": "optional",
+      "description": "Change the mask overlay tint.",
+      "note": ""
+    },
+    {
+      "id": "develop-module---targeted-adjustment--tat----masks:tat--tone-curve",
+      "section": "Develop module \u2014 targeted adjustment (TAT) & masks",
+      "action": "TAT: Tone Curve",
+      "keys": {
+        "windows": "Ctrl+Alt+Shift+T",
+        "macos": "Cmd+Opt+Shift+T"
+      },
+      "scope": "module:develop",
+      "relevance": "optional",
+      "description": "Drag on image to adjust the tone curve at that tone.",
+      "note": ""
+    },
+    {
+      "id": "develop-module---targeted-adjustment--tat----masks:tat--hue",
+      "section": "Develop module \u2014 targeted adjustment (TAT) & masks",
+      "action": "TAT: Hue",
+      "keys": {
+        "windows": "Ctrl+Alt+Shift+H",
+        "macos": "Cmd+Opt+Shift+H"
+      },
+      "scope": "module:develop",
+      "relevance": "optional",
+      "description": "Drag on image to shift hue of the sampled color.",
+      "note": ""
+    },
+    {
+      "id": "develop-module---targeted-adjustment--tat----masks:tat--saturation",
+      "section": "Develop module \u2014 targeted adjustment (TAT) & masks",
+      "action": "TAT: Saturation",
+      "keys": {
+        "windows": "Ctrl+Alt+Shift+S",
+        "macos": "Cmd+Opt+Shift+S"
+      },
+      "scope": "module:develop",
+      "relevance": "optional",
+      "description": "Drag on image to adjust saturation of sampled color.",
+      "note": ""
+    },
+    {
+      "id": "develop-module---targeted-adjustment--tat----masks:tat--luminance",
+      "section": "Develop module \u2014 targeted adjustment (TAT) & masks",
+      "action": "TAT: Luminance",
+      "keys": {
+        "windows": "Ctrl+Alt+Shift+L",
+        "macos": "Cmd+Opt+Shift+L"
+      },
+      "scope": "module:develop",
+      "relevance": "optional",
+      "description": "Drag on image to adjust luminance of sampled color.",
+      "note": ""
+    },
+    {
+      "id": "develop-module---targeted-adjustment--tat----masks:tat--grayscale-mix",
+      "section": "Develop module \u2014 targeted adjustment (TAT) & masks",
+      "action": "TAT: Grayscale Mix",
+      "keys": {
+        "windows": "Ctrl+Alt+Shift+G",
+        "macos": "Cmd+Opt+Shift+G"
+      },
+      "scope": "module:develop",
+      "relevance": "optional",
+      "description": "Drag to adjust B&W channel mix for sampled color.",
+      "note": ""
+    },
+    {
+      "id": "develop-module---targeted-adjustment--tat----masks:deselect-tat",
+      "section": "Develop module \u2014 targeted adjustment (TAT) & masks",
+      "action": "Deselect TAT",
+      "keys": {
+        "windows": "Ctrl+Alt+Shift+N",
+        "macos": "Cmd+Opt+Shift+N"
+      },
+      "scope": "module:develop",
+      "relevance": "optional",
+      "description": "Turn off the targeted adjustment tool.",
+      "note": ""
+    },
+    {
+      "id": "develop-module---targeted-adjustment--tat----masks:show-clipping",
+      "section": "Develop module \u2014 targeted adjustment (TAT) & masks",
+      "action": "Show clipping",
+      "keys": {
+        "windows": "J",
+        "macos": "J"
+      },
+      "scope": "module:develop",
+      "relevance": "core",
+      "description": "Toggle highlight/shadow clipping warnings.",
+      "note": "Collides w/ Library cycle-grid J."
+    },
+    {
+      "id": "develop-module---targeted-adjustment--tat----masks:toggle-loupe-1-1-zoom",
+      "section": "Develop module \u2014 targeted adjustment (TAT) & masks",
+      "action": "Toggle Loupe/1:1 zoom",
+      "keys": {
+        "windows": "Spacebar or Z",
+        "macos": "Spacebar or Z"
+      },
+      "scope": "module:develop",
+      "relevance": "core",
+      "description": "Toggle fit and 1:1 preview.",
+      "note": ""
+    },
+    {
+      "id": "develop-module---targeted-adjustment--tat----masks:zoom-in-out",
+      "section": "Develop module \u2014 targeted adjustment (TAT) & masks",
+      "action": "Zoom in/out",
+      "keys": {
+        "windows": "Ctrl+= / Ctrl+-",
+        "macos": "Cmd+= / Cmd+-"
+      },
+      "scope": "module:develop",
+      "relevance": "core",
+      "description": "Step zoom in Develop.",
+      "note": ""
+    },
+    {
+      "id": "develop-module---targeted-adjustment--tat----masks:before-after-left-right",
+      "section": "Develop module \u2014 targeted adjustment (TAT) & masks",
+      "action": "Before/After left-right",
+      "keys": {
+        "windows": "Y",
+        "macos": "Y"
+      },
+      "scope": "module:develop",
+      "relevance": "core",
+      "description": "Side-by-side before/after.",
+      "note": ""
+    },
+    {
+      "id": "develop-module---targeted-adjustment--tat----masks:before-after-top-bottom",
+      "section": "Develop module \u2014 targeted adjustment (TAT) & masks",
+      "action": "Before/After top-bottom",
+      "keys": {
+        "windows": "Alt+Y",
+        "macos": "Opt+Y"
+      },
+      "scope": "module:develop",
+      "relevance": "optional",
+      "description": "Stacked before/after.",
+      "note": ""
+    },
+    {
+      "id": "develop-module---targeted-adjustment--tat----masks:before-after-split",
+      "section": "Develop module \u2014 targeted adjustment (TAT) & masks",
+      "action": "Before/After split",
+      "keys": {
+        "windows": "Shift+Y",
+        "macos": "Shift+Y"
+      },
+      "scope": "module:develop",
+      "relevance": "optional",
+      "description": "Split-screen before/after.",
+      "note": ""
+    },
+    {
+      "id": "develop-module---targeted-adjustment--tat----masks:view-before-only",
+      "section": "Develop module \u2014 targeted adjustment (TAT) & masks",
+      "action": "View Before only",
+      "keys": {
+        "windows": "\\",
+        "macos": "\\"
+      },
+      "scope": "module:develop",
+      "relevance": "core",
+      "description": "Show the unedited state while held/toggled.",
+      "note": ""
+    },
+    {
+      "id": "develop-module---targeted-adjustment--tat----masks:new-snapshot",
+      "section": "Develop module \u2014 targeted adjustment (TAT) & masks",
+      "action": "New snapshot",
+      "keys": {
+        "windows": "Ctrl+N",
+        "macos": "Cmd+N"
+      },
+      "scope": "module:develop",
+      "relevance": "optional",
+      "description": "Save a named state of the current edit.",
+      "note": "Collides w/ Library new-collection."
+    },
+    {
+      "id": "develop-module---targeted-adjustment--tat----masks:new-preset",
+      "section": "Develop module \u2014 targeted adjustment (TAT) & masks",
+      "action": "New preset",
+      "keys": {
+        "windows": "Ctrl+Shift+N",
+        "macos": "Cmd+Shift+N"
+      },
+      "scope": "module:develop",
+      "relevance": "core",
+      "description": "Save current settings as a reusable preset.",
+      "note": ""
+    },
+    {
+      "id": "develop-module---targeted-adjustment--tat----masks:new-preset-folder",
+      "section": "Develop module \u2014 targeted adjustment (TAT) & masks",
+      "action": "New preset folder",
+      "keys": {
+        "windows": "Ctrl+Alt+N",
+        "macos": "Cmd+Opt+N"
+      },
+      "scope": "module:develop",
+      "relevance": "optional",
+      "description": "Organize presets into a folder.",
+      "note": ""
+    },
+    {
+      "id": "develop-module---targeted-adjustment--tat----masks:open-develop-view-options",
+      "section": "Develop module \u2014 targeted adjustment (TAT) & masks",
+      "action": "Open Develop view options",
+      "keys": {
+        "windows": "Ctrl+J",
+        "macos": "Cmd+J"
+      },
+      "scope": "module:develop",
+      "relevance": "optional",
+      "description": "Develop view/overlay options.",
+      "note": ""
+    },
+    {
+      "id": "develop-module---targeted-adjustment--tat----masks:create-radial-filter",
+      "section": "Develop module \u2014 targeted adjustment (TAT) & masks",
+      "action": "Create Radial filter",
+      "keys": {
+        "windows": "Shift+M",
+        "macos": "Shift+M"
+      },
+      "scope": "module:develop",
+      "relevance": "core",
+      "description": "Radial gradient local adjustment.",
+      "note": ""
+    },
+    {
+      "id": "develop-module---targeted-adjustment--tat----masks:create-luminance-mask",
+      "section": "Develop module \u2014 targeted adjustment (TAT) & masks",
+      "action": "Create Luminance mask",
+      "keys": {
+        "windows": "Shift+Q",
+        "macos": "Shift+Q"
+      },
+      "scope": "module:develop",
+      "relevance": "optional",
+      "description": "Luminance-range mask.",
+      "note": ""
+    },
+    {
+      "id": "develop-module---targeted-adjustment--tat----masks:crop-to-original",
+      "section": "Develop module \u2014 targeted adjustment (TAT) & masks",
+      "action": "Crop to original",
+      "keys": {
+        "windows": "Ctrl+Alt+Shift+R",
+        "macos": "Cmd+Opt+Shift+R"
+      },
+      "scope": "module:develop",
+      "relevance": "optional",
+      "description": "Reset crop to the full original frame.",
+      "note": ""
+    },
+    {
+      "id": "develop-module---targeted-adjustment--tat----masks:create-color-range-mask",
+      "section": "Develop module \u2014 targeted adjustment (TAT) & masks",
+      "action": "Create color range mask",
+      "keys": {
+        "windows": "Shift+J",
+        "macos": "Shift+J"
+      },
+      "scope": "module:develop",
+      "relevance": "optional",
+      "description": "Color-range mask.",
+      "note": ""
+    },
+    {
+      "id": "develop-module---targeted-adjustment--tat----masks:cycle-overlay-mode--crop-mask",
+      "section": "Develop module \u2014 targeted adjustment (TAT) & masks",
+      "action": "Cycle Overlay mode (crop/mask)",
+      "keys": {
+        "windows": "Alt+O",
+        "macos": "Opt+O"
+      },
+      "scope": "module:develop",
+      "relevance": "optional",
+      "description": "Switch overlay rendering mode.",
+      "note": ""
+    },
+    {
+      "id": "develop-module---targeted-adjustment--tat----masks:lock-zoom-position",
+      "section": "Develop module \u2014 targeted adjustment (TAT) & masks",
+      "action": "Lock zoom position",
+      "keys": {
+        "windows": "Shift+Ctrl+=",
+        "macos": "Shift+Cmd+="
+      },
+      "scope": "module:develop",
+      "relevance": "optional",
+      "description": "Pin the zoom focus point.",
+      "note": "Also Library."
+    },
+    {
+      "id": "develop-module---targeted-adjustment--tat----masks:open-close-masking",
+      "section": "Develop module \u2014 targeted adjustment (TAT) & masks",
+      "action": "Open/close Masking",
+      "keys": {
+        "windows": "Shift+W",
+        "macos": "Shift+W"
+      },
+      "scope": "module:develop",
+      "relevance": "core",
+      "description": "Toggle the Masking panel.",
+      "note": ""
+    },
+    {
+      "id": "develop-module---targeted-adjustment--tat----masks:hide-unhide-gamut-warning--soft-proof",
+      "section": "Develop module \u2014 targeted adjustment (TAT) & masks",
+      "action": "Hide/unhide gamut warning (soft proof)",
+      "keys": {
+        "windows": "Shift+S",
+        "macos": "Shift+S"
+      },
+      "scope": "module:develop",
+      "relevance": "optional",
+      "description": "Toggle gamut destination warning.",
+      "note": "Soft-proofing."
+    },
+    {
+      "id": "develop-module---targeted-adjustment--tat----masks:expand-collapse-soft-proofing",
+      "section": "Develop module \u2014 targeted adjustment (TAT) & masks",
+      "action": "Expand/collapse soft proofing",
+      "keys": {
+        "windows": "S",
+        "macos": "S"
+      },
+      "scope": "module:develop",
+      "relevance": "optional",
+      "description": "Toggle soft-proof view.",
+      "note": "Collides w/ Library toggle-stack."
+    },
+    {
+      "id": "develop-module---targeted-adjustment--tat----masks:never-show-overlay-pins",
+      "section": "Develop module \u2014 targeted adjustment (TAT) & masks",
+      "action": "Never show overlay/pins",
+      "keys": {
+        "windows": "H",
+        "macos": "H"
+      },
+      "scope": "module:develop",
+      "relevance": "core",
+      "description": "Hide pins/overlays permanently.",
+      "note": ""
+    },
+    {
+      "id": "develop-module---targeted-adjustment--tat----masks:always-show-overlay-pins",
+      "section": "Develop module \u2014 targeted adjustment (TAT) & masks",
+      "action": "Always show overlay/pins",
+      "keys": {
+        "windows": "Ctrl+Shift+H",
+        "macos": "Cmd+Shift+H"
+      },
+      "scope": "module:develop",
+      "relevance": "optional",
+      "description": "Always show pins/overlays.",
+      "note": "Collides w/ headless HDR."
+    },
+    {
+      "id": "develop-module---targeted-adjustment--tat----masks:cycle-transform-options",
+      "section": "Develop module \u2014 targeted adjustment (TAT) & masks",
+      "action": "Cycle transform options",
+      "keys": {
+        "windows": "Ctrl+Tab",
+        "macos": "Ctrl+Tab"
+      },
+      "scope": "module:develop",
+      "relevance": "optional",
+      "description": "Step through Upright transform modes.",
+      "note": ""
+    },
+    {
+      "id": "develop-module---targeted-adjustment--tat----masks:copy-a-mask",
+      "section": "Develop module \u2014 targeted adjustment (TAT) & masks",
+      "action": "Copy a Mask",
+      "keys": {
+        "windows": "Ctrl+C",
+        "macos": "Cmd+C"
+      },
+      "scope": "module:develop",
+      "relevance": "optional",
+      "description": "Duplicate a mask to reuse.",
+      "note": ""
+    },
+    {
+      "id": "help:display-current-module-shortcuts",
+      "section": "Help",
+      "action": "Display current module shortcuts",
+      "keys": {
+        "windows": "Ctrl+/",
+        "macos": "Cmd+/"
+      },
+      "scope": "global",
+      "relevance": "core",
+      "description": "Overlay the shortcut cheat-sheet for the active context.",
+      "note": ""
+    },
+    {
+      "id": "help:hide-current-module-shortcuts",
+      "section": "Help",
+      "action": "Hide current module shortcuts",
+      "keys": {
+        "windows": "Click",
+        "macos": "Click"
+      },
+      "scope": "global",
+      "relevance": "core",
+      "description": "Dismiss the shortcut overlay.",
+      "note": "Click action."
+    },
+    {
+      "id": "help:go-to-current-module-help",
+      "section": "Help",
+      "action": "Go to current module Help",
+      "keys": {
+        "windows": "Ctrl+Alt+/",
+        "macos": "Cmd+Opt+Shift+/"
+      },
+      "scope": "global",
+      "relevance": "optional",
+      "description": "Open online help for the active module.",
+      "note": ""
+    },
+    {
+      "id": "help:open-community-help",
+      "section": "Help",
+      "action": "Open Community Help",
+      "keys": {
+        "windows": "F1",
+        "macos": "F1"
+      },
+      "scope": "global",
+      "relevance": "optional",
+      "description": "Open the help/community site.",
+      "note": ""
+    },
+    {
+      "id": "book-module--out-of-scope:double-page-view",
+      "section": "Book module (out of scope)",
+      "action": "Double page view",
+      "keys": {
+        "windows": "Ctrl+R",
+        "macos": "Cmd+R"
+      },
+      "scope": "module:book",
+      "relevance": "out_of_scope",
+      "description": "Book spread view.",
+      "note": ""
+    },
+    {
+      "id": "book-module--out-of-scope:multi-page-view",
+      "section": "Book module (out of scope)",
+      "action": "Multi-page view",
+      "keys": {
+        "windows": "Ctrl+E",
+        "macos": "Cmd+E"
+      },
+      "scope": "module:book",
+      "relevance": "out_of_scope",
+      "description": "Book multi-page view.",
+      "note": ""
+    },
+    {
+      "id": "book-module--out-of-scope:next-previous-view-mode",
+      "section": "Book module (out of scope)",
+      "action": "Next/previous view mode",
+      "keys": {
+        "windows": "Ctrl+= / Ctrl+-",
+        "macos": "Cmd+= / Cmd+-"
+      },
+      "scope": "module:book",
+      "relevance": "out_of_scope",
+      "description": "Cycle book view modes.",
+      "note": ""
+    },
+    {
+      "id": "book-module--out-of-scope:single-page-view",
+      "section": "Book module (out of scope)",
+      "action": "Single page view",
+      "keys": {
+        "windows": "Ctrl+T",
+        "macos": "Cmd+T"
+      },
+      "scope": "module:book",
+      "relevance": "out_of_scope",
+      "description": "Single page view.",
+      "note": ""
+    },
+    {
+      "id": "book-module--out-of-scope:zoomed-single-page-view",
+      "section": "Book module (out of scope)",
+      "action": "Zoomed single-page view",
+      "keys": {
+        "windows": "Ctrl+U",
+        "macos": "Cmd+U"
+      },
+      "scope": "module:book",
+      "relevance": "out_of_scope",
+      "description": "Zoomed page view.",
+      "note": ""
+    },
+    {
+      "id": "book-module--out-of-scope:create-saved-book",
+      "section": "Book module (out of scope)",
+      "action": "Create Saved Book",
+      "keys": {
+        "windows": "Ctrl+S",
+        "macos": "Cmd+S"
+      },
+      "scope": "module:book",
+      "relevance": "out_of_scope",
+      "description": "Save the book.",
+      "note": ""
+    },
+    {
+      "id": "book-module--out-of-scope:update-metadata-captions",
+      "section": "Book module (out of scope)",
+      "action": "Update metadata captions",
+      "keys": {
+        "windows": "Ctrl+M",
+        "macos": "Cmd+M"
+      },
+      "scope": "module:book",
+      "relevance": "out_of_scope",
+      "description": "Refresh caption text.",
+      "note": ""
+    },
+    {
+      "id": "book-module--out-of-scope:copy-paste-book-layout",
+      "section": "Book module (out of scope)",
+      "action": "Copy/paste book layout",
+      "keys": {
+        "windows": "Ctrl+Shift+C / +V",
+        "macos": "Cmd+Shift+C / +V"
+      },
+      "scope": "module:book",
+      "relevance": "out_of_scope",
+      "description": "Copy a page layout.",
+      "note": ""
+    },
+    {
+      "id": "book-module--out-of-scope:remove-page",
+      "section": "Book module (out of scope)",
+      "action": "Remove page",
+      "keys": {
+        "windows": "Ctrl+Shift+Backspace",
+        "macos": "Cmd+Shift+Backspace"
+      },
+      "scope": "module:book",
+      "relevance": "out_of_scope",
+      "description": "Delete a page.",
+      "note": ""
+    },
+    {
+      "id": "book-module--out-of-scope:select-photo-cells",
+      "section": "Book module (out of scope)",
+      "action": "Select photo cells",
+      "keys": {
+        "windows": "Ctrl+Shift+Alt+A",
+        "macos": "Cmd+Shift+Opt+A"
+      },
+      "scope": "module:book",
+      "relevance": "out_of_scope",
+      "description": "Select image cells.",
+      "note": ""
+    },
+    {
+      "id": "book-module--out-of-scope:select-text-cells",
+      "section": "Book module (out of scope)",
+      "action": "Select text cells",
+      "keys": {
+        "windows": "Ctrl+Alt+A",
+        "macos": "Cmd+Opt+A"
+      },
+      "scope": "module:book",
+      "relevance": "out_of_scope",
+      "description": "Select text cells.",
+      "note": ""
+    },
+    {
+      "id": "book-module--out-of-scope:show-hide-filter-text",
+      "section": "Book module (out of scope)",
+      "action": "Show/hide filter text",
+      "keys": {
+        "windows": "Ctrl+Shift+H",
+        "macos": "Cmd+Shift+H"
+      },
+      "scope": "module:book",
+      "relevance": "out_of_scope",
+      "description": "Toggle filter text.",
+      "note": ""
+    },
+    {
+      "id": "book-module--out-of-scope:show-hide-text-safe-area",
+      "section": "Book module (out of scope)",
+      "action": "Show/hide text safe area",
+      "keys": {
+        "windows": "Ctrl+Shift+U",
+        "macos": "Cmd+Shift+U"
+      },
+      "scope": "module:book",
+      "relevance": "out_of_scope",
+      "description": "Toggle safe-area guides.",
+      "note": ""
+    },
+    {
+      "id": "slideshow-module--out-of-scope:play-slideshow",
+      "section": "Slideshow module (out of scope)",
+      "action": "Play slideshow",
+      "keys": {
+        "windows": "Enter",
+        "macos": "Return"
+      },
+      "scope": "module:slideshow",
+      "relevance": "out_of_scope",
+      "description": "Start playback.",
+      "note": ""
+    },
+    {
+      "id": "slideshow-module--out-of-scope:pause-slideshow",
+      "section": "Slideshow module (out of scope)",
+      "action": "Pause slideshow",
+      "keys": {
+        "windows": "Spacebar",
+        "macos": "Spacebar"
+      },
+      "scope": "module:slideshow",
+      "relevance": "out_of_scope",
+      "description": "Pause playback.",
+      "note": ""
+    },
+    {
+      "id": "slideshow-module--out-of-scope:preview-slideshow",
+      "section": "Slideshow module (out of scope)",
+      "action": "Preview slideshow",
+      "keys": {
+        "windows": "Alt+Enter",
+        "macos": "Opt+Return"
+      },
+      "scope": "module:slideshow",
+      "relevance": "out_of_scope",
+      "description": "Preview in panel.",
+      "note": ""
+    },
+    {
+      "id": "slideshow-module--out-of-scope:end-slideshow",
+      "section": "Slideshow module (out of scope)",
+      "action": "End slideshow",
+      "keys": {
+        "windows": "Esc",
+        "macos": "Esc"
+      },
+      "scope": "module:slideshow",
+      "relevance": "out_of_scope",
+      "description": "Stop playback.",
+      "note": ""
+    },
+    {
+      "id": "slideshow-module--out-of-scope:next-previous-slide",
+      "section": "Slideshow module (out of scope)",
+      "action": "Next/previous slide",
+      "keys": {
+        "windows": "Right / Left",
+        "macos": "Right / Left"
+      },
+      "scope": "module:slideshow",
+      "relevance": "out_of_scope",
+      "description": "Step slides.",
+      "note": ""
+    },
+    {
+      "id": "slideshow-module--out-of-scope:export-pdf-slideshow",
+      "section": "Slideshow module (out of scope)",
+      "action": "Export PDF slideshow",
+      "keys": {
+        "windows": "Ctrl+J",
+        "macos": "Cmd+J"
+      },
+      "scope": "module:slideshow",
+      "relevance": "out_of_scope",
+      "description": "Export to PDF.",
+      "note": ""
+    },
+    {
+      "id": "slideshow-module--out-of-scope:export-jpeg-slideshow",
+      "section": "Slideshow module (out of scope)",
+      "action": "Export JPEG slideshow",
+      "keys": {
+        "windows": "Ctrl+Shift+J",
+        "macos": "Cmd+Shift+J"
+      },
+      "scope": "module:slideshow",
+      "relevance": "out_of_scope",
+      "description": "Export to JPEG.",
+      "note": ""
+    },
+    {
+      "id": "slideshow-module--out-of-scope:export-video-slideshow",
+      "section": "Slideshow module (out of scope)",
+      "action": "Export video slideshow",
+      "keys": {
+        "windows": "Ctrl+Alt+J",
+        "macos": "Cmd+Opt+J"
+      },
+      "scope": "module:slideshow",
+      "relevance": "out_of_scope",
+      "description": "Export to video.",
+      "note": ""
+    },
+    {
+      "id": "slideshow-module--out-of-scope:new-template---folder",
+      "section": "Slideshow module (out of scope)",
+      "action": "New template / folder",
+      "keys": {
+        "windows": "Ctrl+N / Ctrl+Shift+N",
+        "macos": "Cmd+N / Cmd+Shift+N"
+      },
+      "scope": "module:slideshow",
+      "relevance": "out_of_scope",
+      "description": "Create template/folder.",
+      "note": ""
+    },
+    {
+      "id": "slideshow-module--out-of-scope:save-settings",
+      "section": "Slideshow module (out of scope)",
+      "action": "Save settings",
+      "keys": {
+        "windows": "Ctrl+S",
+        "macos": "Cmd+S"
+      },
+      "scope": "module:slideshow",
+      "relevance": "out_of_scope",
+      "description": "Save slideshow.",
+      "note": ""
+    },
+    {
+      "id": "print-module--out-of-scope:print",
+      "section": "Print module (out of scope)",
+      "action": "Print",
+      "keys": {
+        "windows": "Ctrl+P",
+        "macos": "Cmd+P"
+      },
+      "scope": "module:print",
+      "relevance": "out_of_scope",
+      "description": "Send to printer.",
+      "note": ""
+    },
+    {
+      "id": "print-module--out-of-scope:print-one-copy",
+      "section": "Print module (out of scope)",
+      "action": "Print one copy",
+      "keys": {
+        "windows": "Ctrl+Alt+P",
+        "macos": "Cmd+Opt+P"
+      },
+      "scope": "module:print",
+      "relevance": "out_of_scope",
+      "description": "Print a single copy.",
+      "note": ""
+    },
+    {
+      "id": "print-module--out-of-scope:page-setup---print-settings",
+      "section": "Print module (out of scope)",
+      "action": "Page Setup / Print Settings",
+      "keys": {
+        "windows": "Ctrl+Shift+P / Ctrl+Alt+Shift+P",
+        "macos": "Cmd+Shift+P / Cmd+Opt+Shift+P"
+      },
+      "scope": "module:print",
+      "relevance": "out_of_scope",
+      "description": "Printer dialogs.",
+      "note": ""
+    },
+    {
+      "id": "print-module--out-of-scope:navigate-pages",
+      "section": "Print module (out of scope)",
+      "action": "Navigate pages",
+      "keys": {
+        "windows": "Ctrl+Shift+Left/Right, Ctrl+Left/Right",
+        "macos": "Cmd+Shift+Left/Right, Cmd+Left/Right"
+      },
+      "scope": "module:print",
+      "relevance": "out_of_scope",
+      "description": "Move between pages.",
+      "note": ""
+    },
+    {
+      "id": "print-module--out-of-scope:toggle-guides-rulers-bleed-margins-cells-dims",
+      "section": "Print module (out of scope)",
+      "action": "Toggle guides/rulers/bleed/margins/cells/dims",
+      "keys": {
+        "windows": "Ctrl+Shift+H/\u2026",
+        "macos": "Cmd+Shift+H/\u2026"
+      },
+      "scope": "module:print",
+      "relevance": "out_of_scope",
+      "description": "Layout guide toggles.",
+      "note": ""
+    },
+    {
+      "id": "print-module--out-of-scope:new-template-folder--save",
+      "section": "Print module (out of scope)",
+      "action": "New template/folder, save",
+      "keys": {
+        "windows": "Ctrl+N / Ctrl+Shift+N / Ctrl+S",
+        "macos": "Cmd+N / Cmd+Shift+N / Cmd+S"
+      },
+      "scope": "module:print",
+      "relevance": "out_of_scope",
+      "description": "Template management.",
+      "note": ""
+    },
+    {
+      "id": "map-module--out-of-scope:next-previous-track",
+      "section": "Map module (out of scope)",
+      "action": "Next/previous track",
+      "keys": {
+        "windows": "Ctrl+Alt+T / Ctrl+Alt+Shift+T",
+        "macos": "Cmd+Opt+T / Cmd+Opt+Shift+T"
+      },
+      "scope": "module:map",
+      "relevance": "out_of_scope",
+      "description": "Tracklog navigation.",
+      "note": ""
+    },
+    {
+      "id": "map-module--out-of-scope:search",
+      "section": "Map module (out of scope)",
+      "action": "Search",
+      "keys": {
+        "windows": "Ctrl+F",
+        "macos": "Cmd+F"
+      },
+      "scope": "module:map",
+      "relevance": "out_of_scope",
+      "description": "Search the map.",
+      "note": ""
+    },
+    {
+      "id": "map-module--out-of-scope:delete-all-location-data",
+      "section": "Map module (out of scope)",
+      "action": "Delete all location data",
+      "keys": {
+        "windows": "Ctrl+Backspace",
+        "macos": "Cmd+Delete"
+      },
+      "scope": "module:map",
+      "relevance": "out_of_scope",
+      "description": "Strip geotags.",
+      "note": ""
+    },
+    {
+      "id": "map-module--out-of-scope:map-styles--hybrid-road-sat-terrain-light-dark",
+      "section": "Map module (out of scope)",
+      "action": "Map styles (Hybrid/Road/Sat/Terrain/Light/Dark)",
+      "keys": {
+        "windows": "Ctrl+1\u20136",
+        "macos": "Cmd+1\u20136"
+      },
+      "scope": "module:map",
+      "relevance": "out_of_scope",
+      "description": "Switch base map style.",
+      "note": ""
+    },
+    {
+      "id": "map-module--out-of-scope:lock-pins",
+      "section": "Map module (out of scope)",
+      "action": "Lock pins",
+      "keys": {
+        "windows": "Ctrl+K",
+        "macos": "Cmd+K"
+      },
+      "scope": "module:map",
+      "relevance": "out_of_scope",
+      "description": "Lock map pins.",
+      "note": ""
+    },
+    {
+      "id": "map-module--out-of-scope:show-hide-map-info---preset-overlay",
+      "section": "Map module (out of scope)",
+      "action": "Show/hide map info / preset overlay",
+      "keys": {
+        "windows": "I / O",
+        "macos": "I / O"
+      },
+      "scope": "module:map",
+      "relevance": "out_of_scope",
+      "description": "Toggle map overlays.",
+      "note": ""
+    },
+    {
+      "id": "web-module--out-of-scope:reload-gallery",
+      "section": "Web module (out of scope)",
+      "action": "Reload gallery",
+      "keys": {
+        "windows": "Ctrl+R",
+        "macos": "Cmd+R"
+      },
+      "scope": "module:web",
+      "relevance": "out_of_scope",
+      "description": "Rebuild the web gallery preview.",
+      "note": ""
+    },
+    {
+      "id": "web-module--out-of-scope:preview-in-browser",
+      "section": "Web module (out of scope)",
+      "action": "Preview in browser",
+      "keys": {
+        "windows": "Ctrl+Alt+P",
+        "macos": "Cmd+Opt+P"
+      },
+      "scope": "module:web",
+      "relevance": "out_of_scope",
+      "description": "Open gallery in a browser.",
+      "note": ""
+    },
+    {
+      "id": "web-module--out-of-scope:export-gallery",
+      "section": "Web module (out of scope)",
+      "action": "Export gallery",
+      "keys": {
+        "windows": "Ctrl+J",
+        "macos": "Cmd+J"
+      },
+      "scope": "module:web",
+      "relevance": "out_of_scope",
+      "description": "Export the gallery.",
+      "note": ""
+    },
+    {
+      "id": "web-module--out-of-scope:new-template-folder--save",
+      "section": "Web module (out of scope)",
+      "action": "New template/folder, save",
+      "keys": {
+        "windows": "Ctrl+N / Ctrl+Shift+N / Ctrl+S",
+        "macos": "Cmd+N / Cmd+Shift+N / Cmd+S"
+      },
+      "scope": "module:web",
+      "relevance": "out_of_scope",
+      "description": "Template management.",
+      "note": ""
+    },
+    {
+      "id": "web-module--out-of-scope:open-advanced-settings",
+      "section": "Web module (out of scope)",
+      "action": "Open advanced settings",
+      "keys": {
+        "windows": "Ctrl+Shift+Alt+/",
+        "macos": "Cmd+Shift+Opt+/"
+      },
+      "scope": "module:web",
+      "relevance": "out_of_scope",
+      "description": "Advanced gallery settings.",
+      "note": ""
+    }
+  ]
+}

@@ -1,29 +1,17 @@
-// LR left rail: Navigator · Presets · Snapshots · History.
+// LR left rail: Navigator · Snapshots · History · local browse.
 import { useEffect, useRef, useState } from "react";
 import {
-  applyPreset,
   getHistory,
-  listPresets,
   listSnapshots,
   restoreSnapshot,
-  savePresetNamed,
   snapshot,
 } from "../../ipc/commands";
 import { onFrameReady } from "../../ipc/events";
 import { useDocStore } from "../../state/docStore";
 import { useUiStore } from "../../state/uiStore";
 import { frameUrl } from "../../viewport/Viewport";
+import { LocalBrowser } from "./LocalBrowser";
 import { Panel } from "./widgets";
-
-const DEVELOP_MODULES = [
-  "exposure",
-  "white_balance",
-  "calibration",
-  "detail",
-  "color_grade",
-  "hsl",
-  "tone_curve",
-];
 
 function Navigator() {
   const ref = useRef<HTMLCanvasElement>(null);
@@ -59,47 +47,6 @@ function Navigator() {
   return (
     <div className="navigator" title="click to fit" onClick={() => sendViewCmd("fit")}>
       <canvas ref={ref} className="navigator-canvas" />
-    </div>
-  );
-}
-
-function Presets() {
-  const [presets, setPresets] = useState<string[]>([]);
-  const [name, setName] = useState("");
-  const reconcile = useDocStore((s) => s.reconcile);
-  const refresh = () => listPresets().then(setPresets).catch(() => {});
-  useEffect(() => {
-    void refresh();
-  }, []);
-  return (
-    <div className="lr-list-panel">
-      {presets.length === 0 && <div className="muted sm">No presets yet.</div>}
-      {presets.map((p) => (
-        <button
-          key={p}
-          className="lr-list-row"
-          onClick={() => applyPreset(p).then(reconcile).catch(() => {})}
-        >
-          {p}
-        </button>
-      ))}
-      <div className="lr-add-row">
-        <input
-          placeholder="new preset…"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && name.trim()) {
-              savePresetNamed(name.trim(), DEVELOP_MODULES)
-                .then(() => {
-                  setName("");
-                  void refresh();
-                })
-                .catch(() => {});
-            }
-          }}
-        />
-      </div>
     </div>
   );
 }
@@ -170,21 +117,30 @@ function History() {
   );
 }
 
-export function LeftPanel() {
+export function LeftPanel({
+  currentPath,
+  onOpen,
+}: {
+  currentPath: string | null;
+  onOpen: (path: string) => void;
+}) {
+  const showLeftPanel = useUiStore((s) => s.showLeftPanel);
+  if (!showLeftPanel) return null;
+
   return (
     <div className="lr-left">
-      <Panel title="Navigator">
-        <Navigator />
-      </Panel>
-      <Panel title="Presets">
-        <Presets />
-      </Panel>
-      <Panel title="Snapshots" defaultOpen={false}>
-        <Snapshots />
-      </Panel>
-      <Panel title="History" defaultOpen={false}>
-        <History />
-      </Panel>
+      <div className="lr-left-scroll">
+        <Panel title="Navigator">
+          <Navigator />
+        </Panel>
+        <Panel title="Snapshots" defaultOpen={false}>
+          <Snapshots />
+        </Panel>
+        <Panel title="History" defaultOpen={false}>
+          <History />
+        </Panel>
+      </div>
+      <LocalBrowser currentPath={currentPath} onOpen={onOpen} />
     </div>
   );
 }

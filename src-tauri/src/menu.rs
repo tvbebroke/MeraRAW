@@ -3,7 +3,7 @@
 
 use crate::events;
 use tauri::menu::{Menu, MenuEvent, MenuItem, PredefinedMenuItem, SubmenuBuilder};
-use tauri::{AppHandle, Manager, Wry};
+use tauri::{AppHandle, Emitter, Manager, Wry};
 use tauri_plugin_dialog::DialogExt;
 
 pub fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
@@ -42,8 +42,8 @@ pub fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
             true,
             Some("CmdOrCtrl+Shift+O"),
         )?)
-        .item(&MenuItem::with_id(app, "import", "Import…", false, None::<&str>)?)
-        .item(&MenuItem::with_id(app, "export", "Export…", false, None::<&str>)?)
+        .item(&MenuItem::with_id(app, "import", "Add Photos…", true, None::<&str>)?)
+        .item(&MenuItem::with_id(app, "export", "Export…", true, None::<&str>)?)
         .separator()
         .item(&PredefinedMenuItem::close_window(app, None)?)
         .build()?;
@@ -109,6 +109,16 @@ pub fn handle_menu_event(app: &AppHandle, event: MenuEvent) {
                     events::emit_path_event(&app, events::FOLDER_OPENED, &path);
                 }
             });
+        }
+        "import" => {
+            if let Err(e) = app.emit(events::IMPORT_REQUESTED, ()) {
+                tracing::error!(error = %e, "emit import-requested failed");
+            }
+        }
+        "export" => {
+            if let Err(e) = app.emit(events::EXPORT_REQUESTED, ()) {
+                tracing::error!(error = %e, "emit export-requested failed");
+            }
         }
         "toggle-devtools" => {
             #[cfg(debug_assertions)]

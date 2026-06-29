@@ -56,6 +56,42 @@ fn oetf_srgb(c: vec3<f32>) -> vec3<f32> {
   return select(hi, lo, c <= vec3<f32>(0.0031308));
 }
 
+// ---- AgX filmic display transform (look == 2) ----
+// "Minimal AgX" (Benjamin Wrensch / iolite-engine.com), the implementation
+// Blender ships. Input: linear sRGB (Rec.709 primaries). Output: sRGB
+// display-encoded — graceful highlight desaturation + clean out-of-gamut,
+// unlike the luminance-only Reinhard above. Matrices are the published AgX
+// inset/outset (column-major here for `M * v`); min/max log2 exposure pinned.
+const AGX_INSET = mat3x3<f32>(
+  vec3<f32>(0.8424790622, 0.0423282423, 0.0423756549),
+  vec3<f32>(0.0784336000, 0.8784686365, 0.0784336000),
+  vec3<f32>(0.0792237451, 0.0791661275, 0.8791429738),
+);
+const AGX_OUTSET = mat3x3<f32>(
+  vec3<f32>( 1.1968790051, -0.0528968518, -0.0529716355),
+  vec3<f32>(-0.0980208811,  1.1519031299, -0.0980434501),
+  vec3<f32>(-0.0990297441, -0.0989611768,  1.1510736726),
+);
+const AGX_MIN_EV: f32 = -12.47393;
+const AGX_MAX_EV: f32 = 4.026069;
+
+// 6th-order polynomial approximation of the AgX log-encoded contrast sigmoid.
+fn agx_contrast(x: vec3<f32>) -> vec3<f32> {
+  let x2 = x * x;
+  let x4 = x2 * x2;
+  return 15.5 * x4 * x2 - 40.14 * x4 * x + 31.96 * x4
+       - 6.868 * x2 * x + 0.4298 * x2 + 0.1191 * x - 0.00232;
+}
+
+fn agx(srgb_lin: vec3<f32>) -> vec3<f32> {
+  var v = AGX_INSET * srgb_lin;
+  v = clamp((log2(max(v, vec3<f32>(1e-10))) - AGX_MIN_EV) / (AGX_MAX_EV - AGX_MIN_EV),
+            vec3<f32>(0.0), vec3<f32>(1.0));
+  v = agx_contrast(v);
+  v = AGX_OUTSET * v;
+  return clamp(v, vec3<f32>(0.0), vec3<f32>(1.0)); // already display-encoded
+}
+
 @compute @workgroup_size(16, 16)
 fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
   if (gid.x >= u.width || gid.y >= u.height) {
@@ -64,9 +100,14 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
   let p = textureLoad(src, vec2<i32>(gid.xy), 0);
   var encoded = vec3<f32>(0.0863, 0.0863, 0.0941); // app bg
   if (p.a > 0.0) {
-    var c = REC2020_TO_SRGB * max(p.rgb, vec3<f32>(0.0));
-    c = view_look(max(c, vec3<f32>(0.0)), u.look);
-    encoded = oetf_srgb(clamp(c, vec3<f32>(0.0), vec3<f32>(1.0)));
+    let c = REC2020_TO_SRGB * max(p.rgb, vec3<f32>(0.0));
+    if (u.look == 2u) {
+      // AgX already outputs display-encoded sRGB — no second OETF.
+      encoded = agx(max(c, vec3<f32>(0.0)));
+    } else {
+      let looked = view_look(max(c, vec3<f32>(0.0)), u.look);
+      encoded = oetf_srgb(clamp(looked, vec3<f32>(0.0), vec3<f32>(1.0)));
+    }
     if (u.overlay > 0.0) {
       let m = textureLoad(overlay_mask, vec2<i32>(gid.xy), 0).r;
       encoded = mix(encoded, vec3<f32>(1.0, 0.15, 0.15), clamp(m, 0.0, 1.0) * u.overlay);

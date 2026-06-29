@@ -1,5 +1,6 @@
 // UI-only state. Never holds pixels or canonical edit state.
 import { create } from "zustand";
+import type { RightToolTab } from "../components/lr/RightRail";
 
 interface UiState {
   engineReady: boolean;
@@ -16,12 +17,37 @@ interface UiState {
   setSelectedMask: (id: string | null) => void;
   brushRadius: number;
   setBrushRadius: (r: number) => void;
-  // view-command channel (toolbar/navigator → viewport). nonce drives effect.
   viewCmd: "fit" | "oneToOne" | "zoomIn" | "zoomOut" | null;
   viewCmdNonce: number;
   sendViewCmd: (c: "fit" | "oneToOne" | "zoomIn" | "zoomOut") => void;
   beforeAfter: boolean;
   setBeforeAfter: (b: boolean) => void;
+  /** Develop right-rail tool tab (Presets / Edit / Crop / …). */
+  rightRailTab: RightToolTab;
+  setRightRailTab: (t: RightToolTab) => void;
+  /** Panel chrome visibility (F6–F8, Tab, Shift+Tab). */
+  showLeftPanel: boolean;
+  showRightPanel: boolean;
+  showToolbar: boolean;
+  showFilmstrip: boolean;
+  showTopbar: boolean;
+  toggleLeftPanel: () => void;
+  toggleRightPanel: () => void;
+  toggleSidePanels: () => void;
+  toggleToolbar: () => void;
+  toggleFilmstrip: () => void;
+  toggleAllPanels: () => void;
+  /** Ctrl+/ shortcut help overlay. */
+  helpOverlay: boolean;
+  setHelpOverlay: (on: boolean) => void;
+  /** Develop clipping overlay (J). */
+  clippingVisible: boolean;
+  toggleClipping: () => void;
+  /** On-image info overlay cycle (I / Cmd+I). */
+  infoOverlay: number;
+  cycleInfoOverlay: () => void;
+  toggleInfoOverlay: () => void;
+  toggleFullscreen: () => void;
   setEngineReady: (adapter: string | null) => void;
   setStatus: (msg: string) => void;
   setLastOpenedPath: (p: string | null) => void;
@@ -30,7 +56,7 @@ interface UiState {
   setZoomLabel: (z: string) => void;
 }
 
-export const useUiStore = create<UiState>((set) => ({
+export const useUiStore = create<UiState>((set, get) => ({
   engineReady: false,
   gpuAdapter: null,
   statusMessage: "starting…",
@@ -50,6 +76,52 @@ export const useUiStore = create<UiState>((set) => ({
   sendViewCmd: (c) => set((s) => ({ viewCmd: c, viewCmdNonce: s.viewCmdNonce + 1 })),
   beforeAfter: false,
   setBeforeAfter: (b) => set({ beforeAfter: b }),
+  rightRailTab: "edit",
+  setRightRailTab: (t) => set({ rightRailTab: t }),
+  showLeftPanel: true,
+  showRightPanel: true,
+  showToolbar: true,
+  showFilmstrip: true,
+  showTopbar: true,
+  toggleLeftPanel: () => set((s) => ({ showLeftPanel: !s.showLeftPanel })),
+  toggleRightPanel: () => set((s) => ({ showRightPanel: !s.showRightPanel })),
+  toggleSidePanels: () =>
+    set((s) => ({
+      showLeftPanel: !(s.showLeftPanel && s.showRightPanel),
+      showRightPanel: !(s.showLeftPanel && s.showRightPanel),
+    })),
+  toggleToolbar: () => set((s) => ({ showToolbar: !s.showToolbar })),
+  toggleFilmstrip: () => set((s) => ({ showFilmstrip: !s.showFilmstrip })),
+  toggleAllPanels: () => {
+    const any =
+      get().showLeftPanel ||
+      get().showRightPanel ||
+      get().showToolbar ||
+      get().showFilmstrip ||
+      get().showTopbar;
+    set({
+      showLeftPanel: !any,
+      showRightPanel: !any,
+      showToolbar: !any,
+      showFilmstrip: !any,
+      showTopbar: !any,
+    });
+  },
+  helpOverlay: false,
+  setHelpOverlay: (on) => set({ helpOverlay: on }),
+  clippingVisible: false,
+  toggleClipping: () => set((s) => ({ clippingVisible: !s.clippingVisible })),
+  infoOverlay: 0,
+  cycleInfoOverlay: () => set((s) => ({ infoOverlay: (s.infoOverlay + 1) % 3 })),
+  toggleInfoOverlay: () =>
+    set((s) => ({ infoOverlay: s.infoOverlay === 0 ? 1 : 0 })),
+  toggleFullscreen: () => {
+    if (!document.fullscreenElement) {
+      void document.documentElement.requestFullscreen?.();
+    } else {
+      void document.exitFullscreen?.();
+    }
+  },
   setEngineReady: (adapter) =>
     set({ engineReady: true, gpuAdapter: adapter, statusMessage: "engine ready" }),
   setStatus: (msg) => set({ statusMessage: msg }),

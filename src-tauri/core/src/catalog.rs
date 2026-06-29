@@ -9,7 +9,7 @@ use crate::sidecar;
 use rusqlite::Connection;
 use std::path::{Path, PathBuf};
 
-pub const CATALOG_SCHEMA_VERSION: i64 = 1;
+pub const CATALOG_SCHEMA_VERSION: i64 = 2;
 
 fn db_err(e: impl std::fmt::Display) -> CoreError {
     CoreError::Io(format!("catalog: {e}"))
@@ -70,8 +70,53 @@ pub struct GridQuery {
     pub blurry_only: bool,
     pub dupes_only: bool,
     pub sort: Option<String>, // "captured" (default) | "imported" | "rating"
+    /// Filter to photos in a user album (see albums table).
+    pub album_id: Option<i64>,
     pub offset: i64,
     pub limit: i64,
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ImportCandidate {
+    pub path: String,
+    pub filename: String,
+    /// True when the file is not yet in the catalog at the current mtime.
+    pub is_new: bool,
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AssetDetail {
+    pub id: i64,
+    pub path: String,
+    pub filename: String,
+    pub width: u32,
+    pub height: u32,
+    pub rating: u8,
+    pub flag: String,
+    pub label: Option<String>,
+    pub has_edits: bool,
+    pub captured_at: Option<String>,
+    pub imported_at: Option<String>,
+    pub camera_make: Option<String>,
+    pub camera_model: Option<String>,
+    pub lens: Option<String>,
+    pub iso: Option<i32>,
+    pub shutter: Option<String>,
+    pub aperture: Option<f64>,
+    pub focal_mm: Option<f64>,
+    pub keywords: Vec<String>,
+    pub albums: Vec<String>,
+    pub accessible: bool,
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AlbumItem {
+    pub id: i64,
+    pub name: String,
+    pub photo_count: i64,
 }
 
 #[derive(Debug, Clone, Default, serde::Deserialize)]
@@ -137,6 +182,17 @@ impl Catalog {
             PRIMARY KEY(asset_id, keyword)
         );
         CREATE TABLE IF NOT EXISTS folders(root TEXT PRIMARY KEY);
+        CREATE TABLE IF NOT EXISTS albums(
+            id INTEGER PRIMARY KEY,
+            name TEXT NOT NULL UNIQUE,
+            created_at TEXT
+        );
+        CREATE TABLE IF NOT EXISTS album_assets(
+            album_id INTEGER NOT NULL,
+            asset_id INTEGER NOT NULL,
+            PRIMARY KEY(album_id, asset_id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_album_assets_asset ON album_assets(asset_id);
         "#,
             )
             .map_err(db_err)?;
@@ -147,6 +203,44 @@ impl Catalog {
             )
             .map_err(db_err)?;
         Ok(())
+    }
+
+    /// Parse `facet:value` tokens out of the free-text field into structured filters.
+    pub fn normalize_query(q: &mut GridQuery) {
+        let Some(text) = q.text.take() else {
+            return;
+        };
+        let mut free = Vec::new();
+        for token in text.split_whitespace() {
+            if let Some(rest) = token.strip_prefix("camera:") {
+                if !rest.is_empty() {
+                    q.camera = Some(rest.to_string());
+                }
+            } else if let Some(rest) = token.strip_prefix("rating:") {
+                if let Ok(r) = rest.parse::<u8>() {
+                    q.rating_min = Some(r.max(1));
+                }
+            } else if let Some(rest) = token.strip_prefix("flag:") {
+                if !rest.is_empty() {
+                    q.flag = Some(rest.to_string());
+                }
+            } else if let Some(rest) = token.strip_prefix("label:") {
+                if !rest.is_empty() {
+                    q.label = Some(rest.to_string());
+                }
+            } else if let Some(rest) = token.strip_prefix("keyword:") {
+                if !rest.is_empty() {
+                    free.push(rest.to_string());
+                }
+            } else {
+                free.push(token.to_string());
+            }
+        }
+        if free.is_empty() {
+            q.text = None;
+        } else {
+            q.text = Some(free.join(" "));
+        }
     }
 
     pub fn previews_dir(&self) -> PathBuf {
@@ -333,6 +427,8 @@ impl Catalog {
     }
 
     pub fn grid(&self, q: &GridQuery) -> Result<Vec<GridItem>, CoreError> {
+        let mut q = q.clone();
+        Self::normalize_query(&mut q);
         let mut sql = String::from(
             "SELECT id, path, filename, width, height, rating, flag, label,
                     has_edits, captured_at, camera_model, blur_score, thumb
@@ -384,6 +480,10 @@ impl Catalog {
                                 GROUP BY phash HAVING COUNT(*) > 1)",
             );
         }
+        if let Some(album_id) = q.album_id.filter(|id| *id > 0) {
+            sql.push_str(" AND id IN (SELECT asset_id FROM album_assets WHERE album_id = ?)");
+            params.push(Box::new(album_id));
+        }
         sql.push_str(match q.sort.as_deref() {
             Some("rating") => " ORDER BY rating DESC, captured_at",
             Some("imported") => " ORDER BY imported_at DESC",
@@ -416,6 +516,163 @@ impl Catalog {
             })
             .map_err(db_err)?;
         Ok(rows.filter_map(|r| r.ok()).collect())
+    }
+
+    pub fn asset_detail(&self, id: i64) -> Result<Option<AssetDetail>, CoreError> {
+        let row = self.conn.query_row(
+            r#"SELECT id, path, filename, width, height, rating, flag, label,
+                      has_edits, captured_at, imported_at, camera_make, camera_model,
+                      lens, iso, shutter, aperture, focal_mm
+               FROM assets WHERE id = ?1"#,
+            [id],
+            |r| {
+                let path: String = r.get(1)?;
+                Ok(AssetDetail {
+                    id: r.get(0)?,
+                    path: path.clone(),
+                    filename: r.get(2)?,
+                    width: r.get::<_, Option<u32>>(3)?.unwrap_or(0),
+                    height: r.get::<_, Option<u32>>(4)?.unwrap_or(0),
+                    rating: r.get::<_, i64>(5)? as u8,
+                    flag: r.get(6)?,
+                    label: r.get(7)?,
+                    has_edits: r.get::<_, i64>(8)? != 0,
+                    captured_at: r.get(9)?,
+                    imported_at: r.get(10)?,
+                    camera_make: r.get(11)?,
+                    camera_model: r.get(12)?,
+                    lens: r.get(13)?,
+                    iso: r.get::<_, Option<i64>>(14)?.map(|v| v as i32),
+                    shutter: r.get(15)?,
+                    aperture: r.get(16)?,
+                    focal_mm: r.get(17)?,
+                    keywords: Vec::new(),
+                    albums: Vec::new(),
+                    accessible: Path::new(&path).exists(),
+                })
+            },
+        );
+        match row {
+            Ok(mut d) => {
+                d.keywords = self.keywords_of(id);
+                d.albums = self.albums_for_asset(id);
+                Ok(Some(d))
+            }
+            Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+            Err(e) => Err(db_err(e)),
+        }
+    }
+
+    pub fn list_albums(&self) -> Result<Vec<AlbumItem>, CoreError> {
+        let mut stmt = self
+            .conn
+            .prepare(
+                r#"SELECT a.id, a.name,
+                          (SELECT COUNT(*) FROM album_assets aa WHERE aa.album_id = a.id)
+                   FROM albums a ORDER BY a.name"#,
+            )
+            .map_err(db_err)?;
+        let rows = stmt
+            .query_map([], |r| {
+                Ok(AlbumItem {
+                    id: r.get(0)?,
+                    name: r.get(1)?,
+                    photo_count: r.get(2)?,
+                })
+            })
+            .map_err(db_err)?;
+        Ok(rows.filter_map(|r| r.ok()).collect())
+    }
+
+    pub fn create_album(&mut self, name: &str) -> Result<i64, CoreError> {
+        let name = name.trim();
+        if name.is_empty() {
+            return Err(CoreError::InvalidOp("album name required".into()));
+        }
+        self.conn
+            .execute(
+                "INSERT INTO albums(name, created_at) VALUES(?1, ?2)",
+                rusqlite::params![name, chrono_like_now()],
+            )
+            .map_err(db_err)?;
+        Ok(self.conn.last_insert_rowid())
+    }
+
+    pub fn delete_album(&mut self, id: i64) -> Result<(), CoreError> {
+        self.conn
+            .execute("DELETE FROM album_assets WHERE album_id = ?1", [id])
+            .map_err(db_err)?;
+        self.conn
+            .execute("DELETE FROM albums WHERE id = ?1", [id])
+            .map_err(db_err)?;
+        Ok(())
+    }
+
+    pub fn add_to_album(&mut self, album_id: i64, asset_ids: &[i64]) -> Result<(), CoreError> {
+        for id in asset_ids {
+            self.conn
+                .execute(
+                    "INSERT OR IGNORE INTO album_assets(album_id, asset_id) VALUES(?1, ?2)",
+                    rusqlite::params![album_id, id],
+                )
+                .map_err(db_err)?;
+        }
+        Ok(())
+    }
+
+    pub fn remove_from_album(&mut self, album_id: i64, asset_ids: &[i64]) -> Result<(), CoreError> {
+        for id in asset_ids {
+            self.conn
+                .execute(
+                    "DELETE FROM album_assets WHERE album_id = ?1 AND asset_id = ?2",
+                    rusqlite::params![album_id, id],
+                )
+                .map_err(db_err)?;
+        }
+        Ok(())
+    }
+
+    fn albums_for_asset(&self, asset_id: i64) -> Vec<String> {
+        self.conn
+            .prepare(
+                r#"SELECT a.name FROM albums a
+                   JOIN album_assets aa ON aa.album_id = a.id
+                   WHERE aa.asset_id = ?1 ORDER BY a.name"#,
+            )
+            .and_then(|mut s| {
+                let rows = s.query_map([asset_id], |r| r.get::<_, String>(0))?;
+                Ok(rows.filter_map(|r| r.ok()).collect())
+            })
+            .unwrap_or_default()
+    }
+
+    /// Scan a folder for import candidates (does not import).
+    pub fn scan_import_candidates(&self, root: &Path) -> Result<Vec<ImportCandidate>, CoreError> {
+        if !root.is_dir() {
+            return Err(CoreError::Io(format!("not a folder: {}", root.display())));
+        }
+        Ok(scan_folder(root)
+            .into_iter()
+            .map(|p| {
+                let path = p.to_string_lossy().into_owned();
+                let filename = p
+                    .file_name()
+                    .map(|f| f.to_string_lossy().into_owned())
+                    .unwrap_or_default();
+                let modified_ms = std::fs::metadata(&p)
+                    .ok()
+                    .and_then(|m| m.modified().ok())
+                    .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+                    .map(|d| d.as_millis() as i64)
+                    .unwrap_or(0);
+                let is_new = !self.is_current(&path, modified_ms);
+                ImportCandidate {
+                    path,
+                    filename,
+                    is_new,
+                }
+            })
+            .collect())
     }
 
     /// Apply a metadata patch to assets: DB write + return (id, path) pairs
@@ -486,7 +743,7 @@ impl Catalog {
     /// lost, but they regenerate lazily).
     pub fn wipe_assets(&mut self) -> Result<(), CoreError> {
         self.conn
-            .execute_batch("DELETE FROM keywords; DELETE FROM assets;")
+            .execute_batch("DELETE FROM keywords; DELETE FROM album_assets; DELETE FROM assets;")
             .map_err(db_err)?;
         Ok(())
     }
@@ -672,6 +929,7 @@ mod tests {
             estimated_cct: Some(5200.0),
             camera_profile: None,
             available_profiles: Vec::new(),
+            available_profile_files: Vec::new(),
         }
     }
 

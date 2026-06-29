@@ -124,6 +124,8 @@ impl Engine {
         if self.graph.is_none() {
             self.graph = Some(RenderGraph::new(gpu));
         }
+        let display_look = self.display_look;
+        self.graph.as_mut().unwrap().set_look(display_look);
         let (w, h) = (*w, *h);
         let seg_views: std::collections::HashMap<String, wgpu::TextureView> = cur
             .masks_gpu

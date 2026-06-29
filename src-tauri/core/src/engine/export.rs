@@ -15,7 +15,7 @@ pub(super) struct ExportJob {
     tiles_done: u32,
     tiles_total: u32,
     source_path: String,
-    camera_look: bool,
+    look: u32,
     meta: ImageMeta,
     dcp: Option<Arc<DcpProfile>>,
     cct: f32,
@@ -48,8 +48,9 @@ impl Engine {
             let tiles_x = w.div_ceil(TILE);
             let tiles_y = h.div_ceil(TILE);
             let dcp = cur.dcp_profile.clone();
+            let display_look = self.display_look;
             if let Some(g) = self.export_graph.as_mut() {
-                g.set_look(dcp.is_some());
+                g.set_look(display_look);
             }
             Ok(ExportJob {
                 settings,
@@ -62,7 +63,7 @@ impl Engine {
                 tiles_done: 0,
                 tiles_total: tiles_x * tiles_y,
                 source_path,
-                camera_look: dcp.is_some(),
+                look: display_look,
                 meta: cur.meta.clone(),
                 dcp,
                 cct: cur.as_shot_cct(),
@@ -191,7 +192,7 @@ impl Engine {
         }
 
         let mut job = self.export_job.take().unwrap();
-        let camera_look = job.camera_look;
+        let look = job.look;
         tracing::info!(
             w = job.w,
             h = job.h,
@@ -229,13 +230,13 @@ impl Engine {
                         None => (full, w, h),
                     };
                     let want16 = settings.format == crate::export::ExportFormat::Tiff16;
-                    let mut enc = crate::export::output_transform(
+                    let mut enc = crate::export::output_transform_look(
                         &lin,
                         w,
                         h,
                         settings.target,
                         want16,
-                        camera_look,
+                        look,
                     );
                     if !want16 {
                         crate::export::output_sharpen8(&mut enc.rgb8, w, h, settings.sharpen);

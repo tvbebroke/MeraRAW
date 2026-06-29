@@ -94,6 +94,29 @@ export const Icon = {
       <path d="M5 15v4a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-4" />
     </>,
   ),
+  EditSliders: svg(
+    <>
+      <line x1="4" y1="7" x2="20" y2="7" />
+      <circle cx="9" cy="7" r="2" fill="currentColor" stroke="none" />
+      <line x1="4" y1="12" x2="20" y2="12" />
+      <circle cx="15" cy="12" r="2" fill="currentColor" stroke="none" />
+      <line x1="4" y1="17" x2="20" y2="17" />
+      <circle cx="11" cy="17" r="2" fill="currentColor" stroke="none" />
+    </>,
+  ),
+  Presets: svg(
+    <>
+      <circle cx="9" cy="12" r="6" />
+      <circle cx="15" cy="12" r="6" />
+    </>,
+  ),
+  Remove: svg(
+    <>
+      <path d="M12 3v6" />
+      <path d="M8 9h8l-1 11H9L8 9z" />
+      <path d="M9 3h6" />
+    </>,
+  ),
 };
 
 // ---------- collapsible LR panel ----------

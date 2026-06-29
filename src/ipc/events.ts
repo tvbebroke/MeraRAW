@@ -14,6 +14,8 @@ export const EVENTS = {
   maskReady: "mask-ready",
   exportProgress: "export-progress",
   engineCrashed: "engine-crashed",
+  exportRequested: "export-requested",
+  importRequested: "import-requested",
 } as const;
 
 export function onMaskReady(cb: (id: string) => void): Promise<UnlistenFn> {
@@ -91,4 +93,12 @@ export function onFolderOpened(
   cb: (path: string) => void,
 ): Promise<UnlistenFn> {
   return listen<string>(EVENTS.folderOpened, (e) => cb(e.payload));
+}
+
+export function onImportRequested(cb: () => void): Promise<UnlistenFn> {
+  return listen<null>(EVENTS.importRequested, () => cb());
+}
+
+export function onExportRequested(cb: () => void): Promise<UnlistenFn> {
+  return listen<null>(EVENTS.exportRequested, () => cb());
 }

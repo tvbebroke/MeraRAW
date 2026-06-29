@@ -38,20 +38,7 @@ impl Engine {
                 )
             })
             .collect();
-        let profile_path = match crate::profile::autoload_profile(&meta, &index) {
-            Ok(Some(ap)) => {
-                meta.camera_profile = Some(ap.name.clone());
-                Some(crate::profile::profile_path(&ap.file))
-            }
-            _ => None,
-        };
-
-        let dcp_profile = profile_path.as_ref().and_then(|p| {
-            DcpProfile::load(p)
-                .ok()
-                .filter(|d| d.matches_camera(&meta.camera_make, &meta.camera_model))
-                .map(std::sync::Arc::new)
-        });
+        meta.available_profile_files = available.iter().map(|p| p.file.clone()).collect();
 
         // sidecar = canonical for edits; else Adobe XMP; else fresh doc
         let doc = match sidecar::load_edits(&path) {
@@ -65,6 +52,26 @@ impl Engine {
                 EditDoc::new(&path.to_string_lossy())
             }
         };
+
+        let chosen = crate::profile::choose_profile(
+            &meta,
+            &index,
+            doc.meta.profile_file.as_deref(),
+        );
+        let profile_path = chosen.as_ref().map(|p| {
+            meta.camera_profile = Some(crate::profile::profile_display_name(
+                &p.file,
+                camera_key.as_deref().unwrap_or(""),
+            ));
+            crate::profile::profile_path(&p.file)
+        });
+
+        let dcp_profile = profile_path.as_ref().and_then(|p| {
+            DcpProfile::load(p)
+                .ok()
+                .filter(|d| d.matches_camera(&meta.camera_make, &meta.camera_model))
+                .map(std::sync::Arc::new)
+        });
 
         self.current = Some(CurrentImage {
             path: path.clone(),
@@ -146,11 +153,13 @@ impl Engine {
         if let Some(cur) = &mut self.current {
             let camera_profile = cur.meta.camera_profile.clone();
             let available_profiles = cur.meta.available_profiles.clone();
+            let available_profile_files = cur.meta.available_profile_files.clone();
             cur.working = Some((tex, view, payload.width, payload.height));
             cur.small_cpu = Some(payload.small_cpu);
             cur.meta = payload.meta;
             cur.meta.camera_profile = camera_profile;
             cur.meta.available_profiles = available_profiles;
+            cur.meta.available_profile_files = available_profile_files;
         }
         let vw = self
             .last_view
@@ -174,5 +183,58 @@ impl Engine {
                 });
             }
         }
+    }
+
+    pub(super) fn set_camera_profile(
+        &mut self,
+        profile_file: String,
+        reply: oneshot::Sender<Result<ImageMeta, CoreError>>,
+    ) {
+        let index = crate::profile::ProfileIndex::embedded();
+        let out_meta = match self.current.as_mut() {
+            None => {
+                let _ = reply.send(Err(CoreError::NoImage));
+                return;
+            }
+            Some(cur) => {
+                let profiles = crate::profile::resolve_profiles(&cur.meta, &index);
+                let Some(chosen) = crate::profile::find_profile(&profiles, &profile_file) else {
+                    let _ = reply.send(Err(CoreError::InvalidOp(format!(
+                        "unknown profile: {profile_file}"
+                    ))));
+                    return;
+                };
+                let path = crate::profile::profile_path(&chosen.file);
+                let dcp = DcpProfile::load(&path)
+                    .ok()
+                    .filter(|d| d.matches_camera(&cur.meta.camera_make, &cur.meta.camera_model));
+                let Some(dcp) = dcp else {
+                    let _ = reply.send(Err(CoreError::InvalidOp(format!(
+                        "profile failed to load: {}",
+                        chosen.file
+                    ))));
+                    return;
+                };
+                let camera_key = crate::profile::matched_camera_key(&cur.meta, &index);
+                let display = crate::profile::profile_display_name(
+                    &chosen.file,
+                    camera_key.as_deref().unwrap_or(""),
+                );
+                cur.dcp_profile = Some(std::sync::Arc::new(dcp));
+                cur.meta.camera_profile = Some(display);
+                cur.doc_mut().meta.profile_file = Some(chosen.file.clone());
+                cur.doc_dirty = true;
+                cur.meta.clone()
+            }
+        };
+        if let Some(g) = &mut self.graph {
+            g.invalidate_all();
+        }
+        let display_look = self.display_look;
+        if let Some(g) = &mut self.export_graph {
+            g.set_look(display_look);
+        }
+        self.schedule_render();
+        let _ = reply.send(Ok(out_meta));
     }
 }

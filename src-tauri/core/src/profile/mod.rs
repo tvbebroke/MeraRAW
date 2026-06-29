@@ -233,6 +233,33 @@ pub fn profile_path(file: &str) -> PathBuf {
     profiles_dir().join(file)
 }
 
+pub fn find_profile<'a>(profiles: &'a [ProfileRef], name_or_file: &str) -> Option<&'a ProfileRef> {
+    let key = normalize_key(name_or_file);
+    profiles.iter().find(|p| {
+        normalize_key(&p.name) == key
+            || normalize_key(&p.file) == key
+            || normalize_key(p.file.strip_suffix(".dcp").unwrap_or(&p.file)) == key
+    })
+}
+
+/// Pick a profile from sidecar override, explicit name, or the default autoload.
+pub fn choose_profile(
+    meta: &ImageMeta,
+    index: &ProfileIndex,
+    override_file: Option<&str>,
+) -> Option<ProfileRef> {
+    let profiles = resolve_profiles(meta, index);
+    if profiles.is_empty() {
+        return None;
+    }
+    if let Some(want) = override_file.filter(|s| !s.is_empty()) {
+        if let Some(p) = find_profile(&profiles, want) {
+            return Some(p.clone());
+        }
+    }
+    default_profile(&profiles).cloned()
+}
+
 /// User-facing label from the `.dcp` filename (e.g. "MeraRAW Standard"), not the
 /// internal Adobe ProfileName tag (e.g. "Adobe Standard (MeraRAW)").
 pub fn profile_display_name(file: &str, unique_camera_model: &str) -> String {
@@ -285,6 +312,7 @@ mod tests {
             estimated_cct: Some(5500.0),
             camera_profile: None,
             available_profiles: Vec::new(),
+            available_profile_files: Vec::new(),
         };
         let profiles = resolve_profiles(&meta, &index);
         assert!(

@@ -120,6 +120,59 @@ pub async fn read_file_meta(path: String) -> Result<FileMeta, AppError> {
     }
 }
 
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BrowseRoot {
+    pub name: String,
+    pub path: String,
+}
+
+#[tauri::command]
+pub async fn browse_roots() -> Result<Vec<BrowseRoot>, AppError> {
+    let home = std::env::var("HOME").unwrap_or_else(|_| "/Users".into());
+    let mut roots = vec![
+        BrowseRoot {
+            name: "Desktop".into(),
+            path: format!("{home}/Desktop"),
+        },
+        BrowseRoot {
+            name: "Documents".into(),
+            path: format!("{home}/Documents"),
+        },
+        BrowseRoot {
+            name: "Pictures".into(),
+            path: format!("{home}/Pictures"),
+        },
+        BrowseRoot {
+            name: "Downloads".into(),
+            path: format!("{home}/Downloads"),
+        },
+        BrowseRoot {
+            name: "Home".into(),
+            path: home.clone(),
+        },
+    ];
+    roots.retain(|r| std::path::Path::new(&r.path).exists());
+
+    if let Ok(volumes) = std::fs::read_dir("/Volumes") {
+        for entry in volumes.flatten() {
+            let path = entry.path();
+            if !path.is_dir() {
+                continue;
+            }
+            let name = entry.file_name().to_string_lossy().into_owned();
+            if name.starts_with('.') {
+                continue;
+            }
+            roots.push(BrowseRoot {
+                name,
+                path: path.to_string_lossy().into_owned(),
+            });
+        }
+    }
+    Ok(roots)
+}
+
 #[tauri::command]
 pub async fn list_dir(path: String) -> Result<Vec<DirEntry>, AppError> {
     let mut entries = Vec::new();
@@ -348,6 +401,98 @@ pub async fn import_folder(
 }
 
 #[tauri::command]
+pub async fn scan_import_folder(
+    engine: State<'_, EngineHandle>,
+    path: String,
+) -> Result<Vec<meratech_core::catalog::ImportCandidate>, AppError> {
+    engine
+        .scan_import_folder(PathBuf::from(path))
+        .await?
+        .map_err(AppError::from)
+}
+
+#[tauri::command]
+pub async fn import_selected(
+    engine: State<'_, EngineHandle>,
+    root: String,
+    paths: Vec<String>,
+) -> Result<u64, AppError> {
+    engine
+        .import_selected(
+            PathBuf::from(root),
+            paths.into_iter().map(PathBuf::from).collect(),
+        )
+        .await?
+        .map_err(AppError::from)
+}
+
+#[tauri::command]
+pub async fn get_asset_detail(
+    engine: State<'_, EngineHandle>,
+    id: i64,
+) -> Result<Option<meratech_core::catalog::AssetDetail>, AppError> {
+    engine.get_asset_detail(id).await?.map_err(AppError::from)
+}
+
+#[tauri::command]
+pub async fn list_albums(
+    engine: State<'_, EngineHandle>,
+) -> Result<Vec<meratech_core::catalog::AlbumItem>, AppError> {
+    engine.list_albums().await?.map_err(AppError::from)
+}
+
+#[tauri::command]
+pub async fn create_album(
+    engine: State<'_, EngineHandle>,
+    name: String,
+) -> Result<i64, AppError> {
+    engine.create_album(name).await?.map_err(AppError::from)
+}
+
+#[tauri::command]
+pub async fn delete_album(
+    engine: State<'_, EngineHandle>,
+    id: i64,
+) -> Result<(), AppError> {
+    engine.delete_album(id).await?.map_err(AppError::from)
+}
+
+#[tauri::command]
+pub async fn add_to_album(
+    engine: State<'_, EngineHandle>,
+    albumId: i64,
+    assetIds: Vec<i64>,
+) -> Result<(), AppError> {
+    engine
+        .add_to_album(albumId, assetIds)
+        .await?
+        .map_err(AppError::from)
+}
+
+#[tauri::command]
+pub async fn remove_from_album(
+    engine: State<'_, EngineHandle>,
+    albumId: i64,
+    assetIds: Vec<i64>,
+) -> Result<(), AppError> {
+    engine
+        .remove_from_album(albumId, assetIds)
+        .await?
+        .map_err(AppError::from)
+}
+
+#[tauri::command]
+pub async fn set_camera_profile(
+    engine: State<'_, EngineHandle>,
+    profileFile: String,
+) -> Result<meratech_core::raw::ImageMeta, AppError> {
+    engine
+        .set_camera_profile(profileFile)
+        .await?
+        .map_err(AppError::from)
+}
+
+#[tauri::command]
 pub async fn get_grid(
     engine: State<'_, EngineHandle>,
     query: meratech_core::catalog::GridQuery,
@@ -394,6 +539,15 @@ pub async fn set_preview_bypass(
     on: bool,
 ) -> Result<(), AppError> {
     Ok(engine.set_preview_bypass(on).await?)
+}
+
+/// Display look: 0 = Neutral, 1 = Camera, 2 = Filmic (AgX).
+#[tauri::command]
+pub async fn set_display_look(
+    engine: State<'_, EngineHandle>,
+    look: u32,
+) -> Result<(), AppError> {
+    Ok(engine.set_display_look(look).await?)
 }
 
 #[tauri::command]

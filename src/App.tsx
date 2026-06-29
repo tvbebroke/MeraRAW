@@ -5,30 +5,36 @@ import {
   autoopenPath,
   openImage,
   pickFile,
+  pickFolder,
   pingEngine,
-  redo,
   reportFrontendStatus,
   setPreviewBypass,
-  undo,
 } from "./ipc/commands";
 import {
   onDecodeError,
   onDocUpdated,
   onEngineCrashed,
   onEngineReady,
+  onExportRequested,
   onFileOpened,
+  onFolderOpened,
   onImageReady,
+  onImportRequested,
   onPreviewReady,
 } from "./ipc/events";
 import { isAppError, type ImageMeta } from "./ipc/types";
-import { DevelopRail } from "./components/lr/DevelopRail";
 import { ExportDialog } from "./components/lr/ExportDialog";
+import { KeyboardHelpOverlay } from "./components/KeyboardHelpOverlay";
 import { LeftPanel } from "./components/lr/LeftPanel";
+import { RightRail } from "./components/lr/RightRail";
 import { ViewportToolbar } from "./components/lr/Toolbar";
 import { Icon } from "./components/lr/widgets";
 import { Filmstrip, Library } from "./components/Library";
 import { ReportProblem } from "./components/ReportProblem";
+import { setAppKeyboardContext } from "./keyboard/context";
+import { useKeyboardShortcuts } from "./keyboard/useKeyboardShortcuts";
 import { useDocStore } from "./state/docStore";
+import type { KeymapScope } from "./keyboard/types";
 
 // window-level: survives React StrictMode double-mount AND module reloads
 declare global {
@@ -53,11 +59,55 @@ export default function App() {
     setDecodeState,
   } = useUiStore();
   const beforeAfter = useUiStore((s) => s.beforeAfter);
-  const setBeforeAfter = useUiStore((s) => s.setBeforeAfter);
-  const setBrushRadius = useUiStore((s) => s.setBrushRadius);
+  const showTopbar = useUiStore((s) => s.showTopbar);
+  const showToolbar = useUiStore((s) => s.showToolbar);
+  const showFilmstrip = useUiStore((s) => s.showFilmstrip);
+  const showLeftPanel = useUiStore((s) => s.showLeftPanel);
+  const showRightPanel = useUiStore((s) => s.showRightPanel);
+  const helpOverlay = useUiStore((s) => s.helpOverlay);
+  const setHelpOverlay = useUiStore((s) => s.setHelpOverlay);
   const [meta, setMeta] = useState<ImageMeta | null>(null);
   const [mode, setMode] = useState<"library" | "develop">("library");
   const [showExport, setShowExport] = useState(false);
+  const [exportQueue, setExportQueue] = useState<string[] | undefined>();
+  const [importReviewPath, setImportReviewPath] = useState<string | null>(null);
+
+  useKeyboardShortcuts(true);
+
+  useEffect(() => {
+    setAppKeyboardContext({
+      setMode,
+      openPath: (p) => void open(p),
+      openFilePicker: () => void handleOpen(),
+      triggerImport: () => {
+        setMode("library");
+        void pickFolder().then((p) => {
+          if (p) setImportReviewPath(p);
+        });
+      },
+      triggerExport: () => {
+        setExportQueue(undefined);
+        setShowExport(true);
+      },
+      triggerExportPrevious: () => {
+        notifyExportPrevious();
+      },
+      getMode: () => mode,
+      hasImage: () => meta !== null,
+    });
+    return () => setAppKeyboardContext(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode, meta]);
+
+  function notifyExportPrevious() {
+    setStatus("Quick export with previous settings — coming soon");
+    setShowExport(true);
+  }
+
+  const helpScopes: KeymapScope[] =
+    mode === "develop"
+      ? ["module:develop", "global"]
+      : ["module:library", "global"];
 
   async function open(path: string) {
     setMode("develop");
@@ -102,6 +152,19 @@ export default function App() {
         setStatus(`decode error: ${m}`);
       }),
       onDocUpdated((delta) => useDocStore.getState().reconcile(delta)),
+      onFolderOpened((path) => {
+        setMode("library");
+        setImportReviewPath(path);
+      }),
+      onImportRequested(() => {
+        setMode("library");
+        void pickFolder().then((p) => {
+          if (p) setImportReviewPath(p);
+        });
+      }),
+      onExportRequested(() => {
+        if (meta || exportQueue) setShowExport(true);
+      }),
     ];
     pingEngine()
       .then((s) => {
@@ -127,41 +190,14 @@ export default function App() {
     setPreviewBypass(beforeAfter).catch(() => {});
   }, [beforeAfter]);
 
-  // Develop keyboard map (skip when typing in an input)
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      const t = e.target as HTMLElement;
-      if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA")) return;
-      if (mode !== "develop") return;
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "z") {
-        e.preventDefault();
-        (e.shiftKey ? redo() : undo())
-          .then((d) => useDocStore.getState().reconcile(d))
-          .catch(() => {});
-      } else if (e.key === "\\") {
-        e.preventDefault();
-        setBeforeAfter(!useUiStore.getState().beforeAfter);
-      } else if (e.key === "[") {
-        setBrushRadius(useUiStore.getState().brushRadius - 0.01);
-      } else if (e.key === "]") {
-        setBrushRadius(useUiStore.getState().brushRadius + 0.01);
-      } else if (e.key.toLowerCase() === "d") {
-        setMode("develop");
-      } else if (e.key.toLowerCase() === "g") {
-        setMode("library");
-      }
-    }
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [mode, setBeforeAfter, setBrushRadius]);
-
   async function handleOpen() {
     const path = await pickFile();
     if (path) void open(path);
   }
 
   return (
-    <div className="app">
+    <div className={`app ${showTopbar ? "" : "chrome-all-hidden"}`}>
+      {showTopbar && (
       <div className="topbar">
         <span className="brand">
           <img src="/logo.png" alt="" className="brand-logo" aria-hidden="true" />
@@ -192,25 +228,41 @@ export default function App() {
           <button className="tab" onClick={handleOpen}>
             Open…
           </button>
-          <button className="tab" disabled={!meta} onClick={() => setShowExport(true)}>
+          <button className="tab" disabled={!meta} onClick={() => {
+            setExportQueue(undefined);
+            setShowExport(true);
+          }}>
             <Icon.Export size={13} /> Export…
           </button>
         </div>
       </div>
+      )}
 
       {mode === "library" ? (
-        <Library onOpen={(p) => void open(p)} />
+        <Library
+          onOpen={(p) => void open(p)}
+          onExportSelection={(paths) => {
+            setExportQueue(paths);
+            setShowExport(true);
+          }}
+          pendingReviewRoot={importReviewPath}
+          onReviewClosed={() => setImportReviewPath(null)}
+        />
       ) : (
-        <div className="develop-wrap">
-          <div className="develop">
-            <LeftPanel />
+        <div className={`develop-wrap ${showFilmstrip ? "" : "hide-filmstrip"}`}>
+          <div
+            className={`develop ${showLeftPanel ? "" : "hide-left"} ${showRightPanel ? "" : "hide-right"}`}
+          >
+            <LeftPanel currentPath={lastOpenedPath} onOpen={(p) => void open(p)} />
             <div className="develop-center">
               <Viewport />
-              <ViewportToolbar />
+              {showToolbar && <ViewportToolbar />}
             </div>
-            <DevelopRail meta={meta} />
+            <RightRail meta={meta} onMetaChange={setMeta} />
           </div>
-          <Filmstrip currentPath={lastOpenedPath} onOpen={(p) => void open(p)} />
+          {showFilmstrip && (
+            <Filmstrip currentPath={lastOpenedPath} onOpen={(p) => void open(p)} />
+          )}
         </div>
       )}
 
@@ -231,9 +283,23 @@ export default function App() {
         </span>
       </div>
 
-      {showExport && <ExportDialog onClose={() => setShowExport(false)} />}
+      {showExport && (
+        <ExportDialog
+          queuePaths={exportQueue}
+          onClose={() => {
+            setShowExport(false);
+            setExportQueue(undefined);
+          }}
+        />
+      )}
 
       <ReportProblem />
+
+      <KeyboardHelpOverlay
+        open={helpOverlay}
+        scopes={helpScopes}
+        onClose={() => setHelpOverlay(false)}
+      />
     </div>
   );
 }

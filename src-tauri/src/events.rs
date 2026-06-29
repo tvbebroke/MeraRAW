@@ -17,6 +17,8 @@ pub const IMPORT_DONE: &str = "import-done";
 pub const CATALOG_CHANGED: &str = "catalog-changed";
 pub const EXPORT_PROGRESS: &str = "export-progress";
 pub const ENGINE_CRASHED: &str = "engine-crashed";
+pub const EXPORT_REQUESTED: &str = "export-requested";
+pub const IMPORT_REQUESTED: &str = "import-requested";
 
 /// Forward core EngineEvents to the webview as named events (contract C3).
 pub fn forward_engine_event(app: &AppHandle, ev: meratech_core::message::EngineEvent) {

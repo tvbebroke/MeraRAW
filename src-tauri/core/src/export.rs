@@ -215,6 +215,80 @@ pub fn output_transform(
     }
 }
 
+/// AgX filmic display transform — MIRRORS graph/present.wgsl `agx()` exactly
+/// (same Minimal-AgX constants), so Filmic preview == Filmic sRGB export.
+/// Input: linear sRGB. Output: sRGB display-encoded [0,1].
+fn agx_rs(srgb_lin: [f32; 3]) -> [f32; 3] {
+    const INSET: Mat3 = [
+        [0.8424790622, 0.0423282423, 0.0423756549],
+        [0.0784336000, 0.8784686365, 0.0784336000],
+        [0.0792237451, 0.0791661275, 0.8791429738],
+    ];
+    const OUTSET: Mat3 = [
+        [1.1968790051, -0.0528968518, -0.0529716355],
+        [-0.0980208811, 1.1519031299, -0.0980434501],
+        [-0.0990297441, -0.0989611768, 1.1510736726],
+    ];
+    const MIN_EV: f32 = -12.47393;
+    const MAX_EV: f32 = 4.026069;
+    let contrast = |x: f32| {
+        let x2 = x * x;
+        let x4 = x2 * x2;
+        15.5 * x4 * x2 - 40.14 * x4 * x + 31.96 * x4 - 6.868 * x2 * x + 0.4298 * x2
+            + 0.1191 * x
+            - 0.00232
+    };
+    let v = mat_vec(&INSET, srgb_lin);
+    let mut log = [0f32; 3];
+    for k in 0..3 {
+        let x = (v[k].max(1e-10).log2() - MIN_EV) / (MAX_EV - MIN_EV);
+        log[k] = contrast(x.clamp(0.0, 1.0));
+    }
+    let out = mat_vec(&OUTSET, log);
+    [out[0].clamp(0.0, 1.0), out[1].clamp(0.0, 1.0), out[2].clamp(0.0, 1.0)]
+}
+
+/// AgX → sRGB 8-bit (display-encoded; bypasses the normal matrix/gamut/OETF).
+fn agx_srgb_output(linear: &[f32], width: u32, height: u32) -> EncodedImage {
+    let m = target_from_rec2020(TargetSpace::Srgb); // linear Rec.2020 → linear sRGB
+    let px = (width * height) as usize;
+    let mut rgb8 = Vec::with_capacity(px * 3);
+    for i in 0..px {
+        let rec = [
+            linear[i * 3].max(0.0),
+            linear[i * 3 + 1].max(0.0),
+            linear[i * 3 + 2].max(0.0),
+        ];
+        let srgb = mat_vec(&m, rec).map(|c| c.max(0.0));
+        for c in agx_rs(srgb) {
+            rgb8.push((c * 255.0).round() as u8);
+        }
+    }
+    EncodedImage {
+        width,
+        height,
+        rgb8,
+        rgb16: Vec::new(),
+    }
+}
+
+/// Look-aware output: look 0/1 → the Reinhard view transform; look 2 (Filmic
+/// AgX) → AgX for sRGB 8-bit, else falls back to Camera (wide-gamut/16-bit AgX
+/// is a follow-up — current scope is preview + sRGB export).
+pub fn output_transform_look(
+    linear: &[f32],
+    width: u32,
+    height: u32,
+    target: TargetSpace,
+    want16: bool,
+    look: u32,
+) -> EncodedImage {
+    if look == 2 && target == TargetSpace::Srgb && !want16 {
+        return agx_srgb_output(linear, width, height);
+    }
+    output_transform(linear, width, height, target, want16, look >= 1)
+}
+
 /// Lanczos resize in LINEAR space (before the output transform — quality).
 pub fn resize_linear(
     linear: Vec<f32>,
@@ -672,6 +746,7 @@ mod tests {
             estimated_cct: Some(5200.0),
             camera_profile: None,
             available_profiles: Vec::new(),
+            available_profile_files: Vec::new(),
         }
     }
 

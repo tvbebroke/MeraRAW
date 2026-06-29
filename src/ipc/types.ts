@@ -29,6 +29,11 @@ export interface DirEntry {
   size: number;
 }
 
+export interface BrowseRoot {
+  name: string;
+  path: string;
+}
+
 export interface ImageMeta {
   path: string;
   cameraMake: string;
@@ -46,6 +51,7 @@ export interface ImageMeta {
   estimatedCct: number | null;
   cameraProfile: string | null;
   availableProfiles: string[];
+  availableProfileFiles: string[];
 }
 
 export interface ViewParams {
@@ -146,13 +152,52 @@ export interface GridQuery {
   text?: string;
   ratingMin?: number;
   flag?: string;
+  label?: string;
+  camera?: string;
   hasEdits?: boolean;
   folder?: string;
+  albumId?: number;
   blurryOnly?: boolean;
   dupesOnly?: boolean;
   sort?: string;
   offset?: number;
   limit?: number;
+}
+
+export interface ImportCandidate {
+  path: string;
+  filename: string;
+  isNew: boolean;
+}
+
+export interface AssetDetail {
+  id: number;
+  path: string;
+  filename: string;
+  width: number;
+  height: number;
+  rating: number;
+  flag: string;
+  label: string | null;
+  hasEdits: boolean;
+  capturedAt: string | null;
+  importedAt: string | null;
+  cameraMake: string | null;
+  cameraModel: string | null;
+  lens: string | null;
+  iso: number | null;
+  shutter: string | null;
+  aperture: number | null;
+  focalMm: number | null;
+  keywords: string[];
+  albums: string[];
+  accessible: boolean;
+}
+
+export interface AlbumItem {
+  id: number;
+  name: string;
+  photoCount: number;
 }
 
 export interface MetaPatch {
@@ -182,6 +227,7 @@ export interface ExportSettings {
   destDir: string;
   stripMetadata?: boolean;
   copyright?: string | null;
+  watermarkText?: string | null;
 }
 
 export interface ExportProgress {
