@@ -7,12 +7,16 @@
 #   export APPLE_TEAM_ID="ZJP5CXC3FS"
 # APPLE_PASSWORD is an app-specific password from appleid.apple.com — not your Apple ID password.
 #
+# Or store credentials once:
+#   xcrun notarytool store-credentials "meraraw-notary"
+#   export NOTARY_KEYCHAIN_PROFILE="meraraw-notary"
+#
 # Optional R2 upload (private bucket):
 #   export R2_ENDPOINT="https://<account_id>.r2.cloudflarestorage.com"
 #   export R2_ACCESS_KEY_ID="..."
 #   export R2_SECRET_ACCESS_KEY="..."
 #   export R2_BUCKET_NAME="meraraw-releases"
-#   export R2_OBJECT_KEY="MeraRAW Beta 0.1.2.dmg"
+#   export R2_OBJECT_KEY="MeraRAW Beta 0.1.1.dmg"
 #
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -28,9 +32,32 @@ VERSION="$(node -p "require('./src-tauri/tauri.conf.json').version")"
 DMG_NAME="MeraRAW Beta ${VERSION}.dmg"
 RELEASE_DIR="release"
 
-if [[ -z "${APPLE_ID:-}" || -z "${APPLE_PASSWORD:-}" || -z "${APPLE_TEAM_ID:-}" ]]; then
-  echo "⚠ APPLE_ID / APPLE_PASSWORD / APPLE_TEAM_ID not set — build will sign but skip notarization."
-  echo "  Export those vars and re-run to notarize for Gatekeeper."
+have_notary_creds=false
+if [[ -n "${NOTARY_KEYCHAIN_PROFILE:-}" ]]; then
+  have_notary_creds=true
+elif [[ -n "${APPLE_API_KEY:-}" && -n "${APPLE_API_ISSUER:-}" && -n "${APPLE_API_KEY_PATH:-}" ]]; then
+  have_notary_creds=true
+elif [[ -n "${APPLE_ID:-}" && -n "${APPLE_PASSWORD:-}" && -n "${APPLE_TEAM_ID:-}" ]]; then
+  have_notary_creds=true
+fi
+
+if [[ "${NOTARIZE_ONLY:-}" == "1" ]]; then
+  DMG_PATH="${RELEASE_DIR}/${DMG_NAME}"
+  if [[ ! -f "${DMG_PATH}" ]]; then
+    echo "error: ${DMG_PATH} not found — run a full release build first." >&2
+    exit 1
+  fi
+  if [[ "${have_notary_creds}" != true ]]; then
+    echo "error: notarization credentials required for NOTARIZE_ONLY=1" >&2
+    exit 1
+  fi
+  bash scripts/notarize-dmg.sh "${DMG_PATH}"
+  exit 0
+fi
+
+if [[ "${have_notary_creds}" != true ]]; then
+  echo "⚠ Notarization credentials not set — build will sign but skip notarization."
+  echo "  After build: NOTARIZE_ONLY=1 npm run notarize  (or export APPLE_* and re-run release)"
 else
   echo "→ Apple notarization credentials detected."
 fi
@@ -53,6 +80,12 @@ mkdir -p "${RELEASE_DIR}"
 cp "${BUILT}" "${RELEASE_DIR}/${DMG_NAME}"
 echo "→ Release artifact: ${RELEASE_DIR}/${DMG_NAME}"
 ls -lh "${RELEASE_DIR}/${DMG_NAME}"
+
+if [[ "${have_notary_creds}" == true ]]; then
+  bash scripts/notarize-dmg.sh "${RELEASE_DIR}/${DMG_NAME}"
+else
+  echo "→ DMG is signed but not notarized. Run: NOTARIZE_ONLY=1 npm run notarize"
+fi
 
 if [[ -n "${R2_ENDPOINT:-}" && -n "${R2_ACCESS_KEY_ID:-}" && -n "${R2_SECRET_ACCESS_KEY:-}" && -n "${R2_BUCKET_NAME:-}" ]]; then
   KEY="${R2_OBJECT_KEY:-${DMG_NAME}}"

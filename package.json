@@ -1,7 +1,7 @@
 {
   "name": "meratech-editor",
   "private": true,
-  "version": "0.1.2",
+  "version": "0.1.1",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -10,7 +10,8 @@
     "tauri": "tauri",
     "import-presets": "node scripts/import-lightroom-presets.mjs",
     "tag-presets": "node scripts/tag-presets.mjs",
-    "release": "bash scripts/release-beta.sh"
+    "release": "bash scripts/release-beta.sh",
+    "notarize": "bash scripts/notarize-dmg.sh"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.49.0",
