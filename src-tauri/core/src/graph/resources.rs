@@ -14,7 +14,15 @@ pub(super) struct ExtractUniforms {
     pub scale: f32,
     pub center_x: f32,
     pub center_y: f32,
-    pub _pad: f32,
+    pub crop_left: f32,
+    pub crop_top: f32,
+    pub crop_right: f32,
+    pub crop_bottom: f32,
+    pub crop_angle: f32,
+    pub crop_rotate_90: u32,
+    pub crop_flip_h: u32,
+    pub crop_flip_v: u32,
+    pub crop_enabled: u32,
 }
 
 #[repr(C)]
@@ -475,6 +483,7 @@ impl RenderGraph {
             out_tex: None,
             cache_size: None,
             last_view_key: None,
+            last_crop_key: None,
             dirty_from: 0,
             last_passes_run: Vec::new(),
             last_final: FinalTag::Extract,

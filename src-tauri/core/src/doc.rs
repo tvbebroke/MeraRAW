@@ -194,6 +194,33 @@ pub struct PartialDoc {
     pub modules: ModuleParams,
 }
 
+/// On-disk preset file — modules plus optional catalog metadata.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PresetFile {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub label: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub tags: Vec<String>,
+    #[serde(default)]
+    pub modules: ModuleParams,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PresetCatalogEntry {
+    pub id: String,
+    pub label: String,
+    #[serde(default)]
+    pub tags: Vec<String>,
+}
+
+impl PresetFile {
+    pub fn into_partial(self) -> PartialDoc {
+        PartialDoc {
+            modules: self.modules,
+        }
+    }
+}
+
 fn new_id() -> String {
     // time + counter pseudo-uuid; avoids a uuid dep
     use std::sync::atomic::{AtomicU64, Ordering};

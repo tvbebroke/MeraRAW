@@ -83,6 +83,12 @@ impl RenderGraph {
     }
 
     pub fn invalidate_from_module(&mut self, module: &str) {
+        if module == "crop" {
+            self.last_crop_key = None;
+            self.last_view_key = None;
+            self.dirty_from = 0;
+            return;
+        }
         let idx = if module == "masks" {
             mask_stage_index()
         } else {
@@ -94,6 +100,7 @@ impl RenderGraph {
     pub fn invalidate_all(&mut self) {
         self.dirty_from = 0;
         self.last_view_key = None;
+        self.last_crop_key = None;
     }
 
     fn ensure_pools(&mut self, gpu: &GpuContext, uniforms: usize, luts: usize, strokes: usize) {
@@ -145,7 +152,9 @@ impl RenderGraph {
         const MAX_VIEW: u32 = 8192;
         let out_w = view.out_w.clamp(1, MAX_VIEW);
         let out_h = view.out_h.clamp(1, MAX_VIEW);
-        let scale = view.effective_scale(img_w, img_h);
+        let crop = crate::crop::CropParams::from_doc(doc);
+        let crop_key = crop.signature(view.crop_preview);
+        let scale = view.effective_scale_crop(img_w, img_h, &crop);
         let view_key = [
             out_w,
             out_h,
@@ -154,6 +163,7 @@ impl RenderGraph {
             view.center_y.to_bits(),
         ];
         let view_changed = self.last_view_key != Some(view_key);
+        let crop_changed = self.last_crop_key != Some(crop_key);
 
         // totally clean → out_tex still holds the right pixels
         if !view_changed && self.dirty_from == usize::MAX && self.out_tex.is_some() {
@@ -225,8 +235,9 @@ impl RenderGraph {
         // None. Gating on `dirty_from == 0` was wrong: editing module 0
         // (exposure) sets dirty_from = 0 and needlessly re-ran the ~1.3s CPU
         // dcp_look every slider tick.
-        let run_extract = view_changed;
+        let run_extract = view_changed || crop_changed;
         if run_extract {
+            let crop_enabled = crop.apply_enabled(view.crop_preview);
             let u = ExtractUniforms {
                 out_w,
                 out_h,
@@ -235,7 +246,15 @@ impl RenderGraph {
                 scale,
                 center_x: view.center_x,
                 center_y: view.center_y,
-                _pad: 0.0,
+                crop_left: crop.left,
+                crop_top: crop.top,
+                crop_right: crop.right,
+                crop_bottom: crop.bottom,
+                crop_angle: crop.angle.to_radians(),
+                crop_rotate_90: crop.rotate_90,
+                crop_flip_h: u32::from(crop.flip_h),
+                crop_flip_v: u32::from(crop.flip_v),
+                crop_enabled: u32::from(crop_enabled),
             };
             gpu.queue
                 .write_buffer(&self.extract_uniforms, 0, bytemuck::bytes_of(&u));
@@ -691,6 +710,7 @@ impl RenderGraph {
 
         gpu.queue.submit([encoder.finish()]);
         self.last_view_key = Some(view_key);
+        self.last_crop_key = Some(crop_key);
         self.dirty_from = usize::MAX;
         self.readback(gpu, out_w, out_h)
     }

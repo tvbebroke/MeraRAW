@@ -33,6 +33,7 @@ fn view() -> ViewParams {
         scale: Some(1.0),
         center_x: 0.5,
         center_y: 0.5,
+        crop_preview: false,
     }
 }
 

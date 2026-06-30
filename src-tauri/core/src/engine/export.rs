@@ -124,6 +124,7 @@ impl Engine {
                 scale: Some(1.0),
                 center_x: (tx as f32 + tw as f32 / 2.0) / *w as f32,
                 center_y: (ty as f32 + th as f32 / 2.0) / *h as f32,
+                crop_preview: false,
             };
             let mut tile = graph.render_linear_tile(
                 gpu,

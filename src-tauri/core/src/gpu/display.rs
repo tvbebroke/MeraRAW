@@ -13,6 +13,9 @@ pub struct ViewParams {
     /// View center in normalized image coords. Default (0.5, 0.5).
     pub center_x: f32,
     pub center_y: f32,
+    /// When true, extract shows the full master (crop tool editing overlay).
+    #[serde(default)]
+    pub crop_preview: bool,
 }
 
 impl ViewParams {
@@ -23,6 +26,7 @@ impl ViewParams {
             scale: None,
             center_x: 0.5,
             center_y: 0.5,
+            crop_preview: false,
         }
     }
 
@@ -30,6 +34,21 @@ impl ViewParams {
         self.scale.unwrap_or_else(|| {
             (self.out_w as f32 / img_w as f32).min(self.out_h as f32 / img_h as f32)
         })
+    }
+
+    pub fn effective_scale_crop(
+        &self,
+        img_w: u32,
+        img_h: u32,
+        crop: &crate::crop::CropParams,
+    ) -> f32 {
+        let (ew, eh) = if crop.apply_enabled(self.crop_preview) {
+            crop.effective_size(img_w, img_h)
+        } else {
+            (img_w as f32, img_h as f32)
+        };
+        self.scale
+            .unwrap_or_else(|| (self.out_w as f32 / ew).min(self.out_h as f32 / eh))
     }
 }
 

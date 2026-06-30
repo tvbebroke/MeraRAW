@@ -95,9 +95,14 @@ impl Engine {
             .chars()
             .map(|ch| if ch.is_alphanumeric() || ch == '-' || ch == '_' { ch } else { '_' })
             .collect();
+        let file = crate::doc::PresetFile {
+            label: Some(name.to_string()),
+            tags: Vec::new(),
+            modules: partial.modules,
+        };
         std::fs::write(
             dir.join(format!("{safe}.json")),
-            serde_json::to_string_pretty(&partial).map_err(|e| CoreError::Io(e.to_string()))?,
+            serde_json::to_string_pretty(&file).map_err(|e| CoreError::Io(e.to_string()))?,
         )?;
         Ok(())
     }
@@ -106,21 +111,121 @@ fn presets_dir() -> PathBuf {
     crate::catalog::data_dir().join("presets")
 }
 
+/// Shipped presets (repo `presets/bundled/` in dev; `MERATECH_BUNDLED_PRESETS` in prod).
+pub fn bundled_presets_dir() -> Option<PathBuf> {
+    if let Ok(p) = std::env::var("MERATECH_BUNDLED_PRESETS") {
+        let p = PathBuf::from(p);
+        if p.is_dir() {
+            return Some(p);
+        }
+    }
+    let dev = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../presets/bundled");
+    if dev.is_dir() {
+        return Some(dev);
+    }
+    None
+}
+
+fn preset_json_paths(name: &str) -> Vec<PathBuf> {
+    let mut out = vec![presets_dir().join(format!("{name}.json"))];
+    if let Some(b) = bundled_presets_dir() {
+        out.push(b.join(format!("{name}.json")));
+    }
+    out
+}
+
 pub(super) fn list_presets() -> Vec<String> {
-    std::fs::read_dir(presets_dir())
-        .map(|rd| {
-            rd.flatten()
-                .filter_map(|e| {
-                    let p = e.path();
-                    (p.extension()? == "json")
-                        .then(|| p.file_stem().map(|s| s.to_string_lossy().into_owned()))?
-                })
-                .collect()
-        })
-        .unwrap_or_default()
+    let mut names: Vec<String> = Vec::new();
+    let mut scan = |dir: &PathBuf| {
+        if let Ok(rd) = std::fs::read_dir(dir) {
+            for e in rd.flatten() {
+                let p = e.path();
+                if p.extension().and_then(|x| x.to_str()) == Some("json") {
+                    if let Some(stem) = p.file_stem().and_then(|s| s.to_str()) {
+                        names.push(stem.to_string());
+                    }
+                }
+            }
+        }
+    };
+    scan(&presets_dir());
+    if let Some(b) = bundled_presets_dir() {
+        scan(&b);
+    }
+    names.sort();
+    names.dedup();
+    names
 }
 
 pub(super) fn load_preset(name: &str) -> Result<crate::doc::PartialDoc, CoreError> {
-    let text = std::fs::read_to_string(presets_dir().join(format!("{name}.json")))?;
-    serde_json::from_str(&text).map_err(|e| CoreError::Io(format!("preset parse: {e}")))
+    load_preset_file(name).map(|f| f.into_partial())
+}
+
+pub(super) fn load_preset_file(name: &str) -> Result<crate::doc::PresetFile, CoreError> {
+    for path in preset_json_paths(name) {
+        if path.exists() {
+            let text = std::fs::read_to_string(&path)?;
+            let file: crate::doc::PresetFile = serde_json::from_str(&text).map_err(|e| {
+                CoreError::Io(format!("preset parse: {e}"))
+            })?;
+            return Ok(file);
+        }
+    }
+    Err(CoreError::Io(format!("preset not found: {name}")))
+}
+
+fn humanize_preset_id(id: &str) -> String {
+    id.replace('_', " ")
+}
+
+pub(super) fn list_preset_catalog() -> Vec<crate::doc::PresetCatalogEntry> {
+    let mut entries: Vec<crate::doc::PresetCatalogEntry> = Vec::new();
+    let mut seen = std::collections::HashSet::new();
+
+    let mut scan = |dir: &PathBuf| {
+        if let Ok(rd) = std::fs::read_dir(dir) {
+            for e in rd.flatten() {
+                let p = e.path();
+                if p.extension().and_then(|x| x.to_str()) != Some("json") {
+                    continue;
+                }
+                let Some(id) = p.file_stem().and_then(|s| s.to_str()) else {
+                    continue;
+                };
+                if !seen.insert(id.to_string()) {
+                    continue;
+                }
+                let label;
+                let tags;
+                match std::fs::read_to_string(&p)
+                    .ok()
+                    .and_then(|t| serde_json::from_str::<crate::doc::PresetFile>(&t).ok())
+                {
+                    Some(file) => {
+                        label = file
+                            .label
+                            .unwrap_or_else(|| humanize_preset_id(id));
+                        tags = file.tags;
+                    }
+                    None => {
+                        label = humanize_preset_id(id);
+                        tags = Vec::new();
+                    }
+                }
+                entries.push(crate::doc::PresetCatalogEntry {
+                    id: id.to_string(),
+                    label,
+                    tags,
+                });
+            }
+        }
+    };
+
+    scan(&presets_dir());
+    if let Some(b) = bundled_presets_dir() {
+        scan(&b);
+    }
+
+    entries.sort_by(|a, b| a.label.cmp(&b.label));
+    entries
 }

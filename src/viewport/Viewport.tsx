@@ -10,6 +10,7 @@ import {
 import { onFrameReady } from "../ipc/events";
 import { useDocStore } from "../state/docStore";
 import { useUiStore } from "../state/uiStore";
+import { CropOverlay } from "./CropOverlay";
 
 const FRAME_BASE = "frame://localhost";
 
@@ -58,6 +59,7 @@ export function Viewport() {
   const imageOpen = useUiStore((s) => s.imageOpen);
   const imageDims = useUiStore((s) => s.imageDims);
   const decodeState = useUiStore((s) => s.decodeState);
+  const cropActive = useUiStore((s) => s.cropActive);
   const lastOpenedPath = useUiStore((s) => s.lastOpenedPath);
   const setZoomLabel = useUiStore((s) => s.setZoomLabel);
 
@@ -146,6 +148,7 @@ export function Viewport() {
         scale: v.scale,
         centerX: v.centerX,
         centerY: v.centerY,
+        cropPreview: useUiStore.getState().cropActive,
       });
       showFrame(info.version);
     } catch {
@@ -259,6 +262,7 @@ export function Viewport() {
         (e.target as Element).setPointerCapture(e.pointerId);
         return;
       }
+      if (ui.tool === "crop" && ui.cropActive) return;
       if (ui.tool === "wb" && ui.imageDims && wrapRef.current) {
         const rect = wrapRef.current.getBoundingClientRect();
         const dpr = window.devicePixelRatio;
@@ -289,6 +293,7 @@ export function Viewport() {
   const onPointerMove = useCallback(
     (e: React.PointerEvent) => {
       const ui = useUiStore.getState();
+      if (ui.tool === "crop" && ui.cropActive) return;
       if (ui.tool === "brush" && brushPoints.current.length > 0) {
         const p = toImageCoords(e);
         if (p) brushPoints.current.push(p);
@@ -344,7 +349,7 @@ export function Viewport() {
   return (
     <div
       ref={wrapRef}
-      className="viewport-wrap"
+      className={`viewport-wrap${cropActive ? " viewport-wrap--crop" : ""}`}
       onWheel={onWheel}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
@@ -360,6 +365,12 @@ export function Viewport() {
           onError={() => setError("frame transport failed")}
         />
       )}
+      <CropOverlay
+        wrapRef={wrapRef}
+        viewRef={view}
+        effScaleRef={effScale}
+        onRefresh={() => void refresh()}
+      />
       {error && (
         <div style={{ position: "absolute", color: "var(--error)" }}>
           {error}

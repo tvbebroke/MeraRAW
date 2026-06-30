@@ -2,6 +2,7 @@ import type { ReactElement } from "react";
 import type { ImageMeta } from "../../ipc/types";
 import { useUiStore } from "../../state/uiStore";
 import { MasksPanel } from "../MasksPanel";
+import { CropPanel } from "./CropPanel";
 import { DevelopRail } from "./DevelopRail";
 import { PresetsPanel } from "./PresetsPanel";
 import { Icon } from "./widgets";
@@ -15,19 +16,6 @@ const TABS: { id: RightToolTab; label: string; icon: (p: { size?: number }) => R
   { id: "remove", label: "Remove", icon: Icon.Remove },
   { id: "masking", label: "Masking", icon: Icon.Mask },
 ];
-
-function CropPanel() {
-  return (
-    <div className="lr-rail-panel">
-      <header className="lr-rail-panel-head">
-        <h2>Crop</h2>
-      </header>
-      <div className="lr-rail-panel-body">
-        <p className="muted sm">Straighten, rotate, and crop — coming soon. Press <kbd>R</kbd> to open this panel.</p>
-      </div>
-    </div>
-  );
-}
 
 function RemovePanel() {
   return (

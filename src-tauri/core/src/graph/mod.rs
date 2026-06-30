@@ -50,6 +50,7 @@ pub struct RenderGraph {
     out_tex: Option<wgpu::Texture>,
     cache_size: Option<(u32, u32)>,
     last_view_key: Option<[u32; 5]>,
+    last_crop_key: Option<u64>,
     /// First dirty stage index (NODES.len() = mask stage). usize::MAX = clean.
     dirty_from: usize,
     pub last_passes_run: Vec<String>,

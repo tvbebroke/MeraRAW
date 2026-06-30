@@ -61,6 +61,8 @@ export interface ViewParams {
   scale: number | null;
   centerX: number;
   centerY: number;
+  /** When true, render full master for crop-tool overlay editing. */
+  cropPreview?: boolean;
 }
 
 export interface FrameInfo {

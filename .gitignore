@@ -11,3 +11,4 @@ src-tauri/gen/schemas/
 .env.local
 scripts/license-private.pem
 meraraw-derivatives/
+.preset-import-tmp/

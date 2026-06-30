@@ -187,6 +187,21 @@ fn build_registry() -> BTreeMap<&'static str, ParamSpec> {
             specs.push(f32_spec(path, -100.0, 100.0, 0.0, lbl, 1.0, "HSL"));
         }
     }
+    // ---- crop (non-destructive reframe) ----
+    specs.extend([
+        f32_spec("crop.left", 0.0, 1.0, 0.0, "Left", 0.001, "Crop"),
+        f32_spec("crop.top", 0.0, 1.0, 0.0, "Top", 0.001, "Crop"),
+        f32_spec("crop.right", 0.0, 1.0, 1.0, "Right", 0.001, "Crop"),
+        f32_spec("crop.bottom", 0.0, 1.0, 1.0, "Bottom", 0.001, "Crop"),
+        f32_spec("crop.angle", -45.0, 45.0, 0.0, "Angle", 0.01, "Crop"),
+        f32_spec("crop.rotate_90", 0.0, 3.0, 0.0, "Rotate 90", 1.0, "Crop"),
+        f32_spec("crop.flip_h", 0.0, 1.0, 0.0, "Flip H", 1.0, "Crop"),
+        f32_spec("crop.flip_v", 0.0, 1.0, 0.0, "Flip V", 1.0, "Crop"),
+        f32_spec("crop.aspect_locked", 0.0, 1.0, 0.0, "Aspect Lock", 1.0, "Crop"),
+        f32_spec("crop.aspect_w", 0.0, 100.0, 0.0, "Aspect W", 1.0, "Crop"),
+        f32_spec("crop.aspect_h", 0.0, 100.0, 0.0, "Aspect H", 1.0, "Crop"),
+        f32_spec("crop.constrain_crop", 0.0, 1.0, 1.0, "Constrain", 1.0, "Crop"),
+    ]);
     for s in specs {
         m.insert(s.path, s);
     }

@@ -20,7 +20,7 @@ function ensureInit() {
 
     if (app?.getMode() === "develop") {
       if (ui.tool === "brush") scopes.push("tool:brush");
-      if (ui.rightRailTab === "crop") scopes.push("tool:crop");
+      if (ui.cropActive || ui.rightRailTab === "crop") scopes.push("tool:crop");
       if (ui.rightRailTab === "remove") scopes.push("tool:spot");
     }
 
@@ -38,6 +38,24 @@ export function useKeyboardShortcuts(enabled = true) {
     ensureInit();
 
     function onKeyDown(e: KeyboardEvent) {
+      const ui = useUiStore.getState();
+      if (ui.cropActive && getAppKeyboardContext()?.getMode() === "develop") {
+        if (e.key === "Enter") {
+          ui.exitCropTool(true);
+          e.preventDefault();
+          return;
+        }
+        if (e.key === "Escape") {
+          ui.exitCropTool(false);
+          e.preventDefault();
+          return;
+        }
+        if (e.key === "h" || e.key === "H") {
+          ui.toggleCropOverlayVisible();
+          e.preventDefault();
+          return;
+        }
+      }
       void dispatchKeyEvent(e);
     }
 

@@ -228,6 +228,40 @@ export function listPresets(): Promise<string[]> {
   return invoke<string[]>("list_presets");
 }
 
+export interface PresetCatalogEntry {
+  id: string;
+  label: string;
+  tags: string[];
+}
+
+/** Preset style categories (searchable in Presets panel). */
+export const PRESET_TAGS = [
+  "Natural",
+  "Bright & Airy",
+  "Moody",
+  "Cinematic",
+  "Film",
+  "Vintage",
+  "Matte",
+  "Warm",
+  "Cool",
+  "Vibrant",
+  "Muted",
+  "Pastel",
+  "High Contrast",
+  "Black & White",
+  "Dark",
+  "Dreamy",
+  "Editorial",
+  "Clean",
+  "Earthy",
+  "Teal & Orange",
+] as const;
+
+export function listPresetCatalog(): Promise<PresetCatalogEntry[]> {
+  return invoke<PresetCatalogEntry[]>("list_preset_catalog");
+}
+
 export function applyPreset(name: string): Promise<DocDelta> {
   return invoke<DocDelta>("apply_preset", { name });
 }

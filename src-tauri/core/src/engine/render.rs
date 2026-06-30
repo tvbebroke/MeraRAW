@@ -213,6 +213,7 @@ impl Engine {
             scale: Some(scale),
             center_x: 0.5,
             center_y: 0.5,
+            crop_preview: false,
         };
         let seg_views: std::collections::HashMap<String, wgpu::TextureView> = cur
             .masks_gpu

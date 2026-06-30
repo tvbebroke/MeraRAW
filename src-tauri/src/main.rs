@@ -112,6 +112,7 @@ fn main() {
             commands::save_preset,
             commands::export_image,
             commands::list_presets,
+            commands::list_preset_catalog,
             commands::apply_preset,
             commands::get_perf_stats,
             commands::get_stats,
@@ -150,6 +151,18 @@ fn main() {
             license::license_sign_in_and_activate,
         ])
         .setup(move |app| {
+            if std::env::var("MERATECH_BUNDLED_PRESETS").is_err() {
+                if let Ok(res) = app.path().resolve(
+                    "presets/bundled",
+                    tauri::path::BaseDirectory::Resource,
+                ) {
+                    if res.is_dir() {
+                        std::env::set_var("MERATECH_BUNDLED_PRESETS", &res);
+                        tracing::info!(dir = %res.display(), "bundled presets dir");
+                    }
+                }
+            }
+
             // The window-state plugin can restore a position on a monitor
             // that's since been disconnected, leaving the window invisible.
             // If the restored frame isn't on any current display, recenter.

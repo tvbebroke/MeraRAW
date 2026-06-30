@@ -70,6 +70,7 @@ fn main() {
         scale: Some(scale),
         center_x: 0.5,
         center_y: 0.5,
+        crop_preview: false,
     };
     let t0 = std::time::Instant::now();
     let frame = graph

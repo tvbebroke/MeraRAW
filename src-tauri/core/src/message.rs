@@ -298,6 +298,9 @@ pub enum EngineMsg {
     ListPresets {
         reply: oneshot::Sender<Vec<String>>,
     },
+    ListPresetCatalog {
+        reply: oneshot::Sender<Vec<crate::doc::PresetCatalogEntry>>,
+    },
     ApplyPresetByName {
         name: String,
         reply: oneshot::Sender<Result<crate::ops::DocDelta, CoreError>>,

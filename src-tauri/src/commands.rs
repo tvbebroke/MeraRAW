@@ -370,6 +370,13 @@ pub async fn list_presets(engine: State<'_, EngineHandle>) -> Result<Vec<String>
 }
 
 #[tauri::command]
+pub async fn list_preset_catalog(
+    engine: State<'_, EngineHandle>,
+) -> Result<Vec<meratech_core::doc::PresetCatalogEntry>, AppError> {
+    Ok(engine.list_preset_catalog().await?)
+}
+
+#[tauri::command]
 pub async fn apply_preset(
     engine: State<'_, EngineHandle>,
     name: String,

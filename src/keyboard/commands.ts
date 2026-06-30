@@ -1,4 +1,10 @@
 import { applyParamBatch, redo, setParam, snapshot, undo } from "../ipc/commands";
+import { applyCropParams, resetCropModule } from "../crop/cropActions";
+import {
+  applyAspectToRect,
+  flipOrientation,
+  readCropFromDoc,
+} from "../crop/cropMath";
 import { useDocStore } from "../state/docStore";
 import { useUiStore } from "../state/uiStore";
 import { getAppKeyboardContext, getFilmstripKeyboardContext, getLibraryKeyboardContext } from "./context";
@@ -242,10 +248,40 @@ const HANDLERS: Record<string, (b: ResolvedBinding) => void | Promise<void>> = {
     ui().setTool(ui().tool === "wb" ? "pan" : "wb");
     ui().setRightRailTab("edit");
   },
-  "develop-module---tools:crop-tool": () => ui().setRightRailTab("crop"),
-  "develop-module---tools:constrain-aspect-ratio--crop": () => notify("Constrain aspect — coming soon"),
-  "develop-module---tools:toggle-crop-orientation": () => notify("Crop orientation — coming soon"),
-  "develop-module---tools:reset-crop": () => notify("Reset crop — coming soon"),
+  "develop-module---tools:crop-tool": () => {
+    const u = ui();
+    if (u.cropActive) u.exitCropTool(true);
+    else u.enterCropTool();
+  },
+  "develop-module---tools:constrain-aspect-ratio--crop": () => {
+    const doc = useDocStore.getState().doc;
+    const crop = readCropFromDoc(doc?.modules);
+    const next = !crop.aspectLocked;
+    ui().setCropAspectLocked(next);
+    void applyCropParams({ ...crop, aspectLocked: next }).then(reconcile());
+  },
+  "develop-module---tools:toggle-crop-orientation": () => {
+    const doc = useDocStore.getState().doc;
+    const dims = ui().imageDims;
+    const crop = readCropFromDoc(doc?.modules);
+    if (!dims || crop.aspectW <= 0) return;
+    const [w, h] = flipOrientation(crop.aspectW, crop.aspectH);
+    void applyCropParams({
+      ...crop,
+      aspectW: w,
+      aspectH: h,
+      aspectLocked: true,
+      rect: applyAspectToRect(crop.rect, w / h, dims.w, dims.h),
+    }).then(reconcile());
+  },
+  "develop-module---tools:reset-crop": () => {
+    void resetCropModule().then(reconcile());
+  },
+  "develop-module---tools:cycle-crop-grid-overlay": () => ui().cycleCropOverlay(),
+  "develop-module---tools:cycle-crop-overlay-orientation": () => ui().rotateCropOverlay(),
+  "develop-module---targeted-adjustment--tat----masks:crop-to-original": () => {
+    void resetCropModule().then(reconcile());
+  },
   "develop-module---tools:spot-removal-tool": () => ui().setRightRailTab("remove"),
   "develop-module---tools:toggle-clone-heal": () => notify("Clone/Heal toggle — coming soon"),
   "develop-module---tools:adjustment-brush": () => {

@@ -27,7 +27,7 @@ mod doc_ops;
 mod export;
 mod render;
 
-use doc_ops::{list_presets, load_preset};
+use doc_ops::{list_preset_catalog, list_presets, load_preset};
 
 // Small enough to feel immediate on a slider drag, large enough to still
 // coalesce op storms (the timer resets on each op, so a burst renders once).
@@ -377,6 +377,13 @@ impl EngineHandle {
 
     pub async fn list_presets(&self) -> Result<Vec<String>, EngineError> {
         self.request(|reply| EngineMsg::ListPresets { reply }).await
+    }
+
+    pub async fn list_preset_catalog(
+        &self,
+    ) -> Result<Vec<crate::doc::PresetCatalogEntry>, EngineError> {
+        self.request(|reply| EngineMsg::ListPresetCatalog { reply })
+            .await
     }
 
     pub async fn apply_preset_by_name(
@@ -976,6 +983,9 @@ impl Engine {
             }
             EngineMsg::ListPresets { reply } => {
                 let _ = reply.send(list_presets());
+            }
+            EngineMsg::ListPresetCatalog { reply } => {
+                let _ = reply.send(list_preset_catalog());
             }
             EngineMsg::ApplyPresetByName { name, reply } => {
                 let result = (|| {

@@ -12,17 +12,30 @@
 #   export R2_ACCESS_KEY_ID="..."
 #   export R2_SECRET_ACCESS_KEY="..."
 #   export R2_BUCKET_NAME="meraraw-releases"
-#   export R2_OBJECT_KEY="MeraRAW Beta 0.1.0.dmg"
+#   export R2_OBJECT_KEY="MeraRAW Beta 0.1.2.dmg"
 #
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-VERSION="0.1.1"
+if [[ -f .env ]]; then
+  set -a
+  # shellcheck disable=SC1091
+  source .env
+  set +a
+fi
+
+VERSION="$(node -p "require('./src-tauri/tauri.conf.json').version")"
 DMG_NAME="MeraRAW Beta ${VERSION}.dmg"
-BUNDLE_DIR="src-tauri/target/release/bundle/dmg"
 RELEASE_DIR="release"
 
-echo "→ Building signed DMG (notarizes when APPLE_* env vars are set)…"
+if [[ -z "${APPLE_ID:-}" || -z "${APPLE_PASSWORD:-}" || -z "${APPLE_TEAM_ID:-}" ]]; then
+  echo "⚠ APPLE_ID / APPLE_PASSWORD / APPLE_TEAM_ID not set — build will sign but skip notarization."
+  echo "  Export those vars and re-run to notarize for Gatekeeper."
+else
+  echo "→ Apple notarization credentials detected."
+fi
+
+echo "→ Building MeraRAW Beta ${VERSION} (signed DMG)…"
 npm run tauri build
 
 BUILT=""
@@ -53,3 +66,5 @@ else
   echo "→ Skipping R2 upload (R2_* env vars not set)."
   echo "  Upload manually, then set Supabase R2_OBJECT_KEY to: ${DMG_NAME}"
 fi
+
+echo "→ Done. Tag: v${VERSION}"
