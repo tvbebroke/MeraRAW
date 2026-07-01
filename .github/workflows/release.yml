@@ -1,20 +1,20 @@
-# Builds MeraRAW for macOS (Apple Silicon + Intel, as separate DMGs), Windows,
-# and Linux, and produces artifacts named:
-#   MeraRAW MacOS Apple <version>.dmg
-#   MeraRAW MacOS Intel <version>.dmg
+# Builds MeraRAW for Windows and Linux (these CANNOT be cross-built from a Mac),
+# and produces artifacts named:
 #   MeraRAW Win <version>.exe
 #   MeraRAW Linux <version>.AppImage  (+ .deb)
 #
-# Tauri apps must be built ON each OS, so this uses a 4-runner matrix — you
-# cannot cross-build Windows/Linux from a Mac.
+# macOS is intentionally NOT built here: tauri.conf.json hard-codes a Developer
+# ID signingIdentity, which forces signing on every build — that succeeds
+# locally (cert is in the keychain) but fails on a CI runner that has no cert.
+# So we build + sign + notarize the two Mac DMGs locally instead, and let CI
+# handle only Windows + Linux. (To move Mac into CI later you'd add the APPLE_*
+# secrets AND a keychain-import step before the build.)
 #
 # Trigger it by pushing a tag (e.g. `git tag v0.1.3 && git push origin v0.1.3`)
 # — that also attaches the files to a GitHub Release — or run it manually from
 # the Actions tab (uploads the files as downloadable run artifacts).
 #
-# Signing/notarization is OFF by default (unsigned installers still run; users
-# click through the OS warning). To sign the macOS build in CI, add the
-# APPLE_* repo secrets (same values you export locally for release-beta.sh).
+# Windows/Linux installers are unsigned (users click through the OS warning).
 
 name: Release
 
@@ -31,16 +31,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: macos-latest
-            label: "MacOS Apple"
-            slug: macos-apple
-            rust_targets: "aarch64-apple-darwin"
-            build_args: "--target aarch64-apple-darwin"
-          - os: macos-latest
-            label: "MacOS Intel"
-            slug: macos-intel
-            rust_targets: "x86_64-apple-darwin"
-            build_args: "--target x86_64-apple-darwin"
           - os: windows-latest
             label: Win
             slug: win
@@ -89,14 +79,6 @@ jobs:
 
       - name: Build the app
         run: npm run tauri build -- ${{ matrix.build_args }}
-        env:
-          # Optional macOS signing/notarization — no-ops if the secrets aren't set.
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
-          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
 
       - name: Collect + rename installers
         id: pack
