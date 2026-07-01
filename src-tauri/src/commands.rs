@@ -653,10 +653,30 @@ pub async fn report_problem(message: String, from: Option<String>) -> Result<(),
         pct_encode("MeraRAW beta — problem report"),
         pct_encode(&body),
     );
-    // macOS: hand the mailto URL to the default mail handler.
-    std::process::Command::new("/usr/bin/open")
-        .arg(&url)
-        .spawn()
-        .map_err(|e| AppError::Internal(format!("open mail client: {e}")))?;
+    // Hand the mailto URL to the OS default mail handler.
+    let spawn = |mut cmd: std::process::Command| {
+        cmd.spawn()
+            .map(|_| ())
+            .map_err(|e| AppError::Internal(format!("open mail client: {e}")))
+    };
+    #[cfg(target_os = "macos")]
+    {
+        let mut c = std::process::Command::new("open");
+        c.arg(&url);
+        spawn(c)?;
+    }
+    #[cfg(target_os = "windows")]
+    {
+        // `start` is a cmd builtin; empty "" is the window-title arg.
+        let mut c = std::process::Command::new("cmd");
+        c.args(["/C", "start", "", &url]);
+        spawn(c)?;
+    }
+    #[cfg(all(unix, not(target_os = "macos")))]
+    {
+        let mut c = std::process::Command::new("xdg-open");
+        c.arg(&url);
+        spawn(c)?;
+    }
     Ok(())
 }

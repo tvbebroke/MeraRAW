@@ -1,0 +1,126 @@
+# Builds MeraRAW for macOS (universal: Apple Silicon + Intel), Windows, and
+# Linux, and produces artifacts named:
+#   MeraRAW MacOS <version>.dmg
+#   MeraRAW Win <version>.exe
+#   MeraRAW Linux <version>.AppImage  (+ .deb)
+#
+# Tauri apps must be built ON each OS, so this uses a 3-runner matrix — you
+# cannot cross-build Windows/Linux from a Mac.
+#
+# Trigger it by pushing a tag (e.g. `git tag v0.1.1 && git push origin v0.1.1`)
+# — that also attaches the files to a GitHub Release — or run it manually from
+# the Actions tab (uploads the files as downloadable run artifacts).
+#
+# Signing/notarization is OFF by default (unsigned installers still run; users
+# click through the OS warning). To sign the macOS build in CI, add the
+# APPLE_* repo secrets (same values you export locally for release-beta.sh).
+
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+jobs:
+  build:
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            label: MacOS
+            rust_targets: "aarch64-apple-darwin,x86_64-apple-darwin"
+            build_args: "--target universal-apple-darwin"
+          - os: windows-latest
+            label: Win
+            rust_targets: ""
+            build_args: ""
+          - os: ubuntu-22.04
+            label: Linux
+            rust_targets: ""
+            build_args: ""
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read version from package.json
+        id: ver
+        shell: bash
+        run: echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.rust_targets }}
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "src-tauri -> target"
+
+      - name: Install Linux system deps
+        if: matrix.os == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            patchelf
+
+      - name: Install frontend deps
+        run: npm ci
+
+      - name: Build the app
+        run: npm run tauri build -- ${{ matrix.build_args }}
+        env:
+          # Optional macOS signing/notarization — no-ops if the secrets aren't set.
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+
+      - name: Collect + rename installers
+        id: pack
+        shell: bash
+        run: |
+          set -e
+          shopt -s nullglob globstar
+          mkdir -p dist-release
+          v="${{ steps.ver.outputs.version }}"
+          label="${{ matrix.label }}"
+          # Only this platform's bundles exist on this runner.
+          for f in src-tauri/target/**/release/bundle/**/*.dmg \
+                   src-tauri/target/**/release/bundle/**/*.exe \
+                   src-tauri/target/**/release/bundle/**/*.msi \
+                   src-tauri/target/**/release/bundle/**/*.AppImage \
+                   src-tauri/target/**/release/bundle/**/*.deb; do
+            ext="${f##*.}"
+            dest="dist-release/MeraRAW ${label} ${v}.${ext}"
+            cp "$f" "$dest"
+            echo "packed: $dest"
+          done
+          echo "count=$(ls -1 dist-release | wc -l | tr -d ' ')" >> "$GITHUB_OUTPUT"
+          ls -la dist-release
+
+      - name: Upload run artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: MeraRAW-${{ matrix.label }}-${{ steps.ver.outputs.version }}
+          path: dist-release/*
+          if-no-files-found: error
+
+      - name: Attach to GitHub Release (tag pushes only)
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist-release/*

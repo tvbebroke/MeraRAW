@@ -693,6 +693,15 @@ pub fn encode_and_write(
         ExportFormat::Heic => {
             // No pure-Rust HEIC encoder: hand an ICC+EXIF-embedded PNG carrier
             // to macOS `sips`, which carries the profile into the HEIC.
+            // sips is macOS-only, so HEIC export is a macOS-only feature for now.
+            #[cfg(not(target_os = "macos"))]
+            {
+                return Err(CoreError::Io(
+                    "HEIC export is only available on macOS in this build — \
+                     use JPEG, PNG or TIFF."
+                        .into(),
+                ));
+            }
             let p = dir.join(format!("{stem}.heic"));
             let png = encode_png(enc, icc.as_deref(), exif.as_deref())?;
             let nanos = std::time::SystemTime::now()
