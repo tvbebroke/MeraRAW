@@ -59,7 +59,11 @@ pub async fn ping_engine(
 }
 
 pub const IMAGE_EXTENSIONS: &[&str] = &[
-    "arw", "nef", "cr2", "cr3", "dng", "raf", "orf", "rw2", "jpg", "jpeg", "png", "tif", "tiff",
+    // RAW (rawler)
+    "arw", "nef", "nrw", "cr2", "cr3", "crw", "dng", "raf", "orf", "rw2", "pef", "srw", "erf",
+    "kdc", "dcs", "dcr", "iiq", "3fr", "mef", "mos",
+    // rendered (image crate + jxl-oxide) — everything we can actually open
+    "jpg", "jpeg", "png", "tif", "tiff", "webp", "bmp", "gif", "jxl",
 ];
 
 #[tauri::command]
