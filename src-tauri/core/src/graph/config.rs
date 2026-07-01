@@ -95,7 +95,7 @@ struct GradeU {
     ranges: [f32; 4],
     width: u32,
     height: u32,
-    _p0: u32,
+    model: u32,
     _p1: u32,
 }
 
@@ -369,7 +369,7 @@ pub fn node_configs(doc: &EditDoc, as_shot_cct: f32, w: u32, h: u32) -> Vec<Node
                 ranges: [p("shadow_range"), p("highlight_range"), gc, ps],
                 width: w,
                 height: h,
-                _p0: 0,
+                model: p("model").round().clamp(0.0, 2.0) as u32,
                 _p1: 0,
             }));
         }

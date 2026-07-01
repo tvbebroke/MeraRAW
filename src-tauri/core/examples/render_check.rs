@@ -66,6 +66,23 @@ fn main() {
         }
     }
 
+    // 6th arg: grade model (0=perceptual, 1=classic, 2=light). When present,
+    // push a strong teal-shadow / warm-highlight split so the model's
+    // character is obvious in the output.
+    if let Some(gm) = std::env::args().nth(5) {
+        for (p, v) in [
+            ("color_grade.model", json!(gm.parse::<f32>().unwrap_or(0.0))),
+            ("color_grade.shadows_hue", json!(215.0)),
+            ("color_grade.shadows_sat", json!(55.0)),
+            ("color_grade.highlights_hue", json!(45.0)),
+            ("color_grade.highlights_sat", json!(55.0)),
+            ("color_grade.perceptual_sat", json!(15.0)),
+        ] {
+            apply_op(&mut doc, &Op::SetParam { path: p.into(), value: v }).unwrap();
+        }
+        println!("grade model = {gm}");
+    }
+
     // fit render at 1200px wide-ish
     let scale = 1200.0 / payload.width.max(payload.height) as f32;
     let view = ViewParams {

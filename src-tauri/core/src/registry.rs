@@ -115,6 +115,10 @@ fn build_registry() -> BTreeMap<&'static str, ParamSpec> {
         f32_spec("detail.sharpen_radius", 0.5, 3.0, 1.0, "Sharpen Radius", 0.1, "Detail"),
         f32_spec("detail.sharpen_detail", 0.0, 100.0, 25.0, "Sharpen Detail", 1.0, "Detail"),
         // ---- slot 5: color_grade (schema §3.5) ----
+        // Grading model: 0=Perceptual (Oklab, constant-hue), 1=Classic (RGB
+        // offset wheels, hue crosstalk), 2=Light (LMS von Kries). Selects HOW
+        // the 3-way wheels inject color; identity at zero wheels for all models.
+        f32_spec("color_grade.model", 0.0, 2.0, 0.0, "Model", 1.0, "Color Grade"),
         f32_spec("color_grade.shadows_hue", 0.0, 360.0, 0.0, "Shadow Hue", 1.0, "Color Grade"),
         f32_spec("color_grade.shadows_sat", -100.0, 100.0, 0.0, "Shadow Sat", 1.0, "Color Grade"),
         f32_spec("color_grade.shadows_lum", -100.0, 100.0, 0.0, "Shadow Lum", 1.0, "Color Grade"),

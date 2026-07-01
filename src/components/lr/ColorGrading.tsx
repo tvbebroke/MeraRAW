@@ -12,6 +12,43 @@ import { ParamSlider } from "./widgets";
 const W = 96;
 const R = W / 2 - 6;
 
+// Grading models — must match u.model in grade.wgsl / registry color_grade.model.
+const GRADE_MODELS = [
+  { id: 0, label: "Perceptual", hint: "Oklab — constant-hue, clean & modern" },
+  { id: 1, label: "Classic", hint: "RGB wheels — punchy, hue crosstalk" },
+  { id: 2, label: "Light", hint: "LMS von Kries — filmic, colored-light" },
+] as const;
+
+function ModelSelector() {
+  const doc = useDocStore((s) => s.doc);
+  const reconcile = useDocStore((s) => s.reconcile);
+  const current = Math.round(
+    (doc?.modules?.color_grade?.model as number | undefined) ?? 0,
+  );
+  const active = GRADE_MODELS.find((m) => m.id === current) ?? GRADE_MODELS[0];
+  return (
+    <div className="cg-models-wrap">
+      <div className="cg-models" role="radiogroup" aria-label="Grading model">
+        {GRADE_MODELS.map((m) => (
+          <button
+            key={m.id}
+            role="radio"
+            aria-checked={current === m.id}
+            className={`cg-model ${current === m.id ? "active" : ""}`}
+            title={m.hint}
+            onClick={() =>
+              setParam("color_grade.model", m.id).then(reconcile).catch(() => {})
+            }
+          >
+            {m.label}
+          </button>
+        ))}
+      </div>
+      <div className="cg-model-hint">{active.hint}</div>
+    </div>
+  );
+}
+
 function readVal(
   doc: ReturnType<typeof useDocStore.getState>["doc"],
   selectedMask: string | null,
@@ -127,6 +164,7 @@ export function ColorGrading({
 }) {
   return (
     <div className="cg">
+      <ModelSelector />
       <div className="cg-row">
         <Wheel zone="shadows" label="Shadows" />
         <Wheel zone="midtones" label="Midtones" />

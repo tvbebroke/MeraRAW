@@ -30,6 +30,7 @@ import { RightRail } from "./components/lr/RightRail";
 import { ViewportToolbar } from "./components/lr/Toolbar";
 import { Icon } from "./components/lr/widgets";
 import { Filmstrip, Library } from "./components/Library";
+import { Education } from "./components/Education";
 import { ReportProblem } from "./components/ReportProblem";
 import { setAppKeyboardContext } from "./keyboard/context";
 import { useKeyboardShortcuts } from "./keyboard/useKeyboardShortcuts";
@@ -67,7 +68,7 @@ export default function App() {
   const helpOverlay = useUiStore((s) => s.helpOverlay);
   const setHelpOverlay = useUiStore((s) => s.setHelpOverlay);
   const [meta, setMeta] = useState<ImageMeta | null>(null);
-  const [mode, setMode] = useState<"library" | "develop">("library");
+  const [mode, setMode] = useState<"library" | "develop" | "education">("library");
   const [showExport, setShowExport] = useState(false);
   const [exportQueue, setExportQueue] = useState<string[] | undefined>();
   const [importReviewPath, setImportReviewPath] = useState<string | null>(null);
@@ -92,7 +93,7 @@ export default function App() {
       triggerExportPrevious: () => {
         notifyExportPrevious();
       },
-      getMode: () => mode,
+      getMode: () => (mode === "education" ? "library" : mode),
       hasImage: () => meta !== null,
     });
     return () => setAppKeyboardContext(null);
@@ -223,6 +224,12 @@ export default function App() {
           >
             Develop
           </button>
+          <button
+            className={mode === "education" ? "tab active" : "tab"}
+            onClick={() => setMode("education")}
+          >
+            Education
+          </button>
         </div>
         <div className="topbar-right">
           <button className="tab" onClick={handleOpen}>
@@ -238,7 +245,9 @@ export default function App() {
       </div>
       )}
 
-      {mode === "library" ? (
+      {mode === "education" ? (
+        <Education />
+      ) : mode === "library" ? (
         <Library
           onOpen={(p) => void open(p)}
           onExportSelection={(paths) => {
