@@ -66,8 +66,15 @@ impl RawlerDecoder {
         cct: Option<f32>,
     ) -> ImageMeta {
         let exif = &md.exif;
+        let format = path
+            .extension()
+            .map(|e| e.to_string_lossy().to_uppercase())
+            .unwrap_or_else(|| "RAW".into());
         ImageMeta {
             path: path.to_string_lossy().into_owned(),
+            kind: crate::raw::ImageKind::Raw,
+            format,
+            bit_depth: 0, // RAW depth varies (12/14/16); omit rather than guess
             camera_make: md.make.clone(),
             camera_model: md.model.clone(),
             lens: exif

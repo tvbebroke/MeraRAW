@@ -3,18 +3,47 @@
 //! contained here if coverage demands it).
 
 mod rawler_decoder;
+mod standard_decoder;
 
 pub use rawler_decoder::RawlerDecoder;
+pub use standard_decoder::StandardDecoder;
+
+/// Pick the right decoder for a path: RAW extensions → rawler, standard image
+/// extensions (JPEG/PNG/TIFF/WebP/…) → the rendered-image decoder.
+pub fn decoder_for(path: &Path) -> Box<dyn Decoder> {
+    let raw = RawlerDecoder::default();
+    if raw.probe(path) {
+        Box::new(raw)
+    } else {
+        Box::new(StandardDecoder)
+    }
+}
 
 use crate::error::CoreError;
 use crate::image::RgbF32Buf;
 use std::path::Path;
+
+/// Whether the source is sensor data (needs full RAW development) or an
+/// already-rendered image (JPEG/PNG/… — display-referred, must skip the
+/// camera stages so it isn't double-processed).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum ImageKind {
+    Raw,
+    Rendered,
+}
 
 /// Metadata surfaced to the UI + assistant. serde camelCase for the wire.
 #[derive(Debug, Clone, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ImageMeta {
     pub path: String,
+    /// Sensor RAW vs already-rendered image (drives pipeline + UI badge).
+    pub kind: ImageKind,
+    /// Uppercase format tag for the UI, e.g. "ARW", "JPEG", "PNG".
+    pub format: String,
+    /// Source bit depth per channel (8/14/16/32) — for the UI.
+    pub bit_depth: u8,
     pub camera_make: String,
     pub camera_model: String,
     pub lens: Option<String>,

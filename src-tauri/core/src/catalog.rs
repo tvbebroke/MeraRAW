@@ -914,6 +914,9 @@ mod tests {
     fn meta_stub(path: &str) -> ImageMeta {
         ImageMeta {
             path: path.into(),
+            kind: crate::raw::ImageKind::Raw,
+            format: "ARW".into(),
+            bit_depth: 0,
             camera_make: "Sony".into(),
             camera_model: "ILCE-7M3".into(),
             lens: None,

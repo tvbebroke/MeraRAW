@@ -272,6 +272,23 @@ export default function App() {
         </span>
         <span>{gpuAdapter ?? "—"}</span>
         {meta && (
+          <span
+            className={`file-badge ${meta.kind === "raw" ? "is-raw" : "is-rendered"}`}
+            title={
+              meta.kind === "raw"
+                ? `${meta.format} — camera RAW (full sensor data)`
+                : `${meta.format} — already-rendered image${meta.bitDepth ? `, ${meta.bitDepth}-bit` : ""}`
+            }
+          >
+            {meta.format}
+            {meta.kind === "raw"
+              ? " · RAW"
+              : meta.bitDepth
+                ? ` · ${meta.bitDepth}-bit`
+                : ""}
+          </span>
+        )}
+        {meta && (
           <span className="status-meta">
             {meta.cameraModel} · {meta.lens ?? "—"} · ISO {meta.iso ?? "—"} ·{" "}
             {meta.shutter ?? "—"} · {meta.aperture ? `f/${meta.aperture.toFixed(1)}` : "—"}{" "}

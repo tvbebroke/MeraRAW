@@ -297,6 +297,9 @@ mod tests {
         let index = ProfileIndex::embedded();
         let meta = ImageMeta {
             path: "/x.ARW".into(),
+            kind: crate::raw::ImageKind::Raw,
+            format: "ARW".into(),
+            bit_depth: 0,
             camera_make: "SONY".into(),
             camera_model: "ILCE-7M4".into(),
             lens: None,

@@ -132,6 +132,19 @@ code { background: #222; padding: 1px 4px; border-radius: 3px; }
 .statusbar .ok { color: var(--ok); }
 .statusbar .err, .statusbar .status-msg.err { color: var(--error); }
 .status-meta { color: var(--text-faint); overflow: hidden; text-overflow: ellipsis; }
+/* File-type badge — RAW (amber) vs rendered (blue) so you always know which
+   file you're editing at a glance. */
+.file-badge {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  padding: 1px 6px;
+  border-radius: 3px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.file-badge.is-raw { color: #241a08; background: #e0a34a; }
+.file-badge.is-rendered { color: #cfe0f2; background: #34506b; }
 .status-msg { margin-left: auto; }
 
 /* ---------- develop three-zone ---------- */

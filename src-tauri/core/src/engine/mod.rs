@@ -15,7 +15,7 @@ use crate::message::{
 };
 use crate::ops::{self, DocDelta, History, Op};
 use crate::profile::DcpProfile;
-use crate::raw::{Decoder, ImageMeta, RawlerDecoder};
+use crate::raw::ImageMeta;
 use crate::sidecar;
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
@@ -467,7 +467,6 @@ impl CurrentImage {
 struct Engine {
     gpu: Option<GpuContext>,
     graph: Option<RenderGraph>,
-    decoder: RawlerDecoder,
     events: Option<mpsc::UnboundedSender<EngineEvent>>,
     self_tx: mpsc::Sender<EngineMsg>,
     current: Option<CurrentImage>,
@@ -519,7 +518,6 @@ async fn run(
     let mut engine = Engine {
         gpu,
         graph: None,
-        decoder: RawlerDecoder::default(),
         events,
         self_tx,
         current: None,

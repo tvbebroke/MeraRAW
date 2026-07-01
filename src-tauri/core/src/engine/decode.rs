@@ -11,14 +11,15 @@ impl Engine {
         self.generation += 1;
         let generation = self.generation;
 
-        if !self.decoder.probe(&path) {
+        let decoder = crate::raw::decoder_for(&path);
+        if !decoder.probe(&path) {
             let _ = reply.send(Err(CoreError::Decode(format!(
                 "unsupported file: {}",
                 path.display()
             ))));
             return;
         }
-        let mut meta = match self.decoder.metadata(&path) {
+        let mut meta = match decoder.metadata(&path) {
             Ok(m) => m,
             Err(e) => {
                 let _ = reply.send(Err(e));
@@ -101,7 +102,7 @@ impl Engine {
             std::thread::Builder::new()
                 .name("preview-worker".into())
                 .spawn(move || {
-                    let dec = RawlerDecoder::default();
+                    let dec = crate::raw::decoder_for(&path);
                     match dec.embedded_preview(&path, 2560) {
                         Ok(Some((rgba, width, height))) => {
                             let _ = tx.blocking_send(EngineMsg::PreviewDone {
@@ -124,8 +125,7 @@ impl Engine {
             std::thread::Builder::new()
                 .name("decode-worker".into())
                 .spawn(move || {
-                    use crate::raw::Decoder;
-                    let dec = RawlerDecoder::default();
+                    let dec = crate::raw::decoder_for(&path);
                     let started = Instant::now();
                     let result = dec
                         .decode_with_profile(&path, profile_path.as_deref())

@@ -740,6 +740,9 @@ mod tests {
     fn test_meta() -> ImageMeta {
         ImageMeta {
             path: "/x/DSC0001.ARW".into(),
+            kind: crate::raw::ImageKind::Raw,
+            format: "ARW".into(),
+            bit_depth: 0,
             camera_make: "SONY".into(),
             camera_model: "ILCE-7M4".into(),
             lens: Some("FE 50mm F1.8".into()),

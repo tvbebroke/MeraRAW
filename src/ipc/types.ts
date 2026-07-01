@@ -36,6 +36,12 @@ export interface BrowseRoot {
 
 export interface ImageMeta {
   path: string;
+  /** "raw" = sensor data; "rendered" = already-processed (JPEG/PNG/…). */
+  kind: "raw" | "rendered";
+  /** Uppercase format tag, e.g. "ARW", "JPEG", "PNG". */
+  format: string;
+  /** Source bit depth per channel (8/16); 0 = unknown (RAW). */
+  bitDepth: number;
   cameraMake: string;
   cameraModel: string;
   lens: string | null;
