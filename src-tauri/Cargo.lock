@@ -2611,6 +2611,7 @@ dependencies = [
  "bytemuck",
  "half",
  "image",
+ "jxl-oxide",
  "png 0.17.16",
  "rawler",
  "rusqlite",

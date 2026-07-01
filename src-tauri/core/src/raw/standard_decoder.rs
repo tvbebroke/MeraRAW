@@ -13,7 +13,53 @@ use crate::error::CoreError;
 use crate::image::RgbF32Buf;
 use std::path::Path;
 
-pub const STD_EXTENSIONS: &[&str] = &["jpg", "jpeg", "png", "tif", "tiff", "webp", "bmp", "gif"];
+pub const STD_EXTENSIONS: &[&str] =
+    &["jpg", "jpeg", "png", "tif", "tiff", "webp", "bmp", "gif", "jxl"];
+
+fn is_jxl(path: &Path) -> bool {
+    path.extension()
+        .map(|e| e.eq_ignore_ascii_case("jxl"))
+        .unwrap_or(false)
+}
+
+/// Decode a JPEG XL to interleaved sRGB-encoded RGB f32 (pure-Rust jxl-oxide).
+/// Output is in the file's color encoding (sRGB for the common case), which
+/// the caller linearizes like any other rendered image.
+fn decode_jxl_srgb(path: &Path) -> Result<(Vec<f32>, usize, usize), CoreError> {
+    use jxl_oxide::JxlImage;
+    let image = JxlImage::builder()
+        .open(path)
+        .map_err(|e| CoreError::Decode(format!("jxl open: {e}")))?;
+    let render = image
+        .render_frame(0)
+        .map_err(|e| CoreError::Decode(format!("jxl render: {e}")))?;
+    let fb = render.image_all_channels();
+    let (w, h, ch) = (fb.width(), fb.height(), fb.channels());
+    let buf = fb.buf();
+    let mut rgb = vec![0f32; w * h * 3];
+    for i in 0..(w * h) {
+        let base = i * ch;
+        if ch >= 3 {
+            rgb[i * 3] = buf[base];
+            rgb[i * 3 + 1] = buf[base + 1];
+            rgb[i * 3 + 2] = buf[base + 2];
+        } else {
+            let v = buf[base]; // grayscale
+            rgb[i * 3] = v;
+            rgb[i * 3 + 1] = v;
+            rgb[i * 3 + 2] = v;
+        }
+    }
+    Ok((rgb, w, h))
+}
+
+fn jxl_dimensions(path: &Path) -> Result<(u32, u32), CoreError> {
+    use jxl_oxide::JxlImage;
+    let image = JxlImage::builder()
+        .open(path)
+        .map_err(|e| CoreError::Decode(format!("jxl open: {e}")))?;
+    Ok((image.width(), image.height()))
+}
 
 /// linear sRGB → linear Rec.2020, from the pinned color-science matrices.
 fn srgb_to_rec2020() -> Mat3 {
@@ -37,8 +83,27 @@ fn format_tag(path: &Path) -> String {
     match e.as_str() {
         "jpg" | "jpeg" => "JPEG".into(),
         "tif" | "tiff" => "TIFF".into(),
+        "jxl" => "JXL".into(),
         other => other.to_uppercase(),
     }
+}
+
+/// linear Rec.2020 working data from interleaved sRGB-encoded RGB f32.
+fn srgb_rgb_to_working(src: &[f32], w: usize, h: usize) -> Vec<f32> {
+    let m = srgb_to_rec2020();
+    let mut data = vec![0f32; w * h * 3];
+    for i in 0..(w * h) {
+        let lin = [
+            srgb_eotf(src[i * 3]),
+            srgb_eotf(src[i * 3 + 1]),
+            srgb_eotf(src[i * 3 + 2]),
+        ];
+        let rec = mat_vec(&m, lin);
+        data[i * 3] = rec[0].max(0.0);
+        data[i * 3 + 1] = rec[1].max(0.0);
+        data[i * 3 + 2] = rec[2].max(0.0);
+    }
+    data
 }
 
 fn rendered_meta(path: &Path, w: u32, h: u32, bit_depth: u8) -> ImageMeta {
@@ -77,9 +142,13 @@ impl Decoder for StandardDecoder {
     }
 
     fn metadata(&self, path: &Path) -> Result<ImageMeta, CoreError> {
-        // Cheap: reads only the header for dimensions (depth refined on decode).
-        let (w, h) = image::image_dimensions(path)
-            .map_err(|e| CoreError::Decode(format!("image dims: {e}")))?;
+        // Cheap: header-only dimensions (depth refined on full decode).
+        let (w, h) = if is_jxl(path) {
+            jxl_dimensions(path)?
+        } else {
+            image::image_dimensions(path)
+                .map_err(|e| CoreError::Decode(format!("image dims: {e}")))?
+        };
         Ok(rendered_meta(path, w, h, 8))
     }
 
@@ -88,6 +157,16 @@ impl Decoder for StandardDecoder {
         path: &Path,
         max_dim: u32,
     ) -> Result<Option<(Vec<u8>, u32, u32)>, CoreError> {
+        if is_jxl(path) {
+            // No embedded preview in JXL — decode then downscale.
+            let (rgb, w, h) = decode_jxl_srgb(path)?;
+            let full = image::Rgb32FImage::from_raw(w as u32, h as u32, rgb)
+                .ok_or_else(|| CoreError::Decode("jxl buffer".into()))?;
+            let thumb = image::DynamicImage::ImageRgb32F(full).thumbnail(max_dim, max_dim);
+            let rgba = thumb.to_rgba8();
+            let (tw, th) = (rgba.width(), rgba.height());
+            return Ok(Some((rgba.into_raw(), tw, th)));
+        }
         let img = image::open(path).map_err(|e| CoreError::Decode(format!("image open: {e}")))?;
         let thumb = img.thumbnail(max_dim, max_dim); // aspect-preserving downscale
         let rgba = thumb.to_rgba8();
@@ -100,33 +179,26 @@ impl Decoder for StandardDecoder {
         path: &Path,
         _profile_path: Option<&Path>,
     ) -> Result<DecodedImage, CoreError> {
-        let dynimg =
-            image::open(path).map_err(|e| CoreError::Decode(format!("image open: {e}")))?;
-        let bit_depth = match dynimg.color() {
-            image::ColorType::Rgb16
-            | image::ColorType::Rgba16
-            | image::ColorType::L16
-            | image::ColorType::La16 => 16,
-            _ => 8,
+        // Get interleaved sRGB-encoded RGB f32 + source bit depth.
+        let (src, w, h, bit_depth) = if is_jxl(path) {
+            let (rgb, w, h) = decode_jxl_srgb(path)?;
+            (rgb, w, h, 0u8) // JXL depth varies (8/16/f32) — omit rather than guess
+        } else {
+            let dynimg =
+                image::open(path).map_err(|e| CoreError::Decode(format!("image open: {e}")))?;
+            let bit_depth = match dynimg.color() {
+                image::ColorType::Rgb16
+                | image::ColorType::Rgba16
+                | image::ColorType::L16
+                | image::ColorType::La16 => 16,
+                _ => 8,
+            };
+            // to_rgb32f scales samples to [0,1] WITHOUT gamma decoding — sRGB-encoded.
+            let rgb = dynimg.to_rgb32f();
+            let (w, h) = (rgb.width() as usize, rgb.height() as usize);
+            (rgb.into_raw(), w, h, bit_depth)
         };
-        // to_rgb32f scales the encoded samples to [0,1] WITHOUT gamma decoding,
-        // so these are sRGB-encoded values we then linearize ourselves.
-        let rgb = dynimg.to_rgb32f();
-        let (w, h) = (rgb.width() as usize, rgb.height() as usize);
-        let src = rgb.as_raw(); // len w*h*3, interleaved, sRGB-encoded
-        let m = srgb_to_rec2020();
-        let mut data = vec![0f32; w * h * 3];
-        for i in 0..(w * h) {
-            let lin = [
-                srgb_eotf(src[i * 3]),
-                srgb_eotf(src[i * 3 + 1]),
-                srgb_eotf(src[i * 3 + 2]),
-            ];
-            let rec = mat_vec(&m, lin);
-            data[i * 3] = rec[0].max(0.0);
-            data[i * 3 + 1] = rec[1].max(0.0);
-            data[i * 3 + 2] = rec[2].max(0.0);
-        }
+        let data = srgb_rgb_to_working(&src, w, h);
         let working = RgbF32Buf {
             width: w,
             height: h,
