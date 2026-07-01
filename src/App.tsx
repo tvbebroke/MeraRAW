@@ -281,11 +281,8 @@ export default function App() {
             }
           >
             {meta.format}
-            {meta.kind === "raw"
-              ? " · RAW"
-              : meta.bitDepth
-                ? ` · ${meta.bitDepth}-bit`
-                : ""}
+            {meta.kind === "raw" ? " · RAW" : ""}
+            {meta.bitDepth ? ` · ${meta.bitDepth}-bit` : ""}
           </span>
         )}
         {meta && (

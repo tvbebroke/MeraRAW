@@ -66,15 +66,22 @@ impl RawlerDecoder {
         cct: Option<f32>,
     ) -> ImageMeta {
         let exif = &md.exif;
-        let format = path
+        let ext = path
             .extension()
             .map(|e| e.to_string_lossy().to_uppercase())
             .unwrap_or_else(|| "RAW".into());
+        // Apple ProRAW is a linear DNG (already demosaiced: cpp == 3) from an
+        // Apple device — surface it distinctly since it edits differently from
+        // a mosaiced sensor RAW.
+        let is_proraw = ext == "DNG"
+            && raw.cpp == 3
+            && md.make.to_lowercase().contains("apple");
+        let format = if is_proraw { "ProRAW".into() } else { ext };
         ImageMeta {
             path: path.to_string_lossy().into_owned(),
             kind: crate::raw::ImageKind::Raw,
             format,
-            bit_depth: 0, // RAW depth varies (12/14/16); omit rather than guess
+            bit_depth: raw.bps as u8, // real sensor bit depth from rawler
             camera_make: md.make.clone(),
             camera_model: md.model.clone(),
             lens: exif
