@@ -14,8 +14,58 @@ use crate::image::RgbF32Buf;
 use std::path::Path;
 
 pub const STD_EXTENSIONS: &[&str] = &[
-    "jpg", "jpeg", "png", "tif", "tiff", "webp", "bmp", "gif", "jxl", "heic", "heif", "hif",
+    "jpg", "jpeg", "png", "tif", "tiff", "webp", "bmp", "gif", "jxl", "heic", "heif", "hif", "psd",
 ];
+
+fn is_psd(path: &Path) -> bool {
+    path.extension()
+        .map(|e| e.eq_ignore_ascii_case("psd"))
+        .unwrap_or(false)
+}
+
+/// Decode a Photoshop PSD's flattened composite (fast path — spec §4). Layered
+/// intelligence is ignored; only RGB color mode for now (CMYK/Lab need ICC).
+fn decode_psd_srgb(path: &Path) -> Result<(Vec<f32>, usize, usize), CoreError> {
+    use psd::{ColorMode, Psd};
+    let bytes = std::fs::read(path).map_err(|e| CoreError::Decode(format!("psd read: {e}")))?;
+    let doc = Psd::from_bytes(&bytes).map_err(|e| CoreError::Decode(format!("psd parse: {e:?}")))?;
+    if doc.color_mode() != ColorMode::Rgb {
+        return Err(CoreError::Decode(format!(
+            "PSD color mode {:?} not supported yet — only RGB",
+            doc.color_mode()
+        )));
+    }
+    let (w, h) = (doc.width() as usize, doc.height() as usize);
+    let rgba = doc.rgba(); // flattened composite, RGBA8, sRGB-encoded
+    if rgba.len() < w * h * 4 {
+        return Err(CoreError::Decode("psd: short composite buffer".into()));
+    }
+    let mut rgb = vec![0f32; w * h * 3];
+    for i in 0..(w * h) {
+        rgb[i * 3] = rgba[i * 4] as f32 / 255.0;
+        rgb[i * 3 + 1] = rgba[i * 4 + 1] as f32 / 255.0;
+        rgb[i * 3 + 2] = rgba[i * 4 + 2] as f32 / 255.0;
+    }
+    Ok((rgb, w, h))
+}
+
+/// Cheap PSD dimensions from the 26-byte header (big-endian). PSB ("8BPB")
+/// is not supported by the `psd` crate, so it errors here.
+fn psd_dimensions(path: &Path) -> Result<(u32, u32), CoreError> {
+    use std::io::Read;
+    let mut buf = [0u8; 26];
+    let mut f = std::fs::File::open(path).map_err(|e| CoreError::Decode(format!("psd open: {e}")))?;
+    f.read_exact(&mut buf)
+        .map_err(|e| CoreError::Decode(format!("psd header: {e}")))?;
+    if &buf[0..4] != b"8BPS" {
+        return Err(CoreError::Decode(
+            "not a PSD (PSB is not supported yet)".into(),
+        ));
+    }
+    let h = u32::from_be_bytes([buf[14], buf[15], buf[16], buf[17]]);
+    let w = u32::from_be_bytes([buf[18], buf[19], buf[20], buf[21]]);
+    Ok((w, h))
+}
 
 fn is_jxl(path: &Path) -> bool {
     path.extension()
@@ -177,6 +227,7 @@ fn format_tag(path: &Path) -> String {
         "tif" | "tiff" => "TIFF".into(),
         "jxl" => "JXL".into(),
         "heic" | "heif" | "hif" => "HEIC".into(),
+        "psd" => "PSD".into(),
         other => other.to_uppercase(),
     }
 }
@@ -240,6 +291,8 @@ impl Decoder for StandardDecoder {
             jxl_dimensions(path)?
         } else if is_heic(path) {
             heic_dimensions(path)?
+        } else if is_psd(path) {
+            psd_dimensions(path)?
         } else {
             image::image_dimensions(path)
                 .map_err(|e| CoreError::Decode(format!("image dims: {e}")))?
@@ -252,12 +305,14 @@ impl Decoder for StandardDecoder {
         path: &Path,
         max_dim: u32,
     ) -> Result<Option<(Vec<u8>, u32, u32)>, CoreError> {
-        if is_jxl(path) || is_heic(path) {
+        if is_jxl(path) || is_heic(path) || is_psd(path) {
             // No fast embedded preview for these — decode then downscale.
             let (rgb, w, h) = if is_jxl(path) {
                 decode_jxl_srgb(path)?
-            } else {
+            } else if is_heic(path) {
                 decode_heic_srgb(path)?
+            } else {
+                decode_psd_srgb(path)?
             };
             let full = image::Rgb32FImage::from_raw(w as u32, h as u32, rgb)
                 .ok_or_else(|| CoreError::Decode("decoded buffer".into()))?;
@@ -285,6 +340,9 @@ impl Decoder for StandardDecoder {
         } else if is_heic(path) {
             let (rgb, w, h) = decode_heic_srgb(path)?;
             (rgb, w, h, 8u8) // sips → 8-bit PNG
+        } else if is_psd(path) {
+            let (rgb, w, h) = decode_psd_srgb(path)?;
+            (rgb, w, h, 8u8) // 8-bit RGB composite
         } else {
             let dynimg =
                 image::open(path).map_err(|e| CoreError::Decode(format!("image open: {e}")))?;
