@@ -62,8 +62,8 @@ pub const IMAGE_EXTENSIONS: &[&str] = &[
     // RAW (rawler)
     "arw", "nef", "nrw", "cr2", "cr3", "crw", "dng", "raf", "orf", "rw2", "pef", "srw", "erf",
     "kdc", "dcs", "dcr", "iiq", "3fr", "mef", "mos",
-    // rendered (image crate + jxl-oxide) — everything we can actually open
-    "jpg", "jpeg", "png", "tif", "tiff", "webp", "bmp", "gif", "jxl",
+    // rendered (image crate + jxl-oxide; HEIC via macOS sips)
+    "jpg", "jpeg", "png", "tif", "tiff", "webp", "bmp", "gif", "jxl", "heic", "heif", "hif",
 ];
 
 #[tauri::command]

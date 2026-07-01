@@ -13,13 +13,72 @@ use crate::error::CoreError;
 use crate::image::RgbF32Buf;
 use std::path::Path;
 
-pub const STD_EXTENSIONS: &[&str] =
-    &["jpg", "jpeg", "png", "tif", "tiff", "webp", "bmp", "gif", "jxl"];
+pub const STD_EXTENSIONS: &[&str] = &[
+    "jpg", "jpeg", "png", "tif", "tiff", "webp", "bmp", "gif", "jxl", "heic", "heif", "hif",
+];
 
 fn is_jxl(path: &Path) -> bool {
     path.extension()
         .map(|e| e.eq_ignore_ascii_case("jxl"))
         .unwrap_or(false)
+}
+
+fn is_heic(path: &Path) -> bool {
+    path.extension()
+        .map(|e| {
+            let e = e.to_string_lossy().to_lowercase();
+            e == "heic" || e == "heif" || e == "hif"
+        })
+        .unwrap_or(false)
+}
+
+/// Decode HEIC/HEIF via macOS `sips` (converts to a temp PNG, which we then
+/// read). No pure-Rust permissive HEVC decoder exists yet; the pure-Rust
+/// `heic` crate is AGPL, so this mirrors the sips-based HEIC *export* path.
+/// macOS-only for now (cross-platform HEIC needs the C libheif).
+fn decode_heic_srgb(path: &Path) -> Result<(Vec<f32>, usize, usize), CoreError> {
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = path;
+        Err(CoreError::Decode(
+            "HEIC/HEIF import is only available on macOS in this build.".into(),
+        ))
+    }
+    #[cfg(target_os = "macos")]
+    {
+        let nanos = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_nanos())
+            .unwrap_or(0);
+        let stem = path
+            .file_stem()
+            .map(|s| s.to_string_lossy().into_owned())
+            .unwrap_or_else(|| "heic".into());
+        let tmp = std::env::temp_dir().join(format!("meraraw-heic-{stem}-{nanos}.png"));
+        let out = std::process::Command::new("/usr/bin/sips")
+            .args(["-s", "format", "png"])
+            .arg(path)
+            .arg("--out")
+            .arg(&tmp)
+            .output()
+            .map_err(|e| CoreError::Decode(format!("sips spawn: {e}")))?;
+        if !out.status.success() {
+            let _ = std::fs::remove_file(&tmp);
+            return Err(CoreError::Decode(format!(
+                "sips heic decode: {}",
+                String::from_utf8_lossy(&out.stderr).trim()
+            )));
+        }
+        let result = (|| {
+            let dynimg = image::open(&tmp)
+                .map_err(|e| CoreError::Decode(format!("heic->png read: {e}")))?;
+            let rgb = dynimg.to_rgb32f();
+            let (w, h) = (rgb.width() as usize, rgb.height() as usize);
+            Ok((rgb.into_raw(), w, h))
+        })();
+        let _ = std::fs::remove_file(&tmp);
+        result
+    }
 }
 
 /// Decode a JPEG XL to interleaved sRGB-encoded RGB f32 (pure-Rust jxl-oxide).
@@ -61,6 +120,39 @@ fn jxl_dimensions(path: &Path) -> Result<(u32, u32), CoreError> {
     Ok((image.width(), image.height()))
 }
 
+/// Cheap HEIC dimensions via `sips -g` (no pixel decode).
+fn heic_dimensions(path: &Path) -> Result<(u32, u32), CoreError> {
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = path;
+        return Err(CoreError::Decode(
+            "HEIC/HEIF import is only available on macOS in this build.".into(),
+        ));
+    }
+    #[cfg(target_os = "macos")]
+    {
+        let out = std::process::Command::new("/usr/bin/sips")
+            .args(["-g", "pixelWidth", "-g", "pixelHeight"])
+            .arg(path)
+            .output()
+            .map_err(|e| CoreError::Decode(format!("sips spawn: {e}")))?;
+        let text = String::from_utf8_lossy(&out.stdout);
+        let (mut w, mut h) = (0u32, 0u32);
+        for line in text.lines() {
+            let line = line.trim();
+            if let Some(v) = line.strip_prefix("pixelWidth:") {
+                w = v.trim().parse().unwrap_or(0);
+            } else if let Some(v) = line.strip_prefix("pixelHeight:") {
+                h = v.trim().parse().unwrap_or(0);
+            }
+        }
+        if w == 0 || h == 0 {
+            return Err(CoreError::Decode("sips: could not read HEIC dimensions".into()));
+        }
+        Ok((w, h))
+    }
+}
+
 /// linear sRGB → linear Rec.2020, from the pinned color-science matrices.
 fn srgb_to_rec2020() -> Mat3 {
     mat_mul(&XYZ_TO_REC2020, &SRGB_TO_XYZ)
@@ -84,6 +176,7 @@ fn format_tag(path: &Path) -> String {
         "jpg" | "jpeg" => "JPEG".into(),
         "tif" | "tiff" => "TIFF".into(),
         "jxl" => "JXL".into(),
+        "heic" | "heif" | "hif" => "HEIC".into(),
         other => other.to_uppercase(),
     }
 }
@@ -145,6 +238,8 @@ impl Decoder for StandardDecoder {
         // Cheap: header-only dimensions (depth refined on full decode).
         let (w, h) = if is_jxl(path) {
             jxl_dimensions(path)?
+        } else if is_heic(path) {
+            heic_dimensions(path)?
         } else {
             image::image_dimensions(path)
                 .map_err(|e| CoreError::Decode(format!("image dims: {e}")))?
@@ -157,11 +252,15 @@ impl Decoder for StandardDecoder {
         path: &Path,
         max_dim: u32,
     ) -> Result<Option<(Vec<u8>, u32, u32)>, CoreError> {
-        if is_jxl(path) {
-            // No embedded preview in JXL — decode then downscale.
-            let (rgb, w, h) = decode_jxl_srgb(path)?;
+        if is_jxl(path) || is_heic(path) {
+            // No fast embedded preview for these — decode then downscale.
+            let (rgb, w, h) = if is_jxl(path) {
+                decode_jxl_srgb(path)?
+            } else {
+                decode_heic_srgb(path)?
+            };
             let full = image::Rgb32FImage::from_raw(w as u32, h as u32, rgb)
-                .ok_or_else(|| CoreError::Decode("jxl buffer".into()))?;
+                .ok_or_else(|| CoreError::Decode("decoded buffer".into()))?;
             let thumb = image::DynamicImage::ImageRgb32F(full).thumbnail(max_dim, max_dim);
             let rgba = thumb.to_rgba8();
             let (tw, th) = (rgba.width(), rgba.height());
@@ -183,6 +282,9 @@ impl Decoder for StandardDecoder {
         let (src, w, h, bit_depth) = if is_jxl(path) {
             let (rgb, w, h) = decode_jxl_srgb(path)?;
             (rgb, w, h, 0u8) // JXL depth varies (8/16/f32) — omit rather than guess
+        } else if is_heic(path) {
+            let (rgb, w, h) = decode_heic_srgb(path)?;
+            (rgb, w, h, 8u8) // sips → 8-bit PNG
         } else {
             let dynimg =
                 image::open(path).map_err(|e| CoreError::Decode(format!("image open: {e}")))?;
