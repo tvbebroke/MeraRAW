@@ -27,9 +27,13 @@ fn main() {
     let tex = upload_working_texture(&gpu, &payload.rgba_f16, payload.width, payload.height);
     let tv = tex.create_view(&Default::default());
     let mut graph = RenderGraph::new(&gpu);
-    // 4th arg: look (neutral|camera)
+    // 4th arg: look (neutral|camera|agx)
     let look = std::env::args().nth(4).unwrap_or_default();
-    graph.set_look(look == "camera");
+    graph.set_look(match look.as_str() {
+        "camera" => 1,
+        "agx" => 2,
+        _ => 0,
+    });
 
     let mut doc = EditDoc::new(&path.to_string_lossy());
     if mode == "edited" {

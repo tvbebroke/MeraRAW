@@ -134,11 +134,18 @@ fn decode_heic_srgb(path: &Path) -> Result<(Vec<f32>, usize, usize), CoreError> 
 /// Decode a JPEG XL to interleaved sRGB-encoded RGB f32 (pure-Rust jxl-oxide).
 /// Output is in the file's color encoding (sRGB for the common case), which
 /// the caller linearizes like any other rendered image.
-fn decode_jxl_srgb(path: &Path) -> Result<(Vec<f32>, usize, usize), CoreError> {
+fn decode_jxl_srgb(path: &Path) -> Result<(Vec<f32>, usize, usize, u8), CoreError> {
     use jxl_oxide::JxlImage;
     let image = JxlImage::builder()
         .open(path)
         .map_err(|e| CoreError::Decode(format!("jxl open: {e}")))?;
+    // Real encoded bit depth from the header (8/10/12/16-bit int or float).
+    let bit_depth = image
+        .image_header()
+        .metadata
+        .bit_depth
+        .bits_per_sample()
+        .min(255) as u8;
     let render = image
         .render_frame(0)
         .map_err(|e| CoreError::Decode(format!("jxl render: {e}")))?;
@@ -159,7 +166,7 @@ fn decode_jxl_srgb(path: &Path) -> Result<(Vec<f32>, usize, usize), CoreError> {
             rgb[i * 3 + 2] = v;
         }
     }
-    Ok((rgb, w, h))
+    Ok((rgb, w, h, bit_depth))
 }
 
 fn jxl_dimensions(path: &Path) -> Result<(u32, u32), CoreError> {
@@ -308,7 +315,8 @@ impl Decoder for StandardDecoder {
         if is_jxl(path) || is_heic(path) || is_psd(path) {
             // No fast embedded preview for these — decode then downscale.
             let (rgb, w, h) = if is_jxl(path) {
-                decode_jxl_srgb(path)?
+                let (rgb, w, h, _depth) = decode_jxl_srgb(path)?;
+                (rgb, w, h)
             } else if is_heic(path) {
                 decode_heic_srgb(path)?
             } else {
@@ -335,8 +343,8 @@ impl Decoder for StandardDecoder {
     ) -> Result<DecodedImage, CoreError> {
         // Get interleaved sRGB-encoded RGB f32 + source bit depth.
         let (src, w, h, bit_depth) = if is_jxl(path) {
-            let (rgb, w, h) = decode_jxl_srgb(path)?;
-            (rgb, w, h, 0u8) // JXL depth varies (8/16/f32) — omit rather than guess
+            let (rgb, w, h, depth) = decode_jxl_srgb(path)?;
+            (rgb, w, h, depth) // real encoded depth from JXL header
         } else if is_heic(path) {
             let (rgb, w, h) = decode_heic_srgb(path)?;
             (rgb, w, h, 8u8) // sips → 8-bit PNG
@@ -393,5 +401,66 @@ mod tests {
         assert!((r - 0.216).abs() < 0.02, "sRGB 128 → linear ~0.216, got {r}");
         assert!((r - g).abs() < 0.01 && (g - b).abs() < 0.01, "gray stays neutral");
         let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
+    fn round_trips_all_image_crate_formats() {
+        let base = image::RgbImage::from_fn(8, 6, |x, y| {
+            image::Rgb([((x * 30) % 256) as u8, ((y * 40) % 256) as u8, 100])
+        });
+        let dir = std::env::temp_dir();
+        for (ext, fmt) in [
+            ("jpg", "JPEG"),
+            ("png", "PNG"),
+            ("tiff", "TIFF"),
+            ("webp", "WEBP"),
+            ("bmp", "BMP"),
+            ("gif", "GIF"),
+        ] {
+            let path = dir.join(format!("meraraw-fmt-{ext}.{ext}"));
+            base.save(&path).unwrap_or_else(|e| panic!("save {ext}: {e}"));
+            let dec = crate::raw::decoder_for(&path);
+            assert!(dec.probe(&path), "probe {ext}");
+            let out = dec
+                .decode_with_profile(&path, None)
+                .unwrap_or_else(|e| panic!("decode {ext}: {e:?}"));
+            assert_eq!(out.meta.kind, ImageKind::Rendered, "{ext} kind");
+            assert_eq!(out.meta.format, fmt, "{ext} format");
+            assert_eq!((out.working.width, out.working.height), (8, 6), "{ext} dims");
+            assert_eq!(out.working.data.len(), 8 * 6 * 3, "{ext} buf len");
+            let m = dec.metadata(&path).unwrap_or_else(|e| panic!("meta {ext}: {e:?}"));
+            assert_eq!((m.width, m.height), (8, 6), "{ext} meta dims");
+            let _ = std::fs::remove_file(&path);
+        }
+    }
+
+    #[test]
+    #[cfg(target_os = "macos")]
+    fn decodes_heic_via_sips() {
+        let base = image::RgbImage::from_pixel(16, 12, image::Rgb([120, 60, 200]));
+        let dir = std::env::temp_dir();
+        let png = dir.join("meraraw-heic-src.png");
+        base.save(&png).unwrap();
+        let heic = dir.join("meraraw-heic-test.heic");
+        let out = std::process::Command::new("/usr/bin/sips")
+            .args(["-s", "format", "heic"])
+            .arg(&png)
+            .arg("--out")
+            .arg(&heic)
+            .output()
+            .unwrap();
+        let _ = std::fs::remove_file(&png);
+        if !out.status.success() || !heic.exists() {
+            eprintln!("skip: sips heic encode unavailable");
+            return;
+        }
+        let dec = crate::raw::decoder_for(&heic);
+        assert!(dec.probe(&heic));
+        let d = dec.decode_with_profile(&heic, None).unwrap();
+        assert_eq!(d.meta.kind, ImageKind::Rendered);
+        assert_eq!(d.meta.format, "HEIC");
+        assert_eq!((d.working.width, d.working.height), (16, 12));
+        assert_eq!(d.working.data.len(), 16 * 12 * 3);
+        let _ = std::fs::remove_file(&heic);
     }
 }
