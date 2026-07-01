@@ -76,15 +76,19 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
   let w_mid = max(1.0 - w_sh - w_hi, 0.0);
 
   // per-zone chroma push toward the wheel hue + lum scale.
-  // strength scaled by lightness so deep blacks don't blow up.
-  let prot = mix(0.25, 1.0, t);
+  // Only guard the deepest blacks (< ~0.08 L) from going neon — shadows,
+  // mids and highlights should all take visible color, so the classic
+  // teal-shadow / warm-highlight split actually reads.
+  let tint_prot = mix(0.6, 1.0, smoothstep(0.0, 0.08, t));
+  // Stronger per-1% wheel strength than before so the wheels have real range.
+  let TINT = 0.0032;
   var zones = array<vec4<f32>, 3>(u.shadows, u.midtones, u.highlights);
   var weights = array<f32, 3>(w_sh, w_mid, w_hi);
   for (var i = 0; i < 3; i++) {
     let z = zones[i];
     let w = weights[i];
-    a += w * z.y * 0.002 * cos(z.x) * prot;
-    b += w * z.y * 0.002 * sin(z.x) * prot;
+    a += w * z.y * TINT * cos(z.x) * tint_prot;
+    b += w * z.y * TINT * sin(z.x) * tint_prot;
     l *= 1.0 + w * z.z * 0.005;
   }
 
