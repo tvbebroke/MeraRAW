@@ -41,6 +41,21 @@ fn load_dotenv() {
 }
 
 fn main() {
+    // WebKitGTK's DMABUF / accelerated-compositing renderer aborts on many
+    // Linux GPU stacks — cross-distro AppImages, Nvidia, and newer Mesa — which
+    // shows up as a WebKitWebProcess SIGABRT before the window even draws. Force
+    // the compatible path unless the user overrode it. This only affects the UI
+    // webview; image processing runs on wgpu and is untouched.
+    #[cfg(target_os = "linux")]
+    {
+        if std::env::var_os("WEBKIT_DISABLE_DMABUF_RENDERER").is_none() {
+            std::env::set_var("WEBKIT_DISABLE_DMABUF_RENDERER", "1");
+        }
+        if std::env::var_os("WEBKIT_DISABLE_COMPOSITING_MODE").is_none() {
+            std::env::set_var("WEBKIT_DISABLE_COMPOSITING_MODE", "1");
+        }
+    }
+
     load_dotenv();
     tracing_subscriber::fmt()
         .with_env_filter(

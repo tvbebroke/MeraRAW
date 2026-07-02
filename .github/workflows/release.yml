@@ -1,7 +1,7 @@
 # Builds MeraRAW for Windows and Linux (these CANNOT be cross-built from a Mac),
 # and produces artifacts named:
 #   MeraRAW Win <version>.exe
-#   MeraRAW Linux <version>.AppImage  (+ .deb)
+#   MeraRAW Linux <version>.AppImage  (+ .deb for Debian/Ubuntu, .rpm for Fedora/RHEL)
 #
 # macOS is intentionally NOT built here: tauri.conf.json hard-codes a Developer
 # ID signingIdentity, which forces signing on every build — that succeeds
@@ -94,7 +94,8 @@ jobs:
                    src-tauri/target/**/release/bundle/**/*.exe \
                    src-tauri/target/**/release/bundle/**/*.msi \
                    src-tauri/target/**/release/bundle/**/*.AppImage \
-                   src-tauri/target/**/release/bundle/**/*.deb; do
+                   src-tauri/target/**/release/bundle/**/*.deb \
+                   src-tauri/target/**/release/bundle/**/*.rpm; do
             ext="${f##*.}"
             dest="dist-release/MeraRAW ${label} ${v}.${ext}"
             cp "$f" "$dest"
