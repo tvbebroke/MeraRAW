@@ -13,6 +13,9 @@ tokio = { version = "1", features = ["sync", "rt", "macros", "time"] }
 tracing = "0.1"
 wgpu = "24"
 rawler = "0.7"
+# Custom demosaic engine (RCD/LMMSE/AMaZE/IGV/DDFAPD). Core only — we feed it a
+# CfaImage built from rawler's rescaled mosaic, so no merawler `decode` feature.
+merawler = { path = "../../../MERAWLER" }
 image = { version = "0.25", default-features = false, features = ["jpeg", "png", "tiff", "webp", "bmp", "gif"] }
 # Direct handles to image's own codec crates so we can embed ICC profiles
 # (png iCCP / tiff ICCProfile tag) that image::save doesn't expose.

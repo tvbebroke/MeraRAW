@@ -16,6 +16,7 @@ pub const NODES: &[(&str, &str)] = &[
     ("color_grade", "color_grade"),
     ("hsl", "hsl"),
     ("tone_curve", "tone_curve"),
+    ("lut", "lut"),
     ("sharpen", "detail"),
 ];
 
@@ -152,6 +153,22 @@ fn rows(m: &Mat3) -> ([f32; 4], [f32; 4], [f32; 4]) {
     )
 }
 
+/// 3D-LUT node uniform — field order/layout matches `struct LutU` in lut.wgsl.
+#[repr(C)]
+#[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
+struct LutU {
+    size: u32,
+    width: u32,
+    height: u32,
+    _p0: u32,
+    dmin: [f32; 4],
+    dmax: [f32; 4],
+    opacity: f32,
+    _p1: f32,
+    _p2: f32,
+    _p3: f32,
+}
+
 const IDENTITY: Mat3 = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]];
 
 /// Rotate `v` around the gray axis (1,1,1)/√3 by `deg` (Rodrigues).
@@ -222,7 +239,13 @@ fn oklab_rows() -> ([f32; 4], [f32; 4], [f32; 4], [f32; 4], [f32; 4], [f32; 4], 
     (k0, k1, k2, ki0, ki1, ki2, m0, m1, m2r, mi0, mi1, mi2)
 }
 
-pub fn node_configs(doc: &EditDoc, as_shot_cct: f32, w: u32, h: u32) -> Vec<NodeConfig> {
+pub fn node_configs(
+    doc: &EditDoc,
+    as_shot_cct: f32,
+    w: u32,
+    h: u32,
+    lut: Option<&crate::lut::CubeLut>,
+) -> Vec<NodeConfig> {
     let mut out = Vec::with_capacity(NODES.len());
 
     // exposure
@@ -490,6 +513,34 @@ pub fn node_configs(doc: &EditDoc, as_shot_cct: f32, w: u32, h: u32) -> Vec<Node
         }
     }
 
+    // lut (3D look LUT) — active only when a .cube is loaded + opacity > 0.
+    // The cube data lives outside the doc (engine cache, keyed by path); the
+    // doc holds only the path (meta.lut_file) + this opacity.
+    {
+        let opacity = eff(doc, "lut", "opacity") / 100.0;
+        match lut {
+            Some(cube) if opacity > 0.0 => {
+                let u = LutU {
+                    size: cube.size as u32,
+                    width: w,
+                    height: h,
+                    _p0: 0,
+                    dmin: [cube.domain_min[0], cube.domain_min[1], cube.domain_min[2], 0.0],
+                    dmax: [cube.domain_max[0], cube.domain_max[1], cube.domain_max[2], 0.0],
+                    opacity,
+                    _p1: 0.0,
+                    _p2: 0.0,
+                    _p3: 0.0,
+                };
+                out.push(NodeConfig::Run {
+                    uniforms: bytemuck::bytes_of(&u).to_vec(),
+                    lut: Some(cube.flatten()),
+                });
+            }
+            _ => out.push(NodeConfig::Skip),
+        }
+    }
+
     // sharpen (detail slot 8)
     {
         let amount = eff(doc, "detail", "sharpen_amount");
@@ -524,7 +575,8 @@ pub fn mask_node_configs(
 ) -> Vec<NodeConfig> {
     let mut pseudo = EditDoc::new("mask://scoped");
     pseudo.modules = mask.modules.clone();
-    node_configs(&pseudo, as_shot_cct, w, h)
+    // Masks don't carry a scoped 3D LUT (v1) — the global LUT applies once.
+    node_configs(&pseudo, as_shot_cct, w, h, None)
 }
 
 /// effective_f32 for dynamic (leaked-str registry) param names.
@@ -542,7 +594,7 @@ mod tests {
     #[test]
     fn default_doc_skips_every_node() {
         let doc = EditDoc::new("/x.ARW");
-        let configs = node_configs(&doc, 5200.0, 100, 100);
+        let configs = node_configs(&doc, 5200.0, 100, 100, None);
         assert!(
             configs.iter().all(|c| matches!(c, NodeConfig::Skip)),
             "all nodes must be identity at defaults"
@@ -579,10 +631,12 @@ mod tests {
     fn each_node_activates_from_its_params() {
         let mut doc = EditDoc::new("/x.ARW");
         doc.set("detail", "sharpen_amount", ParamValue::F32(50.0));
-        let configs = node_configs(&doc, 5200.0, 10, 10);
-        // sharpen node (last) runs; noise node (idx 3) still skipped
-        assert!(matches!(configs[7], NodeConfig::Run { .. }));
+        let configs = node_configs(&doc, 5200.0, 10, 10, None);
+        // sharpen node (now idx 8 after inserting lut) runs; noise (idx 3) skipped
+        assert!(matches!(configs[8], NodeConfig::Run { .. }));
         assert!(matches!(configs[3], NodeConfig::Skip));
+        // lut node (idx 7) is skipped when no cube is loaded
+        assert!(matches!(configs[7], NodeConfig::Skip));
     }
 
 }

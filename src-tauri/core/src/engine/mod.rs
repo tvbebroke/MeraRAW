@@ -296,6 +296,23 @@ impl EngineHandle {
         .await
     }
 
+    /// Load (Some) or clear (None) the current image's 3D look LUT (`.cube`).
+    pub async fn set_lut(
+        &self,
+        path: Option<String>,
+    ) -> Result<Result<(), CoreError>, EngineError> {
+        self.request(|reply| EngineMsg::SetLut { path, reply }).await
+    }
+
+    /// Change the demosaic algorithm and re-decode the current image.
+    pub async fn set_demosaic(
+        &self,
+        algo: String,
+    ) -> Result<Result<ImageMeta, CoreError>, EngineError> {
+        self.request(|reply| EngineMsg::SetDemosaic { algo, reply })
+            .await
+    }
+
     pub async fn get_grid(
         &self,
         query: crate::catalog::GridQuery,
@@ -424,6 +441,8 @@ struct CurrentImage {
     meta: ImageMeta,
     /// Parsed DCP for viewport look application (matrix is baked in at decode).
     dcp_profile: Option<std::sync::Arc<DcpProfile>>,
+    /// Parsed 3D look LUT (cached; keyed by doc.meta.lut_file). None = no LUT.
+    lut_cube: Option<std::sync::Arc<crate::lut::CubeLut>>,
     /// (texture, view, w, h) — the working master (contract A4).
     working: Option<(wgpu::Texture, wgpu::TextureView, u32, u32)>,
     /// Retained downsized CPU copy (histogram / segmentation / fallback).
@@ -914,6 +933,12 @@ impl Engine {
                 reply,
             } => {
                 self.set_camera_profile(profile_file, reply);
+            }
+            EngineMsg::SetLut { path, reply } => {
+                self.set_lut(path, reply);
+            }
+            EngineMsg::SetDemosaic { algo, reply } => {
+                self.set_demosaic(algo, reply);
             }
             EngineMsg::GetGrid { query, reply } => {
                 let _ = reply.send(

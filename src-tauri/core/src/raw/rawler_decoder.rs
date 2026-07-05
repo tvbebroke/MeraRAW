@@ -4,7 +4,7 @@
 //! WhiteBalance/Calibrate/SRgb steps are deliberately NOT used: they bake
 //! sRGB and clip highlights.
 
-use super::{DecodedImage, Decoder, ImageMeta};
+use super::{DecodedImage, Decoder, Demosaic, ImageMeta};
 use crate::color::{mat_vec, CameraCalibration};
 use crate::error::CoreError;
 use crate::image::RgbF32Buf;
@@ -114,6 +114,7 @@ impl RawlerDecoder {
             camera_profile: None,
             available_profiles: Vec::new(),
             available_profile_files: Vec::new(),
+            demosaic: String::new(), // set by decode_impl once the algo is known
         }
     }
 }
@@ -177,7 +178,7 @@ impl Decoder for RawlerDecoder {
     }
 
     fn decode(&self, path: &Path) -> Result<DecodedImage, CoreError> {
-        self.decode_with_profile(path, None)
+        self.decode_impl(path, None, Demosaic::Rawler)
     }
 
     fn decode_with_profile(
@@ -185,46 +186,48 @@ impl Decoder for RawlerDecoder {
         path: &Path,
         profile_path: Option<&Path>,
     ) -> Result<DecodedImage, CoreError> {
+        self.decode_impl(path, profile_path, Demosaic::Rawler)
+    }
+
+    fn decode_with_options(
+        &self,
+        path: &Path,
+        profile_path: Option<&Path>,
+        demosaic: Demosaic,
+    ) -> Result<DecodedImage, CoreError> {
+        self.decode_impl(path, profile_path, demosaic)
+    }
+}
+
+impl RawlerDecoder {
+    /// Shared decode: rawler unpack → produce camera-native RGB (rawler's
+    /// built-in demosaic or the merawler engine) → as-shot WB → cam→Rec.2020.
+    fn decode_impl(
+        &self,
+        path: &Path,
+        profile_path: Option<&Path>,
+        demosaic: Demosaic,
+    ) -> Result<DecodedImage, CoreError> {
         let source = RawSource::new(path).map_err(dec_err)?;
         let decoder = self.loader.get_decoder(&source).map_err(dec_err)?;
         let params = RawDecodeParams::default();
         let md = decoder.raw_metadata(&source, &params).map_err(dec_err)?;
         let raw = decoder.raw_image(&source, &params, false).map_err(dec_err)?;
 
-        // rawler stages: levels rescale → demosaic → crops. No WB/SRgb.
-        let dev = RawDevelop {
-            steps: vec![
-                ProcessingStep::Rescale,
-                ProcessingStep::Demosaic,
-                ProcessingStep::CropActiveArea,
-                ProcessingStep::CropDefault,
-            ],
-        };
-        let intermediate = dev.develop_intermediate(&raw).map_err(dec_err)?;
-        let (cam_rgb, w, h): (Vec<[f32; 3]>, usize, usize) = match intermediate {
-            Intermediate::ThreeColor(px) => {
-                let w = px.width;
-                let h = px.height;
-                (px.data, w, h)
-            }
-            Intermediate::FourColor(px) => {
-                // 4-color CFA: average the two greens
-                let w = px.width;
-                let h = px.height;
-                (
-                    px.data
-                        .iter()
-                        .map(|p| [p[0], (p[1] + p[3]) * 0.5, p[2]])
-                        .collect(),
-                    w,
-                    h,
-                )
-            }
-            Intermediate::Monochrome(px) => {
-                let w = px.width;
-                let h = px.height;
-                (px.data.iter().map(|v| [*v, *v, *v]).collect(), w, h)
-            }
+        // Camera-native RGB, either from the merawler engine or rawler's built-in
+        // demosaic. merawler falls back to rawler for non-Bayer sources.
+        let (cam_rgb, w, h): (Vec<[f32; 3]>, usize, usize) = match demosaic.merawler_algo() {
+            Some(algo) => match merawler_cam_rgb(&raw, algo) {
+                Some(v) => v,
+                None => {
+                    tracing::info!(
+                        algo = demosaic.name(),
+                        "merawler unavailable for this CFA (non-Bayer/already demosaiced); using rawler"
+                    );
+                    rawler_cam_rgb(&raw)?
+                }
+            },
+            None => rawler_cam_rgb(&raw)?,
         };
 
         // Our colorimetric landing: as-shot WB → cam→Rec.2020 (dual-illum).
@@ -301,7 +304,7 @@ impl Decoder for RawlerDecoder {
         }
         .bake_orientation(effective_orientation(&raw, &md));
 
-        let meta = self.meta_from(
+        let mut meta = self.meta_from(
             path,
             &raw,
             &md,
@@ -309,6 +312,132 @@ impl Decoder for RawlerDecoder {
             working.height as u32,
             Some(cct),
         );
+        meta.demosaic = demosaic.name().to_string();
         Ok(DecodedImage { working, meta })
+    }
+}
+
+/// rawler's built-in path: rescale → demosaic → crops → camera-native RGB.
+fn rawler_cam_rgb(raw: &rawler::RawImage) -> Result<(Vec<[f32; 3]>, usize, usize), CoreError> {
+    let dev = RawDevelop {
+        steps: vec![
+            ProcessingStep::Rescale,
+            ProcessingStep::Demosaic,
+            ProcessingStep::CropActiveArea,
+            ProcessingStep::CropDefault,
+        ],
+    };
+    let intermediate = dev.develop_intermediate(raw).map_err(dec_err)?;
+    Ok(match intermediate {
+        Intermediate::ThreeColor(px) => (px.data, px.width, px.height),
+        Intermediate::FourColor(px) => (
+            px.data
+                .iter()
+                .map(|p| [p[0], (p[1] + p[3]) * 0.5, p[2]])
+                .collect(),
+            px.width,
+            px.height,
+        ),
+        Intermediate::Monochrome(px) => {
+            (px.data.iter().map(|v| [*v, *v, *v]).collect(), px.width, px.height)
+        }
+    })
+}
+
+/// merawler path: rescale-only → normalized full-sensor mosaic → merawler
+/// demosaic → crop to rawler's default output region. Returns `None` (so the
+/// caller falls back to rawler) for anything that isn't a 2x2 Bayer CFA.
+fn merawler_cam_rgb(
+    raw: &rawler::RawImage,
+    algo: merawler::Algorithm,
+) -> Option<(Vec<[f32; 3]>, usize, usize)> {
+    // Reuse rawler's exact level normalization, then stop before its demosaic.
+    let dev = RawDevelop {
+        steps: vec![ProcessingStep::Rescale],
+    };
+    let Intermediate::Monochrome(px) = dev.develop_intermediate(raw).ok()? else {
+        return None; // already demosaiced (e.g. Apple ProRAW) or multi-channel
+    };
+    let pattern = bayer_pattern(&raw.camera.cfa)?; // X-Trans / 4-color → None
+    let cfa = merawler::CfaImage {
+        width: px.width,
+        height: px.height,
+        data: px.data,
+        pattern,
+        wb: [1.0, 1.0, 1.0],
+    };
+    let rgb = merawler::demosaic(&cfa, algo)?;
+    Some(crop_to_output(rgb, raw))
+}
+
+/// Map rawler's top-left 2x2 CFA tile to a merawler Bayer pattern.
+fn bayer_pattern(cfa: &rawler::cfa::CFA) -> Option<merawler::CfaPattern> {
+    let c = |row: usize, col: usize| cfa.color_at(row, col) as u8;
+    merawler::CfaPattern::from_tile(c(0, 0), c(0, 1), c(1, 0), c(1, 1))
+}
+
+/// Crop the full-sensor demosaic to rawler's net output region — `crop_area`
+/// (or `active_area`) in full-sensor coordinates.
+fn crop_to_output(rgb: merawler::RgbImage, raw: &rawler::RawImage) -> (Vec<[f32; 3]>, usize, usize) {
+    let rect = raw.crop_area.or(raw.active_area);
+    match rect {
+        Some(r)
+            if (r.d.w != rgb.width || r.d.h != rgb.height || r.p.x != 0 || r.p.y != 0)
+                && r.p.x + r.d.w <= rgb.width
+                && r.p.y + r.d.h <= rgb.height =>
+        {
+            let (cw, ch) = (r.d.w, r.d.h);
+            let mut out = Vec::with_capacity(cw * ch);
+            for y in 0..ch {
+                let start = (r.p.y + y) * rgb.width + r.p.x;
+                out.extend_from_slice(&rgb.data[start..start + cw]);
+            }
+            (out, cw, ch)
+        }
+        _ => (rgb.data, rgb.width, rgb.height),
+    }
+}
+
+#[cfg(test)]
+mod integration_tests {
+    use super::*;
+    use crate::raw::Demosaic;
+
+    /// End-to-end: the merawler path must produce the same cropped dimensions as
+    /// rawler (crop correctness) and a genuinely different image (algo applied),
+    /// with finite values. Skips when the sample RAW isn't present.
+    #[test]
+    fn merawler_path_matches_dims_and_differs() {
+        let Ok(home) = std::env::var("HOME") else { return };
+        let p = std::path::PathBuf::from(home).join("Desktop/test-claude-raw/DSC07078.ARW");
+        if !p.exists() {
+            eprintln!("skip: sample RAW not present");
+            return;
+        }
+        let dec = RawlerDecoder::default();
+        let rawler = dec.decode_with_options(&p, None, Demosaic::Rawler).unwrap();
+        for algo in [Demosaic::Rcd, Demosaic::Amaze, Demosaic::Lmmse] {
+            let out = dec.decode_with_options(&p, None, algo).unwrap();
+            assert_eq!(
+                (out.working.width, out.working.height),
+                (rawler.working.width, rawler.working.height),
+                "{}: crop dims differ from rawler",
+                algo.name()
+            );
+            assert_eq!(out.meta.demosaic, algo.name());
+            assert!(
+                out.working.data.iter().all(|v| v.is_finite()),
+                "{}: non-finite pixels",
+                algo.name()
+            );
+            let diff: f64 = rawler
+                .working
+                .data
+                .iter()
+                .zip(&out.working.data)
+                .map(|(a, b)| (*a - *b).abs() as f64)
+                .sum();
+            assert!(diff > 0.0, "{}: identical to rawler — not applied", algo.name());
+        }
     }
 }

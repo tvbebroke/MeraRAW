@@ -145,6 +145,7 @@ impl RenderGraph {
         seg_masks: &HashMap<String, wgpu::TextureView>,
         overlay_mask: Option<&str>,
         dcp_profile: Option<&DcpProfile>,
+        lut: Option<&crate::lut::CubeLut>,
     ) -> Result<Vec<u8>, CoreError> {
         self.last_passes_run.clear();
         // clamp to a safe texture size — never exceed the GPU 2D limit (the
@@ -212,7 +213,7 @@ impl RenderGraph {
             n_masks,
         );
 
-        let configs = node_configs(doc, as_shot_cct, out_w, out_h);
+        let configs = node_configs(doc, as_shot_cct, out_w, out_h, lut);
 
         // Upload the DCP look tables once per profile (cheap signature check).
         if view_changed {
@@ -373,20 +374,27 @@ impl RenderGraph {
             let out = self.node_tex[i].as_ref().unwrap();
             if must_run {
                 gpu.queue.write_buffer(&self.node_uniforms[i], 0, uniforms);
+                // The 3D LUT node has its own buffer; every other LUT-carrying
+                // node (tone_curve) shares self.lut_buffer.
+                let lut_buf = if NODE_PIPES[i] == PipeKind::Lut3d {
+                    &self.lut3d_buffer
+                } else {
+                    &self.lut_buffer
+                };
                 if let Some(lut_data) = lut {
                     gpu.queue
-                        .write_buffer(&self.lut_buffer, 0, bytemuck::cast_slice(lut_data));
+                        .write_buffer(lut_buf, 0, bytemuck::cast_slice(lut_data));
                 }
                 let pipe = self.pipe_for(NODE_PIPES[i]);
                 dispatch_node(
                     gpu,
                     &mut encoder,
                     pipe,
-                    NODE_PIPES[i] == PipeKind::Curve,
+                    NODE_PIPES[i].has_lut(),
                     upstream,
                     out,
                     &self.node_uniforms[i],
-                    &self.lut_buffer,
+                    lut_buf,
                     NODES[i].0,
                     out_w,
                     out_h,
@@ -582,7 +590,7 @@ impl RenderGraph {
                         gpu,
                         &mut encoder,
                         pipe,
-                        NODE_PIPES[i] == PipeKind::Curve,
+                        NODE_PIPES[i].has_lut(),
                         local_src,
                         out,
                         ub,
@@ -724,6 +732,7 @@ impl RenderGraph {
             PipeKind::Hsl => &self.simple_pipes["hsl"],
             PipeKind::Sharpen => &self.simple_pipes["sharpen"],
             PipeKind::Curve => &self.curve_pipe,
+            PipeKind::Lut3d => &self.lut_pipe,
         }
     }
 
@@ -796,7 +805,7 @@ fn dispatch_node(
     gpu: &GpuContext,
     encoder: &mut wgpu::CommandEncoder,
     pipe: &PassResources,
-    is_curve: bool,
+    has_lut: bool,
     input: &wgpu::Texture,
     output: &wgpu::Texture,
     uniforms: &wgpu::Buffer,
@@ -821,7 +830,7 @@ fn dispatch_node(
             resource: uniforms.as_entire_binding(),
         },
     ];
-    if is_curve {
+    if has_lut {
         entries.push(wgpu::BindGroupEntry {
             binding: 3,
             resource: lut.as_entire_binding(),
@@ -986,6 +995,56 @@ impl RenderGraph {
         gpu.queue.submit([encoder.finish()]);
         readback_rgba16f_from_texture(gpu, &out_tex, w, h).unwrap()
     }
+
+    /// Dispatch just the 3D LUT node on `rgba_in` (linear Rec.2020) and read the
+    /// result back. Test-only mirror of the in-chain lut node.
+    pub fn run_lut_test(
+        &mut self,
+        gpu: &GpuContext,
+        cube: &crate::lut::CubeLut,
+        opacity: f32,
+        rgba_in: &[f32],
+        w: u32,
+        h: u32,
+    ) -> Vec<f32> {
+        use crate::gpu::texture_io::{readback_rgba16f_from_texture, upload_rgba16f};
+        let lut_idx = NODES.iter().position(|(n, _)| *n == "lut").unwrap();
+        let configs = {
+            let mut doc = EditDoc::new("/lut-test.ARW");
+            doc.set("lut", "opacity", crate::doc::ParamValue::F32(opacity));
+            super::config::node_configs(&doc, 5200.0, w, h, Some(cube))
+        };
+        let NodeConfig::Run { uniforms, lut } = &configs[lut_idx] else {
+            panic!("lut node did not activate");
+        };
+        gpu.queue.write_buffer(&self.node_uniforms[lut_idx], 0, uniforms);
+        gpu.queue.write_buffer(
+            &self.lut3d_buffer,
+            0,
+            bytemuck::cast_slice(lut.as_ref().unwrap()),
+        );
+        let in_tex = make_chain_tex(gpu, w, h, "test-lut-in");
+        let out_tex = make_chain_tex(gpu, w, h, "test-lut-out");
+        upload_rgba16f(gpu, &in_tex, w, h, rgba_in);
+        let mut encoder = gpu
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
+        dispatch_node(
+            gpu,
+            &mut encoder,
+            &self.lut_pipe,
+            true,
+            &in_tex,
+            &out_tex,
+            &self.node_uniforms[lut_idx],
+            &self.lut3d_buffer,
+            "test-lut",
+            w,
+            h,
+        );
+        gpu.queue.submit([encoder.finish()]);
+        readback_rgba16f_from_texture(gpu, &out_tex, w, h).unwrap()
+    }
 }
 
 #[cfg(test)]
@@ -1057,5 +1116,85 @@ mod tests {
             }
         }
         assert!(max_err < 0.01, "GPU vs CPU dcp_look max abs err = {max_err}");
+    }
+
+    /// The 3D-LUT shader must match a CPU reference (sRGB-encode → trilinear →
+    /// sRGB-decode → opacity mix) within f16 + interpolation tolerance, and a
+    /// non-identity LUT must actually move pixels.
+    #[test]
+    fn gpu_lut_matches_cpu_reference() {
+        // A "swap R and B" 3D LUT — strong, unambiguous, easy to reason about.
+        let size = 5usize;
+        let n = (size - 1) as f32;
+        let mut s = format!("LUT_3D_SIZE {size}\n");
+        for b in 0..size {
+            for g in 0..size {
+                for r in 0..size {
+                    // output = (b, g, r): channel swap in the encoded domain
+                    s.push_str(&format!(
+                        "{} {} {}\n",
+                        b as f32 / n,
+                        g as f32 / n,
+                        r as f32 / n
+                    ));
+                }
+            }
+        }
+        let cube = crate::lut::CubeLut::parse_cube(&s).unwrap();
+
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        let gpu = match rt.block_on(GpuContext::init()) {
+            Ok(g) => g,
+            Err(e) => {
+                eprintln!("skip: no GPU: {e}");
+                return;
+            }
+        };
+        let mut graph = RenderGraph::new(&gpu);
+
+        let srgb_enc = |c: f32| {
+            let x = c.clamp(0.0, 1.0);
+            if x <= 0.0031308 { 12.92 * x } else { 1.055 * x.powf(1.0 / 2.4) - 0.055 }
+        };
+        let srgb_dec = |c: f32| {
+            let x = c.clamp(0.0, 1.0);
+            if x <= 0.04045 { x / 12.92 } else { ((x + 0.055) / 1.055).powf(2.4) }
+        };
+        let opacity = 100.0f32;
+        let samples = [0.05f32, 0.2, 0.5, 0.85];
+        let mut rgba = Vec::new();
+        let mut cpu: Vec<[f32; 3]> = Vec::new();
+        for &r in &samples {
+            for &g in &samples {
+                for &b in &samples {
+                    rgba.extend_from_slice(&[r, g, b, 1.0]);
+                    let enc = [srgb_enc(r), srgb_enc(g), srgb_enc(b)];
+                    let looked = cube.apply_pixel(enc);
+                    let dec = [srgb_dec(looked[0]), srgb_dec(looked[1]), srgb_dec(looked[2])];
+                    let o = opacity / 100.0;
+                    cpu.push([
+                        r * (1.0 - o) + dec[0] * o,
+                        g * (1.0 - o) + dec[1] * o,
+                        b * (1.0 - o) + dec[2] * o,
+                    ]);
+                }
+            }
+        }
+        let w = cpu.len() as u32;
+        let out = graph.run_lut_test(&gpu, &cube, opacity, &rgba, w, 1);
+
+        let mut max_err = 0f32;
+        let mut moved = 0f32;
+        for (i, exp) in cpu.iter().enumerate() {
+            for c in 0..3 {
+                max_err = max_err.max((out[i * 3 + c] - exp[c]).abs());
+                moved = moved.max((out[i * 3 + c] - rgba[i * 4 + c]).abs());
+            }
+        }
+        assert!(max_err < 0.01, "GPU vs CPU lut max abs err = {max_err}");
+        assert!(moved > 0.1, "channel-swap LUT should visibly move pixels");
     }
 }

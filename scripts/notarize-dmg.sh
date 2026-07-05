@@ -43,7 +43,25 @@ elif [[ -n "${APPLE_ID:-}" && -n "${APPLE_PASSWORD:-}" && -n "${APPLE_TEAM_ID:-}
 elif [[ -n "${NOTARY_KEYCHAIN_PROFILE:-}" ]]; then
   SUBMIT_ARGS=(--keychain-profile "${NOTARY_KEYCHAIN_PROFILE}")
 else
-  echo "error: set APPLE_ID/APPLE_PASSWORD/APPLE_TEAM_ID, APPLE_API_* vars, or NOTARY_KEYCHAIN_PROFILE" >&2
+  echo "error: notarization credentials not found." >&2
+  echo "" >&2
+  echo "Add ONE of these to: $(pwd)/.env" >&2
+  echo "" >&2
+  echo "  APPLE_ID=you@example.com" >&2
+  echo "  APPLE_PASSWORD=xxxx-xxxx-xxxx-xxxx" >&2
+  echo "  APPLE_TEAM_ID=ZJP5CXC3FS" >&2
+  echo "" >&2
+  echo "Or store a keychain profile:" >&2
+  echo "  xcrun notarytool store-credentials \"meraraw-notary\"" >&2
+  echo "  NOTARY_KEYCHAIN_PROFILE=meraraw-notary" >&2
+  if [[ -f .env ]]; then
+    echo "" >&2
+    echo "Current .env keys (values hidden):" >&2
+    awk -F= '/^[^#[:space:]]/ {print "  - "$1}' .env >&2
+  else
+    echo "" >&2
+    echo "No .env file found — copy .env.example and add Apple vars." >&2
+  fi
   exit 1
 fi
 

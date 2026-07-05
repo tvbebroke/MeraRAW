@@ -8,6 +8,18 @@ mod license;
 mod menu;
 mod protocol;
 
+// Reference RAW-pipeline scaffold (mirrors the documented stage layout). The
+// live, GPU-accelerated pipeline runs in the `meratech-core` crate; each module
+// below points at its real counterpart. See `pipeline.rs`.
+mod color;
+mod export;
+mod gpu;
+mod grading;
+mod isp;
+mod pipeline;
+mod raw;
+mod tone;
+
 use tauri::Manager;
 use tracing_subscriber::EnvFilter;
 
@@ -145,6 +157,9 @@ fn main() {
             commands::add_to_album,
             commands::remove_from_album,
             commands::set_camera_profile,
+            commands::set_lut,
+            commands::set_demosaic,
+            commands::pick_lut,
             commands::get_grid,
             commands::list_folders,
             commands::set_asset_meta,

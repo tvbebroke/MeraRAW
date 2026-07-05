@@ -2612,6 +2612,7 @@ dependencies = [
  "half",
  "image",
  "jxl-oxide",
+ "merawler",
  "png 0.17.16",
  "psd",
  "rawler",
@@ -2645,6 +2646,10 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
 ]
+
+[[package]]
+name = "merawler"
+version = "0.1.0"
 
 [[package]]
 name = "metal"

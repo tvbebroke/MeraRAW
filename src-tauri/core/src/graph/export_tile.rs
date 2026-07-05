@@ -25,10 +25,14 @@ impl RenderGraph {
         doc: &EditDoc,
         as_shot_cct: f32,
         seg_masks: &HashMap<String, wgpu::TextureView>,
+        lut: Option<&crate::lut::CubeLut>,
     ) -> Result<Vec<f32>, CoreError> {
         self.invalidate_all();
         // run the normal render to execute the whole chain (present output
         // is discarded; cheap relative to the chain itself)…
+        // The look LUT is an in-chain creative module, so it bakes into the
+        // linear readback here just like grade/hsl/curve. (DCP is still applied
+        // CPU-side after readback — see engine/export.rs.)
         let _ = self.render(
             gpu,
             working_view,
@@ -40,6 +44,7 @@ impl RenderGraph {
             seg_masks,
             None,
             None,
+            lut,
         )?;
         // …then read the LINEAR texture that fed present: the last
         // non-identity stage output (or extract when everything's default).

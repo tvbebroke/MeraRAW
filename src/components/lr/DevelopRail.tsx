@@ -1,5 +1,15 @@
 // Right rail — Edit tab: Profile → Light → Color → Effects → Detail (+ histogram, AI).
-import { applyParamBatch, getStats, setCameraProfile, setParam } from "../../ipc/commands";
+import { useState } from "react";
+import {
+  applyParamBatch,
+  getDoc,
+  getStats,
+  pickLut,
+  setCameraProfile,
+  setDemosaic,
+  setLut,
+  setParam,
+} from "../../ipc/commands";
 import type { ImageMeta, ParamSpec } from "../../ipc/types";
 import { useDocStore } from "../../state/docStore";
 import { useUiStore } from "../../state/uiStore";
@@ -53,6 +63,51 @@ function ProfilePanel({
         {files.map((file, i) => (
           <option key={file} value={file}>
             {names[i] ?? file}
+          </option>
+        ))}
+      </select>
+    </Panel>
+  );
+}
+
+const DEMOSAIC_OPTIONS: { id: string; label: string }[] = [
+  { id: "rawler", label: "Rawler (built-in)" },
+  { id: "bilinear", label: "Bilinear" },
+  { id: "malvar", label: "Malvar" },
+  { id: "rcd", label: "RCD — darktable default" },
+  { id: "lmmse", label: "LMMSE — best for noise" },
+  { id: "amaze", label: "AMaZE — max detail" },
+  { id: "igv", label: "IGV — anti-aliasing" },
+  { id: "ddfapd", label: "DDFAPD (Menon)" },
+];
+
+function DemosaicPanel({
+  meta,
+  onMetaChange,
+}: {
+  meta: ImageMeta | null;
+  onMetaChange: (m: ImageMeta) => void;
+}) {
+  // Demosaicing only applies to sensor RAW (rendered images are already RGB).
+  if (!meta || meta.kind !== "raw") {
+    return null;
+  }
+  const current = meta.demosaic || "rcd";
+  return (
+    <Panel title="Demosaic" defaultOpen={false}>
+      <p className="muted sm">
+        Bayer reconstruction algorithm (merawler engine). Switching re-decodes
+        the RAW; the preview and exports update. Your edits are unchanged.
+      </p>
+      <select
+        value={current}
+        onChange={(e) => {
+          setDemosaic(e.target.value).then(onMetaChange).catch(console.error);
+        }}
+      >
+        {DEMOSAIC_OPTIONS.map((o) => (
+          <option key={o.id} value={o.id}>
+            {o.label}
           </option>
         ))}
       </select>
@@ -135,6 +190,82 @@ function EffectsPanel({ meta }: { meta: ImageMeta | null }) {
         <p className="muted sm">Post-crop vignette — coming in a future build.</p>
       </Panel>
     </>
+  );
+}
+
+function LutPanel({
+  meta,
+  specs,
+}: {
+  meta: ImageMeta | null;
+  specs: ParamSpec[];
+}) {
+  const doc = useDocStore((s) => s.doc);
+  const setDoc = useDocStore((s) => s.setDoc);
+  const [busy, setBusy] = useState(false);
+
+  const lutPath = (doc?.meta?.lut_file as string | undefined) ?? undefined;
+  const lutName = lutPath ? lutPath.split(/[\\/]/).pop() : undefined;
+
+  async function load() {
+    setBusy(true);
+    try {
+      const path = await pickLut();
+      if (path) {
+        await setLut(path);
+        setDoc(await getDoc());
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function clear() {
+    setBusy(true);
+    try {
+      await setLut(null);
+      setDoc(await getDoc());
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Panel title="Look LUT" defaultOpen={false}>
+      <p className="muted sm">
+        Apply a 3D <code>.cube</code> look. Sits after tone, before sharpening.
+      </p>
+      <div className="lr-subhead">
+        <span title={lutPath}>{lutName ?? "No LUT loaded"}</span>
+      </div>
+      <div style={{ display: "flex", gap: "6px" }}>
+        <button
+          type="button"
+          className="lr-mini-btn"
+          disabled={busy || !meta}
+          onClick={() => void load()}
+        >
+          {lutName ? "Replace…" : "Load LUT…"}
+        </button>
+        {lutName && (
+          <button
+            type="button"
+            className="lr-mini-btn"
+            disabled={busy}
+            onClick={() => void clear()}
+          >
+            Remove
+          </button>
+        )}
+      </div>
+      {lutName && (
+        <ParamSlider specs={specs} path="lut.opacity" label="Opacity" meta={meta} />
+      )}
+    </Panel>
   );
 }
 
@@ -226,9 +357,11 @@ export function DevelopRail({
           meta={meta}
           onProfileChange={(m) => onMetaChange?.(m)}
         />
+        <DemosaicPanel meta={meta} onMetaChange={(m) => onMetaChange?.(m)} />
         <LightPanel meta={meta} specs={specs} />
         <ColorPanel meta={meta} specs={specs} tool={tool} setTool={setTool} />
         <EffectsPanel meta={meta} />
+        <LutPanel meta={meta} specs={specs} />
         <GroupPanel title="Detail" group="Detail" meta={meta} defaultOpen />
         <GroupPanel title="Calibration" group="Calibration" meta={meta} defaultOpen={false} />
         <Panel title="Optics" defaultOpen={false}>

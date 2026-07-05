@@ -320,7 +320,15 @@ pub(super) enum PipeKind {
     Grade,
     Hsl,
     Curve,
+    Lut3d,
     Sharpen,
+}
+
+impl PipeKind {
+    /// Nodes that bind a storage-buffer LUT at binding 3 (curve LUT / 3D cube).
+    pub(super) fn has_lut(self) -> bool {
+        matches!(self, PipeKind::Curve | PipeKind::Lut3d)
+    }
 }
 
 pub(super) const NODE_PIPES: &[PipeKind] = &[
@@ -331,8 +339,13 @@ pub(super) const NODE_PIPES: &[PipeKind] = &[
     PipeKind::Grade,
     PipeKind::Hsl,
     PipeKind::Curve,
+    PipeKind::Lut3d,
     PipeKind::Sharpen,
 ];
+
+/// Storage-buffer size for the 3D LUT node: MAX_SIZE³ × 3 channels × f32.
+pub(super) const LUT3D_BUF_BYTES: u64 =
+    (crate::lut::MAX_SIZE * crate::lut::MAX_SIZE * crate::lut::MAX_SIZE * 3 * 4) as u64;
 
 pub(super) const MAX_STROKE_POINTS: usize = 512;
 
@@ -380,6 +393,18 @@ impl RenderGraph {
             gpu,
             "tone-curve",
             include_str!("curve.wgsl"),
+            &[
+                bgl_tex(0, true),
+                bgl_storage_tex(1, wgpu::TextureFormat::Rgba16Float),
+                bgl_uniform(2),
+                bgl_storage_buf(3),
+            ],
+        );
+        // Same bind shape as the curve node (tex, storage_tex, uniform, LUT buf).
+        let lut_pipe = make_pass(
+            gpu,
+            "lut3d",
+            include_str!("lut.wgsl"),
             &[
                 bgl_tex(0, true),
                 bgl_storage_tex(1, wgpu::TextureFormat::Rgba16Float),
@@ -456,6 +481,14 @@ impl RenderGraph {
             usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
+        // Dedicated buffer for the 3D LUT node so it never aliases the shared
+        // curve LUT buffer when both nodes run in one submission.
+        let lut3d_buffer = gpu.device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("lut3d"),
+            size: LUT3D_BUF_BYTES,
+            usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
         let dummy_mask = make_mask_tex(gpu, 1, 1, "dummy-mask");
 
         Self {
@@ -463,6 +496,7 @@ impl RenderGraph {
             present,
             simple_pipes,
             curve_pipe,
+            lut_pipe,
             mask_geom,
             mask_sample,
             blend,
@@ -471,6 +505,7 @@ impl RenderGraph {
             present_uniforms: mk_uniform(std::mem::size_of::<PresentUniforms>() as u64, "present-u"),
             node_uniforms,
             lut_buffer,
+            lut3d_buffer,
             pool: Vec::new(),
             lut_pool: Vec::new(),
             strokes_pool: Vec::new(),

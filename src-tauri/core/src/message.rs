@@ -250,6 +250,16 @@ pub enum EngineMsg {
         profile_file: String,
         reply: oneshot::Sender<Result<ImageMeta, CoreError>>,
     },
+    /// Load (Some path) or clear (None) the current image's 3D look LUT.
+    SetLut {
+        path: Option<String>,
+        reply: oneshot::Sender<Result<(), CoreError>>,
+    },
+    /// Change the demosaic algorithm for the current image and re-decode it.
+    SetDemosaic {
+        algo: String,
+        reply: oneshot::Sender<Result<ImageMeta, CoreError>>,
+    },
     GetGrid {
         query: crate::catalog::GridQuery,
         reply: oneshot::Sender<Result<Vec<crate::catalog::GridItem>, CoreError>>,

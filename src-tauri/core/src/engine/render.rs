@@ -147,6 +147,7 @@ impl Engine {
         };
         let as_shot_cct = cur.as_shot_cct();
         let dcp = cur.dcp_profile.clone();
+        let lut = cur.lut_cube.clone();
         let started = Instant::now();
         let rgba = {
             let graph = self.graph.as_mut().unwrap();
@@ -161,6 +162,7 @@ impl Engine {
                 &seg_views,
                 self.overlay_mask.as_deref(),
                 dcp.as_deref(),
+                lut.as_deref(),
             )?
         };
         let elapsed = started.elapsed();
@@ -238,6 +240,7 @@ impl Engine {
             &seg_views,
             None,
             cur.dcp_profile.as_deref(),
+            cur.lut_cube.as_deref(),
         )?;
         let rgb: Vec<u8> = rgba.chunks_exact(4).flat_map(|p| [p[0], p[1], p[2]]).collect();
         let img = image::RgbImage::from_raw(view.out_w, view.out_h, rgb)

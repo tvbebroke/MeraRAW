@@ -95,7 +95,7 @@ fn main() {
     };
     let t0 = std::time::Instant::now();
     let frame = graph
-        .render(&gpu, &tv, payload.width, payload.height, &view, &doc, payload.meta.estimated_cct.unwrap_or(5200.0), &Default::default(), None, None)
+        .render(&gpu, &tv, payload.width, payload.height, &view, &doc, payload.meta.estimated_cct.unwrap_or(5200.0), &Default::default(), None, None, None)
         .expect("render");
     println!(
         "render {}x{} in {} ms, passes: {:?}",

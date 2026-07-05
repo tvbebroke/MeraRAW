@@ -63,6 +63,13 @@ else
 fi
 
 echo "→ Building MeraRAW Beta ${VERSION} (signed DMG)…"
+npm run build
+# Re-link frontend into the Tauri binary when dist is newer than the last release build.
+RELEASE_BIN="src-tauri/target/release/meratech-editor"
+if [[ -f "${RELEASE_BIN}" && dist/index.html -nt "${RELEASE_BIN}" ]]; then
+  echo "→ dist/ newer than release binary — forcing Tauri relink"
+  rm -f "${RELEASE_BIN}"
+fi
 npm run tauri build
 
 BUILT=""

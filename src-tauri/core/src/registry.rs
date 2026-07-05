@@ -48,6 +48,7 @@ pub const MODULE_ORDER: &[&str] = &[
     "color_grade",   // 5 (P3)
     "hsl",           // 6 (P3)
     "tone_curve",    // 7 (P3)
+    "lut",           // 8a: 3D look LUT (opacity param; cube path in meta)
                      // 8: sharpen (detail module, second pass)
 ];
 
@@ -138,6 +139,9 @@ fn build_registry() -> BTreeMap<&'static str, ParamSpec> {
         f32_spec("tone_curve.darks", -100.0, 100.0, 0.0, "Darks", 1.0, "Tone"),
         f32_spec("tone_curve.lights", -100.0, 100.0, 0.0, "Lights", 1.0, "Tone"),
         f32_spec("tone_curve.highlights", -100.0, 100.0, 0.0, "Highlights", 1.0, "Tone"),
+        // ---- slot 8a: lut (3D look LUT). The .cube path lives in
+        // meta.lut_file (set via set_lut); only opacity is a doc param. ----
+        f32_spec("lut.opacity", 0.0, 100.0, 100.0, "LUT Opacity", 1.0, "LUT"),
     ];
     // tone curve point list (Curve type — UI widget later; ops/assistant now)
     specs.push(ParamSpec {

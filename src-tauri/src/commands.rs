@@ -81,6 +81,22 @@ pub async fn pick_file(app: AppHandle) -> Result<Option<String>, AppError> {
     Ok(picked.map(|p| p.to_string()))
 }
 
+/// Native picker for a 3D look LUT (`.cube`).
+#[tauri::command]
+pub async fn pick_lut(app: AppHandle) -> Result<Option<String>, AppError> {
+    let (tx, rx) = tokio::sync::oneshot::channel();
+    app.dialog()
+        .file()
+        .add_filter("3D LUT", &["cube"])
+        .pick_file(move |f| {
+            let _ = tx.send(f);
+        });
+    let picked = rx
+        .await
+        .map_err(|_| AppError::Internal("dialog dropped".into()))?;
+    Ok(picked.map(|p| p.to_string()))
+}
+
 #[tauri::command]
 pub async fn pick_folder(app: AppHandle) -> Result<Option<String>, AppError> {
     let (tx, rx) = tokio::sync::oneshot::channel();
@@ -501,6 +517,24 @@ pub async fn set_camera_profile(
         .set_camera_profile(profileFile)
         .await?
         .map_err(AppError::from)
+}
+
+/// Load a 3D look LUT (`.cube`) for the current image, or clear it (path=None).
+#[tauri::command]
+pub async fn set_lut(
+    engine: State<'_, EngineHandle>,
+    path: Option<String>,
+) -> Result<(), AppError> {
+    engine.set_lut(path).await?.map_err(AppError::from)
+}
+
+/// Change the demosaic algorithm for the current image and re-decode.
+#[tauri::command]
+pub async fn set_demosaic(
+    engine: State<'_, EngineHandle>,
+    algo: String,
+) -> Result<meratech_core::raw::ImageMeta, AppError> {
+    engine.set_demosaic(algo).await?.map_err(AppError::from)
 }
 
 #[tauri::command]

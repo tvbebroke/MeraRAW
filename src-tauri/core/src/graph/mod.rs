@@ -29,6 +29,7 @@ pub struct RenderGraph {
     present: PassResources,
     simple_pipes: HashMap<&'static str, PassResources>,
     curve_pipe: PassResources,
+    lut_pipe: PassResources,
     mask_geom: PassResources,
     mask_sample: PassResources,
     blend: PassResources,
@@ -37,6 +38,8 @@ pub struct RenderGraph {
     present_uniforms: wgpu::Buffer,
     node_uniforms: Vec<wgpu::Buffer>,
     lut_buffer: wgpu::Buffer,
+    /// Dedicated storage buffer for the 3D LUT node (never aliases lut_buffer).
+    lut3d_buffer: wgpu::Buffer,
     /// per-render uniform pool for mask passes (write once per render)
     pool: Vec<wgpu::Buffer>,
     lut_pool: Vec<wgpu::Buffer>,

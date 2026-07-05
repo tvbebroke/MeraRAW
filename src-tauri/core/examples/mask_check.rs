@@ -113,6 +113,7 @@ fn main() {
             &seg,
             None,
             None,
+            None,
         )
         .expect("render");
     println!(

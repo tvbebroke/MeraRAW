@@ -178,6 +178,21 @@ export function setCameraProfile(
   return invoke<ImageMeta>("set_camera_profile", { profileFile });
 }
 
+/** Native picker for a 3D look LUT (.cube). */
+export function pickLut(): Promise<string | null> {
+  return invoke<string | null>("pick_lut");
+}
+
+/** Load (path) or clear (null) the current image's 3D look LUT. */
+export function setLut(path: string | null): Promise<void> {
+  return invoke<void>("set_lut", { path });
+}
+
+/** Change the demosaic algorithm and re-decode the current RAW. */
+export function setDemosaic(algo: string): Promise<ImageMeta> {
+  return invoke<ImageMeta>("set_demosaic", { algo });
+}
+
 export function getGrid(
   query: import("./types").GridQuery,
 ): Promise<import("./types").GridItem[]> {

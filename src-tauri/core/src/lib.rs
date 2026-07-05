@@ -12,6 +12,7 @@ pub mod export;
 pub mod gpu;
 pub mod graph;
 pub mod image;
+pub mod lut;
 pub mod message;
 pub mod ops;
 pub mod profile;

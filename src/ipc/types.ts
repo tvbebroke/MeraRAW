@@ -58,6 +58,8 @@ export interface ImageMeta {
   cameraProfile: string | null;
   availableProfiles: string[];
   availableProfileFiles: string[];
+  /** Demosaic algorithm in effect (e.g. "rcd"). Empty for non-RAW. */
+  demosaic: string;
 }
 
 export interface ViewParams {

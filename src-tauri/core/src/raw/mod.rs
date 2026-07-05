@@ -68,6 +68,89 @@ pub struct ImageMeta {
     /// Parallel to `available_profiles` — DCP filenames for switching.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub available_profile_files: Vec<String>,
+    /// Demosaic algorithm in effect (name, e.g. "rcd"); drives the UI picker.
+    #[serde(default)]
+    pub demosaic: String,
+}
+
+/// Which demosaic algorithm runs at decode time. `Rawler` = rawler's built-in
+/// PPG interpolation; the rest are the merawler engine. The choice is stored in
+/// the doc; changing it re-decodes the RAW (as darktable does).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Demosaic {
+    /// rawler's built-in demosaic (the original path).
+    Rawler,
+    Bilinear,
+    Malvar,
+    /// darktable's default — the MeraRAW default too.
+    #[default]
+    Rcd,
+    Lmmse,
+    Amaze,
+    Igv,
+    Ddfapd,
+}
+
+impl Demosaic {
+    pub fn name(self) -> &'static str {
+        match self {
+            Demosaic::Rawler => "rawler",
+            Demosaic::Bilinear => "bilinear",
+            Demosaic::Malvar => "malvar",
+            Demosaic::Rcd => "rcd",
+            Demosaic::Lmmse => "lmmse",
+            Demosaic::Amaze => "amaze",
+            Demosaic::Igv => "igv",
+            Demosaic::Ddfapd => "ddfapd",
+        }
+    }
+
+    pub fn from_name(s: &str) -> Option<Self> {
+        Some(match s.to_ascii_lowercase().as_str() {
+            "rawler" => Demosaic::Rawler,
+            "bilinear" => Demosaic::Bilinear,
+            "malvar" => Demosaic::Malvar,
+            "rcd" => Demosaic::Rcd,
+            "lmmse" => Demosaic::Lmmse,
+            "amaze" => Demosaic::Amaze,
+            "igv" => Demosaic::Igv,
+            "ddfapd" | "menon" => Demosaic::Ddfapd,
+            _ => return None,
+        })
+    }
+
+    /// Parse a name, falling back to the default for `None`/unknown.
+    pub fn parse_or_default(s: Option<&str>) -> Self {
+        s.and_then(Self::from_name).unwrap_or_default()
+    }
+
+    /// All variants, in UI order.
+    pub fn all() -> &'static [Demosaic] {
+        &[
+            Demosaic::Rawler,
+            Demosaic::Bilinear,
+            Demosaic::Malvar,
+            Demosaic::Rcd,
+            Demosaic::Lmmse,
+            Demosaic::Amaze,
+            Demosaic::Igv,
+            Demosaic::Ddfapd,
+        ]
+    }
+
+    /// The merawler algorithm, or `None` for rawler's built-in path.
+    pub fn merawler_algo(self) -> Option<merawler::Algorithm> {
+        Some(match self {
+            Demosaic::Rawler => return None,
+            Demosaic::Bilinear => merawler::Algorithm::Bilinear,
+            Demosaic::Malvar => merawler::Algorithm::Malvar,
+            Demosaic::Rcd => merawler::Algorithm::Rcd,
+            Demosaic::Lmmse => merawler::Algorithm::Lmmse,
+            Demosaic::Amaze => merawler::Algorithm::Amaze,
+            Demosaic::Igv => merawler::Algorithm::Igv,
+            Demosaic::Ddfapd => merawler::Algorithm::Ddfapd,
+        })
+    }
 }
 
 /// Full decode result: working buffer is linear Rec.2020 scene-referred,
@@ -100,4 +183,16 @@ pub trait Decoder: Send + Sync {
         path: &Path,
         profile_path: Option<&Path>,
     ) -> Result<DecodedImage, CoreError>;
+
+    /// Full decode choosing the demosaic algorithm. The default ignores it
+    /// (correct for already-rendered/non-CFA sources); `RawlerDecoder` overrides
+    /// it to route between rawler's built-in demosaic and the merawler engine.
+    fn decode_with_options(
+        &self,
+        path: &Path,
+        profile_path: Option<&Path>,
+        _demosaic: Demosaic,
+    ) -> Result<DecodedImage, CoreError> {
+        self.decode_with_profile(path, profile_path)
+    }
 }

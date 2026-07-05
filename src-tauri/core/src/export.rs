@@ -759,6 +759,7 @@ mod tests {
             camera_profile: None,
             available_profiles: Vec::new(),
             available_profile_files: Vec::new(),
+            demosaic: String::new(),
         }
     }
 

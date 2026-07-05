@@ -74,10 +74,27 @@ impl Engine {
                 .map(std::sync::Arc::new)
         });
 
+        // Restore a previously-applied look LUT from the sidecar path, if any.
+        let lut_cube = doc.meta.lut_file.as_ref().and_then(|p| {
+            match crate::lut::CubeLut::load_cube(std::path::Path::new(p)) {
+                Ok(c) => Some(std::sync::Arc::new(c)),
+                Err(e) => {
+                    tracing::warn!(error = %e, path = %p, "load look LUT on open");
+                    None
+                }
+            }
+        });
+
+        // Demosaic algorithm from the doc (None = engine default). Surfaced on
+        // meta so the UI picker shows the effective algorithm.
+        let demosaic = crate::raw::Demosaic::parse_or_default(doc.meta.demosaic.as_deref());
+        meta.demosaic = demosaic.name().to_string();
+
         self.current = Some(CurrentImage {
             path: path.clone(),
             meta: meta.clone(),
             dcp_profile,
+            lut_cube,
             working: None,
             small_cpu: None,
             docs: vec![doc],
@@ -118,27 +135,37 @@ impl Engine {
                 })
                 .expect("spawn preview worker");
         }
-        // full decode
-        {
-            let tx = self.self_tx.clone();
-            let profile_path = profile_path.clone();
-            std::thread::Builder::new()
-                .name("decode-worker".into())
-                .spawn(move || {
-                    let dec = crate::raw::decoder_for(&path);
-                    let started = Instant::now();
-                    let result = dec
-                        .decode_with_profile(&path, profile_path.as_deref())
-                        .map(|img| Box::new(DecodedPayload::from_decoded(img)));
-                    tracing::info!(
-                        elapsed_ms = started.elapsed().as_millis() as u64,
-                        ok = result.is_ok(),
-                        "full decode finished"
-                    );
-                    let _ = tx.blocking_send(EngineMsg::DecodeDone { generation, result });
-                })
-                .expect("spawn decode worker");
-        }
+        // full decode with the chosen demosaic algorithm
+        self.spawn_full_decode(path, profile_path, demosaic, generation);
+    }
+
+    /// Spawn the background full-decode worker. Shared by `open_image` and
+    /// `set_demosaic` (re-decode). Result is delivered as `DecodeDone`.
+    pub(super) fn spawn_full_decode(
+        &self,
+        path: PathBuf,
+        profile_path: Option<PathBuf>,
+        demosaic: crate::raw::Demosaic,
+        generation: u64,
+    ) {
+        let tx = self.self_tx.clone();
+        std::thread::Builder::new()
+            .name("decode-worker".into())
+            .spawn(move || {
+                let dec = crate::raw::decoder_for(&path);
+                let started = Instant::now();
+                let result = dec
+                    .decode_with_options(&path, profile_path.as_deref(), demosaic)
+                    .map(|img| Box::new(DecodedPayload::from_decoded(img)));
+                tracing::info!(
+                    elapsed_ms = started.elapsed().as_millis() as u64,
+                    ok = result.is_ok(),
+                    demosaic = demosaic.name(),
+                    "full decode finished"
+                );
+                let _ = tx.blocking_send(EngineMsg::DecodeDone { generation, result });
+            })
+            .expect("spawn decode worker");
     }
 
     pub(super) fn finish_decode(&mut self, payload: DecodedPayload) {
@@ -235,6 +262,81 @@ impl Engine {
             g.set_look(display_look);
         }
         self.schedule_render();
+        let _ = reply.send(Ok(out_meta));
+    }
+
+    /// Load (Some path) or clear (None) the 3D look LUT for the current image.
+    /// The parsed cube is cached on the image; the path is stored in the doc so
+    /// the look persists in the sidecar.
+    pub(super) fn set_lut(
+        &mut self,
+        path: Option<String>,
+        reply: oneshot::Sender<Result<(), CoreError>>,
+    ) {
+        let Some(cur) = self.current.as_mut() else {
+            let _ = reply.send(Err(CoreError::NoImage));
+            return;
+        };
+        match path {
+            Some(p) => match crate::lut::CubeLut::load_cube(std::path::Path::new(&p)) {
+                Ok(cube) => {
+                    cur.lut_cube = Some(std::sync::Arc::new(cube));
+                    cur.doc_mut().meta.lut_file = Some(p);
+                    cur.doc_dirty = true;
+                }
+                Err(e) => {
+                    let _ = reply.send(Err(e));
+                    return;
+                }
+            },
+            None => {
+                cur.lut_cube = None;
+                cur.doc_mut().meta.lut_file = None;
+                cur.doc_dirty = true;
+            }
+        }
+        if let Some(g) = &mut self.graph {
+            g.invalidate_from_module("lut");
+        }
+        self.schedule_render();
+        self.schedule_settle();
+        let _ = reply.send(Ok(()));
+    }
+
+    /// Change the demosaic algorithm for the current image and re-decode it.
+    /// The working buffer (and thus preview + export) is rebuilt; edits are
+    /// preserved since they live in the render graph, not the decoded buffer.
+    pub(super) fn set_demosaic(
+        &mut self,
+        algo: String,
+        reply: oneshot::Sender<Result<ImageMeta, CoreError>>,
+    ) {
+        let Some(demosaic) = crate::raw::Demosaic::from_name(&algo) else {
+            let _ = reply.send(Err(CoreError::InvalidOp(format!(
+                "unknown demosaic algorithm: {algo}"
+            ))));
+            return;
+        };
+        // Update the doc + meta, then gather what the re-decode needs (ending the
+        // &mut self.current borrow before we call spawn_full_decode).
+        let (path, profile_path, out_meta) = {
+            let Some(cur) = self.current.as_mut() else {
+                let _ = reply.send(Err(CoreError::NoImage));
+                return;
+            };
+            cur.doc_mut().meta.demosaic = Some(demosaic.name().to_string());
+            cur.doc_dirty = true;
+            cur.meta.demosaic = demosaic.name().to_string();
+            let profile_file = cur.doc().meta.profile_file.clone();
+            let index = crate::profile::ProfileIndex::embedded();
+            let profile_path =
+                crate::profile::choose_profile(&cur.meta, &index, profile_file.as_deref())
+                    .map(|p| crate::profile::profile_path(&p.file));
+            (cur.path.clone(), profile_path, cur.meta.clone())
+        };
+        // Re-decode with the same generation so DecodeDone isn't discarded as
+        // stale; finish_decode replaces the working buffer and re-renders.
+        self.spawn_full_decode(path, profile_path, demosaic, self.generation);
         let _ = reply.send(Ok(out_meta));
     }
 }

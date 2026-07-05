@@ -9,6 +9,7 @@ import {
   readFileMeta,
   reportFrontendStatus,
   setAssetMeta,
+  setDemosaic,
   setParam,
   undo,
   wbFromPoint,
@@ -67,6 +68,22 @@ export async function runSelfTest(latestVersion: number): Promise<void> {
   const fail = (m: string) => reportFrontendStatus(`selftest-fail: ${m}`);
   try {
     const baseline = await centerLuma(latestVersion);
+
+    // 0) demosaic switch re-decodes and repaints (merawler engine). Runs first
+    // so it is independent of later, environment-dependent steps (import/grid).
+    const frameDem = nextFrame(30000); // re-decode + AMaZE takes a few seconds
+    const mA = await setDemosaic("amaze");
+    if (mA.demosaic !== "amaze") {
+      return void (await fail(`demosaic not set: ${mA.demosaic}`));
+    }
+    await frameDem; // must repaint from the re-decoded working buffer
+    const frameDem2 = nextFrame(30000);
+    const mR = await setDemosaic("rcd");
+    if (mR.demosaic !== "rcd") {
+      return void (await fail(`demosaic restore: ${mR.demosaic}`));
+    }
+    await frameDem2;
+    await reportFrontendStatus("selftest-demosaic-ok");
 
     // 1) exposure +1.5 stops through the real op path
     const frameP = nextFrame();

@@ -79,6 +79,14 @@ pub struct DocMeta {
     pub label: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub profile_file: Option<String>,
+    /// Path to a loaded 3D look LUT (`.cube`); the parsed cube is cached in the
+    /// engine. None = no LUT. Persisted in the sidecar so a look survives reload.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub lut_file: Option<String>,
+    /// Demosaic algorithm name (e.g. "rcd", "amaze", "rawler"). None = engine
+    /// default. Changing it re-decodes the RAW; persisted in the sidecar.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub demosaic: Option<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub keywords: Vec<String>,
 }

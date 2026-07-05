@@ -96,6 +96,7 @@ impl Rig {
                 &Default::default(),
                 None,
                 None,
+                None,
             )
             .unwrap();
         center(&frame)
