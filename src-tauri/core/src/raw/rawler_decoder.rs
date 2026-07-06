@@ -219,12 +219,14 @@ impl RawlerDecoder {
             .raw_image(&source, &params, zalgo.is_some())
             .map_err(dec_err)?;
 
-        // Pixel source + its colour state:
+        // Pixel source + its colour state. `effective` is the algorithm that
+        // ACTUALLY produced the pixels — fallbacks report `rawler`, so the UI
+        // and sidecar never claim an algorithm that didn't run.
         //  * merawler / rawler   → camera-native RGB, sensor orientation
         //  * zerawler LibRaw     → camera-native RGB, orientation pre-baked
         //  * zerawler RT         → linear Rec.2020 + camera WB, pre-baked
         //    (validated contract; skips our WB+matrix landing entirely)
-        let (cam_rgb, w, h, state): (Vec<[f32; 3]>, usize, usize, PixelState) =
+        let (cam_rgb, w, h, state, effective): (Vec<[f32; 3]>, usize, usize, PixelState, Demosaic) =
             if let Some(algo) = zalgo {
                 match zerawler_rgb(path, algo, &raw) {
                     Ok((data, w, h)) => {
@@ -234,7 +236,7 @@ impl RawlerDecoder {
                                 PixelState::CameraNative { prerotated: true }
                             }
                         };
-                        (data, w, h, state)
+                        (data, w, h, state, demosaic)
                     }
                     Err(e) => {
                         tracing::warn!(
@@ -246,24 +248,40 @@ impl RawlerDecoder {
                             .raw_image(&source, &params, false)
                             .map_err(dec_err)?;
                         let (d, w, h) = rawler_cam_rgb(&raw)?;
-                        (d, w, h, PixelState::CameraNative { prerotated: false })
+                        (
+                            d,
+                            w,
+                            h,
+                            PixelState::CameraNative { prerotated: false },
+                            Demosaic::Rawler,
+                        )
                     }
                 }
             } else {
-                let (d, w, h) = match demosaic.merawler_algo() {
+                let (d, w, h, effective) = match demosaic.merawler_algo() {
                     Some(algo) => match merawler_cam_rgb(&raw, algo) {
-                        Some(v) => v,
+                        Some((d, w, h)) => (d, w, h, demosaic),
                         None => {
                             tracing::info!(
                                 algo = demosaic.name(),
                                 "merawler unavailable for this CFA (non-Bayer/already demosaiced); using rawler"
                             );
-                            rawler_cam_rgb(&raw)?
+                            let (d, w, h) = rawler_cam_rgb(&raw)?;
+                            (d, w, h, Demosaic::Rawler)
                         }
                     },
-                    None => rawler_cam_rgb(&raw)?,
+                    None => {
+                        let (d, w, h) = rawler_cam_rgb(&raw)?;
+                        (d, w, h, Demosaic::Rawler)
+                    }
                 };
-                (d, w, h, PixelState::CameraNative { prerotated: false })
+                (
+                    d,
+                    w,
+                    h,
+                    PixelState::CameraNative { prerotated: false },
+                    effective,
+                )
             };
 
         let cal = CameraCalibration::from_rawler(&raw.color_matrix);
@@ -372,13 +390,13 @@ impl RawlerDecoder {
             working.height as u32,
             Some(cct),
         );
-        meta.demosaic = demosaic.name().to_string();
+        meta.demosaic = effective.name().to_string();
         Ok(DecodedImage { working, meta })
     }
 }
 
 /// Colour state of the demosaiced pixel buffer entering the landing stage.
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy)]
 enum PixelState {
     /// Camera-native RGB, unity WB. `prerotated` = EXIF orientation already
     /// baked by the producer (zerawler workers rotate; in-process paths don't).
@@ -388,9 +406,10 @@ enum PixelState {
     Rec2020Ready,
 }
 
-/// zerawler sidecar path: worker decodes the whole file. LibRaw output is
-/// camera-native linear (levels forced to rawler's); RT output is
-/// sRGB-TRC-encoded Rec.2020 (validated 2026-07-05) and is linearized here.
+/// zerawler sidecar path: worker decodes the whole file. Both backends hand
+/// back linear data per their validated contracts — LibRaw camera-native
+/// (levels forced to rawler's below), RT linear Rec.2020 with camera WB
+/// (TRC decoded inside zerawler).
 fn zerawler_rgb(
     path: &Path,
     algo: zerawler::Algorithm,
@@ -409,26 +428,7 @@ fn zerawler_rgb(
     let dec = engine
         .decode_opts(path, algo, zerawler::Mode::Native, opts)
         .map_err(|e| CoreError::Decode(format!("zerawler: {e}")))?;
-    let mut data = dec.image.data;
-    if algo.backend() == zerawler::Backend::RawTherapee {
-        // RTv4_Rec2020 float output carries the sRGB transfer curve.
-        for px in &mut data {
-            for c in px.iter_mut() {
-                *c = srgb_decode(*c);
-            }
-        }
-    }
-    Ok((data, dec.image.width, dec.image.height))
-}
-
-/// Inverse sRGB OETF (linearize an sRGB-encoded component).
-#[inline]
-fn srgb_decode(v: f32) -> f32 {
-    if v <= 0.04045 {
-        v / 12.92
-    } else {
-        ((v + 0.055) / 1.055).powf(2.4)
-    }
+    Ok((dec.image.data, dec.image.width, dec.image.height))
 }
 
 /// rawler's built-in path: rescale → demosaic → crops → camera-native RGB.
