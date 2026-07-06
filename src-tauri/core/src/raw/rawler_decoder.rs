@@ -212,97 +212,157 @@ impl RawlerDecoder {
         let decoder = self.loader.get_decoder(&source).map_err(dec_err)?;
         let params = RawDecodeParams::default();
         let md = decoder.raw_metadata(&source, &params).map_err(dec_err)?;
-        let raw = decoder.raw_image(&source, &params, false).map_err(dec_err)?;
+        // zerawler decodes pixels in the worker process, so a metadata-only
+        // (dummy) rawler decode suffices there; other paths need pixels.
+        let zalgo = demosaic.zerawler_algo();
+        let mut raw = decoder
+            .raw_image(&source, &params, zalgo.is_some())
+            .map_err(dec_err)?;
 
-        // Camera-native RGB, either from the merawler engine or rawler's built-in
-        // demosaic. merawler falls back to rawler for non-Bayer sources.
-        let (cam_rgb, w, h): (Vec<[f32; 3]>, usize, usize) = match demosaic.merawler_algo() {
-            Some(algo) => match merawler_cam_rgb(&raw, algo) {
-                Some(v) => v,
-                None => {
-                    tracing::info!(
-                        algo = demosaic.name(),
-                        "merawler unavailable for this CFA (non-Bayer/already demosaiced); using rawler"
-                    );
-                    rawler_cam_rgb(&raw)?
+        // Pixel source + its colour state:
+        //  * merawler / rawler   → camera-native RGB, sensor orientation
+        //  * zerawler LibRaw     → camera-native RGB, orientation pre-baked
+        //  * zerawler RT         → linear Rec.2020 + camera WB, pre-baked
+        //    (validated contract; skips our WB+matrix landing entirely)
+        let (cam_rgb, w, h, state): (Vec<[f32; 3]>, usize, usize, PixelState) =
+            if let Some(algo) = zalgo {
+                match zerawler_rgb(path, algo, &raw) {
+                    Ok((data, w, h)) => {
+                        let state = match algo.backend() {
+                            zerawler::Backend::RawTherapee => PixelState::Rec2020Ready,
+                            zerawler::Backend::LibRaw => {
+                                PixelState::CameraNative { prerotated: true }
+                            }
+                        };
+                        (data, w, h, state)
+                    }
+                    Err(e) => {
+                        tracing::warn!(
+                            algo = demosaic.name(),
+                            error = %e,
+                            "zerawler sidecar failed; falling back to rawler demosaic"
+                        );
+                        raw = decoder
+                            .raw_image(&source, &params, false)
+                            .map_err(dec_err)?;
+                        let (d, w, h) = rawler_cam_rgb(&raw)?;
+                        (d, w, h, PixelState::CameraNative { prerotated: false })
+                    }
                 }
-            },
-            None => rawler_cam_rgb(&raw)?,
-        };
-
-        // Our colorimetric landing: as-shot WB → cam→Rec.2020 (dual-illum).
-        let mut wb = raw.wb_coeffs;
-        if wb[0].is_nan() || wb[1] <= 0.0 {
-            wb = [1.0, 1.0, 1.0, 1.0];
-        }
-        // normalize to green = 1
-        let g = wb[1];
-        let wbn = [wb[0] / g, 1.0, wb[2] / g];
+            } else {
+                let (d, w, h) = match demosaic.merawler_algo() {
+                    Some(algo) => match merawler_cam_rgb(&raw, algo) {
+                        Some(v) => v,
+                        None => {
+                            tracing::info!(
+                                algo = demosaic.name(),
+                                "merawler unavailable for this CFA (non-Bayer/already demosaiced); using rawler"
+                            );
+                            rawler_cam_rgb(&raw)?
+                        }
+                    },
+                    None => rawler_cam_rgb(&raw)?,
+                };
+                (d, w, h, PixelState::CameraNative { prerotated: false })
+            };
 
         let cal = CameraCalibration::from_rawler(&raw.color_matrix);
         let cct = cal.estimate_cct(&raw.wb_coeffs);
-        let dcp = profile_path.and_then(|p| DcpProfile::load(p).ok());
-        let cam2rec = if let Some(ref dcp) = dcp {
-            if dcp.matches_camera(&md.make, &md.model) {
-                dcp.cam_to_rec2020(&raw.wb_coeffs, &cal).unwrap_or_else(|| {
-                    tracing::warn!(
-                        file = ?profile_path,
-                        "DCP matrix failed; falling back to rawler calibration"
-                    );
-                    cal.cam_to_rec2020(&raw.wb_coeffs).unwrap_or([
-                        [1.0, 0.0, 0.0],
-                        [0.0, 1.0, 0.0],
-                        [0.0, 0.0, 1.0],
-                    ])
-                })
-            } else {
-                tracing::warn!(
-                    profile = %dcp.unique_camera_model,
-                    make = %md.make,
-                    model = %md.model,
-                    "DCP camera mismatch; using rawler calibration"
-                );
-                cal.cam_to_rec2020(&raw.wb_coeffs).ok_or_else(|| {
-                    CoreError::Decode(format!(
-                        "no usable color matrix for {} {}",
-                        md.make, md.model
-                    ))
-                })?
-            }
-        } else if profile_path.is_some() {
-            tracing::warn!(file = ?profile_path, "DCP load failed; using rawler calibration");
-            cal.cam_to_rec2020(&raw.wb_coeffs).ok_or_else(|| {
-                CoreError::Decode(format!(
-                    "no usable color matrix for {} {}",
-                    md.make, md.model
-                ))
-            })?
-        } else {
-            cal.cam_to_rec2020(&raw.wb_coeffs).ok_or_else(|| {
-                CoreError::Decode(format!(
-                    "no usable color matrix for {} {}",
-                    md.make, md.model
-                ))
-            })?
-        };
 
         let mut data = vec![0.0f32; w * h * 3];
-        for (i, px) in cam_rgb.iter().enumerate() {
-            let wbd = [px[0] * wbn[0], px[1], px[2] * wbn[2]];
-            let rgb = mat_vec(&cam2rec, wbd);
-            let o = i * 3;
-            // keep headroom; only clamp negatives (out-of-gamut sensor noise)
-            data[o] = rgb[0].max(0.0);
-            data[o + 1] = rgb[1].max(0.0);
-            data[o + 2] = rgb[2].max(0.0);
+        match state {
+            // Already linear Rec.2020 with camera WB (zerawler RT contract):
+            // just floor out-of-gamut negatives.
+            PixelState::Rec2020Ready => {
+                for (i, px) in cam_rgb.iter().enumerate() {
+                    let o = i * 3;
+                    data[o] = px[0].max(0.0);
+                    data[o + 1] = px[1].max(0.0);
+                    data[o + 2] = px[2].max(0.0);
+                }
+            }
+            // Our colorimetric landing: as-shot WB → cam→Rec.2020 (dual-illum).
+            PixelState::CameraNative { .. } => {
+                let mut wb = raw.wb_coeffs;
+                if wb[0].is_nan() || wb[1] <= 0.0 {
+                    wb = [1.0, 1.0, 1.0, 1.0];
+                }
+                // normalize to green = 1
+                let g = wb[1];
+                let wbn = [wb[0] / g, 1.0, wb[2] / g];
+
+                let dcp = profile_path.and_then(|p| DcpProfile::load(p).ok());
+                let cam2rec = if let Some(ref dcp) = dcp {
+                    if dcp.matches_camera(&md.make, &md.model) {
+                        dcp.cam_to_rec2020(&raw.wb_coeffs, &cal).unwrap_or_else(|| {
+                            tracing::warn!(
+                                file = ?profile_path,
+                                "DCP matrix failed; falling back to rawler calibration"
+                            );
+                            cal.cam_to_rec2020(&raw.wb_coeffs).unwrap_or([
+                                [1.0, 0.0, 0.0],
+                                [0.0, 1.0, 0.0],
+                                [0.0, 0.0, 1.0],
+                            ])
+                        })
+                    } else {
+                        tracing::warn!(
+                            profile = %dcp.unique_camera_model,
+                            make = %md.make,
+                            model = %md.model,
+                            "DCP camera mismatch; using rawler calibration"
+                        );
+                        cal.cam_to_rec2020(&raw.wb_coeffs).ok_or_else(|| {
+                            CoreError::Decode(format!(
+                                "no usable color matrix for {} {}",
+                                md.make, md.model
+                            ))
+                        })?
+                    }
+                } else if profile_path.is_some() {
+                    tracing::warn!(file = ?profile_path, "DCP load failed; using rawler calibration");
+                    cal.cam_to_rec2020(&raw.wb_coeffs).ok_or_else(|| {
+                        CoreError::Decode(format!(
+                            "no usable color matrix for {} {}",
+                            md.make, md.model
+                        ))
+                    })?
+                } else {
+                    cal.cam_to_rec2020(&raw.wb_coeffs).ok_or_else(|| {
+                        CoreError::Decode(format!(
+                            "no usable color matrix for {} {}",
+                            md.make, md.model
+                        ))
+                    })?
+                };
+
+                for (i, px) in cam_rgb.iter().enumerate() {
+                    let wbd = [px[0] * wbn[0], px[1], px[2] * wbn[2]];
+                    let rgb = mat_vec(&cam2rec, wbd);
+                    let o = i * 3;
+                    // keep headroom; only clamp negatives (out-of-gamut sensor noise)
+                    data[o] = rgb[0].max(0.0);
+                    data[o + 1] = rgb[1].max(0.0);
+                    data[o + 2] = rgb[2].max(0.0);
+                }
+            }
         }
 
-        let working = RgbF32Buf {
+        let buf = RgbF32Buf {
             width: w,
             height: h,
             data,
-        }
-        .bake_orientation(effective_orientation(&raw, &md));
+        };
+        // zerawler workers bake EXIF orientation themselves.
+        let prerotated = matches!(
+            state,
+            PixelState::Rec2020Ready | PixelState::CameraNative { prerotated: true }
+        );
+        let working = if prerotated {
+            buf
+        } else {
+            buf.bake_orientation(effective_orientation(&raw, &md))
+        };
 
         let mut meta = self.meta_from(
             path,
@@ -314,6 +374,60 @@ impl RawlerDecoder {
         );
         meta.demosaic = demosaic.name().to_string();
         Ok(DecodedImage { working, meta })
+    }
+}
+
+/// Colour state of the demosaiced pixel buffer entering the landing stage.
+#[derive(Clone, Copy, PartialEq)]
+enum PixelState {
+    /// Camera-native RGB, unity WB. `prerotated` = EXIF orientation already
+    /// baked by the producer (zerawler workers rotate; in-process paths don't).
+    CameraNative { prerotated: bool },
+    /// Linear Rec.2020 with camera WB applied (zerawler RT validated
+    /// contract) — skips the WB+matrix landing. Always prerotated.
+    Rec2020Ready,
+}
+
+/// zerawler sidecar path: worker decodes the whole file. LibRaw output is
+/// camera-native linear (levels forced to rawler's); RT output is
+/// sRGB-TRC-encoded Rec.2020 (validated 2026-07-05) and is linearized here.
+fn zerawler_rgb(
+    path: &Path,
+    algo: zerawler::Algorithm,
+    raw: &rawler::RawImage,
+) -> Result<(Vec<[f32; 3]>, usize, usize), CoreError> {
+    let engine = zerawler::Engine::detect();
+    let mut opts = zerawler::DecodeOpts::default();
+    if algo.backend() == zerawler::Backend::LibRaw {
+        // Force rawler's levels so dcraw's normalization matches ours exactly.
+        let bl = &raw.blacklevel;
+        let black: f32 =
+            bl.levels.iter().map(|r| r.as_f32()).sum::<f32>() / bl.levels.len().max(1) as f32;
+        opts.black = Some(black.round() as u32);
+        opts.white = raw.whitelevel.0.first().copied();
+    }
+    let dec = engine
+        .decode_opts(path, algo, zerawler::Mode::Native, opts)
+        .map_err(|e| CoreError::Decode(format!("zerawler: {e}")))?;
+    let mut data = dec.image.data;
+    if algo.backend() == zerawler::Backend::RawTherapee {
+        // RTv4_Rec2020 float output carries the sRGB transfer curve.
+        for px in &mut data {
+            for c in px.iter_mut() {
+                *c = srgb_decode(*c);
+            }
+        }
+    }
+    Ok((data, dec.image.width, dec.image.height))
+}
+
+/// Inverse sRGB OETF (linearize an sRGB-encoded component).
+#[inline]
+fn srgb_decode(v: f32) -> f32 {
+    if v <= 0.04045 {
+        v / 12.92
+    } else {
+        ((v + 0.055) / 1.055).powf(2.4)
     }
 }
 
@@ -438,6 +552,56 @@ mod integration_tests {
                 .map(|(a, b)| (*a - *b).abs() as f64)
                 .sum();
             assert!(diff > 0.0, "{}: identical to rawler — not applied", algo.name());
+        }
+    }
+
+    /// zerawler sidecar paths decode, land in the working space (orientation
+    /// pre-baked by the workers → portrait for this sample), stay finite, and
+    /// report their algorithm. Skips per-backend when workers are missing.
+    #[test]
+    fn zerawler_sidecar_decodes() {
+        let Ok(home) = std::env::var("HOME") else { return };
+        let p = std::path::PathBuf::from(home).join("Desktop/test-claude-raw/DSC07078.ARW");
+        if !p.exists() {
+            eprintln!("skip: sample RAW not present");
+            return;
+        }
+        let engine = zerawler::Engine::detect();
+        let dec = RawlerDecoder::default();
+        let mut algos: Vec<Demosaic> = Vec::new();
+        if engine.dcraw_emu.is_some() {
+            algos.push(Demosaic::Dht);
+        }
+        if engine.rt_cli.is_some() {
+            algos.push(Demosaic::RtRcd);
+        }
+        if algos.is_empty() {
+            eprintln!("skip: no zerawler workers detected");
+            return;
+        }
+        for algo in algos {
+            let out = dec.decode_with_options(&p, None, algo).unwrap();
+            assert_eq!(out.meta.demosaic, algo.name());
+            // workers bake EXIF rotation → portrait dims for this sample
+            assert!(
+                out.working.width > 4000 && out.working.height > 5900,
+                "{}: unexpected dims {}x{}",
+                algo.name(),
+                out.working.width,
+                out.working.height
+            );
+            assert!(
+                out.working.data.iter().all(|v| v.is_finite()),
+                "{}: non-finite pixels",
+                algo.name()
+            );
+            let mean: f64 = out.working.data.iter().map(|v| *v as f64).sum::<f64>()
+                / out.working.data.len() as f64;
+            assert!(
+                mean > 0.01 && mean < 2.0,
+                "{}: implausible mean {mean}",
+                algo.name()
+            );
         }
     }
 }

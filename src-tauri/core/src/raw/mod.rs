@@ -74,8 +74,10 @@ pub struct ImageMeta {
 }
 
 /// Which demosaic algorithm runs at decode time. `Rawler` = rawler's built-in
-/// PPG interpolation; the rest are the merawler engine. The choice is stored in
-/// the doc; changing it re-decodes the RAW (as darktable does).
+/// PPG interpolation; `Bilinear..Ddfapd` are the in-process merawler engine;
+/// the `Rt*`/`Dht` variants are the zerawler sidecar engine (external
+/// reference binaries). The choice is stored in the doc; changing it
+/// re-decodes the RAW (as darktable does).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum Demosaic {
     /// rawler's built-in demosaic (the original path).
@@ -89,6 +91,14 @@ pub enum Demosaic {
     Amaze,
     Igv,
     Ddfapd,
+    /// RCD via the RawTherapee sidecar (zerawler).
+    RtRcd,
+    /// LMMSE via the RawTherapee sidecar (zerawler).
+    RtLmmse,
+    /// AMaZE via the RawTherapee sidecar (zerawler).
+    RtAmaze,
+    /// DHT via the LibRaw sidecar (zerawler).
+    Dht,
 }
 
 impl Demosaic {
@@ -102,6 +112,10 @@ impl Demosaic {
             Demosaic::Amaze => "amaze",
             Demosaic::Igv => "igv",
             Demosaic::Ddfapd => "ddfapd",
+            Demosaic::RtRcd => "rt-rcd",
+            Demosaic::RtLmmse => "rt-lmmse",
+            Demosaic::RtAmaze => "rt-amaze",
+            Demosaic::Dht => "dht",
         }
     }
 
@@ -115,6 +129,10 @@ impl Demosaic {
             "amaze" => Demosaic::Amaze,
             "igv" => Demosaic::Igv,
             "ddfapd" | "menon" => Demosaic::Ddfapd,
+            "rt-rcd" => Demosaic::RtRcd,
+            "rt-lmmse" => Demosaic::RtLmmse,
+            "rt-amaze" => Demosaic::RtAmaze,
+            "dht" => Demosaic::Dht,
             _ => return None,
         })
     }
@@ -135,13 +153,16 @@ impl Demosaic {
             Demosaic::Amaze,
             Demosaic::Igv,
             Demosaic::Ddfapd,
+            Demosaic::RtRcd,
+            Demosaic::RtLmmse,
+            Demosaic::RtAmaze,
+            Demosaic::Dht,
         ]
     }
 
-    /// The merawler algorithm, or `None` for rawler's built-in path.
+    /// The merawler algorithm, or `None` for non-merawler paths.
     pub fn merawler_algo(self) -> Option<merawler::Algorithm> {
         Some(match self {
-            Demosaic::Rawler => return None,
             Demosaic::Bilinear => merawler::Algorithm::Bilinear,
             Demosaic::Malvar => merawler::Algorithm::Malvar,
             Demosaic::Rcd => merawler::Algorithm::Rcd,
@@ -149,6 +170,18 @@ impl Demosaic {
             Demosaic::Amaze => merawler::Algorithm::Amaze,
             Demosaic::Igv => merawler::Algorithm::Igv,
             Demosaic::Ddfapd => merawler::Algorithm::Ddfapd,
+            _ => return None,
+        })
+    }
+
+    /// The zerawler (sidecar) algorithm, or `None` for in-process paths.
+    pub fn zerawler_algo(self) -> Option<zerawler::Algorithm> {
+        Some(match self {
+            Demosaic::RtRcd => zerawler::Algorithm::Rcd,
+            Demosaic::RtLmmse => zerawler::Algorithm::Lmmse,
+            Demosaic::RtAmaze => zerawler::Algorithm::Amaze,
+            Demosaic::Dht => zerawler::Algorithm::Dht,
+            _ => return None,
         })
     }
 }

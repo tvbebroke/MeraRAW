@@ -71,6 +71,7 @@ function ProfilePanel({
 }
 
 const DEMOSAIC_OPTIONS: { id: string; label: string }[] = [
+  // in-process: rawler built-in + merawler engine
   { id: "rawler", label: "Rawler (built-in)" },
   { id: "bilinear", label: "Bilinear" },
   { id: "malvar", label: "Malvar" },
@@ -79,6 +80,11 @@ const DEMOSAIC_OPTIONS: { id: string; label: string }[] = [
   { id: "amaze", label: "AMaZE — max detail" },
   { id: "igv", label: "IGV — anti-aliasing" },
   { id: "ddfapd", label: "DDFAPD (Menon)" },
+  // sidecar: zerawler engine (external reference binaries)
+  { id: "rt-rcd", label: "RCD — sidecar · RawTherapee" },
+  { id: "rt-lmmse", label: "LMMSE — sidecar · RawTherapee" },
+  { id: "rt-amaze", label: "AMaZE — sidecar · RawTherapee" },
+  { id: "dht", label: "DHT — sidecar · LibRaw" },
 ];
 
 function DemosaicPanel({
@@ -96,8 +102,11 @@ function DemosaicPanel({
   return (
     <Panel title="Demosaic" defaultOpen={false}>
       <p className="muted sm">
-        Bayer reconstruction algorithm (merawler engine). Switching re-decodes
+        Bayer reconstruction algorithm — in-process (merawler) or sidecar
+        (zerawler, external RawTherapee/LibRaw binaries). Switching re-decodes
         the RAW; the preview and exports update. Your edits are unchanged.
+        Sidecar RT color lands via RawTherapee&rsquo;s camera profile, so its
+        base rendition differs slightly from the in-process paths.
       </p>
       <select
         value={current}
