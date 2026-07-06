@@ -5,7 +5,7 @@
 //! sRGB and clip highlights.
 
 use super::{DecodedImage, Decoder, Demosaic, ImageMeta};
-use crate::color::{mat_vec, CameraCalibration};
+use crate::color::{mat_vec, CameraCalibration, Mat3};
 use crate::error::CoreError;
 use crate::image::RgbF32Buf;
 use crate::profile::dcp::DcpProfile;
@@ -115,6 +115,7 @@ impl RawlerDecoder {
             available_profiles: Vec::new(),
             available_profile_files: Vec::new(),
             demosaic: String::new(), // set by decode_impl once the algo is known
+            available_demosaic: crate::raw::Demosaic::available(),
         }
     }
 }
@@ -301,68 +302,8 @@ impl RawlerDecoder {
             }
             // Our colorimetric landing: as-shot WB → cam→Rec.2020 (dual-illum).
             PixelState::CameraNative { .. } => {
-                let mut wb = raw.wb_coeffs;
-                if wb[0].is_nan() || wb[1] <= 0.0 {
-                    wb = [1.0, 1.0, 1.0, 1.0];
-                }
-                // normalize to green = 1
-                let g = wb[1];
-                let wbn = [wb[0] / g, 1.0, wb[2] / g];
-
-                let dcp = profile_path.and_then(|p| DcpProfile::load(p).ok());
-                let cam2rec = if let Some(ref dcp) = dcp {
-                    if dcp.matches_camera(&md.make, &md.model) {
-                        dcp.cam_to_rec2020(&raw.wb_coeffs, &cal).unwrap_or_else(|| {
-                            tracing::warn!(
-                                file = ?profile_path,
-                                "DCP matrix failed; falling back to rawler calibration"
-                            );
-                            cal.cam_to_rec2020(&raw.wb_coeffs).unwrap_or([
-                                [1.0, 0.0, 0.0],
-                                [0.0, 1.0, 0.0],
-                                [0.0, 0.0, 1.0],
-                            ])
-                        })
-                    } else {
-                        tracing::warn!(
-                            profile = %dcp.unique_camera_model,
-                            make = %md.make,
-                            model = %md.model,
-                            "DCP camera mismatch; using rawler calibration"
-                        );
-                        cal.cam_to_rec2020(&raw.wb_coeffs).ok_or_else(|| {
-                            CoreError::Decode(format!(
-                                "no usable color matrix for {} {}",
-                                md.make, md.model
-                            ))
-                        })?
-                    }
-                } else if profile_path.is_some() {
-                    tracing::warn!(file = ?profile_path, "DCP load failed; using rawler calibration");
-                    cal.cam_to_rec2020(&raw.wb_coeffs).ok_or_else(|| {
-                        CoreError::Decode(format!(
-                            "no usable color matrix for {} {}",
-                            md.make, md.model
-                        ))
-                    })?
-                } else {
-                    cal.cam_to_rec2020(&raw.wb_coeffs).ok_or_else(|| {
-                        CoreError::Decode(format!(
-                            "no usable color matrix for {} {}",
-                            md.make, md.model
-                        ))
-                    })?
-                };
-
-                for (i, px) in cam_rgb.iter().enumerate() {
-                    let wbd = [px[0] * wbn[0], px[1], px[2] * wbn[2]];
-                    let rgb = mat_vec(&cam2rec, wbd);
-                    let o = i * 3;
-                    // keep headroom; only clamp negatives (out-of-gamut sensor noise)
-                    data[o] = rgb[0].max(0.0);
-                    data[o + 1] = rgb[1].max(0.0);
-                    data[o + 2] = rgb[2].max(0.0);
-                }
+                let cam2rec = resolve_cam2rec(&cal, &raw, &md, profile_path)?;
+                camera_landing(&cam_rgb, wb_normalize(raw.wb_coeffs), &cam2rec, &mut data);
             }
         }
 
@@ -395,6 +336,65 @@ impl RawlerDecoder {
     }
 }
 
+/// Green-normalized as-shot WB multipliers `[r/g, 1, b/g]` (NaN/degenerate → unity).
+fn wb_normalize(mut wb: [f32; 4]) -> [f32; 3] {
+    if wb[0].is_nan() || wb[1] <= 0.0 {
+        wb = [1.0, 1.0, 1.0, 1.0];
+    }
+    let g = wb[1];
+    [wb[0] / g, 1.0, wb[2] / g]
+}
+
+/// Resolve the camera→Rec.2020 matrix: a matching DCP wins, otherwise
+/// rawler's calibration; one error site for "no usable matrix".
+///
+/// (Behavior note: the old inline version fell back to an *identity* matrix
+/// when a matched DCP produced no matrix but calibration also failed — that
+/// silently rendered wildly wrong colour. All paths now fail loudly instead.)
+fn resolve_cam2rec(
+    cal: &CameraCalibration,
+    raw: &rawler::RawImage,
+    md: &rawler::decoders::RawMetadata,
+    profile_path: Option<&Path>,
+) -> Result<Mat3, CoreError> {
+    if let Some(p) = profile_path {
+        match DcpProfile::load(p).ok() {
+            Some(dcp) if dcp.matches_camera(&md.make, &md.model) => {
+                if let Some(m) = dcp.cam_to_rec2020(&raw.wb_coeffs, cal) {
+                    return Ok(m);
+                }
+                tracing::warn!(file = ?p, "DCP matrix failed; falling back to rawler calibration");
+            }
+            Some(dcp) => tracing::warn!(
+                profile = %dcp.unique_camera_model,
+                make = %md.make,
+                model = %md.model,
+                "DCP camera mismatch; using rawler calibration"
+            ),
+            None => tracing::warn!(file = ?p, "DCP load failed; using rawler calibration"),
+        }
+    }
+    cal.cam_to_rec2020(&raw.wb_coeffs).ok_or_else(|| {
+        CoreError::Decode(format!(
+            "no usable color matrix for {} {}",
+            md.make, md.model
+        ))
+    })
+}
+
+/// The camera landing: WB multipliers → cam→Rec.2020 matrix per pixel, into
+/// an interleaved buffer. Headroom kept; only negatives clamped.
+fn camera_landing(cam_rgb: &[[f32; 3]], wbn: [f32; 3], cam2rec: &Mat3, data: &mut [f32]) {
+    for (i, px) in cam_rgb.iter().enumerate() {
+        let wbd = [px[0] * wbn[0], px[1], px[2] * wbn[2]];
+        let rgb = mat_vec(cam2rec, wbd);
+        let o = i * 3;
+        data[o] = rgb[0].max(0.0);
+        data[o + 1] = rgb[1].max(0.0);
+        data[o + 2] = rgb[2].max(0.0);
+    }
+}
+
 /// Colour state of the demosaiced pixel buffer entering the landing stage.
 #[derive(Clone, Copy)]
 enum PixelState {
@@ -419,11 +419,8 @@ fn zerawler_rgb(
     let mut opts = zerawler::DecodeOpts::default();
     if algo.backend() == zerawler::Backend::LibRaw {
         // Force rawler's levels so dcraw's normalization matches ours exactly.
-        let bl = &raw.blacklevel;
-        let black: f32 =
-            bl.levels.iter().map(|r| r.as_f32()).sum::<f32>() / bl.levels.len().max(1) as f32;
-        opts.black = Some(black.round() as u32);
-        opts.white = raw.whitelevel.0.first().copied();
+        let blacks: Vec<f32> = raw.blacklevel.levels.iter().map(|r| r.as_f32()).collect();
+        opts = zerawler::DecodeOpts::from_levels(&blacks, raw.whitelevel.0.first().copied());
     }
     let dec = engine
         .decode_opts(path, algo, zerawler::Mode::Native, opts)

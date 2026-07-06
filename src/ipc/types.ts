@@ -60,6 +60,9 @@ export interface ImageMeta {
   availableProfileFiles: string[];
   /** Demosaic algorithm in effect (e.g. "rcd"). Empty for non-RAW. */
   demosaic: string;
+  /** Algorithms currently usable (sidecar entries absent when their worker
+   *  binary is missing). Omitted (empty) for non-RAW sources. */
+  availableDemosaic?: string[];
 }
 
 export interface ViewParams {

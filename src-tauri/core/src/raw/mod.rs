@@ -71,6 +71,10 @@ pub struct ImageMeta {
     /// Demosaic algorithm in effect (name, e.g. "rcd"); drives the UI picker.
     #[serde(default)]
     pub demosaic: String,
+    /// Demosaic algorithms currently usable (sidecar entries drop out when
+    /// their worker binary is missing). Empty for non-RAW sources.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub available_demosaic: Vec<String>,
 }
 
 /// Which demosaic algorithm runs at decode time. `Rawler` = rawler's built-in
@@ -183,6 +187,24 @@ impl Demosaic {
             Demosaic::Dht => zerawler::Algorithm::Dht,
             _ => return None,
         })
+    }
+
+    /// Names of the algorithms currently usable: in-process ones always,
+    /// sidecar ones only when their worker binary resolves. Feeds the UI so
+    /// unavailable options can be disabled instead of silently falling back.
+    pub fn available() -> Vec<String> {
+        let engine = zerawler::Engine::detect();
+        Demosaic::all()
+            .iter()
+            .filter(|d| match d.zerawler_algo() {
+                None => true,
+                Some(a) => match a.backend() {
+                    zerawler::Backend::RawTherapee => engine.rt_cli.is_some(),
+                    zerawler::Backend::LibRaw => engine.dcraw_emu.is_some(),
+                },
+            })
+            .map(|d| d.name().to_string())
+            .collect()
     }
 }
 

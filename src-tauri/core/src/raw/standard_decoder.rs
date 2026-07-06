@@ -280,6 +280,7 @@ fn rendered_meta(path: &Path, w: u32, h: u32, bit_depth: u8) -> ImageMeta {
         available_profiles: Vec::new(),
         available_profile_files: Vec::new(),
         demosaic: String::new(), // n/a for already-rendered images
+        available_demosaic: Vec::new(),
     }
 }
 

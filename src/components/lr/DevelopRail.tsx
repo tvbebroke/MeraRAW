@@ -1,8 +1,9 @@
 // Right rail — Edit tab: Profile → Light → Color → Effects → Detail (+ histogram, AI).
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   applyParamBatch,
   getDoc,
+  getMetadata,
   getStats,
   pickLut,
   setCameraProfile,
@@ -10,6 +11,7 @@ import {
   setLut,
   setParam,
 } from "../../ipc/commands";
+import { onImageReady } from "../../ipc/events";
 import type { ImageMeta, ParamSpec } from "../../ipc/types";
 import { useDocStore } from "../../state/docStore";
 import { useUiStore } from "../../state/uiStore";
@@ -94,11 +96,32 @@ function DemosaicPanel({
   meta: ImageMeta | null;
   onMetaChange: (m: ImageMeta) => void;
 }) {
+  // Refresh metadata when a (re)decode lands, so the picker shows the
+  // algorithm that actually ran (worker fallbacks report "rawler").
+  const onMetaChangeRef = useRef(onMetaChange);
+  onMetaChangeRef.current = onMetaChange;
+  useEffect(() => {
+    const un = onImageReady(() => {
+      getMetadata()
+        .then((m) => {
+          if (m) onMetaChangeRef.current(m);
+        })
+        .catch(console.error);
+    });
+    return () => {
+      un.then((f) => f()).catch(console.error);
+    };
+  }, []);
+
   // Demosaicing only applies to sensor RAW (rendered images are already RGB).
   if (!meta || meta.kind !== "raw") {
     return null;
   }
   const current = meta.demosaic || "rcd";
+  // Sidecar options drop out of availableDemosaic when their worker binary
+  // is missing — disable them instead of letting a pick silently fall back.
+  const avail = meta.availableDemosaic;
+  const missing = (id: string) => !!avail && avail.length > 0 && !avail.includes(id);
   return (
     <Panel title="Demosaic" defaultOpen={false}>
       <p className="muted sm">
@@ -115,8 +138,9 @@ function DemosaicPanel({
         }}
       >
         {DEMOSAIC_OPTIONS.map((o) => (
-          <option key={o.id} value={o.id}>
+          <option key={o.id} value={o.id} disabled={missing(o.id)}>
             {o.label}
+            {missing(o.id) ? " — not installed" : ""}
           </option>
         ))}
       </select>

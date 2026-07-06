@@ -317,6 +317,7 @@ mod tests {
             available_profiles: Vec::new(),
             available_profile_files: Vec::new(),
             demosaic: String::new(),
+            available_demosaic: Vec::new(),
         };
         let profiles = resolve_profiles(&meta, &index);
         assert!(
