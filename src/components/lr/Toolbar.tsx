@@ -9,6 +9,7 @@ const LOOKS: [string, number, string][] = [
   ["Neutral", 0, "Flat scene-referred view"],
   ["Camera", 1, "Punchy JPEG-like view"],
   ["Filmic", 2, "AgX — filmic highlight rolloff"],
+  ["Original", 4, "Demosaiced sensor data — no profile, edits, or tone mapping"],
 ];
 
 export function ViewportToolbar() {

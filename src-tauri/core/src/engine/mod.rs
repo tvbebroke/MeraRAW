@@ -500,7 +500,7 @@ struct Engine {
     import_state: Option<ImportState>,
     /// Before/after: when true, render the un-edited base.
     preview_bypass: bool,
-    /// Display look applied to preview + export: 0 Neutral, 1 Camera, 2 AgX.
+    /// Display look applied to preview + export: 0 Neutral, 1 Camera, 2 AgX, 4 Original.
     display_look: u32,
     /// Dedicated graph for assistant previews (own small caches — never
     /// thrashes the viewport graph).
@@ -857,8 +857,15 @@ impl Engine {
             }
             EngineMsg::SetDisplayLook { look, reply } => {
                 if self.display_look != look {
+                    let was_original = self.display_look == 4;
+                    let now_original = look == 4;
                     self.display_look = look;
-                    // present is terminal — re-render is enough (no chain invalidation)
+                    // Original toggles the DCP look path — invalidate when crossing it.
+                    if was_original || now_original {
+                        if let Some(g) = &mut self.graph {
+                            g.invalidate_all();
+                        }
+                    }
                     self.render_now();
                 }
                 let _ = reply.send(());

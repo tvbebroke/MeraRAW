@@ -1,5 +1,8 @@
 use super::Engine;
 use super::*;
+use crate::export::{output_transform, TargetSpace};
+use crate::image::RgbF32Buf;
+use crate::message::Frame;
 
 impl Engine {
     pub(super) fn open_image(
@@ -42,7 +45,7 @@ impl Engine {
         meta.available_profile_files = available.iter().map(|p| p.file.clone()).collect();
 
         // sidecar = canonical for edits; else Adobe XMP; else fresh doc
-        let doc = match sidecar::load_edits(&path) {
+        let mut doc = match sidecar::load_edits(&path) {
             Ok(Some(d)) => {
                 tracing::info!("edit sidecar loaded");
                 d
@@ -86,8 +89,18 @@ impl Engine {
         });
 
         // Demosaic algorithm from the doc (None = engine default). Surfaced on
-        // meta so the UI picker shows the effective algorithm.
-        let demosaic = crate::raw::Demosaic::parse_or_default(doc.meta.demosaic.as_deref());
+        // meta so the UI picker shows the effective algorithm. Reset to an
+        // in-process default when a sidecar algo isn't available on this OS.
+        let mut demosaic = crate::raw::Demosaic::parse_or_default(doc.meta.demosaic.as_deref());
+        let available = crate::raw::Demosaic::available();
+        if !available.iter().any(|n| n == demosaic.name()) {
+            tracing::warn!(
+                requested = demosaic.name(),
+                "demosaic unavailable on this platform; using rcd"
+            );
+            demosaic = crate::raw::Demosaic::Rcd;
+            doc.meta.demosaic = Some(demosaic.name().to_string());
+        }
         meta.demosaic = demosaic.name().to_string();
 
         self.current = Some(CurrentImage {
@@ -170,10 +183,7 @@ impl Engine {
 
     pub(super) fn finish_decode(&mut self, payload: DecodedPayload) {
         let Some(gpu) = &self.gpu else {
-            self.emit(EngineEvent::DecodeError {
-                message: "gpu unavailable; cannot display decoded image".into(),
-            });
-            return;
+            return self.finish_decode_cpu(payload);
         };
         let tex = upload_working_texture(gpu, &payload.rgba_f16, payload.width, payload.height);
         let view = tex.create_view(&Default::default());
@@ -210,6 +220,39 @@ impl Engine {
                 });
             }
         }
+    }
+
+    /// When wgpu init failed (common on Linux VMs / bad drivers), still show a
+    /// CPU-tonemapped preview so CR2/NEF open instead of hard-failing.
+    fn finish_decode_cpu(&mut self, payload: DecodedPayload) {
+        tracing::warn!("gpu unavailable; using CPU preview fallback");
+        if let Some(cur) = &mut self.current {
+            let camera_profile = cur.meta.camera_profile.clone();
+            let available_profiles = cur.meta.available_profiles.clone();
+            let available_profile_files = cur.meta.available_profile_files.clone();
+            cur.small_cpu = Some(payload.small_cpu.clone());
+            cur.meta = payload.meta;
+            cur.meta.camera_profile = camera_profile;
+            cur.meta.available_profiles = available_profiles;
+            cur.meta.available_profile_files = available_profile_files;
+        }
+        let vw = self
+            .last_view
+            .filter(|v| v.out_w >= 64 && v.out_h >= 64)
+            .map(|v| (v.out_w, v.out_h))
+            .unwrap_or((1440, 860));
+        let frame = cpu_preview_frame(
+            &payload.small_cpu,
+            self.display_look == 1,
+            vw.0,
+            vw.1,
+        );
+        let version = self.next_version();
+        let mut frame = frame;
+        frame.version = version;
+        self.latest_frame = Some(frame);
+        self.emit(EngineEvent::ImageReady { version });
+        self.emit(EngineEvent::FrameReady { version });
     }
 
     pub(super) fn set_camera_profile(
@@ -338,5 +381,63 @@ impl Engine {
         // stale; finish_decode replaces the working buffer and re-renders.
         self.spawn_full_decode(path, profile_path, demosaic, self.generation);
         let _ = reply.send(Ok(out_meta));
+    }
+}
+
+/// CPU preview when wgpu is unavailable — fit the downscaled working buffer
+/// and apply the same display look as export/present.
+fn cpu_preview_frame(
+    src: &RgbF32Buf,
+    camera_look: bool,
+    out_w: u32,
+    out_h: u32,
+) -> Frame {
+    let out_w = out_w.max(1);
+    let out_h = out_h.max(1);
+    let sw = src.width as f32;
+    let sh = src.height as f32;
+    let scale = (out_w as f32 / sw).min(out_h as f32 / sh);
+    let mut linear = vec![0.0f32; (out_w as usize) * (out_h as usize) * 3];
+    for y in 0..out_h {
+        for x in 0..out_w {
+            let sx = ((x as f32 + 0.5) / scale - 0.5).clamp(0.0, sw - 1.0);
+            let sy = ((y as f32 + 0.5) / scale - 0.5).clamp(0.0, sh - 1.0);
+            let ix = sx.floor() as usize;
+            let iy = sy.floor() as usize;
+            let fx = sx - ix as f32;
+            let fy = sy - iy as f32;
+            let ix1 = (ix + 1).min(src.width.saturating_sub(1));
+            let iy1 = (iy + 1).min(src.height.saturating_sub(1));
+            let sample = |px: usize, py: usize| {
+                let i = (py * src.width + px) * 3;
+                [src.data[i], src.data[i + 1], src.data[i + 2]]
+            };
+            let c00 = sample(ix, iy);
+            let c10 = sample(ix1, iy);
+            let c01 = sample(ix, iy1);
+            let c11 = sample(ix1, iy1);
+            let o = ((y * out_w + x) * 3) as usize;
+            for ch in 0..3 {
+                linear[o + ch] = c00[ch] * (1.0 - fx) * (1.0 - fy)
+                    + c10[ch] * fx * (1.0 - fy)
+                    + c01[ch] * (1.0 - fx) * fy
+                    + c11[ch] * fx * fy;
+            }
+        }
+    }
+    let enc = output_transform(&linear, out_w, out_h, TargetSpace::Srgb, false, camera_look);
+    let px = (out_w * out_h) as usize;
+    let mut rgba = vec![0u8; px * 4];
+    for i in 0..px {
+        rgba[i * 4] = enc.rgb8[i * 3];
+        rgba[i * 4 + 1] = enc.rgb8[i * 3 + 1];
+        rgba[i * 4 + 2] = enc.rgb8[i * 3 + 2];
+        rgba[i * 4 + 3] = 255;
+    }
+    Frame {
+        width: out_w,
+        height: out_h,
+        rgba,
+        version: 0,
     }
 }

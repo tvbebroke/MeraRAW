@@ -127,7 +127,13 @@ impl Engine {
         // Rendered images (JPEG/PNG/…) are display-referred — force the
         // passthrough look (3) so they aren't re-tonemapped by the RAW view.
         let display_look = match self.current.as_ref() {
-            Some(c) if c.meta.kind == crate::raw::ImageKind::Rendered => 3,
+            Some(c) if c.meta.kind == crate::raw::ImageKind::Rendered => {
+                if self.display_look == 4 {
+                    3
+                } else {
+                    self.display_look
+                }
+            }
             _ => self.display_look,
         };
         self.graph.as_mut().unwrap().set_look(display_look);
@@ -137,17 +143,25 @@ impl Engine {
             .iter()
             .map(|(id, (_, tex))| (id.clone(), tex.create_view(&Default::default())))
             .collect();
-        // before/after: render the all-defaults base when bypass is on
+        // before/after + Original look: render without saved edits.
         let base_doc;
-        let render_doc = if self.preview_bypass {
+        let render_doc = if self.preview_bypass || self.display_look == 4 {
             base_doc = EditDoc::new(&cur.path.to_string_lossy());
             &base_doc
         } else {
             cur.doc()
         };
         let as_shot_cct = cur.as_shot_cct();
-        let dcp = cur.dcp_profile.clone();
-        let lut = cur.lut_cube.clone();
+        let dcp = if self.display_look == 4 {
+            None
+        } else {
+            cur.dcp_profile.clone()
+        };
+        let lut = if self.display_look == 4 {
+            None
+        } else {
+            cur.lut_cube.clone()
+        };
         let started = Instant::now();
         let rgba = {
             let graph = self.graph.as_mut().unwrap();

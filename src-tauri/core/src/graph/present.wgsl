@@ -104,9 +104,9 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
     if (u.look == 2u) {
       // AgX already outputs display-encoded sRGB — no second OETF.
       encoded = agx(max(c, vec3<f32>(0.0)));
-    } else if (u.look == 3u) {
-      // Passthrough for already-rendered images (JPEG/PNG/…): the pixels are
-      // display-referred, so skip the scene→display tonemap — just encode.
+    } else if (u.look == 3u || u.look == 4u) {
+      // 3 = passthrough for rendered JPEG/PNG; 4 = Original RAW view (demosaic
+      // only — Rec.2020→sRGB + OETF, no profile look or display tonemap).
       encoded = oetf_srgb(clamp(max(c, vec3<f32>(0.0)), vec3<f32>(0.0), vec3<f32>(1.0)));
     } else {
       let looked = view_look(max(c, vec3<f32>(0.0)), u.look);

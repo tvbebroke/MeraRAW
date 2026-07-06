@@ -66,6 +66,22 @@ fn main() {
         if std::env::var_os("WEBKIT_DISABLE_COMPOSITING_MODE").is_none() {
             std::env::set_var("WEBKIT_DISABLE_COMPOSITING_MODE", "1");
         }
+        // Some Wayland stacks still crash WebKit unless forced to X11 GDK backend.
+        if std::env::var_os("GDK_BACKEND").is_none()
+            && std::env::var_os("WAYLAND_DISPLAY").is_some()
+        {
+            std::env::set_var("GDK_BACKEND", "x11");
+        }
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        // Ensure child processes (sidecar workers) resolve relative to the app.
+        if let Ok(exe) = std::env::current_exe() {
+            if let Some(dir) = exe.parent() {
+                let _ = std::env::set_current_dir(dir);
+            }
+        }
     }
 
     load_dotenv();
@@ -246,5 +262,11 @@ fn main() {
             Ok(())
         })
         .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .unwrap_or_else(|e| {
+            eprintln!("MeraRAW failed to start: {e}");
+            eprintln!(
+                "On Linux install webkit2gtk4.1; on Windows install the WebView2 runtime."
+            );
+            std::process::exit(1);
+        });
 }

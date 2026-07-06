@@ -318,6 +318,29 @@ impl CameraCalibration {
         Self { calibrations }
     }
 
+    /// Fallback when `color_matrix` is empty — common on older CR2/NEF where
+    /// rawler only populates the legacy `xyz_to_cam` table.
+    pub fn from_xyz_to_cam(xyz_to_cam: &[[f32; 3]; 4]) -> Self {
+        let mat = [
+            [xyz_to_cam[0][0], xyz_to_cam[0][1], xyz_to_cam[0][2]],
+            [xyz_to_cam[1][0], xyz_to_cam[1][1], xyz_to_cam[1][2]],
+            [xyz_to_cam[2][0], xyz_to_cam[2][1], xyz_to_cam[2][2]],
+        ];
+        Self {
+            calibrations: vec![(6504.0, mat)],
+        }
+    }
+
+    /// Prefer dual-illuminant `color_matrix`; fall back to legacy `xyz_to_cam`.
+    pub fn from_raw(raw: &rawler::RawImage) -> Self {
+        let cal = Self::from_rawler(&raw.color_matrix);
+        if cal.calibrations.is_empty() {
+            Self::from_xyz_to_cam(&raw.xyz_to_cam)
+        } else {
+            cal
+        }
+    }
+
     /// Interpolate xyz→cam by inverse-CCT weighting between the two
     /// calibration illuminants (DNG dual-illuminant model, reference §5.4).
     pub fn xyz_to_cam_at(&self, cct: f32) -> Option<Mat3> {
@@ -397,6 +420,19 @@ mod tests {
 
     fn approx(a: f32, b: f32, eps: f32) -> bool {
         (a - b).abs() < eps
+    }
+
+    #[test]
+    fn from_xyz_to_cam_fallback() {
+        let xyz = [
+            [0.7, 0.1, 0.1],
+            [0.2, 0.9, 0.1],
+            [0.1, 0.1, 0.8],
+            [0.0, 0.0, 0.0],
+        ];
+        let cal = CameraCalibration::from_xyz_to_cam(&xyz);
+        assert_eq!(cal.calibrations.len(), 1);
+        assert!(cal.cam_to_rec2020(&[1.0, 1.0, 1.0, 1.0]).is_some());
     }
 
     #[test]

@@ -12,11 +12,32 @@ pub struct GpuContext {
 
 impl GpuContext {
     pub async fn init() -> Result<Self, String> {
+        // High-performance adapter first; fall back for Linux/Windows driver quirks.
+        let attempts = [
+            (wgpu::PowerPreference::HighPerformance, false),
+            (wgpu::PowerPreference::LowPower, false),
+            (wgpu::PowerPreference::LowPower, true),
+        ];
+        let mut last_err = String::from("no suitable GPU adapter");
+        for (power, force_fallback) in attempts {
+            match Self::init_with(power, force_fallback).await {
+                Ok(ctx) => return Ok(ctx),
+                Err(e) => last_err = e,
+            }
+        }
+        Err(last_err)
+    }
+
+    async fn init_with(
+        power_preference: wgpu::PowerPreference,
+        force_fallback_adapter: bool,
+    ) -> Result<Self, String> {
         let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor::default());
         let adapter = instance
             .request_adapter(&wgpu::RequestAdapterOptions {
-                power_preference: wgpu::PowerPreference::HighPerformance,
-                ..Default::default()
+                power_preference,
+                force_fallback_adapter,
+                compatible_surface: None,
             })
             .await
             .ok_or_else(|| "no suitable GPU adapter".to_string())?;

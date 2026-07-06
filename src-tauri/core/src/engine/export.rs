@@ -48,9 +48,17 @@ impl Engine {
             }
             let tiles_x = w.div_ceil(TILE);
             let tiles_y = h.div_ceil(TILE);
-            let dcp = cur.dcp_profile.clone();
-            let lut = cur.lut_cube.clone();
             let display_look = self.display_look;
+            let dcp = if display_look == 4 {
+                None
+            } else {
+                cur.dcp_profile.clone()
+            };
+            let lut = if display_look == 4 {
+                None
+            } else {
+                cur.lut_cube.clone()
+            };
             if let Some(g) = self.export_graph.as_mut() {
                 g.set_look(display_look);
             }
@@ -102,6 +110,7 @@ impl Engine {
         let cct = job.cct;
         let dcp = job.dcp.clone();
         let lut = job.lut.clone();
+        let original = job.look == 4;
 
         let tile_result: Result<Vec<f32>, CoreError> = (|| {
             let gpu = self.gpu.as_ref().ok_or(CoreError::Gpu("no gpu".into()))?;
@@ -130,13 +139,20 @@ impl Engine {
                 center_y: (ty as f32 + th as f32 / 2.0) / *h as f32,
                 crop_preview: false,
             };
+            let base_doc;
+            let render_doc = if original {
+                base_doc = EditDoc::new(&cur.path.to_string_lossy());
+                &base_doc
+            } else {
+                cur.doc()
+            };
             let mut tile = graph.render_linear_tile(
                 gpu,
                 tex_view,
                 *w,
                 *h,
                 &view,
-                cur.doc(),
+                render_doc,
                 cct,
                 &seg_views,
                 lut.as_deref(),

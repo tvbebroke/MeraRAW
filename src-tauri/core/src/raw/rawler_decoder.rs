@@ -134,7 +134,7 @@ impl Decoder for RawlerDecoder {
         let md = decoder.raw_metadata(&source, &params).map_err(dec_err)?;
         // dims need the raw struct; decode dummy (no pixel work)
         let raw = decoder.raw_image(&source, &params, true).map_err(dec_err)?;
-        let cal = CameraCalibration::from_rawler(&raw.color_matrix);
+        let cal = CameraCalibration::from_raw(&raw);
         let cct = Some(cal.estimate_cct(&raw.wb_coeffs));
         Ok(self.meta_from(path, &raw, &md, raw.width as u32, raw.height as u32, cct))
     }
@@ -196,7 +196,18 @@ impl Decoder for RawlerDecoder {
         profile_path: Option<&Path>,
         demosaic: Demosaic,
     ) -> Result<DecodedImage, CoreError> {
-        self.decode_impl(path, profile_path, demosaic)
+        match self.decode_impl(path, profile_path, demosaic) {
+            Ok(img) => Ok(img),
+            Err(e) if demosaic != Demosaic::Rawler => {
+                tracing::warn!(
+                    algo = demosaic.name(),
+                    error = %e,
+                    "demosaic failed; retrying with rawler built-in"
+                );
+                self.decode_impl(path, profile_path, Demosaic::Rawler)
+            }
+            Err(e) => Err(e),
+        }
     }
 }
 
@@ -285,7 +296,7 @@ impl RawlerDecoder {
                 )
             };
 
-        let cal = CameraCalibration::from_rawler(&raw.color_matrix);
+        let cal = CameraCalibration::from_raw(&raw);
         let cct = cal.estimate_cct(&raw.wb_coeffs);
 
         let mut data = vec![0.0f32; w * h * 3];
@@ -376,7 +387,7 @@ fn resolve_cam2rec(
     }
     cal.cam_to_rec2020(&raw.wb_coeffs).ok_or_else(|| {
         CoreError::Decode(format!(
-            "no usable color matrix for {} {}",
+            "no usable color matrix for {} {} (try a DCP profile or update rawler)",
             md.make, md.model
         ))
     })

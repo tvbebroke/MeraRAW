@@ -7,7 +7,7 @@ import {
   requestFrame,
   wbFromPoint,
 } from "../ipc/commands";
-import { onFrameReady } from "../ipc/events";
+import { onEngineReady, onFrameReady } from "../ipc/events";
 import { useDocStore } from "../state/docStore";
 import { useUiStore } from "../state/uiStore";
 import { CropOverlay } from "./CropOverlay";
@@ -44,6 +44,42 @@ function isCustomView(v: ViewState): boolean {
 export function frameUrl(version: number, fmt?: "jpeg"): string {
   const q = fmt === "jpeg" ? "&fmt=jpeg" : "";
   return `${FRAME_BASE}/current?v=${version}${q}`;
+}
+
+/** Load a frame:// JPEG via fetch→blob (reliable on all webviews). */
+async function loadFrameBlob(version: number): Promise<Blob> {
+  const r = await fetch(frameUrl(version, "jpeg"));
+  if (!r.ok) throw new Error(`http ${r.status}`);
+  return r.blob();
+}
+
+/** Decode a blob in-memory — never point <img> at frame:// directly. */
+function decodeBlob(blob: Blob): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const obj = URL.createObjectURL(blob);
+    const probe = new Image();
+    probe.onload = () => {
+      URL.revokeObjectURL(obj);
+      resolve();
+    };
+    probe.onerror = () => {
+      URL.revokeObjectURL(obj);
+      reject(new Error("jpeg decode failed"));
+    };
+    probe.src = obj;
+  });
+}
+
+async function probeFrameTransport(retries = 5): Promise<boolean> {
+  for (let attempt = 0; attempt < retries; attempt++) {
+    try {
+      await decodeBlob(await loadFrameBlob(0));
+      return true;
+    } catch {
+      await new Promise((r) => setTimeout(r, 150 * (attempt + 1)));
+    }
+  }
+  return false;
 }
 
 interface ViewState {
@@ -93,30 +129,19 @@ export function Viewport() {
       // (memory) instead of hitting frame:// a second time — which would
       // re-run get_frame + JPEG encode. Preload from the blob keeps the swap
       // flash-free.
-      fetch(frameUrl(version, "jpeg"))
-        .then((r) => (r.ok ? r.blob() : Promise.reject(new Error(`http ${r.status}`))))
-        .then((blob) => {
-          if (pendingVer.current !== version) return; // a newer frame won
+      loadFrameBlob(version)
+        .then(async (blob) => {
+          if (pendingVer.current !== version) return;
+          await decodeBlob(blob);
+          if (pendingVer.current !== version) return;
           const obj = URL.createObjectURL(blob);
-          const probe = new Image();
-          probe.onload = () => {
-            if (pendingVer.current !== version) {
-              URL.revokeObjectURL(obj);
-              return;
-            }
-            shownVer.current = version;
-            const prev = objUrl.current;
-            objUrl.current = obj;
-            setDisplaySrc(obj);
-            if (prev) URL.revokeObjectURL(prev);
-            setError(null);
-            requestAnimationFrame(() => updateZoomLabel());
-          };
-          probe.onerror = () => {
-            URL.revokeObjectURL(obj);
-            if (pendingVer.current === version) setError("frame transport failed");
-          };
-          probe.src = obj; // in-memory, no network
+          shownVer.current = version;
+          const prev = objUrl.current;
+          objUrl.current = obj;
+          setDisplaySrc(obj);
+          if (prev) URL.revokeObjectURL(prev);
+          setError(null);
+          requestAnimationFrame(() => updateZoomLabel());
         })
         .catch(() => {
           if (pendingVer.current === version) setError("frame transport failed");
@@ -181,13 +206,37 @@ export function Viewport() {
   }, [showFrame]);
 
   useEffect(() => {
-    const probe = new Image();
-    probe.onload = () => reportFrontendStatus("frame-transport-ok");
-    probe.onerror = () => {
-      setError("frame transport failed");
-      reportFrontendStatus("frame-transport-failed").catch(() => {});
+    let cancelled = false;
+    let unlisten: (() => void) | undefined;
+
+    const runProbe = async () => {
+      const ok = await probeFrameTransport();
+      if (cancelled) return;
+      if (ok) {
+        setError(null);
+        reportFrontendStatus("frame-transport-ok").catch(() => {});
+      } else {
+        setError("frame transport failed");
+        reportFrontendStatus("frame-transport-failed").catch(() => {});
+      }
     };
-    probe.src = frameUrl(0, "jpeg");
+
+    if (useUiStore.getState().engineReady) {
+      void runProbe();
+    } else {
+      onEngineReady(() => {
+        if (!cancelled) void runProbe();
+      }).then((u) => {
+        unlisten = () => {
+          u();
+        };
+      });
+    }
+
+    return () => {
+      cancelled = true;
+      unlisten?.();
+    };
   }, []);
 
   useEffect(() => {

@@ -339,6 +339,7 @@ export function Library({
   }, [onOpen, onExportSelection]);
 
   return (
+    <div className="library">
     <div className="library-layout">
       <aside className="library-sidebar">
         <button
@@ -557,7 +558,7 @@ export function Library({
             </div>
           ))}
           {items.length === 0 && (
-            <div className="muted" style={{ padding: 24 }}>
+            <div className="library-grid-empty muted">
               No photos match this view.
             </div>
           )}
@@ -664,6 +665,7 @@ export function Library({
           }}
         />
       )}
+    </div>
     </div>
   );
 }

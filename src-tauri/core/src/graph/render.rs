@@ -73,9 +73,14 @@ impl RenderGraph {
         self.dcp_sig = Some(sig);
     }
 
-    /// Set the display look (0 = Neutral, 1 = Camera/punchy, 2 = Filmic/AgX).
+    /// Set the display look (0 = Neutral, 1 = Camera/punchy, 2 = Filmic/AgX,
+    /// 4 = Original — demosaic only, no DCP profile look).
     pub fn set_look(&mut self, look: u32) {
         self.look = look;
+    }
+
+    fn original_look(&self) -> bool {
+        self.look == 4
     }
 
     pub fn look(&self) -> bool {
@@ -297,7 +302,9 @@ impl RenderGraph {
         // the CPU apply_look; runs only on a view change, result persists in
         // look_tex. Stays in the same encoder — the extract→look read hazard is
         // handled by the compute-pass boundary.
-        let dcp_active = dcp_profile.filter(|d| d.has_look()).is_some() && self.dcp_meta.is_some();
+        let dcp_active = !self.original_look()
+            && dcp_profile.filter(|d| d.has_look()).is_some()
+            && self.dcp_meta.is_some();
         if run_extract && dcp_active {
             let meta = self.dcp_meta.clone().unwrap();
             let look_tex = self.look_tex.as_ref().unwrap();

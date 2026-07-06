@@ -215,6 +215,38 @@ pub fn output_transform(
     }
 }
 
+/// Original look — gamut map + OETF only (mirrors present.wgsl look 4).
+pub fn output_transform_passthrough(
+    linear: &[f32],
+    width: u32,
+    height: u32,
+    target: TargetSpace,
+    want16: bool,
+) -> EncodedImage {
+    let m = target_from_rec2020(target);
+    let px = (width * height) as usize;
+    let mut rgb8 = if want16 { Vec::new() } else { Vec::with_capacity(px * 3) };
+    let mut rgb16 = if want16 { Vec::with_capacity(px * 3) } else { Vec::new() };
+    for i in 0..px {
+        let lin = [linear[i * 3], linear[i * 3 + 1], linear[i * 3 + 2]];
+        let target_lin = gamut_compress(mat_vec(&m, lin));
+        for c in target_lin {
+            let e = oetf(target, c);
+            if want16 {
+                rgb16.push((e * 65535.0).round() as u16);
+            } else {
+                rgb8.push((e * 255.0).round() as u8);
+            }
+        }
+    }
+    EncodedImage {
+        width,
+        height,
+        rgb8,
+        rgb16,
+    }
+}
+
 /// AgX filmic display transform — MIRRORS graph/present.wgsl `agx()` exactly
 /// (same Minimal-AgX constants), so Filmic preview == Filmic sRGB export.
 /// Input: linear sRGB. Output: sRGB display-encoded [0,1].
@@ -273,8 +305,7 @@ fn agx_srgb_output(linear: &[f32], width: u32, height: u32) -> EncodedImage {
 }
 
 /// Look-aware output: look 0/1 → the Reinhard view transform; look 2 (Filmic
-/// AgX) → AgX for sRGB 8-bit, else falls back to Camera (wide-gamut/16-bit AgX
-/// is a follow-up — current scope is preview + sRGB export).
+/// AgX) → AgX for sRGB 8-bit; look 4 (Original) → gamut map + OETF only.
 pub fn output_transform_look(
     linear: &[f32],
     width: u32,
@@ -285,6 +316,9 @@ pub fn output_transform_look(
 ) -> EncodedImage {
     if look == 2 && target == TargetSpace::Srgb && !want16 {
         return agx_srgb_output(linear, width, height);
+    }
+    if look == 4 {
+        return output_transform_passthrough(linear, width, height, target, want16);
     }
     output_transform(linear, width, height, target, want16, look >= 1)
 }
