@@ -13,10 +13,21 @@ const TOKEN_FILE: &str = "license.jwt";
 struct LicenseClaims {
     sub: String,
     status: String,
+    #[serde(default, rename = "earlySupporter")]
+    early_supporter: bool,
     #[allow(dead_code)]
     exp: i64,
     #[allow(dead_code)]
     iat: i64,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SupporterStatusResult {
+    pub licensed: bool,
+    pub is_early_supporter: bool,
+    pub user_id: Option<String>,
+    pub reason: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -246,4 +257,139 @@ pub async fn license_sign_in_and_activate(
 
     license_save_token(app, token.to_string())?;
     Ok(user_id)
+}
+
+#[tauri::command]
+pub fn license_supporter_status(app: AppHandle) -> SupporterStatusResult {
+    if std::env::var("MERARAW_SKIP_LICENSE").ok().as_deref() == Some("1") {
+        return SupporterStatusResult {
+            licensed: true,
+            is_early_supporter: false,
+            user_id: Some("beta-skip".into()),
+            reason: None,
+        };
+    }
+
+    let path = match token_path(&app) {
+        Ok(p) => p,
+        Err(e) => {
+            return SupporterStatusResult {
+                licensed: false,
+                is_early_supporter: false,
+                user_id: None,
+                reason: Some(e.to_string()),
+            };
+        }
+    };
+
+    let token = match std::fs::read_to_string(&path) {
+        Ok(t) => t.trim().to_string(),
+        Err(_) => {
+            return SupporterStatusResult {
+                licensed: false,
+                is_early_supporter: false,
+                user_id: None,
+                reason: Some("no saved license".into()),
+            };
+        }
+    };
+
+    match verify_token(&token) {
+        Ok(claims) => SupporterStatusResult {
+            licensed: true,
+            is_early_supporter: claims.early_supporter,
+            user_id: Some(claims.sub),
+            reason: None,
+        },
+        Err(e) => SupporterStatusResult {
+            licensed: false,
+            is_early_supporter: false,
+            user_id: None,
+            reason: Some(e.to_string()),
+        },
+    }
+}
+
+/// Sign in and create a Stripe checkout session for Early Supporter ($20 lifetime).
+#[tauri::command]
+pub async fn license_start_checkout(email: String, password: String) -> Result<String, AppError> {
+    let email = email.trim();
+    if email.is_empty() || password.is_empty() {
+        return Err(AppError::Internal("Enter email and password.".into()));
+    }
+
+    let base = supabase_url();
+    let anon = supabase_anon_key();
+    let client = reqwest::Client::new();
+
+    let auth_resp = client
+        .post(format!("{base}/auth/v1/token?grant_type=password"))
+        .header("apikey", &anon)
+        .header("Content-Type", "application/json")
+        .json(&serde_json::json!({ "email": email, "password": password }))
+        .send()
+        .await
+        .map_err(|e| AppError::Internal(format!("Could not reach Supabase ({e}).")))?;
+
+    let auth_body = http_text(auth_resp).await?;
+    let auth: serde_json::Value = serde_json::from_str(&auth_body)
+        .map_err(|e| AppError::Internal(format!("Sign-in response: {e}")))?;
+    let access_token = auth["access_token"]
+        .as_str()
+        .ok_or_else(|| AppError::Internal("Sign-in did not return a session.".into()))?;
+
+    let checkout_resp = client
+        .post(format!("{base}/functions/v1/create-checkout-session"))
+        .header("apikey", &anon)
+        .header("Authorization", format!("Bearer {access_token}"))
+        .header("Content-Type", "application/json")
+        .json(&serde_json::json!({ "product": "early_supporter" }))
+        .send()
+        .await
+        .map_err(|e| AppError::Internal(format!("Checkout request failed ({e}).")))?;
+
+    let checkout_body = http_text(checkout_resp).await.map_err(|e| {
+        if e.to_string().contains("STRIPE_PRICE_ID") {
+            AppError::Internal("Stripe price not configured on server.".into())
+        } else {
+            e
+        }
+    })?;
+
+    let checkout: serde_json::Value = serde_json::from_str(&checkout_body)
+        .map_err(|e| AppError::Internal(format!("Checkout response: {e}")))?;
+    checkout["url"]
+        .as_str()
+        .map(|u| u.to_string())
+        .ok_or_else(|| AppError::Internal("Checkout did not return a URL.".into()))
+}
+
+#[tauri::command]
+pub fn open_external_url(url: String) -> Result<(), AppError> {
+    let url = url.trim();
+    if url.is_empty() || (!url.starts_with("https://") && !url.starts_with("http://")) {
+        return Err(AppError::Internal("Invalid URL.".into()));
+    }
+    #[cfg(target_os = "macos")]
+    {
+        std::process::Command::new("open")
+            .arg(url)
+            .spawn()
+            .map_err(|e| AppError::Internal(format!("open URL: {e}")))?;
+    }
+    #[cfg(target_os = "windows")]
+    {
+        std::process::Command::new("cmd")
+            .args(["/C", "start", "", url])
+            .spawn()
+            .map_err(|e| AppError::Internal(format!("open URL: {e}")))?;
+    }
+    #[cfg(target_os = "linux")]
+    {
+        std::process::Command::new("xdg-open")
+            .arg(url)
+            .spawn()
+            .map_err(|e| AppError::Internal(format!("open URL: {e}")))?;
+    }
+    Ok(())
 }

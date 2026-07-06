@@ -9,6 +9,11 @@ export const SUPABASE_ANON_KEY =
 export const PURCHASE_URL =
   import.meta.env.VITE_PURCHASE_URL ?? "https://www.meratech.co/#download";
 
+export const EARLY_SUPPORTER_URL =
+  import.meta.env.VITE_EARLY_SUPPORTER_URL ?? "https://www.meratech.co/early-supporter.html";
+
+export const EARLY_SUPPORTER_PRICE = "$20";
+
 export function supabaseConfigured(): boolean {
   return Boolean(SUPABASE_URL && SUPABASE_ANON_KEY && !SUPABASE_ANON_KEY.includes("YOUR_"));
 }

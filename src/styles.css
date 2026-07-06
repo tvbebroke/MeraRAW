@@ -1683,3 +1683,98 @@ details summary {
 @media (max-width: 900px) {
   .edu-models { grid-template-columns: 1fr; }
 }
+
+/* ---------- early supporter / settings ---------- */
+.modal.es-modal,
+.modal.settings-modal {
+  width: min(440px, 92vw);
+  max-height: 90vh;
+  overflow-y: auto;
+}
+.modal-close {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+}
+.modal.es-modal,
+.modal.settings-modal { position: relative; }
+.es-modal-lede { margin-bottom: 12px; line-height: 1.5; }
+.es-benefits-app {
+  margin: 0 0 10px;
+  padding-left: 18px;
+  font-size: 12px;
+  color: var(--text-dim);
+  line-height: 1.55;
+}
+.es-pricing-notice-app {
+  font-size: 11px;
+  color: var(--text-faint);
+  line-height: 1.45;
+  margin: 0 0 12px;
+}
+.es-modal-form { margin-top: 8px; }
+.es-modal-actions { flex-direction: column; align-items: stretch; }
+.es-modal-actions .primary,
+.es-modal-actions .ghost { width: 100%; justify-content: center; }
+.es-restore-link {
+  margin-top: 10px;
+  width: 100%;
+  font-size: 11px;
+  background: none;
+  border: none;
+  color: var(--accent);
+  cursor: pointer;
+  text-decoration: underline;
+}
+.es-badge-app {
+  display: inline-block;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent-2);
+  background: rgba(74, 144, 217, 0.15);
+  border: 1px solid rgba(74, 144, 217, 0.35);
+  border-radius: 3px;
+  padding: 2px 6px;
+  margin-right: 6px;
+}
+.settings-section { margin-bottom: 16px; }
+.settings-h {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-faint);
+  margin: 0 0 6px;
+}
+.settings-actions { justify-content: flex-start; flex-wrap: wrap; }
+.edu-support-banner {
+  margin-bottom: 16px;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-1);
+  font-size: 12px;
+  color: var(--text-dim);
+}
+.edu-support-banner.is-supporter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.edu-support-link {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--accent-2);
+  cursor: pointer;
+  text-decoration: underline;
+  font: inherit;
+}
+.edu-support-link:hover { color: #fff; }

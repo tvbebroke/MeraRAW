@@ -16,6 +16,7 @@ export const EVENTS = {
   engineCrashed: "engine-crashed",
   exportRequested: "export-requested",
   importRequested: "import-requested",
+  settingsRequested: "settings-requested",
 } as const;
 
 export function onMaskReady(cb: (id: string) => void): Promise<UnlistenFn> {
@@ -101,4 +102,8 @@ export function onImportRequested(cb: () => void): Promise<UnlistenFn> {
 
 export function onExportRequested(cb: () => void): Promise<UnlistenFn> {
   return listen<null>(EVENTS.exportRequested, () => cb());
+}
+
+export function onSettingsRequested(cb: () => void): Promise<UnlistenFn> {
+  return listen<null>(EVENTS.settingsRequested, () => cb());
 }

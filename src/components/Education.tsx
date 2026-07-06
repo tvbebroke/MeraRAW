@@ -559,7 +559,13 @@ const GUIDES: Guide[] = [
 
 const GROUPS = ["Foundations", "The Color Map", "Working With Color", "Inside MeraRAW"];
 
-export function Education() {
+export function Education({
+  onSupportDevelopment,
+  isEarlySupporter = false,
+}: {
+  onSupportDevelopment?: () => void;
+  isEarlySupporter?: boolean;
+}) {
   const [activeId, setActiveId] = useState(GUIDES[0].id);
   const active = GUIDES.find((g) => g.id === activeId) ?? GUIDES[0];
   const idx = GUIDES.findIndex((g) => g.id === active.id);
@@ -590,6 +596,23 @@ export function Education() {
       </nav>
 
       <main className="edu-main">
+        {!isEarlySupporter && onSupportDevelopment && (
+          <div className="edu-support-banner">
+            <p>
+              MeraRAW is free while in beta.{" "}
+              <button type="button" className="edu-support-link" onClick={onSupportDevelopment}>
+                Support development
+              </button>{" "}
+              with an Early Supporter lifetime license ($20).
+            </p>
+          </div>
+        )}
+        {isEarlySupporter && (
+          <div className="edu-support-banner is-supporter">
+            <span className="es-badge-app">Early Supporter</span>
+            <span>Thank you for supporting MeraRAW.</span>
+          </div>
+        )}
         <article className="edu-article" key={active.id}>
           <div className="edu-article-kicker">{active.group} · {active.min} min read</div>
           <h1>{active.title}</h1>

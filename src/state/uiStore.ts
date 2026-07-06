@@ -62,6 +62,12 @@ interface UiState {
   /** Ctrl+/ shortcut help overlay. */
   helpOverlay: boolean;
   setHelpOverlay: (on: boolean) => void;
+  settingsOpen: boolean;
+  setSettingsOpen: (on: boolean) => void;
+  earlySupporterOpen: boolean;
+  setEarlySupporterOpen: (on: boolean) => void;
+  isEarlySupporter: boolean;
+  setIsEarlySupporter: (v: boolean) => void;
   /** Develop clipping overlay (J). */
   clippingVisible: boolean;
   toggleClipping: () => void;
@@ -185,6 +191,12 @@ export const useUiStore = create<UiState>((set, get) => ({
   },
   helpOverlay: false,
   setHelpOverlay: (on) => set({ helpOverlay: on }),
+  settingsOpen: false,
+  setSettingsOpen: (on) => set({ settingsOpen: on }),
+  earlySupporterOpen: false,
+  setEarlySupporterOpen: (on) => set({ earlySupporterOpen: on }),
+  isEarlySupporter: false,
+  setIsEarlySupporter: (v) => set({ isEarlySupporter: v }),
   clippingVisible: false,
   toggleClipping: () => set((s) => ({ clippingVisible: !s.clippingVisible })),
   infoOverlay: 0,

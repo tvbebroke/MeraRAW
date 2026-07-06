@@ -14,7 +14,7 @@ pub fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
             app,
             "settings",
             "Settings…",
-            false,
+            true,
             Some("Cmd+,"),
         )?)
         .separator()
@@ -118,6 +118,11 @@ pub fn handle_menu_event(app: &AppHandle, event: MenuEvent) {
         "export" => {
             if let Err(e) = app.emit(events::EXPORT_REQUESTED, ()) {
                 tracing::error!(error = %e, "emit export-requested failed");
+            }
+        }
+        "settings" => {
+            if let Err(e) = app.emit(events::SETTINGS_REQUESTED, ()) {
+                tracing::error!(error = %e, "emit settings-requested failed");
             }
         }
         "toggle-devtools" => {

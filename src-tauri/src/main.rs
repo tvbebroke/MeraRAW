@@ -179,6 +179,9 @@ fn main() {
             license::license_clear_token,
             license::license_verify_token_locally,
             license::license_sign_in_and_activate,
+            license::license_supporter_status,
+            license::license_start_checkout,
+            license::open_external_url,
         ])
         .setup(move |app| {
             if std::env::var("MERATECH_BUNDLED_PRESETS").is_err() {

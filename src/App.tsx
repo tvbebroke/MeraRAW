@@ -21,6 +21,7 @@ import {
   onImageReady,
   onImportRequested,
   onPreviewReady,
+  onSettingsRequested,
 } from "./ipc/events";
 import { isAppError, type ImageMeta } from "./ipc/types";
 import { ExportDialog } from "./components/lr/ExportDialog";
@@ -32,6 +33,9 @@ import { Icon } from "./components/lr/widgets";
 import { Filmstrip, Library } from "./components/Library";
 import { Education } from "./components/Education";
 import { ReportProblem } from "./components/ReportProblem";
+import { SettingsDialog } from "./components/SettingsDialog";
+import { EarlySupporterModal } from "./components/EarlySupporterModal";
+import { getSupporterStatus } from "./services/purchaseService";
 import { setAppKeyboardContext } from "./keyboard/context";
 import { useKeyboardShortcuts } from "./keyboard/useKeyboardShortcuts";
 import { useDocStore } from "./state/docStore";
@@ -67,6 +71,12 @@ export default function App() {
   const showRightPanel = useUiStore((s) => s.showRightPanel);
   const helpOverlay = useUiStore((s) => s.helpOverlay);
   const setHelpOverlay = useUiStore((s) => s.setHelpOverlay);
+  const settingsOpen = useUiStore((s) => s.settingsOpen);
+  const setSettingsOpen = useUiStore((s) => s.setSettingsOpen);
+  const earlySupporterOpen = useUiStore((s) => s.earlySupporterOpen);
+  const setEarlySupporterOpen = useUiStore((s) => s.setEarlySupporterOpen);
+  const isEarlySupporter = useUiStore((s) => s.isEarlySupporter);
+  const setIsEarlySupporter = useUiStore((s) => s.setIsEarlySupporter);
   const [meta, setMeta] = useState<ImageMeta | null>(null);
   const [mode, setMode] = useState<"library" | "develop" | "education">("library");
   const [showExport, setShowExport] = useState(false);
@@ -166,6 +176,7 @@ export default function App() {
       onExportRequested(() => {
         if (meta || exportQueue) setShowExport(true);
       }),
+      onSettingsRequested(() => setSettingsOpen(true)),
     ];
     pingEngine()
       .then((s) => {
@@ -185,6 +196,10 @@ export default function App() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    void getSupporterStatus().then((s) => setIsEarlySupporter(s.isEarlySupporter));
+  }, [setIsEarlySupporter]);
 
   // before/after → engine bypass
   useEffect(() => {
@@ -246,7 +261,10 @@ export default function App() {
       )}
 
       {mode === "education" ? (
-        <Education />
+        <Education
+          onSupportDevelopment={() => setEarlySupporterOpen(true)}
+          isEarlySupporter={isEarlySupporter}
+        />
       ) : mode === "library" ? (
         <Library
           onOpen={(p) => void open(p)}
@@ -322,6 +340,21 @@ export default function App() {
         open={helpOverlay}
         scopes={helpScopes}
         onClose={() => setHelpOverlay(false)}
+      />
+
+      <SettingsDialog
+        open={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        onSupportDevelopment={() => {
+          setSettingsOpen(false);
+          setEarlySupporterOpen(true);
+        }}
+      />
+
+      <EarlySupporterModal
+        open={earlySupporterOpen}
+        onClose={() => setEarlySupporterOpen(false)}
+        isSupporter={isEarlySupporter}
       />
     </div>
   );
