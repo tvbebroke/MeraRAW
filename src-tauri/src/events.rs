@@ -16,6 +16,8 @@ pub const IMPORT_PROGRESS: &str = "import-progress";
 pub const IMPORT_DONE: &str = "import-done";
 pub const CATALOG_CHANGED: &str = "catalog-changed";
 pub const EXPORT_PROGRESS: &str = "export-progress";
+pub const EXPORT_BATCH_PROGRESS: &str = "export-batch-progress";
+pub const EXPORT_BATCH_DONE: &str = "export-batch-done";
 pub const ENGINE_CRASHED: &str = "engine-crashed";
 pub const EXPORT_REQUESTED: &str = "export-requested";
 pub const IMPORT_REQUESTED: &str = "import-requested";
@@ -39,6 +41,34 @@ pub fn forward_engine_event(app: &AppHandle, ev: meratech_core::message::EngineE
         E::ExportProgress { phase, done, total } => app.emit(
             EXPORT_PROGRESS,
             serde_json::json!({"phase": phase, "done": done, "total": total}),
+        ),
+        E::ExportBatchProgress {
+            index,
+            count,
+            path,
+            phase,
+            done,
+            total,
+        } => app.emit(
+            EXPORT_BATCH_PROGRESS,
+            serde_json::json!({
+                "index": index, "count": count, "path": path,
+                "phase": phase, "done": done, "total": total,
+            }),
+        ),
+        E::ExportBatchDone {
+            ok,
+            failed,
+            cancelled,
+        } => app.emit(
+            EXPORT_BATCH_DONE,
+            serde_json::json!({
+                "ok": ok,
+                "failed": failed.iter().map(|(p, e)| {
+                    serde_json::json!({"path": p, "error": e})
+                }).collect::<Vec<_>>(),
+                "cancelled": cancelled,
+            }),
         ),
         E::EngineCrashed { message } => app.emit(ENGINE_CRASHED, message.clone()),
     };

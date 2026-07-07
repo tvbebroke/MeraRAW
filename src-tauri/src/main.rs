@@ -92,6 +92,18 @@ fn main() {
         )
         .init();
 
+    // Selftest runs are hermetic: a fresh per-process data dir keeps the
+    // import/thumb steps deterministic and the user's real catalog untouched.
+    // An explicit MERATECH_DATA_DIR still wins.
+    if std::env::var("MERATECH_SELFTEST").is_ok_and(|v| !v.is_empty())
+        && std::env::var("MERATECH_DATA_DIR").map_or(true, |v| v.is_empty())
+    {
+        let dir = std::env::temp_dir().join(format!("meratech-selftest-{}", std::process::id()));
+        let _ = std::fs::create_dir_all(&dir);
+        std::env::set_var("MERATECH_DATA_DIR", &dir);
+        tracing::info!(dir = %dir.display(), "selftest: hermetic data dir");
+    }
+
     // Engine actor up before the window — owns GPU + heavy state.
     let profiles_dir = std::env::var("MERARAW_PROFILES_DIR")
         .map(std::path::PathBuf::from)
@@ -154,6 +166,8 @@ fn main() {
             commands::switch_doc,
             commands::save_preset,
             commands::export_image,
+            commands::export_batch,
+            commands::cancel_export_batch,
             commands::list_presets,
             commands::list_preset_catalog,
             commands::apply_preset,

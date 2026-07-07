@@ -198,6 +198,16 @@ impl Engine {
             cur.meta.available_profiles = available_profiles;
             cur.meta.available_profile_files = available_profile_files;
         }
+        // The graph caches by view key + module dirtiness and never tracks the
+        // working texture's identity. On a re-decode (set_demosaic) the view is
+        // unchanged, so without a full invalidation the render below serves the
+        // previous decode's cached pixels.
+        if let Some(g) = &mut self.graph {
+            g.invalidate_all();
+        }
+        if let Some(g) = &mut self.export_graph {
+            g.invalidate_all();
+        }
         let vw = self
             .last_view
             .filter(|v| v.out_w >= 64 && v.out_h >= 64)

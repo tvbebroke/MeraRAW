@@ -48,6 +48,40 @@ async function centerLuma(version: number): Promise<number> {
   return (buf[i] + buf[i + 1] + buf[i + 2]) / 3;
 }
 
+async function frameBytes(): Promise<Uint8Array> {
+  const res = await fetch(frameUrl(Date.now()));
+  return new Uint8Array(await res.arrayBuffer());
+}
+
+function framesDiffer(a: Uint8Array, b: Uint8Array): boolean {
+  if (a.length !== b.length) return true;
+  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return true;
+  return false;
+}
+
+/** Resolve once no FrameReady has arrived for `quietMs`. Used around decode
+ * boundaries where several frames can land (preview, initial decode,
+ * re-decode) and we need the screen to represent the final one. */
+function settleFrames(quietMs = 2500, timeoutMs = 35000): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const done = (fn: () => void) => {
+      clearTimeout(hard);
+      clearTimeout(quiet);
+      un.then((f) => f());
+      fn();
+    };
+    const hard = setTimeout(
+      () => done(() => reject(new Error("settleFrames timeout"))),
+      timeoutMs,
+    );
+    let quiet = setTimeout(() => done(resolve), quietMs);
+    const un = onFrameReady(() => {
+      clearTimeout(quiet);
+      quiet = setTimeout(() => done(resolve), quietMs);
+    });
+  });
+}
+
 /** Poll the rendered frame until `pred(centerLuma)` holds (renders are
  * debounced; event ordering races — pixels are the truth). */
 async function waitLuma(
@@ -67,23 +101,58 @@ async function waitLuma(
 export async function runSelfTest(latestVersion: number): Promise<void> {
   const fail = (m: string) => reportFrontendStatus(`selftest-fail: ${m}`);
   try {
-    const baseline = await centerLuma(latestVersion);
-
     // 0) demosaic switch re-decodes and repaints (merawler engine). Runs first
     // so it is independent of later, environment-dependent steps (import/grid).
+    // Pixel-diff, not just frame events: a re-decode that leaves the render
+    // graph cache warm emits FrameReady with the previous algorithm's pixels
+    // (regression: finish_decode without invalidate_all).
+    // Normalize to rcd first — the sidecar persists the demosaic, so a prior
+    // (possibly interrupted) run may have left the image opening as amaze,
+    // which would make the amaze switch below a pixel-identical no-op.
+    const frameNorm = nextFrame(30000);
+    const mN = await setDemosaic("rcd");
+    if (mN.demosaic !== "rcd") {
+      return void (await fail(`demosaic normalize: ${mN.demosaic}`));
+    }
+    await frameNorm;
+    await settleFrames();
+    const pixRcd = await frameBytes();
     const frameDem = nextFrame(30000); // re-decode + AMaZE takes a few seconds
     const mA = await setDemosaic("amaze");
     if (mA.demosaic !== "amaze") {
       return void (await fail(`demosaic not set: ${mA.demosaic}`));
     }
-    await frameDem; // must repaint from the re-decoded working buffer
+    await frameDem; // the re-decode repaint (FrameReady is emitted even if stale)
+    await settleFrames();
+    const pixAmaze = await frameBytes();
+    if (!framesDiffer(pixRcd, pixAmaze)) {
+      return void (await fail("demosaic switch left frame pixels unchanged (stale render cache)"));
+    }
     const frameDem2 = nextFrame(30000);
     const mR = await setDemosaic("rcd");
     if (mR.demosaic !== "rcd") {
       return void (await fail(`demosaic restore: ${mR.demosaic}`));
     }
     await frameDem2;
+    await settleFrames();
+    const pixRcd2 = await frameBytes();
+    if (!framesDiffer(pixAmaze, pixRcd2)) {
+      return void (await fail("demosaic restore left frame pixels unchanged (stale render cache)"));
+    }
     await reportFrontendStatus("selftest-demosaic-ok");
+
+    // Hermetic baseline: a prior FAILED run leaves its edits in the sidecar
+    // (the doc settles on fail), so the image can open with exposure already
+    // at 1.5 — making the absolute setParam below a pixel-identical no-op
+    // and every later run false-fail with "exposure no-op: X → X".
+    const frameReset = nextFrame();
+    await applyOp({ op: "reset_all" });
+    await frameReset;
+    await settleFrames();
+
+    // luma baseline for the edit/undo checks — taken after step 0 + reset so
+    // it is the decoded, unedited rcd frame
+    const baseline = await centerLuma(latestVersion);
 
     // 1) exposure +1.5 stops through the real op path
     const frameP = nextFrame();
@@ -96,10 +165,12 @@ export async function runSelfTest(latestVersion: number): Promise<void> {
       return void (await fail(`exposure no-op: ${baseline} → ${brighter}`));
     }
 
-    // 2) undo restores
+    // 2) undo restores (depth is relative — the reset above is history too)
     const frameP2 = nextFrame();
     const d2 = await undo();
-    if (d2.undoDepth !== 0) return void (await fail("undo depth"));
+    if (d2.undoDepth !== delta.undoDepth - 1) {
+      return void (await fail("undo depth"));
+    }
     const restored = await centerLuma(await frameP2);
     if (Math.abs(restored - baseline) > 6) {
       return void (await fail(`undo mismatch: ${baseline} vs ${restored}`));
@@ -214,13 +285,17 @@ export async function runSelfTest(latestVersion: number): Promise<void> {
 
     // ---- Phase 5 coverage ----
 
-    // 12) import the test folder; grid populates with thumbs
+    // 12) import the test folder; grid populates with thumbs. Scope queries
+    // to the test folder — the default sort is captured_at over the WHOLE
+    // catalog, so on a machine with prior imports the test asset can rank
+    // past any sane limit.
     const folder = docPath.slice(0, docPath.lastIndexOf("/"));
     await importFolder(folder);
+    // 120 × 250ms = 30s: hermetic runs decode 3 RAWs fresh in debug builds
     let item: import("./ipc/types").GridItem | undefined;
-    for (let i = 0; i < 40 && !item; i++) {
+    for (let i = 0; i < 120 && !item; i++) {
       await new Promise((r) => setTimeout(r, 250));
-      const grid = await getGrid({ limit: 50 });
+      const grid = await getGrid({ limit: 50, folder });
       item = grid.find((g) => g.path === docPath && g.hasThumb);
     }
     if (!item) return void (await fail("import produced no thumbed grid item"));
@@ -238,7 +313,7 @@ export async function runSelfTest(latestVersion: number): Promise<void> {
       flag: "pick",
       addKeyword: "selftest",
     });
-    const grid2 = await getGrid({ ratingMin: 4, limit: 50 });
+    const grid2 = await getGrid({ ratingMin: 4, limit: 50, folder });
     if (!grid2.some((g) => g.id === item!.id)) {
       return void (await fail("rating filter missed the rated asset"));
     }
@@ -307,6 +382,61 @@ export async function runSelfTest(latestVersion: number): Promise<void> {
     const exported = await readFileMeta(out);
     if (!exported.exists || exported.size < 30_000) {
       return void (await fail(`export bad: ${out} ${exported.size}`));
+    }
+
+    // 16b) batch export: engine-side queue (decode+render per image, open
+    // image untouched); completion arrives as export-batch-done
+    {
+      const { listen } = await import("@tauri-apps/api/event");
+      let unBatch: (() => void) | undefined;
+      const donePromise = new Promise<import("./ipc/types").ExportBatchDone>(
+        (resolve, reject) => {
+          // debug-build decodes are 6-8s each idle but balloon under load
+          const t = setTimeout(
+            () => reject(new Error("batch export timeout")),
+            360000,
+          );
+          void listen<import("./ipc/types").ExportBatchDone>(
+            "export-batch-done",
+            (e) => {
+              clearTimeout(t);
+              resolve(e.payload);
+            },
+          ).then((u) => {
+            unBatch = u;
+          });
+        },
+      );
+      const batchPaths = (await getGrid({ limit: 3, folder })).map((g) => g.path);
+      if (batchPaths.length < 2) return void (await fail("batch: <2 grid paths"));
+      const accepted = await invoke<number>("export_batch", {
+        paths: batchPaths,
+        settings: {
+          format: "jpeg",
+          target: "srgb",
+          quality: 85,
+          maxDim: 1024,
+          sharpen: 25,
+          destDir: "/tmp/meratech-selftest-batch",
+        },
+      });
+      if (accepted !== batchPaths.length) {
+        return void (await fail(`batch accepted ${accepted}/${batchPaths.length}`));
+      }
+      const done = await donePromise.finally(() => unBatch?.());
+      if (done.cancelled) return void (await fail("batch cancelled unexpectedly"));
+      if (done.failed.length > 0) {
+        return void (await fail(`batch failed: ${done.failed[0].error}`));
+      }
+      if (done.ok.length !== batchPaths.length) {
+        return void (await fail(`batch wrote ${done.ok.length}/${batchPaths.length}`));
+      }
+      for (const outPath of done.ok) {
+        const m = await readFileMeta(outPath);
+        if (!m.exists || m.size < 20_000) {
+          return void (await fail(`batch output bad: ${outPath} ${m.size}`));
+        }
+      }
     }
 
     // 17) perf instrumentation: render budget + cache reuse counted

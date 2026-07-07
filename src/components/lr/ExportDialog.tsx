@@ -1,8 +1,19 @@
 // Export as a modal dialog action (LR-style), out of the always-visible
-// rail. Supports single open image or a queued library selection.
+// rail. Supports single open image or a queued library selection; the batch
+// runs engine-side (decode + render per image) without touching the open one.
 import { useEffect, useState } from "react";
-import { exportImage, openImage, pickFolder, revealInFinder } from "../../ipc/commands";
-import { onExportProgress } from "../../ipc/events";
+import {
+  cancelExportBatch,
+  exportBatch,
+  exportImage,
+  pickFolder,
+  revealInFinder,
+} from "../../ipc/commands";
+import {
+  onExportBatchDone,
+  onExportBatchProgress,
+  onExportProgress,
+} from "../../ipc/events";
 import { formatAppError, type ExportSettings } from "../../ipc/types";
 import { useUiStore } from "../../state/uiStore";
 
@@ -65,6 +76,54 @@ export function ExportDialog({
     };
   }, []);
 
+  useEffect(() => {
+    // Batch progress: overall bar = finished images + this image's phase.
+    // Phases per image: decode → render → encode.
+    const PHASE_BASE: Record<string, number> = { decode: 0, render: 0.3, encode: 0.9 };
+    const PHASE_SPAN: Record<string, number> = { decode: 0.3, render: 0.6, encode: 0.1 };
+    const unProgress = onExportBatchProgress((p) => {
+      const inPhase = p.total > 0 ? p.done / p.total : 0;
+      const imageFrac =
+        (PHASE_BASE[p.phase] ?? 0) + (PHASE_SPAN[p.phase] ?? 0) * inPhase;
+      const overall = p.count > 0 ? (p.index + imageFrac) / p.count : 0;
+      setProgress({ phase: p.phase, pct: Math.round(overall * 100) });
+      const name = p.path.split("/").pop();
+      const step =
+        p.phase === "decode"
+          ? "Decoding"
+          : p.phase === "render"
+            ? `Rendering ${p.done}/${p.total}`
+            : "Encoding";
+      setStatus(`${name} (${p.index + 1}/${p.count}) — ${step}…`);
+    });
+    const unDone = onExportBatchDone((d) => {
+      setBusy(false);
+      setSavedPaths(d.ok);
+      if (d.ok.length > 0 && !destDir) {
+        const slash = d.ok[0].lastIndexOf("/");
+        if (slash > 0) setDestDir(d.ok[0].slice(0, slash));
+      }
+      if (d.cancelled) {
+        setStatus(`Cancelled — ${d.ok.length} exported before stopping.`);
+        setProgress(null);
+      } else if (d.failed.length > 0) {
+        const first = d.failed[0];
+        setStatus(
+          `Saved ${d.ok.length}, failed ${d.failed.length} — first error: ` +
+            `${first.path.split("/").pop()}: ${first.error}`,
+        );
+        setProgress(null);
+      } else {
+        setStatus(`Saved ${d.ok.length} files.`);
+        setProgress({ phase: "done", pct: 100 });
+      }
+    });
+    return () => {
+      unProgress.then((f) => f());
+      unDone.then((f) => f());
+    };
+  }, [destDir]);
+
   async function chooseFolder() {
     const folder = await pickFolder();
     if (folder) {
@@ -98,40 +157,33 @@ export function ExportDialog({
     setProgress(null);
     setStatus(destDir ? "Starting export…" : "Choose a save folder…");
     const settings = buildSettings();
-    const paths = batch ? queuePaths! : lastOpenedPath ? [lastOpenedPath] : [];
-    if (paths.length === 0) {
+
+    if (batch) {
+      // Engine-side queue: the open image is untouched; progress and
+      // completion arrive as events (busy clears on export-batch-done).
+      try {
+        await exportBatch(queuePaths!, settings);
+      } catch (e) {
+        setStatus(`Export failed: ${formatAppError(e)}`);
+        setProgress(null);
+        setBusy(false);
+      }
+      return;
+    }
+
+    if (!lastOpenedPath) {
       setStatus("No image to export.");
       setBusy(false);
       return;
     }
-
-    const outputs: string[] = [];
     try {
-      for (let i = 0; i < paths.length; i++) {
-        const path = paths[i];
-        if (batch || path !== lastOpenedPath) {
-          setStatus(`Opening ${path.split("/").pop()} (${i + 1}/${paths.length})…`);
-          await openImage(path);
-          // Wait briefly for decode — export_image checks working texture
-          for (let t = 0; t < 120; t++) {
-            if (useUiStore.getState().decodeState === "ready") break;
-            await new Promise((r) => setTimeout(r, 250));
-          }
-        }
-        setStatus(`Exporting ${path.split("/").pop()} (${i + 1}/${paths.length})…`);
-        const out = await exportImage(settings);
-        outputs.push(out);
-        if (!destDir) {
-          const slash = out.lastIndexOf("/");
-          if (slash > 0) setDestDir(out.slice(0, slash));
-        }
+      const out = await exportImage(settings);
+      setSavedPaths([out]);
+      if (!destDir) {
+        const slash = out.lastIndexOf("/");
+        if (slash > 0) setDestDir(out.slice(0, slash));
       }
-      setSavedPaths(outputs);
-      setStatus(
-        outputs.length === 1
-          ? `Saved: ${outputs[0]}`
-          : `Saved ${outputs.length} files to ${destDir ?? "export folder"}`,
-      );
+      setStatus(`Saved: ${out}`);
       setProgress({ phase: "done", pct: 100 });
     } catch (e) {
       setStatus(`Export failed: ${formatAppError(e)}`);
@@ -266,6 +318,11 @@ export function ExportDialog({
           {savedPaths.length === 1 && (
             <button type="button" className="tab" onClick={() => void revealInFinder(savedPaths[0])}>
               Reveal in Finder
+            </button>
+          )}
+          {busy && batch && (
+            <button type="button" onClick={() => void cancelExportBatch()}>
+              Cancel
             </button>
           )}
           <button disabled={busy} onClick={onClose}>

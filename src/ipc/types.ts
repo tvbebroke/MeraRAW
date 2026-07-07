@@ -249,6 +249,21 @@ export interface ExportProgress {
   total: number;
 }
 
+export interface ExportBatchProgress {
+  index: number;
+  count: number;
+  path: string;
+  phase: "decode" | "render" | "encode" | string;
+  done: number;
+  total: number;
+}
+
+export interface ExportBatchDone {
+  ok: string[];
+  failed: { path: string; error: string }[];
+  cancelled: boolean;
+}
+
 /** Serialized form of Rust AppError: #[serde(tag = "kind", content = "message")] */
 export interface AppError {
   kind:

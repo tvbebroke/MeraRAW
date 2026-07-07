@@ -330,17 +330,8 @@ pub fn resize_linear(
     height: u32,
     max_dim: u32,
 ) -> (Vec<f32>, u32, u32) {
-    if width.max(height) <= max_dim {
-        return (linear, width, height);
-    }
-    let img = image::Rgb32FImage::from_raw(width, height, linear).expect("linear buffer");
-    let scale = max_dim as f32 / width.max(height) as f32;
-    let (nw, nh) = (
-        ((width as f32 * scale) as u32).max(1),
-        ((height as f32 * scale) as u32).max(1),
-    );
-    let resized = image::imageops::resize(&img, nw, nh, image::imageops::FilterType::Lanczos3);
-    (resized.into_raw(), nw, nh)
+    // delegated so the Lanczos code compiles optimized in dev (see resize crate)
+    meratech_resize::resize_rgb_f32(linear, width, height, max_dim)
 }
 
 /// Output sharpen (USM on 8-bit luma, after resize — spec 7.2).

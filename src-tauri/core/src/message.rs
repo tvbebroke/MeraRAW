@@ -97,6 +97,22 @@ pub enum EngineEvent {
         done: u32,
         total: u32,
     },
+    /// Batch export progress: per-image phase ("decode" | "render" | "encode")
+    /// plus the image's position in the queue.
+    ExportBatchProgress {
+        index: u32,
+        count: u32,
+        path: String,
+        phase: String,
+        done: u32,
+        total: u32,
+    },
+    /// Batch export finished (or was cancelled). `failed` = (source, error).
+    ExportBatchDone {
+        ok: Vec<String>,
+        failed: Vec<(String, String)>,
+        cancelled: bool,
+    },
     /// Engine thread recovered from a panic; UI should prompt restart.
     EngineCrashed { message: String },
 }
@@ -300,6 +316,18 @@ pub enum EngineMsg {
         settings: crate::export::ExportSettings,
         reply: oneshot::Sender<Result<String, CoreError>>,
     },
+    /// Export many images without touching the open one: each is decoded +
+    /// segmented on a worker, tile-rendered on the actor, encoded on a
+    /// worker. Replies with the accepted queue length; completion arrives as
+    /// EngineEvent::ExportBatchDone.
+    ExportBatch {
+        paths: Vec<PathBuf>,
+        settings: crate::export::ExportSettings,
+        reply: oneshot::Sender<Result<u32, CoreError>>,
+    },
+    ExportBatchCancel {
+        reply: oneshot::Sender<()>,
+    },
     SavePresetToDisk {
         name: String,
         modules: Vec<String>,
@@ -344,6 +372,32 @@ pub enum EngineMsg {
     },
     /// Continue incremental tiled export (one tile per actor tick).
     ExportStep,
+    /// Batch worker finished decode + segmentation for queue slot `index`.
+    BatchImagePrepared {
+        batch_id: u64,
+        index: usize,
+        result: Result<Box<BatchPrepared>, CoreError>,
+    },
+    /// Batch encode worker finished writing queue slot `index`.
+    BatchEncodeDone {
+        batch_id: u64,
+        index: usize,
+        result: Result<String, CoreError>,
+    },
+    /// Continue incremental tiled batch render (one tile per actor tick).
+    ExportBatchStep,
+}
+
+/// Carried from the batch-prepare worker: decoded working image plus
+/// everything the render needs that `open_image` would normally set up
+/// (sidecar doc, DCP, LUT, segmentation masks).
+pub struct BatchPrepared {
+    pub payload: DecodedPayload,
+    pub doc: crate::doc::EditDoc,
+    pub dcp: Option<std::sync::Arc<crate::profile::DcpProfile>>,
+    pub lut: Option<std::sync::Arc<crate::lut::CubeLut>>,
+    /// (mask id, source hash, inferred mask) for doc masks of type "segmented".
+    pub masks: Vec<(String, u64, crate::segment::Mask01)>,
 }
 
 /// Carried from the decode worker thread: f16-packed working master +

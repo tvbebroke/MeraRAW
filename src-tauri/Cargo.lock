@@ -2612,6 +2612,7 @@ dependencies = [
  "half",
  "image",
  "jxl-oxide",
+ "meratech-resize",
  "merawler",
  "png 0.17.16",
  "psd",
@@ -2646,6 +2647,13 @@ dependencies = [
  "tokio",
  "tracing",
  "tracing-subscriber",
+]
+
+[[package]]
+name = "meratech-resize"
+version = "0.1.0"
+dependencies = [
+ "image",
 ]
 
 [[package]]

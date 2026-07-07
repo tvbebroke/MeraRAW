@@ -11,7 +11,8 @@ use crate::gpu::GpuContext;
 use crate::graph::RenderGraph;
 use crate::image::RgbF32Buf;
 use crate::message::{
-    DecodedPayload, EngineEvent, EngineInfo, EngineMsg, EngineStatus, Frame, FrameInfo,
+    BatchPrepared, DecodedPayload, EngineEvent, EngineInfo, EngineMsg, EngineStatus, Frame,
+    FrameInfo,
 };
 use crate::ops::{self, DocDelta, History, Op};
 use crate::profile::DcpProfile;
@@ -379,6 +380,26 @@ impl EngineHandle {
             .await
     }
 
+    /// Queue a batch export. Replies with the accepted queue length;
+    /// progress + completion arrive as ExportBatchProgress/ExportBatchDone.
+    pub async fn export_batch(
+        &self,
+        paths: Vec<PathBuf>,
+        settings: crate::export::ExportSettings,
+    ) -> Result<Result<u32, CoreError>, EngineError> {
+        self.request(|reply| EngineMsg::ExportBatch {
+            paths,
+            settings,
+            reply,
+        })
+        .await
+    }
+
+    pub async fn export_batch_cancel(&self) -> Result<(), EngineError> {
+        self.request(|reply| EngineMsg::ExportBatchCancel { reply })
+            .await
+    }
+
     pub async fn save_preset_to_disk(
         &self,
         name: String,
@@ -508,6 +529,11 @@ struct Engine {
     /// Dedicated graph for tiled export (tile-sized caches).
     export_graph: Option<RenderGraph>,
     export_job: Option<export::ExportJob>,
+    /// Batch export state machine (spec 7.3); shares export_graph with
+    /// single export — the two are mutually exclusive.
+    export_batch: Option<export::BatchState>,
+    /// Monotonic batch id — stale worker messages after cancel are dropped.
+    batch_seq: u64,
     perf: crate::message::PerfStats,
 }
 
@@ -554,6 +580,8 @@ async fn run(
         preview_graph: None,
         export_graph: None,
         export_job: None,
+        export_batch: None,
+        batch_seq: 0,
         perf: Default::default(),
     };
     tracing::info!("engine actor up");
@@ -574,6 +602,7 @@ async fn run(
                         if crashed {
                             tracing::error!("engine panic during message handling");
                             engine.export_job = None;
+                            engine.export_batch = None;
                             engine.emit(EngineEvent::EngineCrashed {
                                 message: "GPU/render panic — restart the app".into(),
                             });
@@ -1003,6 +1032,33 @@ impl Engine {
             }
             EngineMsg::ExportStep => {
                 self.export_step();
+            }
+            EngineMsg::ExportBatch {
+                paths,
+                settings,
+                reply,
+            } => {
+                self.export_batch_start(paths, settings, reply);
+            }
+            EngineMsg::ExportBatchCancel { reply } => {
+                self.export_batch_cancel(reply);
+            }
+            EngineMsg::BatchImagePrepared {
+                batch_id,
+                index,
+                result,
+            } => {
+                self.batch_image_prepared(batch_id, index, result);
+            }
+            EngineMsg::BatchEncodeDone {
+                batch_id,
+                index,
+                result,
+            } => {
+                self.batch_encode_done(batch_id, index, result);
+            }
+            EngineMsg::ExportBatchStep => {
+                self.export_batch_step();
             }
             EngineMsg::SavePresetToDisk {
                 name,

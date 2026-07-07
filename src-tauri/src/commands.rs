@@ -372,6 +372,40 @@ pub async fn export_image(
     engine.export_image(settings).await?.map_err(AppError::from)
 }
 
+/// Batch export: engine decodes + renders each path off the open image.
+/// Returns the accepted queue length; progress arrives as
+/// export-batch-progress / export-batch-done events.
+#[tauri::command]
+pub async fn export_batch(
+    app: AppHandle,
+    engine: State<'_, EngineHandle>,
+    paths: Vec<String>,
+    mut settings: meratech_core::export::ExportSettings,
+) -> Result<u32, AppError> {
+    if settings.dest_dir.trim().is_empty() {
+        let (tx, rx) = tokio::sync::oneshot::channel();
+        app.dialog().file().pick_folder(move |f| {
+            let _ = tx.send(f);
+        });
+        let picked = rx
+            .await
+            .map_err(|_| AppError::Internal("dialog dropped".into()))?;
+        settings.dest_dir = picked
+            .map(|p| p.to_string())
+            .ok_or_else(|| AppError::InvalidOp("export cancelled".into()))?;
+    }
+    let paths = paths.into_iter().map(std::path::PathBuf::from).collect();
+    engine
+        .export_batch(paths, settings)
+        .await?
+        .map_err(AppError::from)
+}
+
+#[tauri::command]
+pub async fn cancel_export_batch(engine: State<'_, EngineHandle>) -> Result<(), AppError> {
+    Ok(engine.export_batch_cancel().await?)
+}
+
 #[tauri::command]
 pub async fn save_preset(
     engine: State<'_, EngineHandle>,

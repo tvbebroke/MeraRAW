@@ -235,6 +235,19 @@ export function exportImage(settings: ExportSettings): Promise<string> {
   return invoke<string>("export_image", { settings });
 }
 
+/** Engine-side batch export: returns the accepted queue length; progress
+ * arrives via export-batch-progress / export-batch-done events. */
+export function exportBatch(
+  paths: string[],
+  settings: ExportSettings,
+): Promise<number> {
+  return invoke<number>("export_batch", { paths, settings });
+}
+
+export function cancelExportBatch(): Promise<void> {
+  return invoke<void>("cancel_export_batch");
+}
+
 export function revealInFinder(path: string): Promise<void> {
   return invoke<void>("reveal_in_finder", { path });
 }

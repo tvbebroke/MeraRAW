@@ -13,6 +13,8 @@ export const EVENTS = {
   docUpdated: "doc-updated",
   maskReady: "mask-ready",
   exportProgress: "export-progress",
+  exportBatchProgress: "export-batch-progress",
+  exportBatchDone: "export-batch-done",
   engineCrashed: "engine-crashed",
   exportRequested: "export-requested",
   importRequested: "import-requested",
@@ -59,6 +61,23 @@ export function onExportProgress(
   cb: (p: import("./types").ExportProgress) => void,
 ): Promise<UnlistenFn> {
   return listen<import("./types").ExportProgress>(EVENTS.exportProgress, (e) =>
+    cb(e.payload),
+  );
+}
+
+export function onExportBatchProgress(
+  cb: (p: import("./types").ExportBatchProgress) => void,
+): Promise<UnlistenFn> {
+  return listen<import("./types").ExportBatchProgress>(
+    EVENTS.exportBatchProgress,
+    (e) => cb(e.payload),
+  );
+}
+
+export function onExportBatchDone(
+  cb: (p: import("./types").ExportBatchDone) => void,
+): Promise<UnlistenFn> {
+  return listen<import("./types").ExportBatchDone>(EVENTS.exportBatchDone, (e) =>
     cb(e.payload),
   );
 }
