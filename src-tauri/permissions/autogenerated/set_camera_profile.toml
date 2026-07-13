@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-set-camera-profile"
+description = "Enables the set_camera_profile command without any pre-configured scope."
+commands.allow = ["set_camera_profile"]
+
+[[permission]]
+identifier = "deny-set-camera-profile"
+description = "Denies the set_camera_profile command without any pre-configured scope."
+commands.deny = ["set_camera_profile"]

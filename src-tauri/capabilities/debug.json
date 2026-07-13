@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "debug-probes",
+  "description": "Extra dig/selftest IPC probes. Only active in debug builds (platforms omitted so file is always present; probes are also cfg-gated in invoke_handler).",
+  "windows": ["main"],
+  "permissions": ["allow-dev-probes"]
+}

@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-autoopen-path"
+description = "Enables the autoopen_path command without any pre-configured scope."
+commands.allow = ["autoopen_path"]
+
+[[permission]]
+identifier = "deny-autoopen-path"
+description = "Denies the autoopen_path command without any pre-configured scope."
+commands.deny = ["autoopen_path"]

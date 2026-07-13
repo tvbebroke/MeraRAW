@@ -3,7 +3,6 @@
 
 use crate::error::AppError;
 use meratech_core::engine::EngineHandle;
-use std::path::PathBuf;
 use tauri::{AppHandle, State};
 use tauri_plugin_dialog::DialogExt;
 
@@ -111,7 +110,8 @@ pub async fn pick_folder(app: AppHandle) -> Result<Option<String>, AppError> {
 
 #[tauri::command]
 pub async fn read_file_meta(path: String) -> Result<FileMeta, AppError> {
-    let p = PathBuf::from(&path);
+    let p = crate::paths::validate_user_path(&path)?;
+    let path = p.to_string_lossy().into_owned();
     let ext = p
         .extension()
         .map(|e| e.to_string_lossy().to_lowercase());
@@ -195,6 +195,7 @@ pub async fn browse_roots() -> Result<Vec<BrowseRoot>, AppError> {
 
 #[tauri::command]
 pub async fn list_dir(path: String) -> Result<Vec<DirEntry>, AppError> {
+    let path = crate::paths::validate_existing_path(&path)?;
     let mut entries = Vec::new();
     let mut rd = tokio::fs::read_dir(&path).await?;
     while let Some(entry) = rd.next_entry().await? {
@@ -215,8 +216,9 @@ pub async fn open_image(
     engine: State<'_, EngineHandle>,
     path: String,
 ) -> Result<meratech_core::raw::ImageMeta, AppError> {
+    let path = crate::paths::validate_existing_path(&path)?;
     engine
-        .open_image(PathBuf::from(path))
+        .open_image(path)
         .await?
         .map_err(AppError::from)
 }
@@ -369,6 +371,9 @@ pub async fn export_image(
             .map(|p| p.to_string())
             .ok_or_else(|| AppError::InvalidOp("export cancelled".into()))?;
     }
+    settings.dest_dir = crate::paths::validate_user_path(&settings.dest_dir)?
+        .to_string_lossy()
+        .into_owned();
     engine.export_image(settings).await?.map_err(AppError::from)
 }
 
@@ -394,9 +399,15 @@ pub async fn export_batch(
             .map(|p| p.to_string())
             .ok_or_else(|| AppError::InvalidOp("export cancelled".into()))?;
     }
-    let paths = paths.into_iter().map(std::path::PathBuf::from).collect();
+    settings.dest_dir = crate::paths::validate_user_path(&settings.dest_dir)?
+        .to_string_lossy()
+        .into_owned();
+    let mut validated = Vec::with_capacity(paths.len());
+    for p in paths {
+        validated.push(crate::paths::validate_existing_path(&p)?);
+    }
     engine
-        .export_batch(paths, settings)
+        .export_batch(validated, settings)
         .await?
         .map_err(AppError::from)
 }
@@ -455,8 +466,9 @@ pub async fn import_folder(
     engine: State<'_, EngineHandle>,
     path: String,
 ) -> Result<u64, AppError> {
+    let path = crate::paths::validate_existing_path(&path)?;
     engine
-        .import_folder(PathBuf::from(path))
+        .import_folder(path)
         .await?
         .map_err(AppError::from)
 }
@@ -466,8 +478,9 @@ pub async fn scan_import_folder(
     engine: State<'_, EngineHandle>,
     path: String,
 ) -> Result<Vec<meratech_core::catalog::ImportCandidate>, AppError> {
+    let path = crate::paths::validate_existing_path(&path)?;
     engine
-        .scan_import_folder(PathBuf::from(path))
+        .scan_import_folder(path)
         .await?
         .map_err(AppError::from)
 }
@@ -478,11 +491,13 @@ pub async fn import_selected(
     root: String,
     paths: Vec<String>,
 ) -> Result<u64, AppError> {
+    let root = crate::paths::validate_existing_path(&root)?;
+    let mut validated = Vec::with_capacity(paths.len());
+    for p in paths {
+        validated.push(crate::paths::validate_existing_path(&p)?);
+    }
     engine
-        .import_selected(
-            PathBuf::from(root),
-            paths.into_iter().map(PathBuf::from).collect(),
-        )
+        .import_selected(root, validated)
         .await?
         .map_err(AppError::from)
 }
@@ -559,6 +574,12 @@ pub async fn set_lut(
     engine: State<'_, EngineHandle>,
     path: Option<String>,
 ) -> Result<(), AppError> {
+    let path = match path {
+        Some(p) if !p.trim().is_empty() => {
+            Some(crate::paths::validate_existing_path(&p)?.to_string_lossy().into_owned())
+        }
+        _ => None,
+    };
     engine.set_lut(path).await?.map_err(AppError::from)
 }
 
@@ -661,10 +682,8 @@ pub async fn report_frontend_status(status: String) -> Result<(), AppError> {
 /// Reveal an exported file in Finder (macOS) or the system file manager.
 #[tauri::command]
 pub async fn reveal_in_finder(path: String) -> Result<(), AppError> {
-    let p = PathBuf::from(&path);
-    if !p.exists() {
-        return Err(AppError::NotFound(path));
-    }
+    let p = crate::paths::validate_existing_path(&path)?;
+    let path = p.to_string_lossy().into_owned();
     #[cfg(target_os = "macos")]
     {
         std::process::Command::new("open")

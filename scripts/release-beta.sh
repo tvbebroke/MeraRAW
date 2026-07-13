@@ -96,11 +96,22 @@ fi
 
 if [[ -n "${R2_ENDPOINT:-}" && -n "${R2_ACCESS_KEY_ID:-}" && -n "${R2_SECRET_ACCESS_KEY:-}" && -n "${R2_BUCKET_NAME:-}" ]]; then
   KEY="${R2_OBJECT_KEY:-${DMG_NAME}}"
+  ENDPOINT="${R2_ENDPOINT%/}"
+  if [[ "${ENDPOINT}" == */"${R2_BUCKET_NAME}" ]]; then
+    ENDPOINT="${ENDPOINT%/"${R2_BUCKET_NAME}"}"
+  fi
   echo "→ Uploading to R2: s3://${R2_BUCKET_NAME}/${KEY}"
-  AWS_ACCESS_KEY_ID="${R2_ACCESS_KEY_ID}" \
-  AWS_SECRET_ACCESS_KEY="${R2_SECRET_ACCESS_KEY}" \
-  aws s3 cp "${RELEASE_DIR}/${DMG_NAME}" "s3://${R2_BUCKET_NAME}/${KEY}" \
-    --endpoint-url "${R2_ENDPOINT}"
+  if command -v aws >/dev/null 2>&1; then
+    AWS_ACCESS_KEY_ID="${R2_ACCESS_KEY_ID}" \
+    AWS_SECRET_ACCESS_KEY="${R2_SECRET_ACCESS_KEY}" \
+    aws s3 cp "${RELEASE_DIR}/${DMG_NAME}" "s3://${R2_BUCKET_NAME}/${KEY}" \
+      --endpoint-url "${ENDPOINT}"
+  elif [[ -x ".venv-r2/bin/python" && -f scripts/r2-upload.py ]]; then
+    R2_ENDPOINT="${ENDPOINT}" .venv-r2/bin/python scripts/r2-upload.py "${RELEASE_DIR}/${DMG_NAME}" "${KEY}"
+  else
+    echo "error: aws CLI unavailable — run: python3 -m venv .venv-r2 && .venv-r2/bin/pip install boto3" >&2
+    exit 1
+  fi
   echo "→ Uploaded. Set Supabase secret R2_OBJECT_KEY=${KEY}"
 else
   echo "→ Skipping R2 upload (R2_* env vars not set)."

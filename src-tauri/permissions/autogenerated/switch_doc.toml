@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-switch-doc"
+description = "Enables the switch_doc command without any pre-configured scope."
+commands.allow = ["switch_doc"]
+
+[[permission]]
+identifier = "deny-switch-doc"
+description = "Denies the switch_doc command without any pre-configured scope."
+commands.deny = ["switch_doc"]

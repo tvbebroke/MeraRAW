@@ -28,6 +28,8 @@ jsonwebtoken = "9"
 [profile.release]
 lto = true
 opt-level = 3
+codegen-units = 1
+panic = "abort"
 strip = true
 
 # heavy numeric deps (tract inference, rawler decode) stay fast in dev

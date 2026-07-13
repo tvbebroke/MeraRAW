@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-close-image"
+description = "Enables the close_image command without any pre-configured scope."
+commands.allow = ["close_image"]
+
+[[permission]]
+identifier = "deny-close-image"
+description = "Denies the close_image command without any pre-configured scope."
+commands.deny = ["close_image"]

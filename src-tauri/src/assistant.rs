@@ -137,7 +137,7 @@ async fn execute_tool(
     input: &Value,
 ) -> (Value, Option<Vec<u8>>) {
     let progress = |label: String| {
-        let _ = app.emit("assistant-progress", json!({"kind": "tool", "label": label}));
+        let _ = app.emit(crate::events::ASSISTANT_PROGRESS, json!({"kind": "tool", "label": label}));
     };
     let op_result = |r: Result<Result<meratech_core::ops::DocDelta, meratech_core::error::CoreError>, meratech_core::engine::EngineError>| -> Value {
         match r {
@@ -438,7 +438,7 @@ pub async fn run(
                     .clamp(5, 60);
                 tracing::warn!(wait, attempt, "rate limited; backing off");
                 let _ = app.emit(
-                    "assistant-progress",
+                    crate::events::ASSISTANT_PROGRESS,
                     json!({"kind": "tool", "label": format!("rate limited — waiting {wait}s")}),
                 );
                 tokio::time::sleep(std::time::Duration::from_secs(wait)).await;
@@ -472,7 +472,7 @@ pub async fn run(
                     if let Some(t) = block["text"].as_str() {
                         final_text.push_str(t);
                         let _ = app.emit(
-                            "assistant-progress",
+                            crate::events::ASSISTANT_PROGRESS,
                             json!({"kind": "text", "label": t}),
                         );
                     }
@@ -566,7 +566,7 @@ pub async fn assistant_send(
         mode.unwrap_or_else(|| "edit".into()),
     )
     .await?;
-    let _ = app.emit("assistant-progress", json!({"kind": "done", "label": ""}));
+    let _ = app.emit(crate::events::ASSISTANT_PROGRESS, json!({"kind": "done", "label": ""}));
     events::forward_engine_event(
         &app,
         meratech_core::message::EngineEvent::CatalogChanged,

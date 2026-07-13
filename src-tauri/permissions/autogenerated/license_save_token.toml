@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-license-save-token"
+description = "Enables the license_save_token command without any pre-configured scope."
+commands.allow = ["license_save_token"]
+
+[[permission]]
+identifier = "deny-license-save-token"
+description = "Denies the license_save_token command without any pre-configured scope."
+commands.deny = ["license_save_token"]

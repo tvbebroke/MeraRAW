@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-license-clear-token"
+description = "Enables the license_clear_token command without any pre-configured scope."
+commands.allow = ["license_clear_token"]
+
+[[permission]]
+identifier = "deny-license-clear-token"
+description = "Denies the license_clear_token command without any pre-configured scope."
+commands.deny = ["license_clear_token"]

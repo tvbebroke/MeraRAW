@@ -14,7 +14,6 @@
     "notarize": "bash scripts/notarize-dmg.sh"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.49.0",
     "@tauri-apps/api": "^2",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",

@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>NSPhotoLibraryUsageDescription</key>
+  <string>MeraRAW needs access to your photo library so you can open and edit RAW and image files.</string>
+  <key>NSDocumentsFolderUsageDescription</key>
+  <string>MeraRAW needs access to your documents so you can import and export photo edits.</string>
+  <key>NSDownloadsFolderUsageDescription</key>
+  <string>MeraRAW needs access to Downloads so you can import photos and save exports.</string>
+  <key>NSDesktopFolderUsageDescription</key>
+  <string>MeraRAW needs access to the Desktop so you can open and save image files.</string>
+  <key>CFBundleDocumentTypes</key>
+  <array>
+    <dict>
+      <key>CFBundleTypeName</key>
+      <string>Camera RAW Image</string>
+      <key>CFBundleTypeRole</key>
+      <string>Viewer</string>
+      <key>LSHandlerRank</key>
+      <string>Default</string>
+      <key>LSItemContentTypes</key>
+      <array>
+        <string>public.camera-raw-image</string>
+        <string>com.adobe.raw-image</string>
+        <string>public.image</string>
+      </array>
+    </dict>
+  </array>
+</dict>
+</plist>

@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-license-verify-token-locally"
+description = "Enables the license_verify_token_locally command without any pre-configured scope."
+commands.allow = ["license_verify_token_locally"]
+
+[[permission]]
+identifier = "deny-license-verify-token-locally"
+description = "Denies the license_verify_token_locally command without any pre-configured scope."
+commands.deny = ["license_verify_token_locally"]

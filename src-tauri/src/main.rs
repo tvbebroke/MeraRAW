@@ -6,6 +6,7 @@ mod error;
 mod events;
 mod license;
 mod menu;
+mod paths;
 mod protocol;
 
 // Reference RAW-pipeline scaffold (mirrors the documented stage layout). The
@@ -201,6 +202,7 @@ fn main() {
             commands::selftest_enabled,
             commands::live_assistant_enabled,
             commands::verify_slider_enabled,
+            #[cfg(debug_assertions)]
             commands::fail_on_purpose,
             commands::report_frontend_status,
             commands::reveal_in_finder,

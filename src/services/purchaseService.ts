@@ -26,8 +26,8 @@ export async function getSupporterStatus(): Promise<SupporterStatus> {
 /** Open meratech.co checkout in the system browser (user signs in on web). */
 export function openEarlySupporterPage(surface?: string): void {
   trackSupporterEvent("supporter_page_viewed", { surface: surface ?? "app" });
-  void invoke("open_external_url", { url: EARLY_SUPPORTER_URL }).catch(() => {
-    window.open(EARLY_SUPPORTER_URL, "_blank", "noopener,noreferrer");
+  void invoke("open_external_url", { url: EARLY_SUPPORTER_URL }).catch((err) => {
+    console.error("open_external_url failed", err);
   });
 }
 

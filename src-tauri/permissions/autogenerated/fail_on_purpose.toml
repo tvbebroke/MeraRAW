@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-fail-on-purpose"
+description = "Enables the fail_on_purpose command without any pre-configured scope."
+commands.allow = ["fail_on_purpose"]
+
+[[permission]]
+identifier = "deny-fail-on-purpose"
+description = "Denies the fail_on_purpose command without any pre-configured scope."
+commands.deny = ["fail_on_purpose"]

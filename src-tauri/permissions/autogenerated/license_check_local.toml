@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-license-check-local"
+description = "Enables the license_check_local command without any pre-configured scope."
+commands.allow = ["license_check_local"]
+
+[[permission]]
+identifier = "deny-license-check-local"
+description = "Denies the license_check_local command without any pre-configured scope."
+commands.deny = ["license_check_local"]

@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-wb-from-point"
+description = "Enables the wb_from_point command without any pre-configured scope."
+commands.allow = ["wb_from_point"]
+
+[[permission]]
+identifier = "deny-wb-from-point"
+description = "Denies the wb_from_point command without any pre-configured scope."
+commands.deny = ["wb_from_point"]

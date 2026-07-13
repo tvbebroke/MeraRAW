@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-set-lut"
+description = "Enables the set_lut command without any pre-configured scope."
+commands.allow = ["set_lut"]
+
+[[permission]]
+identifier = "deny-set-lut"
+description = "Denies the set_lut command without any pre-configured scope."
+commands.deny = ["set_lut"]

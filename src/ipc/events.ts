@@ -12,6 +12,9 @@ export const EVENTS = {
   decodeError: "decode-error",
   docUpdated: "doc-updated",
   maskReady: "mask-ready",
+  importProgress: "import-progress",
+  importDone: "import-done",
+  catalogChanged: "catalog-changed",
   exportProgress: "export-progress",
   exportBatchProgress: "export-batch-progress",
   exportBatchDone: "export-batch-done",
@@ -19,6 +22,7 @@ export const EVENTS = {
   exportRequested: "export-requested",
   importRequested: "import-requested",
   settingsRequested: "settings-requested",
+  assistantProgress: "assistant-progress",
 } as const;
 
 export function onMaskReady(cb: (id: string) => void): Promise<UnlistenFn> {
@@ -28,17 +32,17 @@ export function onMaskReady(cb: (id: string) => void): Promise<UnlistenFn> {
 export function onImportProgress(
   cb: (p: { done: number; total: number }) => void,
 ): Promise<UnlistenFn> {
-  return listen<{ done: number; total: number }>("import-progress", (e) =>
+  return listen<{ done: number; total: number }>(EVENTS.importProgress, (e) =>
     cb(e.payload),
   );
 }
 
 export function onImportDone(cb: (total: number) => void): Promise<UnlistenFn> {
-  return listen<number>("import-done", (e) => cb(e.payload));
+  return listen<number>(EVENTS.importDone, (e) => cb(e.payload));
 }
 
 export function onCatalogChanged(cb: () => void): Promise<UnlistenFn> {
-  return listen<null>("catalog-changed", () => cb());
+  return listen<null>(EVENTS.catalogChanged, () => cb());
 }
 
 export function onPreviewReady(cb: (version: number) => void): Promise<UnlistenFn> {
@@ -125,4 +129,12 @@ export function onExportRequested(cb: () => void): Promise<UnlistenFn> {
 
 export function onSettingsRequested(cb: () => void): Promise<UnlistenFn> {
   return listen<null>(EVENTS.settingsRequested, () => cb());
+}
+
+export function onAssistantProgress(
+  cb: (p: { kind: string; label: string }) => void,
+): Promise<UnlistenFn> {
+  return listen<{ kind: string; label: string }>(EVENTS.assistantProgress, (e) =>
+    cb(e.payload),
+  );
 }

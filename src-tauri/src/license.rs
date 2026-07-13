@@ -367,7 +367,12 @@ pub async fn license_start_checkout(email: String, password: String) -> Result<S
 #[tauri::command]
 pub fn open_external_url(url: String) -> Result<(), AppError> {
     let url = url.trim();
-    if url.is_empty() || (!url.starts_with("https://") && !url.starts_with("http://")) {
+    // https only — never open arbitrary http: (or other schemes) from the webview.
+    if url.is_empty() || !url.starts_with("https://") {
+        return Err(AppError::Internal("Invalid URL (https only).".into()));
+    }
+    // Block credentials-in-URL and obvious local/network pivots.
+    if url.contains('@') || url.to_lowercase().contains("https://localhost") {
         return Err(AppError::Internal("Invalid URL.".into()));
     }
     #[cfg(target_os = "macos")]

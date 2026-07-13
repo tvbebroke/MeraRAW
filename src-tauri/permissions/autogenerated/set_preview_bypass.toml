@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-set-preview-bypass"
+description = "Enables the set_preview_bypass command without any pre-configured scope."
+commands.allow = ["set_preview_bypass"]
+
+[[permission]]
+identifier = "deny-set-preview-bypass"
+description = "Denies the set_preview_bypass command without any pre-configured scope."
+commands.deny = ["set_preview_bypass"]

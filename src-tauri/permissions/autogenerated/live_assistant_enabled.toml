@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-live-assistant-enabled"
+description = "Enables the live_assistant_enabled command without any pre-configured scope."
+commands.allow = ["live_assistant_enabled"]
+
+[[permission]]
+identifier = "deny-live-assistant-enabled"
+description = "Denies the live_assistant_enabled command without any pre-configured scope."
+commands.deny = ["live_assistant_enabled"]

@@ -10,11 +10,8 @@
 # handle only Windows + Linux. (To move Mac into CI later you'd add the APPLE_*
 # secrets AND a keychain-import step before the build.)
 #
-# Trigger it by pushing a tag (e.g. `git tag v0.1.3 && git push origin v0.1.3`)
-# — that also attaches the files to a GitHub Release — or run it manually from
-# the Actions tab (uploads the files as downloadable run artifacts).
-#
-# Windows/Linux installers are unsigned (users click through the OS warning).
+# Windows signing: set GitHub secrets WINDOWS_CERTIFICATE (base64 PFX) and
+# WINDOWS_CERTIFICATE_PASSWORD. Without those secrets, installers remain unsigned.
 
 name: Release
 
@@ -24,7 +21,23 @@ on:
   workflow_dispatch:
 
 jobs:
+  audit:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - uses: dtolnay/rust-toolchain@stable
+      - name: npm audit
+        run: npm ci && npm audit --audit-level=high
+      - name: cargo audit
+        run: |
+          cargo install cargo-audit --locked
+          (cd src-tauri && cargo audit)
+
   build:
+    needs: audit
     permissions:
       contents: write
     strategy:
@@ -74,6 +87,19 @@ jobs:
             librsvg2-dev \
             patchelf
 
+      - name: Import Windows code-signing certificate
+        if: matrix.os == 'windows-latest' && env.WINDOWS_CERTIFICATE != ''
+        shell: pwsh
+        env:
+          WINDOWS_CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE }}
+          WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+        run: |
+          $bytes = [Convert]::FromBase64String($env:WINDOWS_CERTIFICATE)
+          [IO.File]::WriteAllBytes("$env:RUNNER_TEMP\\cert.pfx", $bytes)
+          Import-PfxCertificate -FilePath "$env:RUNNER_TEMP\\cert.pfx" `
+            -CertStoreLocation Cert:\CurrentUser\My `
+            -Password (ConvertTo-SecureString -String $env:WINDOWS_CERTIFICATE_PASSWORD -AsPlainText -Force)
+
       - name: Install frontend deps
         run: npm ci
 
@@ -89,7 +115,6 @@ jobs:
           mkdir -p dist-release
           v="${{ steps.ver.outputs.version }}"
           label="${{ matrix.label }}"
-          # Only this platform's bundles exist on this runner.
           for f in src-tauri/target/**/release/bundle/**/*.dmg \
                    src-tauri/target/**/release/bundle/**/*.exe \
                    src-tauri/target/**/release/bundle/**/*.msi \

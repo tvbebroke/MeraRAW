@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-license-supporter-status"
+description = "Enables the license_supporter_status command without any pre-configured scope."
+commands.allow = ["license_supporter_status"]
+
+[[permission]]
+identifier = "deny-license-supporter-status"
+description = "Denies the license_supporter_status command without any pre-configured scope."
+commands.deny = ["license_supporter_status"]

@@ -1,9 +1,19 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "main-capability",
-  "description": "Least-privilege grants for the main window. No fs write. Dialogs + core IPC only; image-byte I/O happens in the Rust core.",
+  "description": "Least-privilege grants for the main window. Custom commands gated via permissions/default.toml; filesystem I/O stays in Rust with path validation.",
   "windows": ["main"],
   "permissions": [
-    "core:default"
+    "core:path:default",
+    "core:event:default",
+    "core:window:default",
+    "core:app:default",
+    "core:image:default",
+    "core:resources:default",
+    "core:menu:default",
+    "core:tray:default",
+    "dialog:default",
+    "window-state:default",
+    "default"
   ]
 }

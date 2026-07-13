@@ -1,58 +1,23 @@
-import { createClient, type Session, type SupabaseClient } from "@supabase/supabase-js";
+/** License helpers — all network I/O goes through Rust commands (no webview fetch). */
 import { invoke } from "@tauri-apps/api/core";
-import { PURCHASE_URL, SUPABASE_ANON_KEY, SUPABASE_URL } from "../config";
+import { PURCHASE_URL } from "../config";
 
-let client: SupabaseClient | null = null;
-
-export function getSupabase(): SupabaseClient {
-  if (!client) {
-    client = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-  }
-  return client;
+export async function signInAndActivate(
+  email: string,
+  password: string,
+): Promise<string> {
+  return invoke<string>("license_sign_in_and_activate", { email, password });
 }
 
-export async function activateLicense(session: Session): Promise<void> {
-  // Ensure free beta row exists (same as meratech.co sign-in flow).
-  try {
-    await fetch(`${SUPABASE_URL}/functions/v1/grant-beta-license`, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${session.access_token}` },
-    });
-  } catch {
-    // verify-license will surface a clear error if license is still missing
-  }
-
-  const res = await fetch(`${SUPABASE_URL}/functions/v1/verify-license`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${session.access_token}` },
-  });
-  const result = (await res.json()) as { token?: string; error?: string };
-  if (!res.ok || !result.token) {
-    throw new Error(result.error || "License verification failed");
-  }
-
-  const valid = await invoke<boolean>("license_verify_token_locally", {
-    token: result.token,
-  });
-  if (!valid) {
-    throw new Error("Server token failed local signature check");
-  }
-
-  await invoke("license_save_token", { token: result.token });
-}
-
-export async function signIn(email: string, password: string): Promise<Session> {
-  const supabase = getSupabase();
-  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-  if (error) throw error;
-  if (!data.session) throw new Error("No session returned");
-  return data.session;
-}
-
-export async function signOutAndClearLicense(): Promise<void> {
-  const supabase = getSupabase();
-  await supabase.auth.signOut();
+export async function clearLicense(): Promise<void> {
   await invoke("license_clear_token");
+}
+
+export async function checkLocalLicense(): Promise<{
+  licensed: boolean;
+  userId?: string;
+}> {
+  return invoke("license_check_local");
 }
 
 export { PURCHASE_URL };

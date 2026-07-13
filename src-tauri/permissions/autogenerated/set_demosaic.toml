@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-set-demosaic"
+description = "Enables the set_demosaic command without any pre-configured scope."
+commands.allow = ["set_demosaic"]
+
+[[permission]]
+identifier = "deny-set-demosaic"
+description = "Denies the set_demosaic command without any pre-configured scope."
+commands.deny = ["set_demosaic"]
