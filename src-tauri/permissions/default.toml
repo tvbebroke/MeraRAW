@@ -1,5 +1,9 @@
+# App IPC grants. Identifier must NOT be bare "default" — Tauri capability
+# resolution treats that like an empty permission-set and silently skips it,
+# which denies every custom command (pick_folder, import_*, etc.).
+
 [[permission]]
-identifier = "default"
+identifier = "meraraw-ipc"
 description = "Production IPC surface for the main MeraRAW window. Dig/selftest probes are excluded."
 commands.allow = [
   "app_info",

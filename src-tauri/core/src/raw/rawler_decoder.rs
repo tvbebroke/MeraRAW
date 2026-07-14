@@ -33,7 +33,19 @@ const RAW_EXTENSIONS: &[&str] = &[
 ];
 
 fn dec_err(e: impl std::fmt::Display) -> CoreError {
-    CoreError::Decode(e.to_string())
+    let msg = e.to_string();
+    // RawSource / mmap surface macOS TCC as EPERM — rewrite so the status
+    // bar isn't just "Operation not permitted (os error 1)".
+    if msg.contains("Operation not permitted") || msg.contains("os error 1") {
+        CoreError::Decode(
+            "macOS blocked reading this file. Open it via Browse… / the file picker \
+             (grants access), or allow MeraRAW under System Settings → Privacy & Security \
+             → Files and Folders / Full Disk Access. Download iCloud files in Finder first."
+                .into(),
+        )
+    } else {
+        CoreError::Decode(msg)
+    }
 }
 
 /// Some decoders leave RawImage.orientation at Normal even when the EXIF

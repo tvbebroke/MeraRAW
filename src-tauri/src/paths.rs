@@ -2,7 +2,41 @@
 //! Canonicalize when possible, reject traversal tricks and sensitive locations.
 
 use crate::error::AppError;
+use std::io;
 use std::path::{Component, Path, PathBuf};
+
+/// True when macOS TCC / iCloud / ACL denied the open (EPERM / EACCES).
+pub fn is_permission_denied(err: &io::Error) -> bool {
+    err.kind() == io::ErrorKind::PermissionDenied
+        || matches!(err.raw_os_error(), Some(1) | Some(13))
+}
+
+/// Human-readable guidance when the OS blocks reading a photo path.
+pub fn permission_denied_message(path: &Path) -> String {
+    let name = path
+        .file_name()
+        .map(|n| n.to_string_lossy().into_owned())
+        .unwrap_or_else(|| path.display().to_string());
+    format!(
+        "macOS blocked reading “{name}”. \
+         Open it with Browse… / the file picker (that grants access), \
+         or System Settings → Privacy & Security → Files and Folders \
+         (or Full Disk Access) → allow MeraRAW. \
+         If the file lives in iCloud/Photos, download it first in Finder."
+    )
+}
+
+/// Ensure we can open the file for read before handing it to the decoder.
+/// Surfaces TCC / cloud-placeholder failures as a clear Decode error.
+pub fn ensure_readable(path: &Path) -> Result<(), AppError> {
+    match std::fs::File::open(path) {
+        Ok(_) => Ok(()),
+        Err(e) if is_permission_denied(&e) => {
+            Err(AppError::Decode(permission_denied_message(path)))
+        }
+        Err(e) => Err(AppError::Io(format!("cannot open {}: {e}", path.display()))),
+    }
+}
 
 /// Sensitive prefixes we never open/list via IPC (defense in depth).
 fn is_denied(path: &Path) -> bool {

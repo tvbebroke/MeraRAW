@@ -30,6 +30,19 @@ fn frame_jpeg(frame: &meratech_core::message::Frame) -> Result<Vec<u8>, String> 
     Ok(bytes)
 }
 
+/// Webview pages load from `http://127.0.0.1:1420` (dev) / `tauri://` (prod).
+/// `fetch(frame://…)` is cross-origin and needs ACAO to read the body.
+fn cors_headers(builder: http::response::Builder) -> http::response::Builder {
+    builder
+        .header("Access-Control-Allow-Origin", "*")
+        .header("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS")
+        .header("Access-Control-Allow-Headers", "*")
+        .header(
+            "Access-Control-Expose-Headers",
+            "X-Frame-Width, X-Frame-Height, X-Frame-Version",
+        )
+}
+
 /// thumb://localhost/<asset_id>?tier=t|p → preview JPEG bytes (contract C5
 /// sibling for the P5 grid).
 pub fn handle_thumb_request<R: Runtime>(
@@ -56,12 +69,12 @@ pub fn handle_thumb_request<R: Runtime>(
             _ => None,
         };
         let resp = match file {
-            Some(bytes) => http::Response::builder()
+            Some(bytes) => cors_headers(http::Response::builder())
                 .status(200)
                 .header("Content-Type", "image/jpeg")
                 .header("Cache-Control", "max-age=60")
                 .body(bytes),
-            None => http::Response::builder()
+            None => cors_headers(http::Response::builder())
                 .status(404)
                 .body(Vec::new()),
         };
@@ -76,6 +89,16 @@ pub fn handle_frame_request<R: Runtime>(
     request: http::Request<Vec<u8>>,
     responder: UriSchemeResponder,
 ) {
+    // Preflight for cross-origin fetch from the Vite/dev or tauri origin.
+    if request.method() == http::Method::OPTIONS {
+        let resp = cors_headers(http::Response::builder())
+            .status(204)
+            .body(Vec::new())
+            .expect("options response build");
+        responder.respond(resp);
+        return;
+    }
+
     let app = ctx.app_handle().clone();
     let uri = request.uri().to_string();
     tauri::async_runtime::spawn(async move {
@@ -87,11 +110,12 @@ pub fn handle_frame_request<R: Runtime>(
             Ok(None) => engine.test_frame(TEST_FRAME_W, TEST_FRAME_H).await,
             Err(e) => Err(e),
         };
+
         match frame {
             Ok(frame) => {
                 let resp = if uri.contains("fmt=jpeg") {
                     match frame_jpeg(&frame) {
-                        Ok(bytes) => http::Response::builder()
+                        Ok(bytes) => cors_headers(http::Response::builder())
                             .status(200)
                             .header("Content-Type", "image/jpeg")
                             .header("X-Frame-Width", frame.width.to_string())
@@ -101,23 +125,19 @@ pub fn handle_frame_request<R: Runtime>(
                             .body(bytes),
                         Err(e) => {
                             tracing::error!(error = %e, "frame jpeg encode failed");
-                            http::Response::builder()
+                            cors_headers(http::Response::builder())
                                 .status(500)
                                 .body(e.to_string().into_bytes())
                         }
                     }
                 } else {
-                    http::Response::builder()
+                    cors_headers(http::Response::builder())
                         .status(200)
                         .header("Content-Type", "application/octet-stream")
                         .header("X-Frame-Width", frame.width.to_string())
                         .header("X-Frame-Height", frame.height.to_string())
                         .header("X-Frame-Version", frame.version.to_string())
                         .header("Cache-Control", "no-store")
-                        .header(
-                            "Access-Control-Expose-Headers",
-                            "X-Frame-Width, X-Frame-Height, X-Frame-Version",
-                        )
                         .body(frame.rgba)
                 };
                 if let Ok(resp) = resp {
@@ -126,7 +146,7 @@ pub fn handle_frame_request<R: Runtime>(
             }
             Err(e) => {
                 tracing::error!(error = %e, "frame render failed");
-                let resp = http::Response::builder()
+                let resp = cors_headers(http::Response::builder())
                     .status(500)
                     .body(e.to_string().into_bytes())
                     .expect("error response build");

@@ -1,12 +1,15 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "main-capability",
-  "description": "Least-privilege grants for the main window. Custom commands gated via permissions/default.toml; filesystem I/O stays in Rust with path validation.",
+  "description": "Least-privilege grants for the main window. Custom commands gated via permissions/default.toml (meraraw-ipc); filesystem I/O stays in Rust with path validation.",
   "windows": ["main"],
   "permissions": [
     "core:path:default",
     "core:event:default",
     "core:window:default",
+    "core:window:allow-start-dragging",
+    "core:window:allow-set-effects",
+    "core:window:allow-set-background-color",
     "core:app:default",
     "core:image:default",
     "core:resources:default",
@@ -14,6 +17,6 @@
     "core:tray:default",
     "dialog:default",
     "window-state:default",
-    "default"
+    "meraraw-ipc"
   ]
 }

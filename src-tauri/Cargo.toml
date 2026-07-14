@@ -1,6 +1,6 @@
 [package]
 name = "meratech-editor"
-version = "0.1.4"
+version = "0.1.5"
 edition = "2021"
 description = "MeraRAW RAW Editor"
 
@@ -12,7 +12,7 @@ tauri-build = { version = "2", features = [] }
 
 [dependencies]
 meratech-core = { path = "core" }
-tauri = { version = "2", features = [] }
+tauri = { version = "2", features = ["macos-private-api"] }
 tauri-plugin-dialog = "2"
 tauri-plugin-window-state = "2"
 serde = { version = "1", features = ["derive"] }

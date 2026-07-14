@@ -18,6 +18,7 @@ import {
 } from "../ipc/events";
 import { setFilmstripKeyboardContext } from "../keyboard/context";
 import { ImportReview } from "./ImportReview";
+import { Icon } from "./lr/widgets";
 import { setLibraryKeyboardContext } from "../keyboard/context";
 import {
   formatAppError,
@@ -30,6 +31,56 @@ import {
 } from "../ipc/types";
 
 const FLAG_ICON: Record<string, string> = { pick: "✓", reject: "✕", none: "" };
+
+function LibraryThumb({
+  item,
+  selected,
+  gridMode,
+  onSelect,
+  onOpen,
+}: {
+  item: GridItem;
+  selected: boolean;
+  gridMode: GridMode;
+  onSelect: (extend: boolean) => void;
+  onOpen: () => void;
+}) {
+  const [thumbFailed, setThumbFailed] = useState(false);
+  const showImg = item.accessible && !thumbFailed;
+
+  return (
+    <div
+      className={`grid-cell ${selected ? "selected" : ""} ${!item.accessible ? "offline" : ""}`}
+      onClick={(e) => onSelect(e.shiftKey || e.metaKey)}
+      onDoubleClick={onOpen}
+      title={item.filename}
+    >
+      {showImg ? (
+        <img
+          src={`thumb://localhost/${item.id}?tier=t`}
+          loading="lazy"
+          alt={item.filename}
+          onError={() => setThumbFailed(true)}
+        />
+      ) : (
+        <div className="thumb-placeholder">
+          <span className="thumb-ext">{extLabel(item.filename) || "FILE"}</span>
+          <span className="thumb-name">
+            {item.accessible ? item.filename : "⚠ offline"}
+          </span>
+        </div>
+      )}
+      {gridMode === "square" && (
+        <span className="grid-ext-label">{extLabel(item.filename)}</span>
+      )}
+      <div className="cell-badges">
+        {item.rating > 0 && <span>{"★".repeat(item.rating)}</span>}
+        {item.flag !== "none" && <span>{FLAG_ICON[item.flag]}</span>}
+        {item.hasEdits && <span title="has edits">✎</span>}
+      </div>
+    </div>
+  );
+}
 
 type LibraryView =
   | { kind: "all" }
@@ -81,7 +132,7 @@ export function Library({
   const [items, setItems] = useState<GridItem[]>([]);
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [anchor, setAnchor] = useState<number | null>(null);
-  const [query, setQuery] = useState<GridQuery>({ limit: 500, sort: "captured" });
+  const [query, setQuery] = useState<GridQuery>({ limit: 2000, sort: "captured" });
   const [searchInput, setSearchInput] = useState("");
   const [gridMode, setGridMode] = useState<GridMode>("photo");
   const [showFilterBar, setShowFilterBar] = useState(true);
@@ -108,7 +159,15 @@ export function Library({
 
   const refreshFolders = useCallback(async () => {
     try {
-      setFolders(await listFolders());
+      // Only show folders whose roots are currently on disk — hide offline
+      // import roots so the library only lists what’s connected to MeraRAW.
+      const next = (await listFolders()).filter((f) => f.accessible);
+      setFolders(next);
+      const v = viewRef.current;
+      if (v.kind === "folder" && !next.some((f) => f.root === v.root)) {
+        setView({ kind: "all" });
+        setSelected(new Set());
+      }
     } catch (e) {
       console.error("folders", e);
     }
@@ -123,7 +182,7 @@ export function Library({
   }, []);
 
   const gridQuery = useCallback((): GridQuery => {
-    const q = { ...queryRef.current, limit: queryRef.current.limit ?? 500 };
+    const q = { ...queryRef.current, limit: queryRef.current.limit ?? 2000 };
     const v = viewRef.current;
     if (v.kind === "folder") q.folder = v.root;
     else {
@@ -140,7 +199,15 @@ export function Library({
 
   const refreshGrid = useCallback(async () => {
     try {
-      setItems(await getGrid(gridQuery()));
+      const grid = (await getGrid(gridQuery())).filter((i) => i.accessible);
+      setItems(grid);
+      setSelected((prev) => {
+        if (prev.size === 0) return prev;
+        const keep = new Set(
+          [...prev].filter((id) => grid.some((i) => i.id === id)),
+        );
+        return keep.size === prev.size ? prev : keep;
+      });
     } catch (e) {
       console.error("grid", e);
     }
@@ -193,8 +260,20 @@ export function Library({
   }, [refreshFolders, refreshAlbums, refreshGrid]);
 
   async function beginImportBrowse() {
-    const folder = await pickFolder();
-    if (folder) setReviewRoot(folder);
+    setImportStatus("choose a folder…");
+    try {
+      const folder = await pickFolder();
+      if (folder) {
+        setImportStatus(null);
+        setReviewRoot(folder);
+      } else {
+        setImportStatus(null);
+      }
+    } catch (e) {
+      const msg = formatAppError(e);
+      setImportStatus(`add photos failed: ${msg}`);
+      console.error("pick_folder failed", e);
+    }
   }
 
   async function patchSelected(patch: MetaPatch) {
@@ -357,14 +436,14 @@ export function Library({
           <button
             key={f.root}
             type="button"
-            className={`library-nav ${view.kind === "folder" && view.root === f.root ? "active" : ""} ${f.accessible ? "" : "offline"}`}
+            className={`library-nav ${view.kind === "folder" && view.root === f.root ? "active" : ""}`}
             onClick={() => {
               setView({ kind: "folder", root: f.root });
               setSelected(new Set());
             }}
             title={f.root}
           >
-            {f.accessible ? "📁" : "📂"} {f.name}
+            📁 {f.name}
             <span className="muted">{f.photoCount}</span>
           </button>
         ))}
@@ -391,6 +470,20 @@ export function Library({
       </aside>
 
       <div className="library-main">
+        <div className="library-search-row">
+          <div className="library-search">
+            <span className="library-search-icon" aria-hidden="true">
+              <Icon.Loupe size={16} />
+            </span>
+            <input
+              ref={searchRef}
+              className="library-search-input"
+              placeholder="Search photos…"
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+            />
+          </div>
+        </div>
         <div className="library-toolbar">
           <button className="library-add-btn" onClick={() => void beginImportBrowse()} title="Add photos">
             + Add Photos…
@@ -405,14 +498,8 @@ export function Library({
             }}
             title="Rebuild the index from folders + sidecars"
           >
-            ♻️ Rebuild
+            Rebuild
           </button>
-          <input
-            ref={searchRef}
-            placeholder="search… (camera:Sony rating:3 flag:pick)"
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-          />
           {showFilterBar && (
           <>
           <select
@@ -501,7 +588,7 @@ export function Library({
           )}
           {importStatus && <span className="muted">{importStatus}</span>}
           <span className="muted" style={{ marginLeft: "auto" }}>
-            {items.length} photos · G grid · 0-5 rate · P/X/U flags · ⏎ develop
+            {items.length} photos
           </span>
         </div>
 
@@ -529,33 +616,14 @@ export function Library({
           style={{ ["--thumb-scale" as string]: thumbScale }}
         >
           {items.map((it) => (
-            <div
+            <LibraryThumb
               key={it.id}
-              className={`grid-cell ${selected.has(it.id) ? "selected" : ""} ${!it.accessible ? "offline" : ""}`}
-              onClick={(e) => toggleSelect(it.id, e.shiftKey || e.metaKey)}
-              onDoubleClick={() => it.accessible && onOpen(it.path)}
-              title={it.filename}
-            >
-              {it.accessible && it.hasThumb ? (
-                <img
-                  src={`thumb://localhost/${it.id}?tier=t`}
-                  loading="lazy"
-                  alt={it.filename}
-                />
-              ) : (
-                <div className="thumb-placeholder">
-                  {it.accessible ? it.filename : "⚠ offline"}
-                </div>
-              )}
-              {gridMode === "square" && (
-                <span className="grid-ext-label">{extLabel(it.filename)}</span>
-              )}
-              <div className="cell-badges">
-                {it.rating > 0 && <span>{"★".repeat(it.rating)}</span>}
-                {it.flag !== "none" && <span>{FLAG_ICON[it.flag]}</span>}
-                {it.hasEdits && <span title="has edits">✎</span>}
-              </div>
-            </div>
+              item={it}
+              selected={selected.has(it.id)}
+              gridMode={gridMode}
+              onSelect={(extend) => toggleSelect(it.id, extend)}
+              onOpen={() => it.accessible && onOpen(it.path)}
+            />
           ))}
           {items.length === 0 && (
             <div className="library-grid-empty muted">
@@ -563,7 +631,6 @@ export function Library({
             </div>
           )}
         </div>
-      </div>
 
       {detail && (
         <aside className="library-info">
@@ -650,6 +717,7 @@ export function Library({
           </div>
         </aside>
       )}
+      </div>
 
       {reviewRoot && (
         <ImportReview
@@ -691,10 +759,10 @@ export function Filmstrip({
           : undefined;
         if (cancelled) return;
         setFolderRoot(root);
-        const grid = await getGrid({
+        const grid = (await getGrid({
           folder: root,
           limit: 200,
-        });
+        })).filter((i) => i.accessible);
         if (!cancelled) setItems(grid);
       } catch {
         if (!cancelled) setItems([]);

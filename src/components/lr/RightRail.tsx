@@ -9,22 +9,25 @@ import { Icon } from "./widgets";
 
 export type RightToolTab = "presets" | "edit" | "crop" | "remove" | "masking";
 
+/** Order matches Figma Develop Intermediate tool strip. */
 const TABS: { id: RightToolTab; label: string; icon: (p: { size?: number }) => ReactElement }[] = [
-  { id: "presets", label: "Presets", icon: Icon.Presets },
   { id: "edit", label: "Edit", icon: Icon.EditSliders },
   { id: "crop", label: "Crop", icon: Icon.Crop },
-  { id: "remove", label: "Remove", icon: Icon.Remove },
-  { id: "masking", label: "Masking", icon: Icon.Mask },
+  { id: "masking", label: "Mask", icon: Icon.Mask },
+  { id: "remove", label: "AI", icon: Icon.Sparkles },
+  { id: "presets", label: "Presets", icon: Icon.Presets },
 ];
 
 function RemovePanel() {
   return (
     <div className="lr-rail-panel">
       <header className="lr-rail-panel-head">
-        <h2>Remove</h2>
+        <h2>AI / Remove</h2>
       </header>
       <div className="lr-rail-panel-body">
-        <p className="muted sm">Spot removal and healing brush — coming soon. Press <kbd>Q</kbd> to open this panel.</p>
+        <p className="muted sm">
+          Spot removal and healing brush — coming soon. Press <kbd>Q</kbd> to open this panel.
+        </p>
       </div>
     </div>
   );
@@ -70,16 +73,7 @@ export function RightRail({
   if (!showRightPanel) return null;
 
   return (
-    <div className="lr-right-wrap">
-      <div className="lr-right-main">
-        {tab === "presets" && <PresetsPanel />}
-        {tab === "edit" && (
-          <DevelopRail meta={meta} onMetaChange={onMetaChange} />
-        )}
-        {tab === "crop" && <CropPanel />}
-        {tab === "remove" && <RemovePanel />}
-        {tab === "masking" && <MaskingPanel />}
-      </div>
+    <div className="lr-right-stack">
       <nav className="lr-tool-tabs" aria-label="Develop tools">
         {TABS.map(({ id, label, icon: TabIcon }) => (
           <button
@@ -89,11 +83,20 @@ export function RightRail({
             title={label}
             onClick={() => setTab(id)}
           >
-            <TabIcon size={18} />
+            <TabIcon size={22} />
             <span>{label}</span>
           </button>
         ))}
       </nav>
+      <div className="lr-right-main">
+        {tab === "presets" && <PresetsPanel />}
+        {tab === "edit" && (
+          <DevelopRail meta={meta} onMetaChange={onMetaChange} />
+        )}
+        {tab === "crop" && <CropPanel />}
+        {tab === "remove" && <RemovePanel />}
+        {tab === "masking" && <MaskingPanel />}
+      </div>
     </div>
   );
 }

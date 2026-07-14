@@ -992,14 +992,20 @@ impl Engine {
                 let _ = reply.send(self.rebuild_index());
             }
             EngineMsg::GetPreviewFile { id, tier, reply } => {
-                let p = self.catalog_mut().ok().map(|c| {
+                let p = self.catalog_mut().ok().and_then(|c| {
                     if tier == "p" {
-                        c.preview_path(id)
+                        let path = c.preview_path(id);
+                        if path.exists() {
+                            Some(path)
+                        } else {
+                            // Fall back to thumb; generate if needed.
+                            c.ensure_thumb(id)
+                        }
                     } else {
-                        c.thumb_path(id)
+                        c.ensure_thumb(id)
                     }
                 });
-                let _ = reply.send(p.filter(|p| p.exists()));
+                let _ = reply.send(p);
             }
             EngineMsg::ImportFileDone { import_id, file } => {
                 self.import_file_done(import_id, *file);

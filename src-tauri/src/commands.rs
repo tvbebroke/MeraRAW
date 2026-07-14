@@ -3,8 +3,22 @@
 
 use crate::error::AppError;
 use meratech_core::engine::EngineHandle;
-use tauri::{AppHandle, State};
-use tauri_plugin_dialog::DialogExt;
+use tauri::{AppHandle, Manager, State};
+use tauri_plugin_dialog::{DialogExt, FileDialogBuilder, FilePath};
+
+fn file_dialog(app: &AppHandle) -> FileDialogBuilder<tauri::Wry> {
+    let mut dialog = app.dialog().file();
+    if let Some(win) = app.get_webview_window("main") {
+        dialog = dialog.set_parent(&win);
+    }
+    dialog
+}
+
+fn filepath_to_string(path: FilePath) -> Result<String, AppError> {
+    path.into_path()
+        .map(|p| p.to_string_lossy().into_owned())
+        .map_err(|e| AppError::Internal(format!("resolve picked path: {e}")))
+}
 
 #[derive(serde::Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -67,45 +81,56 @@ pub const IMAGE_EXTENSIONS: &[&str] = &[
 
 #[tauri::command]
 pub async fn pick_file(app: AppHandle) -> Result<Option<String>, AppError> {
-    let (tx, rx) = tokio::sync::oneshot::channel();
-    app.dialog()
-        .file()
-        .add_filter("Images", IMAGE_EXTENSIONS)
-        .pick_file(move |f| {
-            let _ = tx.send(f);
-        });
-    let picked = rx
-        .await
-        .map_err(|_| AppError::Internal("dialog dropped".into()))?;
-    Ok(picked.map(|p| p.to_string()))
+    let picked = tauri::async_runtime::spawn_blocking(move || {
+        file_dialog(&app)
+            .add_filter("Images", IMAGE_EXTENSIONS)
+            .blocking_pick_file()
+    })
+    .await
+    .map_err(|e| AppError::Internal(format!("file dialog join: {e}")))?;
+    match picked {
+        Some(p) => Ok(Some(filepath_to_string(p)?)),
+        None => Ok(None),
+    }
 }
 
 /// Native picker for a 3D look LUT (`.cube`).
 #[tauri::command]
 pub async fn pick_lut(app: AppHandle) -> Result<Option<String>, AppError> {
-    let (tx, rx) = tokio::sync::oneshot::channel();
-    app.dialog()
-        .file()
-        .add_filter("3D LUT", &["cube"])
-        .pick_file(move |f| {
-            let _ = tx.send(f);
-        });
-    let picked = rx
-        .await
-        .map_err(|_| AppError::Internal("dialog dropped".into()))?;
-    Ok(picked.map(|p| p.to_string()))
+    let picked = tauri::async_runtime::spawn_blocking(move || {
+        file_dialog(&app)
+            .add_filter("3D LUT", &["cube"])
+            .blocking_pick_file()
+    })
+    .await
+    .map_err(|e| AppError::Internal(format!("lut dialog join: {e}")))?;
+    match picked {
+        Some(p) => Ok(Some(filepath_to_string(p)?)),
+        None => Ok(None),
+    }
 }
 
 #[tauri::command]
 pub async fn pick_folder(app: AppHandle) -> Result<Option<String>, AppError> {
-    let (tx, rx) = tokio::sync::oneshot::channel();
-    app.dialog().file().pick_folder(move |f| {
-        let _ = tx.send(f);
-    });
-    let picked = rx
-        .await
-        .map_err(|_| AppError::Internal("dialog dropped".into()))?;
-    Ok(picked.map(|p| p.to_string()))
+    tracing::info!("pick_folder: opening native folder dialog");
+    let picked = tauri::async_runtime::spawn_blocking(move || {
+        file_dialog(&app)
+            .set_title("Add Photos — choose a folder")
+            .blocking_pick_folder()
+    })
+    .await
+    .map_err(|e| AppError::Internal(format!("folder dialog join: {e}")))?;
+    match picked {
+        Some(p) => {
+            let path = filepath_to_string(p)?;
+            tracing::info!(%path, "pick_folder: selected");
+            Ok(Some(path))
+        }
+        None => {
+            tracing::info!("pick_folder: cancelled");
+            Ok(None)
+        }
+    }
 }
 
 #[tauri::command]
@@ -197,7 +222,13 @@ pub async fn browse_roots() -> Result<Vec<BrowseRoot>, AppError> {
 pub async fn list_dir(path: String) -> Result<Vec<DirEntry>, AppError> {
     let path = crate::paths::validate_existing_path(&path)?;
     let mut entries = Vec::new();
-    let mut rd = tokio::fs::read_dir(&path).await?;
+    let mut rd = match tokio::fs::read_dir(&path).await {
+        Ok(rd) => rd,
+        Err(e) if crate::paths::is_permission_denied(&e) => {
+            return Err(AppError::Io(crate::paths::permission_denied_message(&path)));
+        }
+        Err(e) => return Err(e.into()),
+    };
     while let Some(entry) = rd.next_entry().await? {
         let md = entry.metadata().await?;
         entries.push(DirEntry {
@@ -217,6 +248,9 @@ pub async fn open_image(
     path: String,
 ) -> Result<meratech_core::raw::ImageMeta, AppError> {
     let path = crate::paths::validate_existing_path(&path)?;
+    // Fail fast with a clear macOS TCC / iCloud message — RawSource reports
+    // the same failure as a cryptic "Operation not permitted (os error 1)".
+    crate::paths::ensure_readable(&path)?;
     engine
         .open_image(path)
         .await?
@@ -360,16 +394,18 @@ pub async fn export_image(
     mut settings: meratech_core::export::ExportSettings,
 ) -> Result<String, AppError> {
     if settings.dest_dir.trim().is_empty() {
-        let (tx, rx) = tokio::sync::oneshot::channel();
-        app.dialog().file().pick_folder(move |f| {
-            let _ = tx.send(f);
-        });
-        let picked = rx
-            .await
-            .map_err(|_| AppError::Internal("dialog dropped".into()))?;
-        settings.dest_dir = picked
-            .map(|p| p.to_string())
-            .ok_or_else(|| AppError::InvalidOp("export cancelled".into()))?;
+        let app2 = app.clone();
+        let picked = tauri::async_runtime::spawn_blocking(move || {
+            file_dialog(&app2)
+                .set_title("Export destination")
+                .blocking_pick_folder()
+        })
+        .await
+        .map_err(|e| AppError::Internal(format!("export dialog join: {e}")))?;
+        settings.dest_dir = match picked {
+            Some(p) => filepath_to_string(p)?,
+            None => return Err(AppError::InvalidOp("export cancelled".into())),
+        };
     }
     settings.dest_dir = crate::paths::validate_user_path(&settings.dest_dir)?
         .to_string_lossy()
@@ -388,16 +424,18 @@ pub async fn export_batch(
     mut settings: meratech_core::export::ExportSettings,
 ) -> Result<u32, AppError> {
     if settings.dest_dir.trim().is_empty() {
-        let (tx, rx) = tokio::sync::oneshot::channel();
-        app.dialog().file().pick_folder(move |f| {
-            let _ = tx.send(f);
-        });
-        let picked = rx
-            .await
-            .map_err(|_| AppError::Internal("dialog dropped".into()))?;
-        settings.dest_dir = picked
-            .map(|p| p.to_string())
-            .ok_or_else(|| AppError::InvalidOp("export cancelled".into()))?;
+        let app2 = app.clone();
+        let picked = tauri::async_runtime::spawn_blocking(move || {
+            file_dialog(&app2)
+                .set_title("Export destination")
+                .blocking_pick_folder()
+        })
+        .await
+        .map_err(|e| AppError::Internal(format!("export dialog join: {e}")))?;
+        settings.dest_dir = match picked {
+            Some(p) => filepath_to_string(p)?,
+            None => return Err(AppError::InvalidOp("export cancelled".into())),
+        };
     }
     settings.dest_dir = crate::paths::validate_user_path(&settings.dest_dir)?
         .to_string_lossy()

@@ -1,5 +1,5 @@
-// Main develop preview — same transport as the filmstrip: frame:// JPEG in an
-// <img>. Raw RGBA fetch remains available for the navigator + selftest.
+// Main develop preview — frame:// JPEG in an <img>, same transport as the
+// filmstrip (thumb://). Prefetch via a detached Image before swapping src.
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   applyOp,
@@ -46,34 +46,25 @@ export function frameUrl(version: number, fmt?: "jpeg"): string {
   return `${FRAME_BASE}/current?v=${version}${q}`;
 }
 
-/** Load a frame:// JPEG via fetch→blob (reliable on all webviews). */
-async function loadFrameBlob(version: number): Promise<Blob> {
-  const r = await fetch(frameUrl(version, "jpeg"));
-  if (!r.ok) throw new Error(`http ${r.status}`);
-  return r.blob();
-}
-
-/** Decode a blob in-memory — never point <img> at frame:// directly. */
-function decodeBlob(blob: Blob): Promise<void> {
+/**
+ * Prefetch a frame:// JPEG the same way filmstrip thumbs load thumb:// —
+ * via <img>, not fetch. Custom-protocol fetch is cross-origin from the
+ * Vite/dev page and used to fail CORS; <img> only needs img-src CSP.
+ */
+function preloadFrame(version: number): Promise<string> {
+  const url = frameUrl(version, "jpeg");
   return new Promise((resolve, reject) => {
-    const obj = URL.createObjectURL(blob);
     const probe = new Image();
-    probe.onload = () => {
-      URL.revokeObjectURL(obj);
-      resolve();
-    };
-    probe.onerror = () => {
-      URL.revokeObjectURL(obj);
-      reject(new Error("jpeg decode failed"));
-    };
-    probe.src = obj;
+    probe.onload = () => resolve(url);
+    probe.onerror = () => reject(new Error("frame image load failed"));
+    probe.src = url;
   });
 }
 
 async function probeFrameTransport(retries = 5): Promise<boolean> {
   for (let attempt = 0; attempt < retries; attempt++) {
     try {
-      await decodeBlob(await loadFrameBlob(0));
+      await preloadFrame(0);
       return true;
     } catch {
       await new Promise((r) => setTimeout(r, 150 * (attempt + 1)));
@@ -124,21 +115,16 @@ export function Viewport() {
     (version: number) => {
       if (version <= shownVer.current) return;
       pendingVer.current = version;
-      // Single network round-trip: fetch the frame once, hold it as an
-      // in-memory blob, and display that. The <img> reads from the object URL
-      // (memory) instead of hitting frame:// a second time — which would
-      // re-run get_frame + JPEG encode. Preload from the blob keeps the swap
-      // flash-free.
-      loadFrameBlob(version)
-        .then(async (blob) => {
+      // Prefetch into a detached Image, then swap <img src> once decoded so
+      // the visible frame doesn't flash empty. Same custom-protocol path as
+      // filmstrip thumbs (no fetch/CORS).
+      preloadFrame(version)
+        .then((url) => {
           if (pendingVer.current !== version) return;
-          await decodeBlob(blob);
-          if (pendingVer.current !== version) return;
-          const obj = URL.createObjectURL(blob);
           shownVer.current = version;
           const prev = objUrl.current;
-          objUrl.current = obj;
-          setDisplaySrc(obj);
+          objUrl.current = null;
+          setDisplaySrc(url);
           if (prev) URL.revokeObjectURL(prev);
           setError(null);
           requestAnimationFrame(() => updateZoomLabel());

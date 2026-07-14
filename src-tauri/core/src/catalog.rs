@@ -420,6 +420,36 @@ impl Catalog {
             .ok()
     }
 
+    /// Build a missing library thumb from the file's embedded preview (or a
+    /// tiny decode). Used when older imports / rebuilds left `thumb=0`.
+    pub fn ensure_thumb(&mut self, id: i64) -> Option<PathBuf> {
+        let path = self.thumb_path(id);
+        if path.exists() {
+            let _ = self.mark_thumb(id);
+            return Some(path);
+        }
+        let src = self.asset_path(id)?;
+        let src = PathBuf::from(src);
+        if !src.exists() {
+            return None;
+        }
+        let dec = RawlerDecoder::default();
+        let (rgba, w, h) = match dec.embedded_preview(&src, 640) {
+            Ok(Some(v)) => v,
+            _ => return None,
+        };
+        let img = image::RgbaImage::from_raw(w, h, rgba)?;
+        let thumb = image::DynamicImage::ImageRgba8(img)
+            .thumbnail(320, 320)
+            .to_rgb8();
+        let bytes = encode_jpeg(&thumb, 80)?;
+        if std::fs::write(&path, bytes).is_err() {
+            return None;
+        }
+        let _ = self.mark_thumb(id);
+        Some(path)
+    }
+
     pub fn count(&self) -> i64 {
         self.conn
             .query_row("SELECT COUNT(*) FROM assets", [], |r| r.get(0))

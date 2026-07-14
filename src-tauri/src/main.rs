@@ -22,7 +22,104 @@ mod raw;
 mod tone;
 
 use tauri::Manager;
+use tauri::window::Monitor;
 use tracing_subscriber::EnvFilter;
+
+/// Keep the main window fully usable on the current display.
+///
+/// `tauri-plugin-window-state` can restore a size/position from a larger or
+/// disconnected monitor. A top-left-on-screen check is not enough — the right
+/// ~300px Develop rail can sit past the physical edge while the window still
+/// looks "launched". Clamp size + origin into the chosen monitor's work area.
+fn ensure_main_window_visible(win: &tauri::WebviewWindow) {
+    let _ = win.unminimize();
+    let _ = win.show();
+
+    let Ok(pos) = win.outer_position() else {
+        return;
+    };
+    let Ok(size) = win.outer_size() else {
+        return;
+    };
+    let Ok(monitors) = win.available_monitors() else {
+        return;
+    };
+    if monitors.is_empty() {
+        return;
+    }
+
+    let center_x = pos.x.saturating_add(size.width as i32 / 2);
+    let center_y = pos.y.saturating_add(size.height as i32 / 2);
+
+    let monitor: Monitor = monitors
+        .iter()
+        .find(|m| {
+            let wa = m.work_area();
+            center_x >= wa.position.x
+                && center_y >= wa.position.y
+                && center_x < wa.position.x + wa.size.width as i32
+                && center_y < wa.position.y + wa.size.height as i32
+        })
+        .cloned()
+        .or_else(|| {
+            monitors.iter().find(|m| {
+                let mp = m.position();
+                let ms = m.size();
+                pos.x >= mp.x - 64
+                    && pos.y >= mp.y - 64
+                    && pos.x < mp.x + ms.width as i32
+                    && pos.y < mp.y + ms.height as i32
+            }).cloned()
+        })
+        .or_else(|| win.primary_monitor().ok().flatten())
+        .unwrap_or_else(|| monitors[0].clone());
+
+    let wa = monitor.work_area();
+    // Leave a tiny margin so the frame isn't flush against the dock/menu bar.
+    let margin = 8i32;
+    let max_w = wa.size.width.saturating_sub(margin as u32 * 2).max(640);
+    let max_h = wa.size.height.saturating_sub(margin as u32 * 2).max(480);
+
+    let new_w = size.width.min(max_w);
+    let new_h = size.height.min(max_h);
+
+    let min_x = wa.position.x + margin;
+    let min_y = wa.position.y + margin;
+    let max_x = wa.position.x + wa.size.width as i32 - new_w as i32 - margin;
+    let max_y = wa.position.y + wa.size.height as i32 - new_h as i32 - margin;
+
+    let new_x = pos.x.clamp(min_x, max_x.max(min_x));
+    let new_y = pos.y.clamp(min_y, max_y.max(min_y));
+
+    let size_changed = new_w != size.width || new_h != size.height;
+    let pos_changed = new_x != pos.x || new_y != pos.y;
+
+    if size_changed || pos_changed {
+        tracing::info!(
+            old_w = size.width,
+            old_h = size.height,
+            old_x = pos.x,
+            old_y = pos.y,
+            new_w,
+            new_h,
+            new_x,
+            new_y,
+            monitor = ?monitor.name(),
+            "clamping main window into monitor work area"
+        );
+    }
+
+    if size_changed {
+        let _ = win.set_size(tauri::Size::Physical(tauri::PhysicalSize::new(new_w, new_h)));
+    }
+    if pos_changed {
+        let _ = win.set_position(tauri::Position::Physical(tauri::PhysicalPosition::new(
+            new_x, new_y,
+        )));
+    }
+
+    let _ = win.set_focus();
+}
 
 /// Load KEY=VALUE lines from a `.env` next to the project (dev cwd) or via
 /// MERATECH_ENV_FILE. Real process env always wins; secrets never logged.
@@ -228,31 +325,11 @@ fn main() {
                 }
             }
 
-            // The window-state plugin can restore a position on a monitor
-            // that's since been disconnected, leaving the window invisible.
-            // If the restored frame isn't on any current display, recenter.
+            // Window-state restore can leave the frame oversized / hanging off
+            // the right edge (common when moving from a large display to a
+            // 13" MacBook). Clamp into the current monitor work area.
             if let Some(win) = app.get_webview_window("main") {
-                // always bring it back into a usable state
-                let _ = win.unminimize();
-                let _ = win.show();
-                let on_screen = (|| {
-                    let pos = win.outer_position().ok()?;
-                    let monitors = win.available_monitors().ok()?;
-                    Some(monitors.iter().any(|m| {
-                        let mp = m.position();
-                        let ms = m.size();
-                        pos.x >= mp.x - 64
-                            && pos.y >= mp.y - 64
-                            && pos.x < mp.x + ms.width as i32 - 64
-                            && pos.y < mp.y + ms.height as i32 - 64
-                    }))
-                })()
-                .unwrap_or(false);
-                if !on_screen {
-                    tracing::info!("restored window off-screen; recentering");
-                    let _ = win.center();
-                }
-                let _ = win.set_focus();
+                ensure_main_window_visible(&win);
             }
 
             // pump engine events → webview
@@ -270,12 +347,35 @@ fn main() {
                 match engine.ping().await {
                     Ok(s) => {
                         tracing::info!(gpu = s.gpu_ready, adapter = ?s.adapter, "ENGINE-READY");
-                        events::emit_engine_ready(&handle, s.adapter, s.gpu_ready);
+                        let adapter = s.adapter.clone();
+                        let gpu = s.gpu_ready;
+                        events::emit_engine_ready(&handle, adapter.clone(), gpu);
+                        // Re-broadcast shortly after so late webview listeners catch it.
+                        let handle2 = handle.clone();
+                        tauri::async_runtime::spawn(async move {
+                            tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+                            events::emit_engine_ready(&handle2, adapter.clone(), gpu);
+                            tokio::time::sleep(std::time::Duration::from_millis(1500)).await;
+                            events::emit_engine_ready(&handle2, adapter, gpu);
+                        });
                     }
                     Err(e) => tracing::error!(error = %e, "engine never came up"),
                 }
             });
             Ok(())
+        })
+        .on_page_load(|window, payload| {
+            if payload.event() == tauri::webview::PageLoadEvent::Finished {
+                let app = window.app_handle().clone();
+                tauri::async_runtime::spawn(async move {
+                    let engine = app.state::<meratech_core::engine::EngineHandle>();
+                    if let Ok(s) = engine.ping().await {
+                        if s.alive {
+                            events::emit_engine_ready(&app, s.adapter, s.gpu_ready);
+                        }
+                    }
+                });
+            }
         })
         .run(tauri::generate_context!())
         .unwrap_or_else(|e| {

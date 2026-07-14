@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { getSupporterStatus, openEarlySupporterPage, type SupporterStatus } from "../services/purchaseService";
+import { ViewportBgSettings } from "./ViewportBgPicker";
 
 interface SettingsDialogProps {
   open: boolean;
@@ -45,6 +46,8 @@ export function SettingsDialog({
             <p className="muted sm">Free beta — all core editing features included.</p>
           )}
         </section>
+
+        <ViewportBgSettings />
 
         <section className="settings-section">
           <h3 className="settings-h">Support</h3>

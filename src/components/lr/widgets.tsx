@@ -57,6 +57,20 @@ export const Icon = {
       <path d="m6 6 2 2M16 16l2 2M18 6l-2 2M8 16l-2 2" />
     </>,
   ),
+  Library: svg(
+    <>
+      <path d="M4 4h3v16H4z" />
+      <path d="M9 4h4v16H9z" />
+      <path d="M15 4h5v16h-5z" />
+    </>,
+  ),
+  Help: svg(
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.7.3-1.5.9-1.5 1.7V14" />
+      <circle cx="12" cy="17" r="0.8" fill="currentColor" stroke="none" />
+    </>,
+  ),
   Wand: svg(
     <>
       <path d="M15 4V2M15 10V8M11 6H9M21 6h-2" />
@@ -117,6 +131,58 @@ export const Icon = {
       <path d="M9 3h6" />
     </>,
   ),
+  Settings: svg(
+    <>
+      <circle cx="12" cy="12" r="3" />
+      <path d="M12 1v2M12 21v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M1 12h2M21 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4" />
+    </>,
+  ),
+  Mic: svg(
+    <>
+      <rect x="9" y="2" width="6" height="12" rx="3" />
+      <path d="M5 11a7 7 0 0 0 14 0" />
+      <path d="M12 18v4" />
+    </>,
+  ),
+  Pencil: svg(
+    <>
+      <path d="M12 20h9" />
+      <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" />
+    </>,
+  ),
+  Backdrop: svg(
+    <>
+      <rect x="3" y="3" width="18" height="18" rx="3" />
+      <circle cx="9" cy="10" r="2.5" />
+      <path d="M4 17.5 9 12l3 3 3-4 5 6.5" />
+    </>,
+  ),
+  Play: svg(<polygon points="8 5 19 12 8 19 8 5" fill="currentColor" stroke="none" />),
+  Pause: svg(
+    <>
+      <rect x="6" y="5" width="4" height="14" rx="1" fill="currentColor" stroke="none" />
+      <rect x="14" y="5" width="4" height="14" rx="1" fill="currentColor" stroke="none" />
+    </>,
+  ),
+  Rewind: svg(
+    <>
+      <polygon points="11 12 19 6 19 18 11 12" fill="currentColor" stroke="none" />
+      <polygon points="4 12 12 6 12 18 4 12" fill="currentColor" stroke="none" />
+    </>,
+  ),
+  Volume: svg(
+    <>
+      <path d="M4 10v4h3l4 3V7L7 10H4z" fill="currentColor" stroke="none" />
+      <path d="M15 9a4 4 0 0 1 0 6" />
+      <path d="M17.5 7a7 7 0 0 1 0 10" />
+    </>,
+  ),
+  VolumeMute: svg(
+    <>
+      <path d="M4 10v4h3l4 3V7L7 10H4z" fill="currentColor" stroke="none" />
+      <path d="m16 9 5 5M21 9l-5 5" />
+    </>,
+  ),
 };
 
 // ---------- collapsible LR panel ----------
@@ -137,12 +203,12 @@ export function Panel({
   return (
     <section className={`lr-panel ${className ?? ""}`}>
       <header className="lr-panel-head" onClick={() => setOpen((o) => !o)}>
-        <span className={`lr-disclosure ${open ? "open" : ""}`}>
-          <Icon.Chevron size={12} />
-        </span>
         <span className="lr-panel-title">{title}</span>
         <span className="lr-panel-right" onClick={(e) => e.stopPropagation()}>
           {right}
+        </span>
+        <span className={`lr-disclosure ${open ? "open" : ""}`}>
+          <Icon.Chevron size={12} />
         </span>
       </header>
       {open && <div className="lr-panel-body">{children}</div>}

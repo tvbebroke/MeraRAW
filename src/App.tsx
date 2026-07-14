@@ -29,14 +29,23 @@ import { KeyboardHelpOverlay } from "./components/KeyboardHelpOverlay";
 import { LeftPanel } from "./components/lr/LeftPanel";
 import { RightRail } from "./components/lr/RightRail";
 import { ViewportToolbar } from "./components/lr/Toolbar";
+import { ZenAiBar } from "./components/lr/ZenAiBar";
 import { Icon } from "./components/lr/widgets";
 import { Filmstrip, Library } from "./components/Library";
 import { Education } from "./components/Education";
+import { Histogram } from "./components/Histogram";
 import { ReportProblem } from "./components/ReportProblem";
 import { SettingsDialog } from "./components/SettingsDialog";
+import { ViewportBgMenuButton } from "./components/ViewportBgPicker";
+import { PsychedelicBg } from "./components/PsychedelicBg";
+import { PsychedelicControls } from "./components/PsychedelicControls";
 import { EarlySupporterModal } from "./components/EarlySupporterModal";
 import { getSupporterStatus } from "./services/purchaseService";
 import { setAppKeyboardContext } from "./keyboard/context";
+import {
+  applyViewportBgAttr,
+  syncWindowBackdrop,
+} from "./theme/viewportBackground";
 import { useKeyboardShortcuts } from "./keyboard/useKeyboardShortcuts";
 import { useDocStore } from "./state/docStore";
 import type { KeymapScope } from "./keyboard/types";
@@ -69,6 +78,7 @@ export default function App() {
   const showFilmstrip = useUiStore((s) => s.showFilmstrip);
   const showLeftPanel = useUiStore((s) => s.showLeftPanel);
   const showRightPanel = useUiStore((s) => s.showRightPanel);
+  const viewportBg = useUiStore((s) => s.viewportBg);
   const helpOverlay = useUiStore((s) => s.helpOverlay);
   const setHelpOverlay = useUiStore((s) => s.setHelpOverlay);
   const settingsOpen = useUiStore((s) => s.settingsOpen);
@@ -181,8 +191,30 @@ export default function App() {
     pingEngine()
       .then((s) => {
         if (s.alive) setEngineReady(s.adapter);
+        else setStatus("engine ping: not alive yet — retrying…");
       })
-      .catch(() => {});
+      .catch((e) => {
+        const msg = isAppError(e) ? `${e.kind}: ${e.message}` : String(e);
+        setStatus(`engine ping failed: ${msg}`);
+        console.error("ping_engine failed", e);
+      });
+    // Race-safe: engine-ready often fires before the webview listens.
+    let tries = 0;
+    const retry = window.setInterval(() => {
+      tries += 1;
+      if (useUiStore.getState().engineReady || tries > 40) {
+        window.clearInterval(retry);
+        return;
+      }
+      pingEngine()
+        .then((s) => {
+          if (s.alive) {
+            setEngineReady(s.adapter);
+            window.clearInterval(retry);
+          }
+        })
+        .catch(() => {});
+    }, 250);
     autoopenPath()
       .then((p) => {
         if (p && !autoOpened) {
@@ -192,6 +224,7 @@ export default function App() {
       })
       .catch(() => {});
     return () => {
+      window.clearInterval(retry);
       unlistens.forEach((u) => u.then((f) => f()));
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -206,56 +239,155 @@ export default function App() {
     setPreviewBypass(beforeAfter).catch(() => {});
   }, [beforeAfter]);
 
+  // Preview backdrop preference (CSS + optional macOS vibrancy).
+  useEffect(() => {
+    applyViewportBgAttr(viewportBg);
+    void syncWindowBackdrop(viewportBg);
+  }, [viewportBg]);
+
   async function handleOpen() {
     const path = await pickFile();
     if (path) void open(path);
   }
 
   return (
-    <div className={`app ${showTopbar ? "" : "chrome-all-hidden"}`}>
+    <div
+      className={`app ${showTopbar ? "" : "chrome-all-hidden"}`}
+      data-viewport-bg={viewportBg}
+    >
+      {viewportBg === "psychedelic" && (
+        <div className="psy-layer">
+          <PsychedelicBg />
+          <div className="psy-controls-float topbar-no-drag">
+            <PsychedelicControls compact />
+          </div>
+        </div>
+      )}
       {showTopbar && (
-      <div className="topbar">
-        <span className="brand">
+      <div className="topbar" data-tauri-drag-region>
+        <span className="brand" data-tauri-drag-region>
           <img src="/logo.png" alt="" className="brand-logo" aria-hidden="true" />
           MeraRAW
         </span>
         <span
           className="beta-badge"
+          data-tauri-drag-region
           title="Beta — the full version is coming soon. Built by a solo dev who's passionate about color grading."
         >
           BETA
         </span>
-        <div className="topbar-tabs">
+        <nav className="topbar-tabs topbar-no-drag" aria-label="Main">
           <button
+            type="button"
             className={mode === "library" ? "tab active" : "tab"}
             onClick={() => setMode("library")}
           >
             Library
           </button>
           <button
+            type="button"
             className={mode === "develop" ? "tab active" : "tab"}
             onClick={() => setMode("develop")}
             disabled={!meta}
+            title={meta ? "Develop" : "Open a photo first"}
           >
             Develop
           </button>
           <button
+            type="button"
             className={mode === "education" ? "tab active" : "tab"}
             onClick={() => setMode("education")}
           >
             Education
           </button>
-        </div>
-        <div className="topbar-right">
-          <button className="tab" onClick={handleOpen}>
-            Open…
-          </button>
-          <button className="tab" disabled={!meta} onClick={() => {
-            setExportQueue(undefined);
-            setShowExport(true);
-          }}>
-            <Icon.Export size={13} /> Export…
-          </button>
+        </nav>
+        <div className="topbar-right topbar-no-drag">
+          {mode === "develop" ? (
+            <>
+              <button
+                type="button"
+                className="topbar-icon-btn"
+                title="Settings"
+                onClick={() => setSettingsOpen(true)}
+              >
+                <Icon.Settings size={16} />
+              </button>
+              <ViewportBgMenuButton />
+              <button
+                type="button"
+                className={`zen-toggle ${showRightPanel ? "" : "zen"}`}
+                title={showRightPanel ? "Switch to Zen" : "Switch to Expert"}
+                onClick={() => useUiStore.getState().toggleRightPanel()}
+              >
+                <span className="zen-toggle-knob" />
+                <span className="zen-toggle-label">
+                  {showRightPanel ? "Expert" : "Zen"}
+                </span>
+              </button>
+              <button
+                type="button"
+                className="topbar-icon-btn"
+                title="Keyboard shortcuts"
+                onClick={() => setHelpOverlay(true)}
+              >
+                <Icon.Help size={16} />
+              </button>
+              <button
+                type="button"
+                className="topbar-export-btn"
+                disabled={!meta}
+                title="Export"
+                onClick={() => {
+                  setExportQueue(undefined);
+                  setShowExport(true);
+                }}
+              >
+                <Icon.Export size={16} />
+              </button>
+            </>
+          ) : mode === "library" ? (
+            <>
+              <button
+                type="button"
+                className="topbar-icon-btn"
+                title="Settings"
+                onClick={() => setSettingsOpen(true)}
+              >
+                <Icon.Settings size={16} />
+              </button>
+              <ViewportBgMenuButton />
+              <button
+                type="button"
+                className="topbar-icon-btn"
+                title="Keyboard shortcuts"
+                onClick={() => setHelpOverlay(true)}
+              >
+                <Icon.Help size={16} />
+              </button>
+              <button
+                type="button"
+                className="topbar-edit-btn"
+                disabled={!meta}
+                title="Open Develop"
+                onClick={() => meta && setMode("develop")}
+              >
+                Edit
+                <Icon.Pencil size={14} />
+              </button>
+            </>
+          ) : (
+            <>
+              <button className="tab" onClick={handleOpen}>
+                Open…
+              </button>
+              <button className="tab" disabled={!meta} onClick={() => {
+                setExportQueue(undefined);
+                setShowExport(true);
+              }}>
+                <Icon.Export size={13} /> Export…
+              </button>
+            </>
+          )}
         </div>
       </div>
       )}
@@ -283,12 +415,20 @@ export default function App() {
             <LeftPanel currentPath={lastOpenedPath} onOpen={(p) => void open(p)} />
             <div className="develop-center">
               <Viewport />
+              {!showRightPanel && <ZenAiBar />}
               {showToolbar && <ViewportToolbar />}
             </div>
             <RightRail meta={meta} onMetaChange={setMeta} />
           </div>
           {showFilmstrip && (
-            <Filmstrip currentPath={lastOpenedPath} onOpen={(p) => void open(p)} />
+            <div className="develop-bottom">
+              <Filmstrip currentPath={lastOpenedPath} onOpen={(p) => void open(p)} />
+              {showRightPanel && (
+                <div className="develop-hist">
+                  <Histogram />
+                </div>
+              )}
+            </div>
           )}
         </div>
       )}

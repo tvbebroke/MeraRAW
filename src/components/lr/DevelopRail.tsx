@@ -15,7 +15,6 @@ import { onImageReady } from "../../ipc/events";
 import type { ImageMeta, ParamSpec } from "../../ipc/types";
 import { useDocStore } from "../../state/docStore";
 import { useUiStore } from "../../state/uiStore";
-import { Histogram } from "../Histogram";
 import { AiGrader } from "./AiGrader";
 import { ColorGrading } from "./ColorGrading";
 import { HslPicker } from "./HslPicker";
@@ -211,7 +210,7 @@ function ColorPanel({
 
 function EffectsPanel({ meta }: { meta: ImageMeta | null }) {
   return (
-    <>
+    <Panel title="Effects" defaultOpen={false}>
       <Panel title="Split Toning" defaultOpen>
         <p className="muted sm">Separate hue and saturation for shadows and highlights.</p>
         <ColorGrading specs={useRegistry()} meta={meta} />
@@ -222,7 +221,7 @@ function EffectsPanel({ meta }: { meta: ImageMeta | null }) {
       <Panel title="Vignette" defaultOpen={false}>
         <p className="muted sm">Post-crop vignette — coming in a future build.</p>
       </Panel>
-    </>
+    </Panel>
   );
 }
 
@@ -268,7 +267,7 @@ function LutPanel({
   }
 
   return (
-    <Panel title="Look LUT" defaultOpen={false}>
+    <Panel title="LUT Conversion" defaultOpen={false}>
       <p className="muted sm">
         Apply a 3D <code>.cube</code> look. Sits after tone, before sharpening.
       </p>
@@ -377,9 +376,6 @@ export function DevelopRail({
           </button>
         </div>
       </header>
-      <div className="lr-histogram-pin">
-        <Histogram />
-      </div>
       <div className="lr-ai-pin">
         <Panel title="AI Color Grader" className="ai-panel" defaultOpen>
           <AiGrader />
@@ -390,16 +386,16 @@ export function DevelopRail({
           meta={meta}
           onProfileChange={(m) => onMetaChange?.(m)}
         />
-        <DemosaicPanel meta={meta} onMetaChange={(m) => onMetaChange?.(m)} />
         <LightPanel meta={meta} specs={specs} />
         <ColorPanel meta={meta} specs={specs} tool={tool} setTool={setTool} />
+        <GroupPanel title="Detail" group="Detail" meta={meta} defaultOpen={false} />
         <EffectsPanel meta={meta} />
-        <LutPanel meta={meta} specs={specs} />
-        <GroupPanel title="Detail" group="Detail" meta={meta} defaultOpen />
-        <GroupPanel title="Calibration" group="Calibration" meta={meta} defaultOpen={false} />
+        <DemosaicPanel meta={meta} onMetaChange={(m) => onMetaChange?.(m)} />
         <Panel title="Optics" defaultOpen={false}>
           <p className="muted sm">Lens corrections and chromatic aberration — coming soon.</p>
         </Panel>
+        <LutPanel meta={meta} specs={specs} />
+        <GroupPanel title="Calibration" group="Calibration" meta={meta} defaultOpen={false} />
         <Panel title="Geometry" defaultOpen={false}>
           <p className="muted sm">Upright transforms — coming soon.</p>
         </Panel>

@@ -5,7 +5,16 @@ import type { CropOverlayKind } from "../crop/cropConstants";
 import type { CropParams } from "../crop/cropMath";
 import { readCropFromDoc } from "../crop/cropMath";
 import { applyCropParams } from "../crop/cropActions";
+import {
+  applyViewportBgAttr,
+  persistViewportBg,
+  readStoredViewportBg,
+  syncWindowBackdrop,
+  type ViewportBg,
+} from "../theme/viewportBackground";
 import { useDocStore } from "./docStore";
+
+export type { ViewportBg };
 
 interface UiState {
   engineReady: boolean;
@@ -64,6 +73,9 @@ interface UiState {
   setHelpOverlay: (on: boolean) => void;
   settingsOpen: boolean;
   setSettingsOpen: (on: boolean) => void;
+  /** Develop preview backdrop (behind the image). */
+  viewportBg: ViewportBg;
+  setViewportBg: (id: ViewportBg) => void;
   earlySupporterOpen: boolean;
   setEarlySupporterOpen: (on: boolean) => void;
   isEarlySupporter: boolean;
@@ -193,6 +205,13 @@ export const useUiStore = create<UiState>((set, get) => ({
   setHelpOverlay: (on) => set({ helpOverlay: on }),
   settingsOpen: false,
   setSettingsOpen: (on) => set({ settingsOpen: on }),
+  viewportBg: readStoredViewportBg(),
+  setViewportBg: (id) => {
+    persistViewportBg(id);
+    applyViewportBgAttr(id);
+    void syncWindowBackdrop(id);
+    set({ viewportBg: id });
+  },
   earlySupporterOpen: false,
   setEarlySupporterOpen: (on) => set({ earlySupporterOpen: on }),
   isEarlySupporter: false,
