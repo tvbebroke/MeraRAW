@@ -23,6 +23,9 @@ pub const EXPORT_REQUESTED: &str = "export-requested";
 pub const IMPORT_REQUESTED: &str = "import-requested";
 pub const SETTINGS_REQUESTED: &str = "settings-requested";
 pub const ASSISTANT_PROGRESS: &str = "assistant-progress";
+pub const DENOISE_PROGRESS: &str = "denoise-progress";
+pub const DENOISE_DONE: &str = "denoise-done";
+pub const DENOISE_ERROR: &str = "denoise-error";
 
 /// Forward core EngineEvents to the webview as named events (contract C3).
 pub fn forward_engine_event(app: &AppHandle, ev: meratech_core::message::EngineEvent) {
@@ -72,6 +75,20 @@ pub fn forward_engine_event(app: &AppHandle, ev: meratech_core::message::EngineE
             }),
         ),
         E::EngineCrashed { message } => app.emit(ENGINE_CRASHED, message.clone()),
+        E::DenoiseProgress {
+            job,
+            pct,
+            tile,
+            tiles,
+        } => app.emit(
+            DENOISE_PROGRESS,
+            serde_json::json!({"job": job, "pct": pct, "tile": tile, "tiles": tiles}),
+        ),
+        E::DenoiseDone { job } => app.emit(DENOISE_DONE, job),
+        E::DenoiseError { job, message } => app.emit(
+            DENOISE_ERROR,
+            serde_json::json!({"job": job, "message": message}),
+        ),
     };
     if let Err(e) = result {
         tracing::error!(error = %e, "forward engine event failed");

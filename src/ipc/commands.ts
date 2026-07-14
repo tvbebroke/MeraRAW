@@ -94,6 +94,36 @@ export function getRegistry(): Promise<ParamSpec[]> {
   return invoke<ParamSpec[]>("get_registry");
 }
 
+export function denoiseEstimateProfile(): Promise<{
+  a: number;
+  b: number;
+  source: string;
+}> {
+  return invoke("denoise_estimate_profile");
+}
+
+export function denoiseModelsList(): Promise<
+  Array<{
+    id: string;
+    name: string;
+    sizeMb: number;
+    ready: boolean;
+    standIn: boolean;
+    sha256?: string | null;
+    license: string;
+  }>
+> {
+  return invoke("denoise_models_list");
+}
+
+export function denoiseAiStart(): Promise<number> {
+  return invoke<number>("denoise_ai_start");
+}
+
+export function denoiseAiCancel(job: number): Promise<void> {
+  return invoke<void>("denoise_ai_cancel", { job });
+}
+
 export function snapshot(name: string): Promise<void> {
   return invoke<void>("snapshot", { name });
 }

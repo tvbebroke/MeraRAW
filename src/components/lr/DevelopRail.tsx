@@ -15,8 +15,10 @@ import { onImageReady } from "../../ipc/events";
 import type { ImageMeta, ParamSpec } from "../../ipc/types";
 import { useDocStore } from "../../state/docStore";
 import { useUiStore } from "../../state/uiStore";
+import { Histogram } from "../Histogram";
 import { AiGrader } from "./AiGrader";
 import { ColorGrading } from "./ColorGrading";
+import { DenoisePanel } from "./DenoisePanel";
 import { HslPicker } from "./HslPicker";
 import { ToneCurve } from "./ToneCurve";
 import { Icon, Panel, ParamSlider, useRegistry } from "./widgets";
@@ -363,6 +365,8 @@ export function DevelopRail({
       .catch(console.error);
   }
 
+  const faithful = useUiStore((s) => s.uiShell) === "faithful";
+
   return (
     <div className="lr-rail-panel lr-edit-panel">
       <header className="lr-rail-panel-head lr-edit-head">
@@ -376,6 +380,11 @@ export function DevelopRail({
           </button>
         </div>
       </header>
+      {faithful && (
+        <div className="lr-histogram-pin">
+          <Histogram />
+        </div>
+      )}
       <div className="lr-ai-pin">
         <Panel title="AI Color Grader" className="ai-panel" defaultOpen>
           <AiGrader />
@@ -388,6 +397,7 @@ export function DevelopRail({
         />
         <LightPanel meta={meta} specs={specs} />
         <ColorPanel meta={meta} specs={specs} tool={tool} setTool={setTool} />
+        <DenoisePanel meta={meta} />
         <GroupPanel title="Detail" group="Detail" meta={meta} defaultOpen={false} />
         <EffectsPanel meta={meta} />
         <DemosaicPanel meta={meta} onMetaChange={(m) => onMetaChange?.(m)} />

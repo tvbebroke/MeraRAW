@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-denoise-estimate-profile"
+description = "Enables the denoise_estimate_profile command without any pre-configured scope."
+commands.allow = ["denoise_estimate_profile"]
+
+[[permission]]
+identifier = "deny-denoise-estimate-profile"
+description = "Denies the denoise_estimate_profile command without any pre-configured scope."
+commands.deny = ["denoise_estimate_profile"]

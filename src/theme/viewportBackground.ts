@@ -12,6 +12,20 @@ export type ViewportBg =
   | "transparent"
   | "psychedelic";
 
+/** Solid chrome colors available in both Modern and Faithful. */
+export const SOLID_VIEWPORT_BGS = [
+  "white",
+  "light-gray",
+  "black",
+  "jet-black",
+] as const satisfies readonly ViewportBg[];
+
+export type SolidViewportBg = (typeof SOLID_VIEWPORT_BGS)[number];
+
+export function isSolidViewportBg(id: ViewportBg): id is SolidViewportBg {
+  return (SOLID_VIEWPORT_BGS as readonly string[]).includes(id);
+}
+
 export const VIEWPORT_BG_OPTIONS: {
   id: ViewportBg;
   label: string;
@@ -41,6 +55,11 @@ export const VIEWPORT_BG_OPTIONS: {
     hint: "Looping trance video — play/mute from the controls",
   },
 ];
+
+/** Faithful shell: solid colors only (no glass / video). */
+export const FAITHFUL_VIEWPORT_BG_OPTIONS = VIEWPORT_BG_OPTIONS.filter((o) =>
+  isSolidViewportBg(o.id),
+);
 
 const STORAGE_KEY = "meraraw.viewportBg";
 const DEFAULT_BG: ViewportBg = "black";

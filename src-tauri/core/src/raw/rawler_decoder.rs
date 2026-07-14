@@ -493,10 +493,14 @@ fn merawler_cam_rgb(
         return None; // already demosaiced (e.g. Apple ProRAW) or multi-channel
     };
     let pattern = bayer_pattern(&raw.camera.cfa)?; // X-Trans / 4-color → None
+    // P0 hot/dead pixel suppression (denoise doc 04) — same-CFA-neighbor median.
+    // Always-on for the merawler path; toggle→re-decode lands with the panel.
+    let mut mosaic = px.data;
+    let _fixed = crate::denoise::hot_pixel_suppress(&mut mosaic, px.width, px.height, 4.0, 1.0);
     let cfa = merawler::CfaImage {
         width: px.width,
         height: px.height,
-        data: px.data,
+        data: mosaic,
         pattern,
         wb: [1.0, 1.0, 1.0],
     };

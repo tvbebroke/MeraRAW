@@ -497,6 +497,38 @@ pub async fn get_perf_stats(
     Ok(engine.get_perf_stats().await?)
 }
 
+// ---- Denoise ----
+
+#[tauri::command]
+pub async fn denoise_estimate_profile(
+    engine: State<'_, EngineHandle>,
+) -> Result<meratech_core::denoise::NoiseProfile, AppError> {
+    engine
+        .denoise_estimate_profile()
+        .await?
+        .map_err(AppError::from)
+}
+
+#[tauri::command]
+pub async fn denoise_models_list(
+    engine: State<'_, EngineHandle>,
+) -> Result<Vec<meratech_core::denoise::ai::ModelInfo>, AppError> {
+    Ok(engine.denoise_models_list().await?)
+}
+
+#[tauri::command]
+pub async fn denoise_ai_start(engine: State<'_, EngineHandle>) -> Result<u64, AppError> {
+    engine.denoise_ai_start().await?.map_err(AppError::from)
+}
+
+#[tauri::command]
+pub async fn denoise_ai_cancel(
+    engine: State<'_, EngineHandle>,
+    job: u64,
+) -> Result<(), AppError> {
+    Ok(engine.denoise_ai_cancel(job).await?)
+}
+
 // ---- Phase 5: catalog ----
 
 #[tauri::command]

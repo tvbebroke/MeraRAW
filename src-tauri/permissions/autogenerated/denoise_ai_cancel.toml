@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-denoise-ai-cancel"
+description = "Enables the denoise_ai_cancel command without any pre-configured scope."
+commands.allow = ["denoise_ai_cancel"]
+
+[[permission]]
+identifier = "deny-denoise-ai-cancel"
+description = "Denies the denoise_ai_cancel command without any pre-configured scope."
+commands.deny = ["denoise_ai_cancel"]

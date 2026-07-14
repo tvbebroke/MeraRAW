@@ -115,6 +115,15 @@ pub enum EngineEvent {
     },
     /// Engine thread recovered from a panic; UI should prompt restart.
     EngineCrashed { message: String },
+    /// AI denoise job progress (tiles).
+    DenoiseProgress {
+        job: u64,
+        pct: f32,
+        tile: u32,
+        tiles: u32,
+    },
+    DenoiseDone { job: u64 },
+    DenoiseError { job: u64, message: String },
 }
 
 pub enum EngineMsg {
@@ -345,6 +354,20 @@ pub enum EngineMsg {
     },
     GetPerfStats {
         reply: oneshot::Sender<PerfStats>,
+    },
+    // ---- Denoise (classical settings via ApplyOp; AI async) ----
+    DenoiseEstimateProfile {
+        reply: oneshot::Sender<Result<crate::denoise::NoiseProfile, CoreError>>,
+    },
+    DenoiseModelsList {
+        reply: oneshot::Sender<Vec<crate::denoise::ai::ModelInfo>>,
+    },
+    DenoiseAiStart {
+        reply: oneshot::Sender<Result<u64, CoreError>>,
+    },
+    DenoiseAiCancel {
+        job: u64,
+        reply: oneshot::Sender<()>,
     },
     // ---- internal (workers → engine) ----
     PreviewDone {

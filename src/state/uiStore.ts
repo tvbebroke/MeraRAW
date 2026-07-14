@@ -7,14 +7,21 @@ import { readCropFromDoc } from "../crop/cropMath";
 import { applyCropParams } from "../crop/cropActions";
 import {
   applyViewportBgAttr,
+  isSolidViewportBg,
   persistViewportBg,
   readStoredViewportBg,
   syncWindowBackdrop,
   type ViewportBg,
 } from "../theme/viewportBackground";
+import {
+  applyUiShellAttr,
+  persistUiShell,
+  readStoredUiShell,
+  type UiShell,
+} from "../theme/uiShell";
 import { useDocStore } from "./docStore";
 
-export type { ViewportBg };
+export type { ViewportBg, UiShell };
 
 interface UiState {
   engineReady: boolean;
@@ -76,6 +83,9 @@ interface UiState {
   /** Develop preview backdrop (behind the image). */
   viewportBg: ViewportBg;
   setViewportBg: (id: ViewportBg) => void;
+  /** App chrome: Modern (Figma) vs Faithful (Lightroom Classic / v0.1.4). */
+  uiShell: UiShell;
+  setUiShell: (shell: UiShell) => void;
   earlySupporterOpen: boolean;
   setEarlySupporterOpen: (on: boolean) => void;
   isEarlySupporter: boolean;
@@ -205,12 +215,39 @@ export const useUiStore = create<UiState>((set, get) => ({
   setHelpOverlay: (on) => set({ helpOverlay: on }),
   settingsOpen: false,
   setSettingsOpen: (on) => set({ settingsOpen: on }),
-  viewportBg: readStoredViewportBg(),
+  viewportBg: (() => {
+    const shell = readStoredUiShell();
+    const bg = readStoredViewportBg();
+    if (shell === "faithful" && !isSolidViewportBg(bg)) return "black";
+    return bg;
+  })(),
   setViewportBg: (id) => {
     persistViewportBg(id);
     applyViewportBgAttr(id);
     void syncWindowBackdrop(id);
     set({ viewportBg: id });
+  },
+  uiShell: readStoredUiShell(),
+  setUiShell: (shell) => {
+    persistUiShell(shell);
+    applyUiShellAttr(shell);
+    // Faithful: no Zen; clamp fancy backdrops to a solid color.
+    set((s) => {
+      const nextBg =
+        shell === "faithful" && !isSolidViewportBg(s.viewportBg)
+          ? ("black" as ViewportBg)
+          : s.viewportBg;
+      if (nextBg !== s.viewportBg) {
+        persistViewportBg(nextBg);
+        applyViewportBgAttr(nextBg);
+        void syncWindowBackdrop(nextBg);
+      }
+      return {
+        uiShell: shell,
+        viewportBg: nextBg,
+        showRightPanel: shell === "faithful" ? true : s.showRightPanel,
+      };
+    });
   },
   earlySupporterOpen: false,
   setEarlySupporterOpen: (on) => set({ earlySupporterOpen: on }),

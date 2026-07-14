@@ -2,6 +2,10 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
 import "./styles.css";
+import { applyUiShellAttr, readStoredUiShell } from "./theme/uiShell";
+
+// Apply shell before first paint so the correct scoped stylesheet matches.
+applyUiShellAttr(readStoredUiShell());
 
 // Proportional UI scale on small windows: below DESIGN_W the whole app scales
 // down (panels + sliders + image together) instead of cropping the right side.

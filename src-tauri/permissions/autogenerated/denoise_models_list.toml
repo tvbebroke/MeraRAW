@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-denoise-models-list"
+description = "Enables the denoise_models_list command without any pre-configured scope."
+commands.allow = ["denoise_models_list"]
+
+[[permission]]
+identifier = "deny-denoise-models-list"
+description = "Denies the denoise_models_list command without any pre-configured scope."
+commands.deny = ["denoise_models_list"]

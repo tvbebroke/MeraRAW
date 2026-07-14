@@ -62,13 +62,34 @@ struct CalibU {
     _p1: u32,
 }
 
+/// Classical denoise uniforms — must match `NoiseUniforms` in noise.wgsl.
 #[repr(C)]
 #[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 struct NoiseU {
-    luma_sigma: f32,
-    luma_amt: f32,
-    chroma_amt: f32,
-    _pad: f32,
+    /// Profile (a, b) already strength-scaled.
+    profile_a: f32,
+    profile_b: f32,
+    /// Per-level Wiener s multipliers (luma / chroma), packed.
+    luma_s0: f32,
+    luma_s1: f32,
+    luma_s2: f32,
+    luma_s3: f32,
+    luma_s4: f32,
+    chroma_s0: f32,
+    chroma_s1: f32,
+    chroma_s2: f32,
+    chroma_s3: f32,
+    chroma_s4: f32,
+    chroma_s5: f32,
+    detail: f32,
+    impulse_k: f32,
+    texture_k: f32,
+    sigma_scale: f32,
+    use_nlm: f32,
+    nlm_patch: f32,
+    nlm_search: f32,
+    nlm_h: f32,
+    nlm_center: f32,
     width: u32,
     height: u32,
     _p0: u32,
@@ -326,20 +347,45 @@ pub fn node_configs(
         }
     }
 
-    // noise (detail slot 4)
+    // noise (detail slot 4) — classical VST + à-trous / NLM chain
     {
-        let nl = eff(doc, "detail", "noise_luma");
-        let nc = eff(doc, "detail", "noise_chroma");
-        let dp = eff(doc, "detail", "detail_preserve");
-        if nl == 0.0 && nc == 0.0 {
+        // ISO is stashed on open into doc.unknown["denoise_iso"] (engine/decode).
+        let iso_hint = doc
+            .unknown
+            .get("denoise_iso")
+            .and_then(|v| v.as_u64().or_else(|| v.as_f64().map(|f| f as u64)))
+            .unwrap_or(800) as u32;
+        let profile = crate::denoise::NoiseProfile::from_iso(iso_hint);
+        let settings = crate::denoise::DenoiseSettings::from_doc(doc, &profile);
+        if !settings.classical_active() {
             out.push(NodeConfig::Skip);
         } else {
-            let strength = nl / 100.0;
+            // Preview is already downsampled by extract; treat σ as full-res
+            // (sigma_scale=1). Viewport-scale correction is a future polish item.
+            let p = settings.to_chain_params(&profile, 1.0);
             out.push(run(NoiseU {
-                luma_sigma: (0.10 + 0.50 * strength) * (1.0 - 0.7 * dp / 100.0),
-                luma_amt: strength,
-                chroma_amt: nc / 100.0,
-                _pad: 0.0,
+                profile_a: p.profile.a,
+                profile_b: p.profile.b,
+                luma_s0: p.luma_s[0],
+                luma_s1: p.luma_s[1],
+                luma_s2: p.luma_s[2],
+                luma_s3: p.luma_s[3],
+                luma_s4: p.luma_s[4],
+                chroma_s0: p.chroma_s[0],
+                chroma_s1: p.chroma_s[1],
+                chroma_s2: p.chroma_s[2],
+                chroma_s3: p.chroma_s[3],
+                chroma_s4: p.chroma_s[4],
+                chroma_s5: p.chroma_s[5],
+                detail: p.detail,
+                impulse_k: p.impulse_k,
+                texture_k: p.texture_k,
+                sigma_scale: p.sigma_scale,
+                use_nlm: if p.use_nlm { 1.0 } else { 0.0 },
+                nlm_patch: p.nlm_patch as f32,
+                nlm_search: p.nlm_search as f32,
+                nlm_h: p.nlm_h,
+                nlm_center: p.nlm_center,
                 width: w,
                 height: h,
                 _p0: 0,

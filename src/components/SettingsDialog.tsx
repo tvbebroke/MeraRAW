@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { getSupporterStatus, openEarlySupporterPage, type SupporterStatus } from "../services/purchaseService";
+import { UiShellSettings } from "./UiShellPicker";
 import { ViewportBgSettings } from "./ViewportBgPicker";
 
 interface SettingsDialogProps {
@@ -47,6 +48,8 @@ export function SettingsDialog({
           )}
         </section>
 
+        <UiShellSettings />
+
         <ViewportBgSettings />
 
         <section className="settings-section">
@@ -75,7 +78,7 @@ export function SettingsDialog({
           <p className="muted sm">
             MeraRAW — GPU-powered RAW editor with local AI grading.
           </p>
-          <p className="muted xs">Version 0.1.4 (beta)</p>
+          <p className="muted xs">Version 0.1.5 (beta)</p>
         </section>
 
         <div className="modal-actions">

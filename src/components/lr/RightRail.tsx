@@ -9,8 +9,14 @@ import { Icon } from "./widgets";
 
 export type RightToolTab = "presets" | "edit" | "crop" | "remove" | "masking";
 
-/** Order matches Figma Develop Intermediate tool strip. */
-const TABS: { id: RightToolTab; label: string; icon: (p: { size?: number }) => ReactElement }[] = [
+type TabDef = {
+  id: RightToolTab;
+  label: string;
+  icon: (p: { size?: number }) => ReactElement;
+};
+
+/** Modern (Figma) tool strip order. */
+const TABS_MODERN: TabDef[] = [
   { id: "edit", label: "Edit", icon: Icon.EditSliders },
   { id: "crop", label: "Crop", icon: Icon.Crop },
   { id: "masking", label: "Mask", icon: Icon.Mask },
@@ -18,11 +24,20 @@ const TABS: { id: RightToolTab; label: string; icon: (p: { size?: number }) => R
   { id: "presets", label: "Presets", icon: Icon.Presets },
 ];
 
-function RemovePanel() {
+/** Faithful (Lightroom Classic / v0.1.4) tool strip order. */
+const TABS_FAITHFUL: TabDef[] = [
+  { id: "presets", label: "Presets", icon: Icon.Presets },
+  { id: "edit", label: "Edit", icon: Icon.EditSliders },
+  { id: "crop", label: "Crop", icon: Icon.Crop },
+  { id: "remove", label: "Remove", icon: Icon.Remove },
+  { id: "masking", label: "Masking", icon: Icon.Mask },
+];
+
+function RemovePanel({ modern }: { modern: boolean }) {
   return (
     <div className="lr-rail-panel">
       <header className="lr-rail-panel-head">
-        <h2>AI / Remove</h2>
+        <h2>{modern ? "AI / Remove" : "Remove"}</h2>
       </header>
       <div className="lr-rail-panel-body">
         <p className="muted sm">
@@ -69,34 +84,53 @@ export function RightRail({
   const tab = useUiStore((s) => s.rightRailTab);
   const setTab = useUiStore((s) => s.setRightRailTab);
   const showRightPanel = useUiStore((s) => s.showRightPanel);
+  const uiShell = useUiStore((s) => s.uiShell);
+  const modern = uiShell === "modern";
+  const tabs = modern ? TABS_MODERN : TABS_FAITHFUL;
 
   if (!showRightPanel) return null;
 
-  return (
-    <div className="lr-right-stack">
-      <nav className="lr-tool-tabs" aria-label="Develop tools">
-        {TABS.map(({ id, label, icon: TabIcon }) => (
-          <button
-            key={id}
-            type="button"
-            className={`lr-tool-tab ${tab === id ? "active" : ""}`}
-            title={label}
-            onClick={() => setTab(id)}
-          >
-            <TabIcon size={22} />
-            <span>{label}</span>
-          </button>
-        ))}
-      </nav>
-      <div className="lr-right-main">
-        {tab === "presets" && <PresetsPanel />}
-        {tab === "edit" && (
-          <DevelopRail meta={meta} onMetaChange={onMetaChange} />
-        )}
-        {tab === "crop" && <CropPanel />}
-        {tab === "remove" && <RemovePanel />}
-        {tab === "masking" && <MaskingPanel />}
+  const toolNav = (
+    <nav className="lr-tool-tabs" aria-label="Develop tools">
+      {tabs.map(({ id, label, icon: TabIcon }) => (
+        <button
+          key={id}
+          type="button"
+          className={`lr-tool-tab ${tab === id ? "active" : ""}`}
+          title={label}
+          onClick={() => setTab(id)}
+        >
+          <TabIcon size={modern ? 22 : 18} />
+          <span>{label}</span>
+        </button>
+      ))}
+    </nav>
+  );
+
+  const main = (
+    <div className="lr-right-main">
+      {tab === "presets" && <PresetsPanel />}
+      {tab === "edit" && <DevelopRail meta={meta} onMetaChange={onMetaChange} />}
+      {tab === "crop" && <CropPanel />}
+      {tab === "remove" && <RemovePanel modern={modern} />}
+      {tab === "masking" && <MaskingPanel />}
+    </div>
+  );
+
+  // Modern: horizontal tools above panels. Faithful: vertical wrap, tools below.
+  if (modern) {
+    return (
+      <div className="lr-right-stack">
+        {toolNav}
+        {main}
       </div>
+    );
+  }
+
+  return (
+    <div className="lr-right-wrap">
+      {main}
+      {toolNav}
     </div>
   );
 }

@@ -5,6 +5,7 @@ pub mod catalog;
 pub mod color;
 pub mod crop;
 pub mod curve;
+pub mod denoise;
 pub mod doc;
 pub mod engine;
 pub mod error;

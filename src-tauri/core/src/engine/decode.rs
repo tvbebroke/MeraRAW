@@ -57,6 +57,12 @@ impl Engine {
             }
         };
 
+        // Seed denoise ISO profile hint for the classical noise node.
+        if let Some(iso) = meta.iso {
+            doc.unknown
+                .insert("denoise_iso".into(), serde_json::json!(iso));
+        }
+
         let chosen = crate::profile::choose_profile(
             &meta,
             &index,

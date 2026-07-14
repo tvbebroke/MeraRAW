@@ -200,16 +200,21 @@ export function Panel({
   children: React.ReactNode;
 }) {
   const [open, setOpen] = useState(defaultOpen);
+  const faithful = useUiStore((s) => s.uiShell) === "faithful";
+  const disclosure = (
+    <span className={`lr-disclosure ${open ? "open" : ""}`}>
+      <Icon.Chevron size={12} />
+    </span>
+  );
   return (
     <section className={`lr-panel ${className ?? ""}`}>
       <header className="lr-panel-head" onClick={() => setOpen((o) => !o)}>
+        {faithful && disclosure}
         <span className="lr-panel-title">{title}</span>
         <span className="lr-panel-right" onClick={(e) => e.stopPropagation()}>
           {right}
         </span>
-        <span className={`lr-disclosure ${open ? "open" : ""}`}>
-          <Icon.Chevron size={12} />
-        </span>
+        {!faithful && disclosure}
       </header>
       {open && <div className="lr-panel-body">{children}</div>}
     </section>

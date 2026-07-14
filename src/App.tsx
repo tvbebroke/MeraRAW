@@ -79,6 +79,8 @@ export default function App() {
   const showLeftPanel = useUiStore((s) => s.showLeftPanel);
   const showRightPanel = useUiStore((s) => s.showRightPanel);
   const viewportBg = useUiStore((s) => s.viewportBg);
+  const uiShell = useUiStore((s) => s.uiShell);
+  const isModern = uiShell === "modern";
   const helpOverlay = useUiStore((s) => s.helpOverlay);
   const setHelpOverlay = useUiStore((s) => s.setHelpOverlay);
   const settingsOpen = useUiStore((s) => s.settingsOpen);
@@ -240,6 +242,7 @@ export default function App() {
   }, [beforeAfter]);
 
   // Preview backdrop preference (CSS + optional macOS vibrancy).
+  // Faithful supports solid colors only; glass/video stay Modern-only.
   useEffect(() => {
     applyViewportBgAttr(viewportBg);
     void syncWindowBackdrop(viewportBg);
@@ -254,8 +257,9 @@ export default function App() {
     <div
       className={`app ${showTopbar ? "" : "chrome-all-hidden"}`}
       data-viewport-bg={viewportBg}
+      data-ui-shell={uiShell}
     >
-      {viewportBg === "psychedelic" && (
+      {isModern && viewportBg === "psychedelic" && (
         <div className="psy-layer">
           <PsychedelicBg />
           <div className="psy-controls-float topbar-no-drag">
@@ -302,88 +306,116 @@ export default function App() {
           </button>
         </nav>
         <div className="topbar-right topbar-no-drag">
-          {mode === "develop" ? (
+          {isModern ? (
+            mode === "develop" ? (
+              <>
+                <button
+                  type="button"
+                  className="topbar-icon-btn"
+                  title="Settings"
+                  onClick={() => setSettingsOpen(true)}
+                >
+                  <Icon.Settings size={16} />
+                </button>
+                <ViewportBgMenuButton />
+                <button
+                  type="button"
+                  className={`zen-toggle ${showRightPanel ? "" : "zen"}`}
+                  title={showRightPanel ? "Switch to Zen" : "Switch to Expert"}
+                  onClick={() => useUiStore.getState().toggleRightPanel()}
+                >
+                  <span className="zen-toggle-knob" />
+                  <span className="zen-toggle-label">
+                    {showRightPanel ? "Expert" : "Zen"}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  className="topbar-icon-btn"
+                  title="Keyboard shortcuts"
+                  onClick={() => setHelpOverlay(true)}
+                >
+                  <Icon.Help size={16} />
+                </button>
+                <button
+                  type="button"
+                  className="topbar-export-btn"
+                  disabled={!meta}
+                  title="Export"
+                  onClick={() => {
+                    setExportQueue(undefined);
+                    setShowExport(true);
+                  }}
+                >
+                  <Icon.Export size={16} />
+                </button>
+              </>
+            ) : mode === "library" ? (
+              <>
+                <button
+                  type="button"
+                  className="topbar-icon-btn"
+                  title="Settings"
+                  onClick={() => setSettingsOpen(true)}
+                >
+                  <Icon.Settings size={16} />
+                </button>
+                <ViewportBgMenuButton />
+                <button
+                  type="button"
+                  className="topbar-icon-btn"
+                  title="Keyboard shortcuts"
+                  onClick={() => setHelpOverlay(true)}
+                >
+                  <Icon.Help size={16} />
+                </button>
+                <button
+                  type="button"
+                  className="topbar-edit-btn"
+                  disabled={!meta}
+                  title="Open Develop"
+                  onClick={() => meta && setMode("develop")}
+                >
+                  Edit
+                  <Icon.Pencil size={14} />
+                </button>
+              </>
+            ) : (
+              <>
+                <button type="button" className="tab" onClick={handleOpen}>
+                  Open…
+                </button>
+                <button
+                  type="button"
+                  className="tab"
+                  disabled={!meta}
+                  onClick={() => {
+                    setExportQueue(undefined);
+                    setShowExport(true);
+                  }}
+                >
+                  <Icon.Export size={13} /> Export…
+                </button>
+              </>
+            )
+          ) : (
             <>
-              <button
-                type="button"
-                className="topbar-icon-btn"
-                title="Settings"
-                onClick={() => setSettingsOpen(true)}
-              >
-                <Icon.Settings size={16} />
+              <button type="button" className="tab" onClick={() => setSettingsOpen(true)}>
+                Settings
               </button>
               <ViewportBgMenuButton />
-              <button
-                type="button"
-                className={`zen-toggle ${showRightPanel ? "" : "zen"}`}
-                title={showRightPanel ? "Switch to Zen" : "Switch to Expert"}
-                onClick={() => useUiStore.getState().toggleRightPanel()}
-              >
-                <span className="zen-toggle-knob" />
-                <span className="zen-toggle-label">
-                  {showRightPanel ? "Expert" : "Zen"}
-                </span>
+              <button type="button" className="tab" onClick={handleOpen}>
+                Open…
               </button>
               <button
                 type="button"
-                className="topbar-icon-btn"
-                title="Keyboard shortcuts"
-                onClick={() => setHelpOverlay(true)}
-              >
-                <Icon.Help size={16} />
-              </button>
-              <button
-                type="button"
-                className="topbar-export-btn"
+                className="tab"
                 disabled={!meta}
-                title="Export"
                 onClick={() => {
                   setExportQueue(undefined);
                   setShowExport(true);
                 }}
               >
-                <Icon.Export size={16} />
-              </button>
-            </>
-          ) : mode === "library" ? (
-            <>
-              <button
-                type="button"
-                className="topbar-icon-btn"
-                title="Settings"
-                onClick={() => setSettingsOpen(true)}
-              >
-                <Icon.Settings size={16} />
-              </button>
-              <ViewportBgMenuButton />
-              <button
-                type="button"
-                className="topbar-icon-btn"
-                title="Keyboard shortcuts"
-                onClick={() => setHelpOverlay(true)}
-              >
-                <Icon.Help size={16} />
-              </button>
-              <button
-                type="button"
-                className="topbar-edit-btn"
-                disabled={!meta}
-                title="Open Develop"
-                onClick={() => meta && setMode("develop")}
-              >
-                Edit
-                <Icon.Pencil size={14} />
-              </button>
-            </>
-          ) : (
-            <>
-              <button className="tab" onClick={handleOpen}>
-                Open…
-              </button>
-              <button className="tab" disabled={!meta} onClick={() => {
-                setExportQueue(undefined);
-                setShowExport(true);
-              }}>
                 <Icon.Export size={13} /> Export…
               </button>
             </>
@@ -415,21 +447,24 @@ export default function App() {
             <LeftPanel currentPath={lastOpenedPath} onOpen={(p) => void open(p)} />
             <div className="develop-center">
               <Viewport />
-              {!showRightPanel && <ZenAiBar />}
+              {isModern && !showRightPanel && <ZenAiBar />}
               {showToolbar && <ViewportToolbar />}
             </div>
             <RightRail meta={meta} onMetaChange={setMeta} />
           </div>
-          {showFilmstrip && (
-            <div className="develop-bottom">
+          {showFilmstrip &&
+            (isModern ? (
+              <div className="develop-bottom">
+                <Filmstrip currentPath={lastOpenedPath} onOpen={(p) => void open(p)} />
+                {showRightPanel && (
+                  <div className="develop-hist">
+                    <Histogram />
+                  </div>
+                )}
+              </div>
+            ) : (
               <Filmstrip currentPath={lastOpenedPath} onOpen={(p) => void open(p)} />
-              {showRightPanel && (
-                <div className="develop-hist">
-                  <Histogram />
-                </div>
-              )}
-            </div>
-          )}
+            ))}
         </div>
       )}
 
