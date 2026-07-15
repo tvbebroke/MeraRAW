@@ -7,7 +7,6 @@ import {
   type ViewportBg,
 } from "../theme/viewportBackground";
 import { Icon } from "./lr/widgets";
-import { PsychedelicControls } from "./PsychedelicControls";
 
 function SwatchGrid({
   value,
@@ -61,16 +60,10 @@ export function ViewportBgSettings() {
       <h3 className="settings-h">App background</h3>
       <p className="muted sm">
         {modern
-          ? "Chrome behind panels. Transparent / liquid glass show your desktop; Psychedelic plays a looping video with audio. Photo and controls stay solid."
+          ? "Chrome behind panels. Transparent / liquid glass show your desktop. Photo and controls stay solid."
           : "Solid chrome colors for the Faithful Lightroom-style interface."}
       </p>
       <SwatchGrid value={viewportBg} onChange={setViewportBg} options={options} />
-      {modern && viewportBg === "psychedelic" && (
-        <div className="psy-controls-block">
-          <div className="vp-bg-popover-title">Background video</div>
-          <PsychedelicControls />
-        </div>
-      )}
     </section>
   );
 }
@@ -79,7 +72,7 @@ export function ViewportBgSettings() {
 export function ViewportBgMenuButton() {
   const viewportBg = useUiStore((s) => s.viewportBg);
   const setViewportBg = useUiStore((s) => s.setViewportBg);
-  const { modern, options } = useShellBgOptions();
+  const { options } = useShellBgOptions();
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
 
@@ -112,15 +105,9 @@ export function ViewportBgMenuButton() {
             options={options}
             onChange={(id) => {
               setViewportBg(id);
-              if (id !== "psychedelic") setOpen(false);
+              setOpen(false);
             }}
           />
-          {modern && viewportBg === "psychedelic" && (
-            <div className="psy-controls-block">
-              <div className="vp-bg-popover-title">Background video</div>
-              <PsychedelicControls />
-            </div>
-          )}
         </div>
       )}
     </div>

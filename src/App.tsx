@@ -37,8 +37,6 @@ import { Histogram } from "./components/Histogram";
 import { ReportProblem } from "./components/ReportProblem";
 import { SettingsDialog } from "./components/SettingsDialog";
 import { ViewportBgMenuButton } from "./components/ViewportBgPicker";
-import { PsychedelicBg } from "./components/PsychedelicBg";
-import { PsychedelicControls } from "./components/PsychedelicControls";
 import { EarlySupporterModal } from "./components/EarlySupporterModal";
 import { getSupporterStatus } from "./services/purchaseService";
 import { setAppKeyboardContext } from "./keyboard/context";
@@ -259,14 +257,6 @@ export default function App() {
       data-viewport-bg={viewportBg}
       data-ui-shell={uiShell}
     >
-      {isModern && viewportBg === "psychedelic" && (
-        <div className="psy-layer">
-          <PsychedelicBg />
-          <div className="psy-controls-float topbar-no-drag">
-            <PsychedelicControls compact />
-          </div>
-        </div>
-      )}
       {showTopbar && (
       <div className="topbar" data-tauri-drag-region>
         <span className="brand" data-tauri-drag-region>

@@ -9,8 +9,7 @@ export type ViewportBg =
   | "black"
   | "jet-black"
   | "liquid-glass"
-  | "transparent"
-  | "psychedelic";
+  | "transparent";
 
 /** Solid chrome colors available in both Modern and Faithful. */
 export const SOLID_VIEWPORT_BGS = [
@@ -48,12 +47,6 @@ export const VIEWPORT_BG_OPTIONS: {
     swatch: "repeating-conic-gradient(#666 0% 25%, #333 0% 50%) 0 0/12px 12px",
     hint: "Clear chrome — only photo & controls stay solid",
   },
-  {
-    id: "psychedelic",
-    label: "Psychedelic",
-    swatch: "linear-gradient(135deg,#ff00aa,#7a00ff 40%,#00e5ff 75%,#ffe600)",
-    hint: "Looping trance video — play/mute from the controls",
-  },
 ];
 
 /** Faithful shell: solid colors only (no glass / video). */
@@ -65,7 +58,7 @@ const STORAGE_KEY = "meraraw.viewportBg";
 const DEFAULT_BG: ViewportBg = "black";
 
 const SOLID_WINDOW_COLORS: Record<
-  Exclude<ViewportBg, "liquid-glass" | "transparent" | "psychedelic">,
+  Exclude<ViewportBg, "liquid-glass" | "transparent">,
   [number, number, number, number]
 > = {
   white: [240, 240, 240, 255],
@@ -112,7 +105,7 @@ export async function syncWindowBackdrop(id: ViewportBg): Promise<void> {
       });
       return;
     }
-    if (id === "transparent" || id === "psychedelic") {
+    if (id === "transparent") {
       await win.clearEffects();
       await win.setBackgroundColor([0, 0, 0, 0]);
       return;
