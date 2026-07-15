@@ -20,8 +20,11 @@ if [ ! -d "$DST" ]; then
   exit 1
 fi
 
-DRY=()
-[ "${1:-}" = "--dry-run" ] && DRY=(--dry-run) && echo "(dry run — no changes written)"
+DRY_ARGS=()
+if [ "${1:-}" = "--dry-run" ]; then
+  DRY_ARGS=(--dry-run)
+  echo "(dry run — no changes written)"
+fi
 
 echo "Syncing front-end source:"
 echo "  from: $SRC"
@@ -29,16 +32,16 @@ echo "    to: $DST"
 
 # Mirror the source directories (with --delete so removals propagate). These
 # are byte-identical to the UI repo's copies, so mirroring is safe.
-rsync -a --delete "${DRY[@]}" "$SRC/src/"      "$DST/src/"
-rsync -a --delete "${DRY[@]}" "$SRC/public/"   "$DST/public/"
-rsync -a --delete "${DRY[@]}" "$SRC/assets/"   "$DST/assets/"
+rsync -a --delete ${DRY_ARGS[@]+"${DRY_ARGS[@]}"} "$SRC/src/"      "$DST/src/"
+rsync -a --delete ${DRY_ARGS[@]+"${DRY_ARGS[@]}"} "$SRC/public/"   "$DST/public/"
+rsync -a --delete ${DRY_ARGS[@]+"${DRY_ARGS[@]}"} "$SRC/assets/"   "$DST/assets/"
 
 # keybinds: only the keymap.json is imported by the UI.
 mkdir -p "$DST/keybinds"
-rsync -a "${DRY[@]}" "$SRC/keybinds/keymap.json" "$DST/keybinds/keymap.json"
+rsync -a ${DRY_ARGS[@]+"${DRY_ARGS[@]}"} "$SRC/keybinds/keymap.json" "$DST/keybinds/keymap.json"
 
 # index.html entry (identical in both).
-rsync -a "${DRY[@]}" "$SRC/index.html" "$DST/index.html"
+rsync -a ${DRY_ARGS[@]+"${DRY_ARGS[@]}"} "$SRC/index.html" "$DST/index.html"
 
 echo
 echo "Done. Now review + commit in the UI repo:"
