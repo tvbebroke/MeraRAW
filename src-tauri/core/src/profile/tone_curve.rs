@@ -6,6 +6,8 @@ use crate::error::CoreError;
 const TIFF_FLOAT: u16 = 11;
 const TIFF_SRATIONAL: u16 = 10;
 
+const MAX_TONE_PAIRS: u32 = 4096;
+
 pub fn parse_tone_curve(
     data: &[u8],
     typ: u16,
@@ -15,8 +17,18 @@ pub fn parse_tone_curve(
     if typ != TIFF_FLOAT || count < 4 || count % 2 != 0 {
         return Ok(None);
     }
+    let pairs = count / 2;
+    if pairs > MAX_TONE_PAIRS {
+        return Ok(None);
+    }
     let off = val as usize;
-    let pairs = (count / 2) as usize;
+    let need = off
+        .checked_add((count as usize).saturating_mul(4))
+        .unwrap_or(usize::MAX);
+    if need > data.len() {
+        return Ok(None);
+    }
+    let pairs = pairs as usize;
     let mut pts = Vec::with_capacity(pairs);
     for i in 0..pairs {
         let x = read_f32(data, off + i * 8)?;

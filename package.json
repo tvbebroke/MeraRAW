@@ -11,7 +11,8 @@
     "import-presets": "node scripts/import-lightroom-presets.mjs",
     "tag-presets": "node scripts/tag-presets.mjs",
     "release": "bash scripts/release-beta.sh",
-    "notarize": "bash scripts/notarize-dmg.sh"
+    "notarize": "bash scripts/notarize-dmg.sh",
+    "test": "vitest run"
   },
   "dependencies": {
     "@tauri-apps/api": "^2",
@@ -25,6 +26,7 @@
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.3.1",
     "typescript": "^5.5.3",
-    "vite": "^6"
+    "vite": "^6",
+    "vitest": "^4.1.10"
   }
 }

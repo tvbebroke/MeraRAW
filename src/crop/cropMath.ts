@@ -273,6 +273,204 @@ export function imageNormToScreen(
   return [px, py];
 }
 
+// ---------------------------------------------------------------------------
+// Content-space + rotation geometry (mirrors the engine's crop_common.wgsl /
+// crop.rs contract — keep in lockstep).
+// ---------------------------------------------------------------------------
+
+/** Angle/rotate-90/flip only (rect ignored) — mirrors Rust geometry_identity. */
+export function isGeometryIdentity(p: CropParams): boolean {
+  return Math.abs(p.angle) < 0.001 && p.rotate90 === 0 && !p.flipH && !p.flipV;
+}
+
+/** Extract crop mode: 0 = none, 1 = committed crop, 2 = geometry-only preview. */
+export function cropModeFor(p: CropParams, cropActive: boolean): 0 | 1 | 2 {
+  if (!cropActive && !isDefaultCrop(p)) return 1;
+  if (cropActive && !isGeometryIdentity(p)) return 2;
+  return 0;
+}
+
+/** Physical px dims of the post-rotate-90 space the crop rect lives in. */
+export function rotatedDims(p: CropParams, imgW: number, imgH: number): [number, number] {
+  return p.rotate90 % 2 === 1 ? [imgH, imgW] : [imgW, imgH];
+}
+
+/**
+ * Pixel dims of the displayed content — what the viewport's pan/zoom and the
+ * engine's fit-scale are defined against.
+ */
+export function contentDims(
+  p: CropParams,
+  imgW: number,
+  imgH: number,
+  mode: 0 | 1 | 2,
+): [number, number] {
+  const [rw, rh] = rotatedDims(p, imgW, imgH);
+  if (mode === 1) {
+    return [
+      Math.max(Math.max(p.rect.right - p.rect.left, 0.01) * rw, 1),
+      Math.max(Math.max(p.rect.bottom - p.rect.top, 0.01) * rh, 1),
+    ];
+  }
+  if (mode === 2) return [rw, rh];
+  return [imgW, imgH];
+}
+
+/**
+ * Largest centered axis-aligned rect of aspect `ratio` (w/h, px) inside the
+ * rotated image (closed form): w·|cosθ| + h·|sinθ| ≤ W and w·|sinθ| + h·|cosθ| ≤ H.
+ * Returns [w, h] in px of rotated space.
+ */
+export function maxInscribedSize(
+  rotW: number,
+  rotH: number,
+  angleDeg: number,
+  ratio: number,
+): [number, number] {
+  const t = (Math.abs(angleDeg) * Math.PI) / 180;
+  const c = Math.cos(t);
+  const s = Math.sin(t);
+  const r = Math.max(ratio, 1e-6);
+  const h = Math.min(rotW / (r * c + s), rotH / (r * s + c));
+  return [r * h, h];
+}
+
+/**
+ * Constrain-to-image: keep the rect's exact aspect, cap its size to the
+ * largest rect of that aspect that fits anywhere in the rotated image, then
+ * slide the center the minimal amount needed so no corner leaves the image
+ * quad. Never shows blank pixels; idempotent; preserves the user's framing
+ * as much as geometry allows. Rect is normalized in rotated space.
+ */
+export function constrainRectToImage(
+  rect: CropRect,
+  p: CropParams,
+  imgW: number,
+  imgH: number,
+): CropRect {
+  const [rw, rh] = rotatedDims(p, imgW, imgH);
+  const t = (p.angle * Math.PI) / 180;
+  const c = Math.cos(t);
+  const s = Math.sin(t);
+  const hw = rw / 2;
+  const hh = rh / 2;
+
+  const w0 = Math.max((rect.right - rect.left) * rw, 1e-6);
+  const h0 = Math.max((rect.bottom - rect.top) * rh, 1e-6);
+  let dx = ((rect.left + rect.right) / 2 - 0.5) * rw;
+  let dy = ((rect.top + rect.bottom) / 2 - 0.5) * rh;
+
+  // display → source (matches the shader's rotate-by-−θ)
+  const inv = (x: number, y: number): [number, number] => [x * c + y * s, -x * s + y * c];
+
+  // 1. If rotation left the rect's CENTER outside the image quad, pull it
+  //    radially toward the image center just far enough to get back inside
+  //    (the origin is inside both the quad and the [0,1] box, so the segment
+  //    always crosses into the feasible region).
+  {
+    const [ax, ay] = inv(dx, dy);
+    const over = Math.max(Math.abs(ax) / hw, Math.abs(ay) / hh);
+    if (over > 1) {
+      const shrink = 1 / over;
+      dx *= shrink;
+      dy *= shrink;
+    }
+  }
+
+  // 2. Largest k ∈ [0,1] scaling (w0,h0) about the fixed center such that
+  //    every corner stays inside BOTH the rotated image quad (source-space
+  //    box) and the [0,1] storage box (display-space box). All constraints
+  //    are linear in k, so this is exact and idempotent.
+  let k = 1;
+  const [ax, ay] = inv(dx, dy);
+  for (const sx of [-1, 1]) {
+    for (const sy of [-1, 1]) {
+      const [bx, by] = inv((sx * w0) / 2, (sy * h0) / 2);
+      for (const [A, B, C] of [
+        [ax, bx, hw],
+        [ay, by, hh],
+        [dx, (sx * w0) / 2, hw],
+        [dy, (sy * h0) / 2, hh],
+      ] as const) {
+        if (Math.abs(B) < 1e-12) continue;
+        const lim = B > 0 ? (C - A) / B : (C + A) / -B;
+        k = Math.min(k, Math.max(lim, 0));
+      }
+    }
+  }
+
+  const w = w0 * k;
+  const h = h0 * k;
+  return {
+    left: (dx - w / 2) / rw + 0.5,
+    top: (dy - h / 2) / rh + 0.5,
+    right: (dx + w / 2) / rw + 0.5,
+    bottom: (dy + h / 2) / rh + 0.5,
+  };
+}
+
+/**
+ * Largest-area fit: recenter to the image center with the given ratio (px
+ * ratio in rotated space) — darktable's "largest area" auto-crop.
+ */
+export function maxCenteredRect(
+  p: CropParams,
+  imgW: number,
+  imgH: number,
+  ratio: number,
+): CropRect {
+  const [rw, rh] = rotatedDims(p, imgW, imgH);
+  const [w, h] = maxInscribedSize(rw, rh, p.angle, ratio);
+  const wn = Math.min(w / rw, 1);
+  const hn = Math.min(h / rh, 1);
+  return {
+    left: 0.5 - wn / 2,
+    top: 0.5 - hn / 2,
+    right: 0.5 + wn / 2,
+    bottom: 0.5 + hn / 2,
+  };
+}
+
+/**
+ * Map a point in CONTENT-normalized coords (what the viewport displays) back
+ * to ORIGINAL-image normalized coords (mask/WB space) — TS mirror of the
+ * shader chain in crop_common.wgsl. Returns null when the point falls on
+ * blank (outside-the-image) pixels.
+ */
+export function contentNormToImageNorm(
+  nx: number,
+  ny: number,
+  p: CropParams,
+  imgW: number,
+  imgH: number,
+  mode: 0 | 1 | 2,
+): [number, number] | null {
+  if (nx < 0 || nx > 1 || ny < 0 || ny > 1) return null;
+  if (mode === 0) return [nx, ny];
+  let rx = nx;
+  let ry = ny;
+  if (mode === 1) {
+    rx = p.rect.left + nx * Math.max(p.rect.right - p.rect.left, 0.01);
+    ry = p.rect.top + ny * Math.max(p.rect.bottom - p.rect.top, 0.01);
+  }
+  const [rw, rh] = rotatedDims(p, imgW, imgH);
+  const t = (-p.angle * Math.PI) / 180; // shader rotates by −angle
+  const c = Math.cos(t);
+  const s = Math.sin(t);
+  const px = (rx - 0.5) * rw;
+  const py = (ry - 0.5) * rh;
+  let ux = (px * c - py * s) / rw + 0.5;
+  let uy = (px * s + py * c) / rh + 0.5;
+  // inverse discrete (flips first, then rotate-90 — same as the shader)
+  if (p.flipV) uy = 1 - uy;
+  if (p.flipH) ux = 1 - ux;
+  if (p.rotate90 === 3) [ux, uy] = [1 - uy, ux];
+  else if (p.rotate90 === 2) [ux, uy] = [1 - ux, 1 - uy];
+  else if (p.rotate90 === 1) [ux, uy] = [uy, 1 - ux];
+  if (ux < 0 || ux > 1 || uy < 0 || uy > 1) return null;
+  return [ux, uy];
+}
+
 export function isDefaultCrop(p: CropParams): boolean {
   const r = p.rect;
   return (

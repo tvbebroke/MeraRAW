@@ -42,6 +42,7 @@ commands.allow = [
   "denoise_ai_cancel",
   "get_stats",
   "wb_from_point",
+  "auto_level",
   "set_mask_overlay",
   "set_preview_bypass",
   "set_display_look",

@@ -32,6 +32,8 @@ export function PresetsPanel() {
   const [query, setQuery] = useState("");
   const [activeTag, setActiveTag] = useState<string | null>(null);
   const [name, setName] = useState("");
+  /** Off by default — crop is creative framing, not a "look" (plan P6). */
+  const [includeCrop, setIncludeCrop] = useState(false);
   const reconcile = useDocStore((s) => s.reconcile);
   const refresh = () =>
     listPresetCatalog()
@@ -41,6 +43,9 @@ export function PresetsPanel() {
   useEffect(() => {
     void refresh();
   }, []);
+
+  const modulesForSave = () =>
+    includeCrop ? [...DEVELOP_MODULES, "crop"] : DEVELOP_MODULES;
 
   const filtered = useMemo(
     () => presets.filter((p) => matchesQuery(p, query, activeTag)),
@@ -133,7 +138,7 @@ export function PresetsPanel() {
               onChange={(e) => setName(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && name.trim()) {
-                  savePresetNamed(name.trim(), DEVELOP_MODULES)
+                  savePresetNamed(name.trim(), modulesForSave())
                     .then(() => {
                       setName("");
                       void refresh();
@@ -143,6 +148,14 @@ export function PresetsPanel() {
               }}
             />
           </div>
+          <label className="muted sm" style={{ display: "flex", gap: 6, alignItems: "center", marginTop: 6 }}>
+            <input
+              type="checkbox"
+              checked={includeCrop}
+              onChange={(e) => setIncludeCrop(e.target.checked)}
+            />
+            Include crop
+          </label>
         </div>
       </div>
     </div>

@@ -65,7 +65,7 @@ impl Engine {
         if let Some(c) = &mut self.current {
             // primary doc only; virtual copies are in-memory until P5
             if c.doc_dirty && c.active_doc == 0 {
-                match sidecar::write_sidecar(&c.docs[0]) {
+                match sidecar::write_sidecar(&c.path, &c.docs[0]) {
                     Ok(p) => {
                         c.doc_dirty = false;
                         tracing::debug!(path = %p.display(), "sidecar written");
@@ -126,12 +126,36 @@ pub fn bundled_presets_dir() -> Option<PathBuf> {
     None
 }
 
-fn preset_json_paths(name: &str) -> Vec<PathBuf> {
+/// Reject path separators / traversal — preset names are identifiers only.
+fn validate_preset_name(name: &str) -> Result<&str, CoreError> {
+    let name = name.trim();
+    if name.is_empty() || name.len() > 128 {
+        return Err(CoreError::InvalidOp("invalid preset name".into()));
+    }
+    if name.contains("..")
+        || name.contains('/')
+        || name.contains('\\')
+        || name.contains('\0')
+        || std::path::Path::new(name).is_absolute()
+    {
+        return Err(CoreError::InvalidOp("invalid preset name".into()));
+    }
+    if !name
+        .chars()
+        .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-' || c == ' ' || c == '.')
+    {
+        return Err(CoreError::InvalidOp("invalid preset name".into()));
+    }
+    Ok(name)
+}
+
+fn preset_json_paths(name: &str) -> Result<Vec<PathBuf>, CoreError> {
+    let name = validate_preset_name(name)?;
     let mut out = vec![presets_dir().join(format!("{name}.json"))];
     if let Some(b) = bundled_presets_dir() {
         out.push(b.join(format!("{name}.json")));
     }
-    out
+    Ok(out)
 }
 
 pub(super) fn list_presets() -> Vec<String> {
@@ -161,9 +185,15 @@ pub(super) fn load_preset(name: &str) -> Result<crate::doc::PartialDoc, CoreErro
     load_preset_file(name).map(|f| f.into_partial())
 }
 
+const MAX_PRESET_BYTES: u64 = 1 * 1024 * 1024;
+
 pub(super) fn load_preset_file(name: &str) -> Result<crate::doc::PresetFile, CoreError> {
-    for path in preset_json_paths(name) {
+    for path in preset_json_paths(name)? {
         if path.exists() {
+            let meta = std::fs::metadata(&path)?;
+            if meta.len() > MAX_PRESET_BYTES {
+                return Err(CoreError::Io("preset file too large".into()));
+            }
             let text = std::fs::read_to_string(&path)?;
             let file: crate::doc::PresetFile = serde_json::from_str(&text).map_err(|e| {
                 CoreError::Io(format!("preset parse: {e}"))

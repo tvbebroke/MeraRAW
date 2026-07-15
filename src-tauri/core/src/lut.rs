@@ -26,6 +26,13 @@ impl CubeLut {
     /// Parse an Adobe/IRIDAS `.cube` file. Only 3D LUTs are supported (1D LUTs
     /// are rejected — they belong in the tone-curve node).
     pub fn load_cube(path: &Path) -> Result<CubeLut, CoreError> {
+        // Cap before read — MAX_SIZE^3 floats fit well under 32 MiB of text.
+        const MAX_LUT_BYTES: u64 = 32 * 1024 * 1024;
+        let meta = std::fs::metadata(path)
+            .map_err(|e| CoreError::InvalidOp(format!("read LUT: {e}")))?;
+        if meta.len() > MAX_LUT_BYTES {
+            return Err(CoreError::InvalidOp("LUT file too large".into()));
+        }
         let text = std::fs::read_to_string(path)
             .map_err(|e| CoreError::InvalidOp(format!("read LUT: {e}")))?;
         Self::parse_cube(&text)

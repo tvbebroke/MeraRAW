@@ -6,13 +6,30 @@ use crate::doc::EditDoc;
 use crate::error::CoreError;
 use std::path::{Path, PathBuf};
 
+/// Hard caps against DoS via huge adjacent sidecars / XMP.
+const MAX_MRT_BYTES: u64 = 16 * 1024 * 1024;
+const MAX_XMP_BYTES: u64 = 2 * 1024 * 1024;
+
 pub fn sidecar_path(source: &Path) -> PathBuf {
     source.with_extension("mrt.json")
 }
 
-pub fn write_sidecar(doc: &EditDoc) -> Result<PathBuf, CoreError> {
-    let source = PathBuf::from(&doc.source_ref.path);
-    let path = sidecar_path(&source);
+fn read_to_string_capped(path: &Path, max_bytes: u64) -> Result<String, CoreError> {
+    let meta = std::fs::metadata(path).map_err(|e| CoreError::Io(e.to_string()))?;
+    if meta.len() > max_bytes {
+        return Err(CoreError::Io(format!(
+            "file too large ({} > {max_bytes} bytes): {}",
+            meta.len(),
+            path.display()
+        )));
+    }
+    std::fs::read_to_string(path).map_err(|e| CoreError::Io(e.to_string()))
+}
+
+/// Write the edit sidecar next to `source` (authoritative path — never trust
+/// `doc.source_ref.path` for filesystem writes).
+pub fn write_sidecar(source: &Path, doc: &EditDoc) -> Result<PathBuf, CoreError> {
+    let path = sidecar_path(source);
     let json = serde_json::to_string_pretty(&doc.to_json())
         .map_err(|e| CoreError::Io(e.to_string()))?;
     let tmp = path.with_extension("mrt.json.tmp");
@@ -26,10 +43,12 @@ pub fn load_sidecar(source: &Path) -> Result<Option<EditDoc>, CoreError> {
     if !path.exists() {
         return Ok(None);
     }
-    let text = std::fs::read_to_string(&path)?;
+    let text = read_to_string_capped(&path, MAX_MRT_BYTES)?;
     let value: serde_json::Value =
         serde_json::from_str(&text).map_err(|e| CoreError::Io(format!("sidecar parse: {e}")))?;
-    let doc = EditDoc::from_json(value).map_err(CoreError::Io)?;
+    let mut doc = EditDoc::from_json(value).map_err(CoreError::Io)?;
+    // Bind to the opened image — ignore any attacker-controlled source_ref.path.
+    doc.source_ref.path = source.to_string_lossy().into_owned();
     Ok(Some(doc))
 }
 
@@ -40,7 +59,7 @@ pub fn load_from_xmp(source: &Path) -> Result<Option<EditDoc>, CoreError> {
     if !path.exists() {
         return Ok(None);
     }
-    let text = std::fs::read_to_string(&path)?;
+    let text = read_to_string_capped(&path, MAX_XMP_BYTES)?;
     if !text.contains("crs:") {
         return Ok(None);
     }
@@ -101,13 +120,31 @@ mod tests {
 
         let mut doc = EditDoc::new(src.to_str().unwrap());
         doc.set("exposure", "stops", ParamValue::F32(0.75));
-        let written = write_sidecar(&doc).unwrap();
+        let written = write_sidecar(&src, &doc).unwrap();
         assert_eq!(written, dir.join("IMG_0001.mrt.json"));
 
         let loaded = load_sidecar(&src).unwrap().expect("sidecar exists");
         assert_eq!(loaded.get("exposure", "stops"), Some(&ParamValue::F32(0.75)));
         assert_eq!(loaded.doc_id, doc.doc_id);
 
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn load_rebinds_source_ref_path() {
+        let dir = std::env::temp_dir().join("meratech-sidecar-rebind");
+        std::fs::create_dir_all(&dir).unwrap();
+        let src = dir.join("real.ARW");
+        std::fs::write(&src, b"fake").unwrap();
+        let evil = serde_json::json!({
+            "schema_version": 1,
+            "doc_id": "x",
+            "source_ref": { "path": "/tmp/evil-redirect.ARW" },
+            "modules": { "exposure": { "stops": 1.0 } }
+        });
+        std::fs::write(dir.join("real.mrt.json"), evil.to_string()).unwrap();
+        let loaded = load_sidecar(&src).unwrap().expect("sidecar");
+        assert_eq!(loaded.source_ref.path, src.to_string_lossy());
         std::fs::remove_dir_all(&dir).ok();
     }
 
@@ -119,7 +156,6 @@ mod tests {
 
     #[test]
     fn old_schema_doc_with_missing_fields_upgrades() {
-        // minimal v1 doc lacking meta/masks → defaults fill
         let v = serde_json::json!({
             "schema_version": 1,
             "doc_id": "old",
@@ -175,7 +211,7 @@ mod tests {
         .unwrap();
         let mut doc = EditDoc::new(src.to_str().unwrap());
         doc.set("exposure", "stops", ParamValue::F32(0.5));
-        write_sidecar(&doc).unwrap();
+        write_sidecar(&src, &doc).unwrap();
 
         let loaded = load_edits(&src).unwrap().expect("edits");
         assert_eq!(loaded.get("exposure", "stops"), Some(&ParamValue::F32(0.5)));

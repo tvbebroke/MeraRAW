@@ -6,6 +6,7 @@ mod error;
 mod events;
 mod license;
 mod menu;
+mod open_url;
 mod paths;
 mod protocol;
 
@@ -123,6 +124,8 @@ fn ensure_main_window_visible(win: &tauri::WebviewWindow) {
 
 /// Load KEY=VALUE lines from a `.env` next to the project (dev cwd) or via
 /// MERATECH_ENV_FILE. Real process env always wins; secrets never logged.
+/// Debug builds only — packaged releases must not pick up a cwd `.env`.
+#[cfg(debug_assertions)]
 fn load_dotenv() {
     let candidates = [
         std::env::var("MERATECH_ENV_FILE").ok(),
@@ -149,6 +152,9 @@ fn load_dotenv() {
         break;
     }
 }
+
+#[cfg(not(debug_assertions))]
+fn load_dotenv() {}
 
 fn main() {
     // WebKitGTK's DMABUF / accelerated-compositing renderer aborts on many
@@ -276,6 +282,7 @@ fn main() {
             commands::denoise_ai_cancel,
             commands::get_stats,
             commands::wb_from_point,
+            commands::auto_level,
             commands::set_mask_overlay,
             commands::set_preview_bypass,
             commands::set_display_look,

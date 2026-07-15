@@ -144,6 +144,7 @@ impl Catalog {
         let conn = Connection::open(dir.join("catalog.db")).map_err(db_err)?;
         conn.pragma_update(None, "journal_mode", "WAL").map_err(db_err)?;
         conn.pragma_update(None, "synchronous", "NORMAL").map_err(db_err)?;
+        conn.pragma_update(None, "foreign_keys", "ON").map_err(db_err)?;
         let cat = Self { conn, dir };
         cat.init_schema()?;
         Ok(cat)
@@ -639,7 +640,29 @@ impl Catalog {
     }
 
     pub fn add_to_album(&mut self, album_id: i64, asset_ids: &[i64]) -> Result<(), CoreError> {
+        let album_ok: bool = self
+            .conn
+            .query_row(
+                "SELECT EXISTS(SELECT 1 FROM albums WHERE id = ?1)",
+                [album_id],
+                |r| r.get(0),
+            )
+            .map_err(db_err)?;
+        if !album_ok {
+            return Err(CoreError::InvalidOp("album not found".into()));
+        }
         for id in asset_ids {
+            let asset_ok: bool = self
+                .conn
+                .query_row(
+                    "SELECT EXISTS(SELECT 1 FROM assets WHERE id = ?1)",
+                    [id],
+                    |r| r.get(0),
+                )
+                .map_err(db_err)?;
+            if !asset_ok {
+                return Err(CoreError::InvalidOp(format!("asset not found: {id}")));
+            }
             self.conn
                 .execute(
                     "INSERT OR IGNORE INTO album_assets(album_id, asset_id) VALUES(?1, ?2)",
@@ -1026,7 +1049,7 @@ mod tests {
         doc.set("exposure", "stops", ParamValue::F32(0.5));
         doc.meta.rating = 5;
         doc.meta.keywords = vec!["grad".into()];
-        sidecar::write_sidecar(&doc).unwrap();
+        sidecar::write_sidecar(&img, &doc).unwrap();
 
         let catdir = dir.join("catalog");
         {

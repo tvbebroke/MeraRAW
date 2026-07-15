@@ -25,28 +25,34 @@ pub enum AppError {
 
 impl From<std::io::Error> for AppError {
     fn from(e: std::io::Error) -> Self {
+        // Log detail natively; don't ship absolute paths to the renderer.
+        tracing::warn!(error = %e, "io error");
         match e.kind() {
-            std::io::ErrorKind::NotFound => AppError::NotFound(e.to_string()),
-            _ => AppError::Io(e.to_string()),
+            std::io::ErrorKind::NotFound => AppError::NotFound("not found".into()),
+            std::io::ErrorKind::PermissionDenied => AppError::Io("permission denied".into()),
+            _ => AppError::Io("io error".into()),
         }
     }
 }
 
 impl From<EngineError> for AppError {
     fn from(e: EngineError) -> Self {
-        AppError::Engine(e.to_string())
+        tracing::warn!(error = %e, "engine error");
+        AppError::Engine("engine error".into())
     }
 }
 
 impl From<meratech_core::error::CoreError> for AppError {
     fn from(e: meratech_core::error::CoreError) -> Self {
         use meratech_core::error::CoreError as CE;
+        tracing::warn!(error = %e, "core error");
         match e {
-            CE::Io(m) => AppError::Io(m),
-            CE::Decode(m) => AppError::Decode(m),
-            CE::Gpu(m) => AppError::Gpu(m),
+            CE::Io(_) => AppError::Io("io error".into()),
+            CE::Decode(_) => AppError::Decode("decode failed".into()),
+            CE::Gpu(_) => AppError::Gpu("gpu error".into()),
             CE::NoImage => AppError::NotFound("no image open".into()),
-            CE::Engine(m) => AppError::Engine(m),
+            CE::Engine(_) => AppError::Engine("engine error".into()),
+            // InvalidOp messages are intentional user-facing validation text.
             CE::InvalidOp(m) => AppError::InvalidOp(m),
         }
     }

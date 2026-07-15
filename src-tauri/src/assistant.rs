@@ -451,7 +451,8 @@ pub async fn run(
             }
             if !status.is_success() {
                 let text = resp.text().await.unwrap_or_default();
-                return Err(AppError::Internal(format!("api {status}: {text}")));
+                tracing::warn!(%status, body = %text, "assistant api error");
+                return Err(AppError::Internal(format!("api error ({status})")));
             }
             parsed = Some(
                 resp.json()

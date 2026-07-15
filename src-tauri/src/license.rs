@@ -59,9 +59,19 @@ fn verify_token(token: &str) -> Result<LicenseClaims, AppError> {
     Ok(data.claims)
 }
 
+#[cfg(debug_assertions)]
+fn license_skip_enabled() -> bool {
+    std::env::var("MERARAW_SKIP_LICENSE").ok().as_deref() == Some("1")
+}
+
+#[cfg(not(debug_assertions))]
+fn license_skip_enabled() -> bool {
+    false
+}
+
 #[tauri::command]
 pub fn license_check_local(app: AppHandle) -> LicenseCheckResult {
-    if std::env::var("MERARAW_SKIP_LICENSE").ok().as_deref() == Some("1") {
+    if license_skip_enabled() {
         return LicenseCheckResult {
             licensed: true,
             user_id: Some("beta-skip".into()),
@@ -72,10 +82,11 @@ pub fn license_check_local(app: AppHandle) -> LicenseCheckResult {
     let path = match token_path(&app) {
         Ok(p) => p,
         Err(e) => {
+            tracing::warn!(error = %e, "license token path");
             return LicenseCheckResult {
                 licensed: false,
                 user_id: None,
-                reason: Some(e.to_string()),
+                reason: Some("license unavailable".into()),
             };
         }
     };
@@ -97,11 +108,14 @@ pub fn license_check_local(app: AppHandle) -> LicenseCheckResult {
             user_id: Some(claims.sub),
             reason: None,
         },
-        Err(e) => LicenseCheckResult {
-            licensed: false,
-            user_id: None,
-            reason: Some(e.to_string()),
-        },
+        Err(e) => {
+            tracing::warn!(error = %e, "license verify failed");
+            LicenseCheckResult {
+                licensed: false,
+                user_id: None,
+                reason: Some("invalid license".into()),
+            }
+        }
     }
 }
 
@@ -149,11 +163,29 @@ async fn http_text(resp: reqwest::Response) -> Result<String, AppError> {
     let body = resp
         .text()
         .await
-        .map_err(|e| AppError::Internal(format!("read response: {e}")))?;
+        .map_err(|e| {
+            tracing::warn!(error = %e, "license http read failed");
+            AppError::Internal("Could not read server response.".into())
+        })?;
     if status.is_success() {
         Ok(body)
     } else {
-        Err(AppError::Internal(format!("HTTP {status}: {body}")))
+        // Keep a short body snippet for known config probes; log the rest.
+        tracing::warn!(%status, body = %body, "license http error");
+        let hint = if body.contains("No active license") {
+            "No beta license yet. Sign up and log in on meratech.co first, then try again."
+        } else if body.contains("STRIPE_PRICE_ID") {
+            "Stripe price not configured on server."
+        } else if body.contains("LICENSE_SIGNING_PRIVATE_KEY") {
+            "Server missing LICENSE_SIGNING_PRIVATE_KEY in Supabase secrets."
+        } else if status.as_u16() == 404 {
+            "Server endpoint not found. Deploy the required Supabase Edge Function."
+        } else if status.as_u16() == 401 || status.as_u16() == 403 {
+            "Authentication failed."
+        } else {
+            "Server request failed."
+        };
+        Err(AppError::Internal(hint.into()))
     }
 }
 
@@ -230,24 +262,7 @@ pub async fn license_sign_in_and_activate(
             ))
         })?;
 
-    let verify_body = http_text(verify_resp).await.map_err(|e| {
-        if e.to_string().contains("No active license") {
-            AppError::Internal(
-                "No beta license yet. Sign up and log in on meratech.co first, then try again."
-                    .into(),
-            )
-        } else if e.to_string().contains("LICENSE_SIGNING_PRIVATE_KEY") {
-            AppError::Internal(
-                "Server missing LICENSE_SIGNING_PRIVATE_KEY in Supabase secrets.".into(),
-            )
-        } else if e.to_string().contains("404") || e.to_string().contains("Not Found") {
-            AppError::Internal(
-                "verify-license function not deployed. Add it in Supabase Edge Functions.".into(),
-            )
-        } else {
-            e
-        }
-    })?;
+    let verify_body = http_text(verify_resp).await?;
 
     let verify: serde_json::Value = serde_json::from_str(&verify_body)
         .map_err(|e| AppError::Internal(format!("Activation response: {e}")))?;
@@ -261,7 +276,7 @@ pub async fn license_sign_in_and_activate(
 
 #[tauri::command]
 pub fn license_supporter_status(app: AppHandle) -> SupporterStatusResult {
-    if std::env::var("MERARAW_SKIP_LICENSE").ok().as_deref() == Some("1") {
+    if license_skip_enabled() {
         return SupporterStatusResult {
             licensed: true,
             is_early_supporter: false,
@@ -273,11 +288,12 @@ pub fn license_supporter_status(app: AppHandle) -> SupporterStatusResult {
     let path = match token_path(&app) {
         Ok(p) => p,
         Err(e) => {
+            tracing::warn!(error = %e, "license token path");
             return SupporterStatusResult {
                 licensed: false,
                 is_early_supporter: false,
                 user_id: None,
-                reason: Some(e.to_string()),
+                reason: Some("license unavailable".into()),
             };
         }
     };
@@ -301,12 +317,15 @@ pub fn license_supporter_status(app: AppHandle) -> SupporterStatusResult {
             user_id: Some(claims.sub),
             reason: None,
         },
-        Err(e) => SupporterStatusResult {
-            licensed: false,
-            is_early_supporter: false,
-            user_id: None,
-            reason: Some(e.to_string()),
-        },
+        Err(e) => {
+            tracing::warn!(error = %e, "license verify failed");
+            SupporterStatusResult {
+                licensed: false,
+                is_early_supporter: false,
+                user_id: None,
+                reason: Some("invalid license".into()),
+            }
+        }
     }
 }
 
@@ -348,13 +367,7 @@ pub async fn license_start_checkout(email: String, password: String) -> Result<S
         .await
         .map_err(|e| AppError::Internal(format!("Checkout request failed ({e}).")))?;
 
-    let checkout_body = http_text(checkout_resp).await.map_err(|e| {
-        if e.to_string().contains("STRIPE_PRICE_ID") {
-            AppError::Internal("Stripe price not configured on server.".into())
-        } else {
-            e
-        }
-    })?;
+    let checkout_body = http_text(checkout_resp).await?;
 
     let checkout: serde_json::Value = serde_json::from_str(&checkout_body)
         .map_err(|e| AppError::Internal(format!("Checkout response: {e}")))?;
@@ -366,35 +379,5 @@ pub async fn license_start_checkout(email: String, password: String) -> Result<S
 
 #[tauri::command]
 pub fn open_external_url(url: String) -> Result<(), AppError> {
-    let url = url.trim();
-    // https only — never open arbitrary http: (or other schemes) from the webview.
-    if url.is_empty() || !url.starts_with("https://") {
-        return Err(AppError::Internal("Invalid URL (https only).".into()));
-    }
-    // Block credentials-in-URL and obvious local/network pivots.
-    if url.contains('@') || url.to_lowercase().contains("https://localhost") {
-        return Err(AppError::Internal("Invalid URL.".into()));
-    }
-    #[cfg(target_os = "macos")]
-    {
-        std::process::Command::new("open")
-            .arg(url)
-            .spawn()
-            .map_err(|e| AppError::Internal(format!("open URL: {e}")))?;
-    }
-    #[cfg(target_os = "windows")]
-    {
-        std::process::Command::new("cmd")
-            .args(["/C", "start", "", url])
-            .spawn()
-            .map_err(|e| AppError::Internal(format!("open URL: {e}")))?;
-    }
-    #[cfg(target_os = "linux")]
-    {
-        std::process::Command::new("xdg-open")
-            .arg(url)
-            .spawn()
-            .map_err(|e| AppError::Internal(format!("open URL: {e}")))?;
-    }
-    Ok(())
+    crate::open_url::open_https_url(&url)
 }

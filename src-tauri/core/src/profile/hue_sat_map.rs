@@ -27,14 +27,27 @@ pub struct HueSatMap {
 
 impl HueSatMap {
     pub fn is_valid(&self) -> bool {
+        let Some(n) = self
+            .hue_div
+            .checked_mul(self.sat_div)
+            .and_then(|v| v.checked_mul(self.val_div))
+        else {
+            return false;
+        };
         self.hue_div >= 1
             && self.sat_div >= 2
             && self.val_div >= 1
-            && self.deltas.len() == (self.hue_div * self.sat_div * self.val_div) as usize
+            && self.hue_div <= 360
+            && self.sat_div <= 256
+            && self.val_div <= 256
+            && self.deltas.len() == n as usize
     }
 
     fn idx(&self, h: u32, s: u32, v: u32) -> usize {
-        (v * self.hue_div * self.sat_div + h * self.sat_div + s) as usize
+        // Dims are capped in is_valid / DCP parse; compute in usize.
+        (v as usize) * (self.hue_div as usize) * (self.sat_div as usize)
+            + (h as usize) * (self.sat_div as usize)
+            + (s as usize)
     }
 
     fn delta_at(&self, h: u32, s: u32, v: u32) -> [f32; 3] {

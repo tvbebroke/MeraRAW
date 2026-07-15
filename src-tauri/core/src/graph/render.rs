@@ -3,9 +3,9 @@
 use super::config::{mask_node_configs, node_configs, NodeConfig};
 use super::mask_stage_index;
 use super::resources::{
-    make_chain_tex, make_mask_tex, make_tex, BlendUniforms, DcpLookUniforms, DcpMeta,
-    ExtractUniforms, MaskGeomUniforms, MaskSampleUniforms, PassResources, PresentUniforms,
-    PipeKind, MAX_STROKE_POINTS, NODE_PIPES,
+    make_chain_tex, make_mask_tex, make_tex, BlendUniforms, CropUniform, DcpLookUniforms,
+    DcpMeta, ExtractUniforms, MaskGeomUniforms, MaskSampleUniforms, PassResources,
+    PresentUniforms, PipeKind, MAX_STROKE_POINTS, NODE_PIPES,
 };
 use super::{FinalTag, RenderGraph, NODES};
 use crate::doc::EditDoc;
@@ -241,9 +241,10 @@ impl RenderGraph {
         // None. Gating on `dirty_from == 0` was wrong: editing module 0
         // (exposure) sets dirty_from = 0 and needlessly re-ran the ~1.3s CPU
         // dcp_look every slider tick.
+        let crop_mode = crop.mode(view.crop_preview);
+        let crop_u = CropUniform::new(&crop, crop_mode);
         let run_extract = view_changed || crop_changed;
         if run_extract {
-            let crop_enabled = crop.apply_enabled(view.crop_preview);
             let u = ExtractUniforms {
                 out_w,
                 out_h,
@@ -252,15 +253,7 @@ impl RenderGraph {
                 scale,
                 center_x: view.center_x,
                 center_y: view.center_y,
-                crop_left: crop.left,
-                crop_top: crop.top,
-                crop_right: crop.right,
-                crop_bottom: crop.bottom,
-                crop_angle: crop.angle.to_radians(),
-                crop_rotate_90: crop.rotate_90,
-                crop_flip_h: u32::from(crop.flip_h),
-                crop_flip_v: u32::from(crop.flip_v),
-                crop_enabled: u32::from(crop_enabled),
+                crop: crop_u,
             };
             gpu.queue
                 .write_buffer(&self.extract_uniforms, 0, bytemuck::bytes_of(&u));
@@ -452,9 +445,11 @@ impl RenderGraph {
                             opacity,
                             invert: mask.invert as u32,
                             stroke_count: strokes.len() as u32,
+                            crop: crop_u,
                             _p0: 0,
                             _p1: 0,
                             _p2: 0,
+                            _p3: 0,
                         };
                         gpu.queue.write_buffer(ub, 0, bytemuck::bytes_of(&u));
                         if !strokes.is_empty() {
@@ -509,6 +504,7 @@ impl RenderGraph {
                                 feather,
                                 opacity,
                                 invert,
+                                crop: crop_u,
                                 _p0: 0,
                                 _p1: 0,
                             };
@@ -1058,6 +1054,113 @@ impl RenderGraph {
 mod tests {
     use super::*;
     use crate::profile::DcpProfile;
+
+    /// The crop path must be a pure re-window of the uncropped render:
+    /// a rect-only crop equals the matching sub-region pixel-for-pixel, and
+    /// rotate-90 transposes (with the correct output dims). Guards the
+    /// content-space mapping in crop_common.wgsl.
+    #[test]
+    fn extract_crop_rect_matches_subregion() {
+        use crate::doc::{EditDoc, ParamValue};
+        use crate::gpu::texture_io::upload_rgba16f;
+
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        let gpu = match rt.block_on(GpuContext::init()) {
+            Ok(g) => g,
+            Err(e) => {
+                eprintln!("skip: no GPU: {e}");
+                return;
+            }
+        };
+        let (w, h) = (64u32, 48u32);
+        // distinct value per texel so any mapping slip shows up
+        let mut rgba = Vec::with_capacity((w * h * 4) as usize);
+        for y in 0..h {
+            for x in 0..w {
+                rgba.extend_from_slice(&[
+                    x as f32 / w as f32,
+                    y as f32 / h as f32,
+                    (x + y) as f32 / (w + h) as f32,
+                    1.0,
+                ]);
+            }
+        }
+        let tex = make_chain_tex(&gpu, w, h, "crop-test-src");
+        upload_rgba16f(&gpu, &tex, w, h, &rgba);
+        let tex_view = tex.create_view(&Default::default());
+        let seg = HashMap::new();
+
+        let mut render_with = |doc: &EditDoc, out_w: u32, out_h: u32| -> Vec<u8> {
+            let mut graph = RenderGraph::new(&gpu);
+            let view = ViewParams {
+                out_w,
+                out_h,
+                scale: Some(1.0),
+                center_x: 0.5,
+                center_y: 0.5,
+                crop_preview: false,
+            };
+            graph
+                .render(&gpu, &tex_view, w, h, &view, doc, 5200.0, &seg, None, None, None)
+                .unwrap()
+        };
+
+        let base_doc = EditDoc::new("/crop-test.ARW");
+        let base = render_with(&base_doc, w, h);
+
+        // rect-only crop, texel-aligned: left/top/right/bottom quarters
+        let mut doc = EditDoc::new("/crop-test.ARW");
+        doc.set("crop", "left", ParamValue::F32(0.25));
+        doc.set("crop", "top", ParamValue::F32(0.25));
+        doc.set("crop", "right", ParamValue::F32(0.75));
+        doc.set("crop", "bottom", ParamValue::F32(0.75));
+        let cropped = render_with(&doc, w / 2, h / 2);
+        let (x0, y0) = (w / 4, h / 4);
+        for y in 0..h / 2 {
+            for x in 0..w / 2 {
+                let c = ((y * (w / 2) + x) * 4) as usize;
+                let b = (((y + y0) * w + (x + x0)) * 4) as usize;
+                for ch in 0..3 {
+                    let d = (cropped[c + ch] as i32 - base[b + ch] as i32).abs();
+                    assert!(
+                        d <= 1,
+                        "crop({x},{y}) ch{ch}: {} vs base {} (Δ{d})",
+                        cropped[c + ch],
+                        base[b + ch]
+                    );
+                }
+            }
+        }
+
+        // rotate-90 CW: output dims swap; out(x,y) = src(y, h-1-x)... verify
+        // via the inverse map used by the shader: uv' = (v, 1-u).
+        let mut doc = EditDoc::new("/crop-test.ARW");
+        doc.set("crop", "rotate_90", ParamValue::F32(1.0));
+        let rot = render_with(&doc, h, w); // content dims swap
+        for y in (0..w).step_by(7) {
+            for x in (0..h).step_by(7) {
+                // out px (x,y) in 48×64 → uv (u,v) → src uv (v, 1-u)
+                let sx = ((y as f32 + 0.5) / w as f32 * w as f32 - 0.5).round() as i64;
+                let sy = ((1.0 - (x as f32 + 0.5) / h as f32) * h as f32 - 0.5).round() as i64;
+                let sx = sx.clamp(0, (w - 1) as i64) as u32;
+                let sy = sy.clamp(0, (h - 1) as i64) as u32;
+                let r = ((y * h + x) * 4) as usize;
+                let b = ((sy * w + sx) * 4) as usize;
+                for ch in 0..3 {
+                    let d = (rot[r + ch] as i32 - base[b + ch] as i32).abs();
+                    assert!(
+                        d <= 1,
+                        "rot90({x},{y}) ch{ch}: {} vs src({sx},{sy}) {} (Δ{d})",
+                        rot[r + ch],
+                        base[b + ch]
+                    );
+                }
+            }
+        }
+    }
 
     /// The GPU look pass must reproduce the CPU `apply_look` to within f16 +
     /// LUT-interp tolerance, across a spread of colors including HDR (>1).

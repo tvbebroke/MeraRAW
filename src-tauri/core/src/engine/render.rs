@@ -227,10 +227,13 @@ impl Engine {
         }
         let (w, h) = (*w, *h);
         let max_dim = max_dim.clamp(256, 1600);
-        let scale = (max_dim as f32 / w.max(h) as f32).min(1.0);
+        // previews reflect a committed crop: size against the content dims
+        let crop = crate::crop::CropParams::from_doc(cur.doc());
+        let (cw, ch) = crop.content_dims(w, h, crop.mode(false));
+        let scale = (max_dim as f32 / cw.max(ch)).min(1.0);
         let view = ViewParams {
-            out_w: ((w as f32 * scale) as u32).max(1),
-            out_h: ((h as f32 * scale) as u32).max(1),
+            out_w: ((cw * scale) as u32).max(1),
+            out_h: ((ch * scale) as u32).max(1),
             scale: Some(scale),
             center_x: 0.5,
             center_y: 0.5,
@@ -301,6 +304,88 @@ impl Engine {
             display,
         })
     }
+    /// Crop-tool auto-level (plan P6): Sobel gradients on a downscaled luma,
+    /// magnitude-weighted histogram of edge orientation folded mod 90° into
+    /// [-45°, 45°), smoothed; the peak is the dominant line deviation.
+    /// Returns 0.0 when no direction clearly dominates.
+    pub(super) fn auto_level(&self) -> Result<f32, CoreError> {
+        let cur = self.current.as_ref().ok_or(CoreError::NoImage)?;
+        let small = cur.small_cpu.as_ref().ok_or(CoreError::NoImage)?;
+        let img = small.downscale_to(768);
+        let (w, h) = (img.width, img.height);
+        if w < 16 || h < 16 {
+            return Ok(0.0);
+        }
+        let luma: Vec<f32> = img
+            .data
+            .chunks_exact(3)
+            .map(|p| {
+                let l = 0.2627 * p[0].max(0.0) + 0.678 * p[1].max(0.0) + 0.0593 * p[2].max(0.0);
+                // log-ish tone compression so bright skies don't drown edges
+                (1.0 + l * 64.0).ln()
+            })
+            .collect();
+
+        const BINS: usize = 360; // 0.25° over [-45, 45)
+        let mut hist = vec![0f64; BINS];
+        let mut total_mag = 0f64;
+        let mut count = 0usize;
+        for y in 1..h - 1 {
+            for x in 1..w - 1 {
+                let px = |dx: i32, dy: i32| {
+                    luma[(y as i32 + dy) as usize * w + (x as i32 + dx) as usize]
+                };
+                let gx = (px(1, -1) + 2.0 * px(1, 0) + px(1, 1))
+                    - (px(-1, -1) + 2.0 * px(-1, 0) + px(-1, 1));
+                let gy = (px(-1, 1) + 2.0 * px(0, 1) + px(1, 1))
+                    - (px(-1, -1) + 2.0 * px(0, -1) + px(1, -1));
+                let mag = (gx * gx + gy * gy).sqrt();
+                if mag < 1e-4 {
+                    continue;
+                }
+                // edge direction = gradient rotated 90°; fold into [-45, 45)
+                let edge_deg = gy.atan2(gx).to_degrees() + 90.0;
+                let mut d = edge_deg.rem_euclid(90.0);
+                if d >= 45.0 {
+                    d -= 90.0;
+                }
+                let bin = (((d + 45.0) / 90.0 * BINS as f32) as usize).min(BINS - 1);
+                hist[bin] += mag as f64;
+                total_mag += mag as f64;
+                count += 1;
+            }
+        }
+        if count == 0 || total_mag <= 0.0 {
+            return Ok(0.0);
+        }
+        // smooth (±2 bins ≈ ±0.5°)
+        let smoothed: Vec<f64> = (0..BINS)
+            .map(|i| {
+                (-2i32..=2)
+                    .map(|o| hist[(i as i32 + o).rem_euclid(BINS as i32) as usize])
+                    .sum::<f64>()
+                    / 5.0
+            })
+            .collect();
+        let (peak_bin, peak_val) = smoothed
+            .iter()
+            .enumerate()
+            .max_by(|a, b| a.1.total_cmp(b.1))
+            .unwrap();
+        // confidence: the peak must beat the average bin mass by a clear margin
+        let avg = total_mag / BINS as f64;
+        if *peak_val < avg * 2.5 {
+            return Ok(0.0);
+        }
+        let d = (peak_bin as f32 + 0.5) / BINS as f32 * 90.0 - 45.0;
+        // tiny deviations aren't worth a resample; huge ones are usually a
+        // diagonal composition, not a crooked horizon
+        if d.abs() < 0.05 || d.abs() > 20.0 {
+            return Ok(0.0);
+        }
+        Ok(d)
+    }
+
     pub(super) fn render_now(&mut self) {
         let Some(view) = self.last_view else { return };
         match self.render_view(view) {

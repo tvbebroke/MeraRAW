@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { applyCropParams } from "../crop/cropActions";
-import type { CropOverlayKind } from "../crop/cropConstants";
+import { applyCropParams, resetCropModule } from "../crop/cropActions";
+import { copyCropToClipboard, readCropClipboard } from "../crop/cropClipboard";
 import {
-  angleFromDrag,
+  constrainRectToImage,
+  contentDims,
   dragHandle,
   imageNormToScreen,
   panCrop,
@@ -12,6 +13,7 @@ import {
   type CropParams,
   type HandleId,
 } from "../crop/cropMath";
+import { renderGuide } from "../crop/guides";
 import { useDocStore } from "../state/docStore";
 import { useUiStore } from "../state/uiStore";
 
@@ -32,95 +34,22 @@ const HANDLES: { id: HandleId; x: number; y: number; cursor: string }[] = [
   { id: "w", x: 0, y: 0.5, cursor: "ew-resize" },
 ];
 
-function GuideLines({
-  kind,
-  variant,
-  x,
-  y,
-  w,
-  h,
-}: {
-  kind: CropOverlayKind;
-  variant: number;
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-}) {
-  if (kind === "none") return null;
-  const lines: JSX.Element[] = [];
-  const push = (x1: number, y1: number, x2: number, y2: number, key: string) =>
-    lines.push(
-      <line key={key} x1={x1} y1={y1} x2={x2} y2={y2} className="crop-guide-line" />,
-    );
-
-  if (kind === "grid" || kind === "thirds") {
-    const n = kind === "grid" ? 6 : 3;
-    for (let i = 1; i < n; i++) {
-      const t = i / n;
-      push(x + w * t, y, x + w * t, y + h, `v${i}`);
-      push(x, y + h * t, x + w, y + h * t, `h${i}`);
+type DragState =
+  | {
+      mode: "handle";
+      handle: HandleId;
+      start: CropParams;
+      startNorm: [number, number];
+      mods: { alt: boolean; shift: boolean };
     }
-  } else if (kind === "diagonal") {
-    push(x, y, x + w, y + h, "d1");
-    push(x + w, y, x, y + h, "d2");
-  } else if (kind === "triangle") {
-    const flip = variant % 2 === 1;
-    if (flip) {
-      push(x, y, x + w, y + h, "t1");
-      push(x + w, y, x, y + h, "t2");
-    } else {
-      push(x, y + h, x + w, y, "t1");
-      push(x, y, x + w, y + h, "t2");
+  | { mode: "pan"; start: CropParams; startNorm: [number, number] }
+  | {
+      mode: "rotate";
+      start: CropParams;
+      origin: [number, number];
+      startNorm: [number, number];
     }
-  } else if (kind === "golden") {
-    const phi = 0.618;
-    push(x + w * phi, y, x + w * phi, y + h, "gv");
-    push(x + w * (1 - phi), y, x + w * (1 - phi), y + h, "gv2");
-    push(x, y + h * phi, x + w, y + h * phi, "gh");
-    push(x, y + h * (1 - phi), x + w, y + h * (1 - phi), "gh2");
-  } else if (kind === "spiral") {
-    const ox = variant % 4;
-    const cx = ox === 0 || ox === 3 ? x : x + w;
-    const cy = ox <= 1 ? y : y + h;
-    lines.push(
-      <path
-        key="spiral"
-        className="crop-guide-spiral"
-        d={`M ${cx} ${cy} Q ${x + w * 0.5} ${y} ${x + w} ${y + h * 0.5} T ${x + w * 0.2} ${y + h}`}
-        fill="none"
-      />,
-    );
-  } else if (kind === "aspects") {
-    const ratios = [
-      [1, 1],
-      [4, 5],
-      [16, 9],
-    ];
-    ratios.forEach(([rw, rh], i) => {
-      const r = rw / rh;
-      let bw = w * 0.85;
-      let bh = bw / r;
-      if (bh > h * 0.85) {
-        bh = h * 0.85;
-        bw = bh * r;
-      }
-      const bx = x + (w - bw) / 2;
-      const by = y + (h - bh) / 2;
-      lines.push(
-        <rect
-          key={`ar${i}`}
-          x={bx}
-          y={by}
-          width={bw}
-          height={bh}
-          className="crop-guide-aspect"
-        />,
-      );
-    });
-  }
-  return <g>{lines}</g>;
-}
+  | { mode: "straighten"; start: CropParams; a: [number, number] };
 
 export function CropOverlay({
   wrapRef,
@@ -137,30 +66,36 @@ export function CropOverlay({
   const overlayKind = useUiStore((s) => s.cropOverlay);
   const overlayVisible = useUiStore((s) => s.cropOverlayVisible);
   const overlayVariant = useUiStore((s) => s.cropOverlayVariant);
+  const guideMode = useUiStore((s) => s.cropGuideMode);
+  const guideColor = useUiStore((s) => s.cropGuideColor);
+  const guideOpacity = useUiStore((s) => s.cropGuideOpacity);
+  const gridSize = useUiStore((s) => s.cropGridSize);
+  const aspectPreviewRatios = useUiStore((s) => s.cropAspectPreviewRatios);
+  const maskOpacity = useUiStore((s) => s.cropMaskOpacity);
+  const maskColor = useUiStore((s) => s.cropMaskColor);
   const lightsOut = useUiStore((s) => s.cropLightsOut);
   const imageDims = useUiStore((s) => s.imageDims);
+  const ppi = useUiStore((s) => s.cropPpi);
   const doc = useDocStore((s) => s.doc);
   const reconcile = useDocStore((s) => s.reconcile);
 
   const [draft, setDraft] = useState<CropParams | null>(null);
-  const drag = useRef<
-    | {
-        mode: "handle";
-        handle: HandleId;
-        start: CropParams;
-        startNorm: [number, number];
-        mods: { alt: boolean; shift: boolean };
-      }
-    | { mode: "pan"; start: CropParams; startNorm: [number, number] }
-    | { mode: "rotate"; start: CropParams; origin: [number, number]; startNorm: [number, number] }
-    | { mode: "straighten"; start: CropParams; a: [number, number] }
-    | null
-  >(null);
+  const [dragging, setDragging] = useState<DragState["mode"] | null>(null);
+  const [ruler, setRuler] = useState<[[number, number], [number, number]] | null>(null);
+  const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
+  const drag = useRef<DragState | null>(null);
+  const draftRef = useRef<CropParams | null>(null);
 
   const crop = draft ?? readCropFromDoc(doc?.modules);
 
   useEffect(() => {
-    if (!cropActive) setDraft(null);
+    if (!cropActive) {
+      setDraft(null);
+      draftRef.current = null;
+      setDragging(null);
+      setRuler(null);
+      setMenu(null);
+    }
   }, [cropActive]);
 
   const measure = useCallback(() => {
@@ -170,116 +105,157 @@ export function CropOverlay({
     const scale = effScaleRef.current ?? 1;
     if (!wrap || !dims || !view) return null;
     const dpr = window.devicePixelRatio || 1;
+    // While the crop tool is open the viewport shows the ROTATED full image
+    // (extract mode 2) — all mapping runs against those content dims.
+    const c = readCropFromDoc(useDocStore.getState().doc?.modules);
+    const [cw, ch] = contentDims(c, dims.w, dims.h, 2);
     return {
       outW: wrap.clientWidth * dpr,
       outH: wrap.clientHeight * dpr,
       layoutW: wrap.clientWidth,
       layoutH: wrap.clientHeight,
       dpr,
+      cw,
+      ch,
       imgW: dims.w,
       imgH: dims.h,
       view: { scale, centerX: view.centerX, centerY: view.centerY },
     };
   }, [wrapRef, viewRef, effScaleRef, imageDims]);
 
-  const normDelta = (d: NonNullable<typeof drag.current>, nx: number, ny: number) => {
-    if (d.mode === "straighten") return { dx: 0, dy: 0 };
-    const dx = nx - d.startNorm[0];
-    const dy = ny - d.startNorm[1];
-    return { dx, dy };
-  };
-
   const commit = useCallback(
     (next: CropParams, live = false) => {
+      const prev = draftRef.current ?? readCropFromDoc(useDocStore.getState().doc?.modules);
+      draftRef.current = next;
       setDraft(next);
       void applyCropParams(next, live).then(reconcile);
-      onRefresh();
+      // Rect-only edits while the crop tool is open are UI overlay only —
+      // skip the GPU frame request (RapidRAW lesson: 60 fps drag).
+      const geomChanged =
+        Math.abs(next.angle - prev.angle) > 1e-4 ||
+        next.rotate90 !== prev.rotate90 ||
+        next.flipH !== prev.flipH ||
+        next.flipV !== prev.flipV;
+      if (!live || geomChanged) onRefresh();
     },
     [reconcile, onRefresh],
   );
 
+  const constrain = useCallback(
+    (p: CropParams): CropParams => {
+      if (!p.constrainCrop || !imageDims) return p;
+      return { ...p, rect: constrainRectToImage(p.rect, p, imageDims.w, imageDims.h) };
+    },
+    [imageDims],
+  );
+
+  const pointerNorm = (e: React.PointerEvent, m: NonNullable<ReturnType<typeof measure>>) => {
+    const rect = wrapRef.current!.getBoundingClientRect();
+    const px = (e.clientX - rect.left) * m.dpr;
+    const py = (e.clientY - rect.top) * m.dpr;
+    return screenToImageNorm(px, py, m.view, m.cw, m.ch, m.outW, m.outH);
+  };
+
   const onPointerDown = (e: React.PointerEvent) => {
-    if (!cropActive || !imageDims) return;
+    if (!cropActive || !imageDims || e.button === 2) return;
     e.stopPropagation();
+    setMenu(null);
     (e.target as Element).setPointerCapture(e.pointerId);
     const m = measure();
     if (!m) return;
-    const rect = wrapRef.current?.getBoundingClientRect();
-    if (!rect) return;
-    const px = (e.clientX - rect.left) * m.dpr;
-    const py = (e.clientY - rect.top) * m.dpr;
-    const startNorm = screenToImageNorm(px, py, m.view, m.imgW, m.imgH, m.outW, m.outH);
+    const startNorm = pointerNorm(e, m);
     const t = e.target as HTMLElement;
     const handle = t.dataset.handle as HandleId | undefined;
+    let next: DragState;
     if (handle) {
-      drag.current = {
+      next = {
         mode: "handle",
         handle,
         start: crop,
         startNorm,
         mods: { alt: e.altKey, shift: e.shiftKey },
       };
-      return;
+    } else if (e.metaKey || e.ctrlKey) {
+      next = { mode: "straighten", start: crop, a: startNorm };
+    } else if (t.dataset.cropPan !== undefined) {
+      next = { mode: "pan", start: crop, startNorm };
+    } else {
+      next = {
+        mode: "rotate",
+        start: crop,
+        origin: [
+          (crop.rect.left + crop.rect.right) * 0.5,
+          (crop.rect.top + crop.rect.bottom) * 0.5,
+        ],
+        startNorm,
+      };
     }
-    if (t.dataset.cropPan !== undefined) {
-      drag.current = { mode: "pan", start: crop, startNorm };
-      return;
-    }
-    if (e.metaKey || e.ctrlKey) {
-      drag.current = { mode: "straighten", start: crop, a: startNorm };
-      return;
-    }
-    drag.current = {
-      mode: "rotate",
-      start: crop,
-      origin: [(crop.rect.left + crop.rect.right) * 0.5, (crop.rect.top + crop.rect.bottom) * 0.5],
-      startNorm,
-    };
+    drag.current = next;
+    setDragging(next.mode);
   };
 
   const onPointerMove = (e: React.PointerEvent) => {
     const d = drag.current;
     const m = measure();
     if (!d || !m) return;
-    const rect = wrapRef.current?.getBoundingClientRect();
-    if (!rect) return;
-    const px = (e.clientX - rect.left) * m.dpr;
-    const py = (e.clientY - rect.top) * m.dpr;
-    const [nx, ny] = screenToImageNorm(px, py, m.view, m.imgW, m.imgH, m.outW, m.outH);
-    const { dx, dy } = normDelta(d, nx, ny);
+    const [nx, ny] = pointerNorm(e, m);
 
     if (d.mode === "handle") {
+      const dx = nx - d.startNorm[0];
+      const dy = ny - d.startNorm[1];
       const ratio =
         d.start.aspectW > 0 && d.start.aspectH > 0
           ? d.start.aspectW / d.start.aspectH
-          : ((d.start.rect.right - d.start.rect.left) * m.imgW) /
-            Math.max((d.start.rect.bottom - d.start.rect.top) * m.imgH, 1);
-      const next = dragHandle(d.start.rect, d.handle, dx, dy, {
-        imgW: m.imgW,
-        imgH: m.imgH,
+          : ((d.start.rect.right - d.start.rect.left) * m.cw) /
+            Math.max((d.start.rect.bottom - d.start.rect.top) * m.ch, 1);
+      let rect = dragHandle(d.start.rect, d.handle, dx, dy, {
+        imgW: m.cw,
+        imgH: m.ch,
         aspectLocked: d.start.aspectLocked,
         aspectRatio: ratio,
         fromCenter: d.mods.alt,
         tempAspect: d.mods.shift,
       });
-      commit({ ...d.start, rect: next }, true);
+      let next = { ...d.start, rect };
+      if (Math.abs(d.start.angle) > 0.001) next = constrain(next);
+      commit(next, true);
     } else if (d.mode === "pan") {
-      commit({ ...d.start, rect: panCrop(d.start.rect, dx, dy) }, true);
+      const dx = nx - d.startNorm[0];
+      const dy = ny - d.startNorm[1];
+      commit(constrain({ ...d.start, rect: panCrop(d.start.rect, dx, dy) }), true);
     } else if (d.mode === "rotate") {
-      const delta = angleFromDrag(d.startNorm, [nx, ny], d.origin);
+      const a0 = Math.atan2(d.startNorm[1] - d.origin[1], d.startNorm[0] - d.origin[0]);
+      const a1 = Math.atan2(ny - d.origin[1], nx - d.origin[0]);
+      const delta = ((a1 - a0) * 180) / Math.PI;
       const angle = Math.max(-45, Math.min(45, d.start.angle + delta));
-      commit({ ...d.start, angle }, true);
+      commit(constrain({ ...d.start, angle }), true);
     } else if (d.mode === "straighten") {
       const angle = straightenFromLine(d.a, [nx, ny], d.start.angle);
-      commit({ ...d.start, angle }, true);
+      setRuler([d.a, [nx, ny]]);
+      commit(constrain({ ...d.start, angle }), true);
     }
   };
 
   const onPointerUp = () => {
     if (drag.current) {
       drag.current = null;
+      setDragging(null);
+      setRuler(null);
+      // final non-live commit → one undo step per gesture
+      if (draft) commit(draft, false);
       setDraft(null);
     }
+  };
+
+  const onContextMenu = (e: React.MouseEvent) => {
+    if (!cropActive) return;
+    e.preventDefault();
+    e.stopPropagation();
+    // macOS fires contextmenu on ctrl+click, which is the straighten gesture
+    if (drag.current) return;
+    const rect = wrapRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    setMenu({ x: e.clientX - rect.left, y: e.clientY - rect.top });
   };
 
   if (!cropActive || !imageDims) return null;
@@ -291,8 +267,8 @@ export function CropOverlay({
     crop.rect.left,
     crop.rect.top,
     m.view,
-    m.imgW,
-    m.imgH,
+    m.cw,
+    m.ch,
     m.outW,
     m.outH,
   );
@@ -300,8 +276,8 @@ export function CropOverlay({
     crop.rect.right,
     crop.rect.bottom,
     m.view,
-    m.imgW,
-    m.imgH,
+    m.cw,
+    m.ch,
     m.outW,
     m.outH,
   );
@@ -310,14 +286,54 @@ export function CropOverlay({
   const width = Math.abs(x2 - x1) / m.dpr;
   const height = Math.abs(y2 - y1) / m.dpr;
 
-  const dimClass = lightsOut ? "crop-overlay crop-overlay--lights-out" : "crop-overlay";
+  const rotating = dragging === "rotate" || dragging === "straighten";
+  const guideShown =
+    guideMode !== "never" &&
+    overlayVisible &&
+    (guideMode === "always" || dragging !== null);
+
+  // HUD: px dims + ratio (+ optional print size) while resizing, angle while rotating
+  const pxW = Math.round((crop.rect.right - crop.rect.left) * m.cw);
+  const pxH = Math.round((crop.rect.bottom - crop.rect.top) * m.ch);
+  const mp = (pxW * pxH) / 1_000_000;
+  const g = gcd(pxW, pxH);
+  const ratioLabel =
+    crop.aspectW > 0 && crop.aspectH > 0
+      ? `${trimNum(crop.aspectW)}:${trimNum(crop.aspectH)}`
+      : g > 0 && pxW / g < 50 && pxH / g < 50
+        ? `${pxW / g}:${pxH / g}`
+        : (pxW / Math.max(pxH, 1)).toFixed(2);
+  let hud: string | null = null;
+  if (rotating) {
+    hud = `${crop.angle.toFixed(2)}°`;
+  } else if (dragging) {
+    hud = `${pxW} × ${pxH} px · ${ratioLabel} · ${mp.toFixed(1)} MP`;
+    if (ppi > 0) {
+      hud += `  ·  @${ppi} PPI → ${(pxW / ppi).toFixed(1)} × ${(pxH / ppi).toFixed(1)} in`;
+    }
+  }
+
+  const dim = lightsOut ? 0.94 : maskOpacity;
+  const maskRgb = hexToRgb(maskColor);
+  const rulerPx =
+    ruler &&
+    ([
+      imageNormToScreen(ruler[0][0], ruler[0][1], m.view, m.cw, m.ch, m.outW, m.outH),
+      imageNormToScreen(ruler[1][0], ruler[1][1], m.view, m.cw, m.ch, m.outW, m.outH),
+    ] as const);
+
+  const menuAction = (fn: () => void) => () => {
+    setMenu(null);
+    fn();
+  };
 
   return (
     <div
-      className={dimClass}
+      className={`crop-overlay${lightsOut ? " crop-overlay--lights-out" : ""}`}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
       onPointerLeave={onPointerUp}
+      onContextMenu={onContextMenu}
     >
       <svg className="crop-overlay-svg" width={m.layoutW} height={m.layoutH}>
         <defs>
@@ -330,7 +346,9 @@ export function CropOverlay({
           width="100%"
           height="100%"
           className="crop-dim"
+          style={{ fill: `rgba(${maskRgb}, ${dim})` }}
           mask="url(#crop-dim-mask)"
+          onPointerDown={onPointerDown}
         />
         <rect
           x={left}
@@ -341,14 +359,35 @@ export function CropOverlay({
           data-crop-pan=""
           onPointerDown={onPointerDown}
         />
-        {overlayVisible && (
-          <GuideLines
-            kind={overlayKind}
-            variant={overlayVariant}
-            x={left}
-            y={top}
-            w={width}
-            h={height}
+        {(guideShown || rotating) && (
+          <g
+            className="crop-guides"
+            style={{
+              stroke: guideColor,
+              opacity: rotating ? Math.max(guideOpacity, 0.5) : guideOpacity,
+              fill: "none",
+              pointerEvents: "none",
+              strokeWidth: 1,
+            }}
+          >
+            {renderGuide(rotating ? "grid" : overlayKind, {
+              x: left,
+              y: top,
+              w: width,
+              h: height,
+              variant: overlayVariant,
+              gridSize: rotating ? 10 : gridSize,
+              aspectRatios: aspectPreviewRatios,
+            })}
+          </g>
+        )}
+        {rulerPx && (
+          <line
+            x1={rulerPx[0][0] / m.dpr}
+            y1={rulerPx[0][1] / m.dpr}
+            x2={rulerPx[1][0] / m.dpr}
+            y2={rulerPx[1][1] / m.dpr}
+            style={{ stroke: guideColor, strokeWidth: 1.5, strokeDasharray: "6 4" }}
           />
         )}
         {HANDLES.map((h) => (
@@ -365,6 +404,105 @@ export function CropOverlay({
           />
         ))}
       </svg>
+      {hud && (
+        <div
+          style={{
+            position: "absolute",
+            left: left + width / 2,
+            top: top + height / 2,
+            transform: "translate(-50%, -50%)",
+            background: "rgba(0, 0, 0, 0.65)",
+            color: "#fff",
+            font: "12px/1.6 -apple-system, system-ui, sans-serif",
+            padding: "3px 10px",
+            borderRadius: 4,
+            pointerEvents: "none",
+            whiteSpace: "nowrap",
+          }}
+        >
+          {hud}
+        </div>
+      )}
+      {menu && (
+        <div
+          style={{
+            position: "absolute",
+            left: menu.x,
+            top: menu.y,
+            zIndex: 30,
+            background: "var(--panel-bg, #222)",
+            border: "1px solid rgba(255,255,255,0.15)",
+            borderRadius: 6,
+            padding: 4,
+            minWidth: 180,
+            boxShadow: "0 6px 24px rgba(0,0,0,0.5)",
+            font: "12px -apple-system, system-ui, sans-serif",
+            color: "var(--text, #ddd)",
+          }}
+          onPointerDown={(e) => e.stopPropagation()}
+        >
+          {[
+            {
+              label: "Reset crop",
+              fn: () => void resetCropModule().then(reconcile),
+            },
+            {
+              label: "Crop as shot",
+              fn: () =>
+                commit({
+                  ...crop,
+                  rect: { left: 0, top: 0, right: 1, bottom: 1 },
+                  angle: 0,
+                }),
+            },
+            {
+              label: crop.aspectLocked ? "Unlock aspect ratio" : "Lock aspect ratio",
+              fn: () => commit({ ...crop, aspectLocked: !crop.aspectLocked }),
+            },
+            { label: "Copy crop", fn: () => copyCropToClipboard(crop) },
+            {
+              label: "Paste crop",
+              fn: () => {
+                const p = readCropClipboard();
+                if (p) commit(constrain({ ...p, constrainCrop: crop.constrainCrop }));
+              },
+            },
+          ].map((item) => (
+            <div
+              key={item.label}
+              onClick={menuAction(item.fn)}
+              style={{ padding: "5px 10px", cursor: "default", borderRadius: 4 }}
+              onMouseEnter={(e) =>
+                ((e.target as HTMLElement).style.background = "rgba(255,255,255,0.1)")
+              }
+              onMouseLeave={(e) =>
+                ((e.target as HTMLElement).style.background = "transparent")
+              }
+            >
+              {item.label}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
+}
+
+function gcd(a: number, b: number): number {
+  let x = Math.abs(Math.round(a));
+  let y = Math.abs(Math.round(b));
+  while (y) [x, y] = [y, x % y];
+  return x;
+}
+
+function trimNum(n: number): string {
+  return Number.isInteger(n) ? String(n) : n.toFixed(2).replace(/0+$/, "").replace(/\.$/, "");
+}
+
+/** "#rrggbb" → "r, g, b" for rgba() fill. */
+function hexToRgb(hex: string): string {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
+  if (!m) return "0, 0, 0";
+  const n = parseInt(m[1], 16);
+  return `${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}`;
 }

@@ -13,6 +13,16 @@ struct MaskSampleUniforms {
   feather: f32,
   opacity: f32,
   invert: u32,
+  // crop mapping (same contract as extract.wgsl / crop_common.wgsl)
+  crop_left: f32,
+  crop_top: f32,
+  crop_right: f32,
+  crop_bottom: f32,
+  crop_angle: f32,
+  crop_rotate_90: u32,
+  crop_flip_h: u32,
+  crop_flip_v: u32,
+  crop_mode: u32,
   _p0: u32,
   _p1: u32,
 };
@@ -31,12 +41,17 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
     return;
   }
   let out_half = vec2<f32>(f32(u.out_w), f32(u.out_h)) * 0.5;
-  let img_px = vec2<f32>(u.center_x * u.img_w, u.center_y * u.img_h)
-    + (vec2<f32>(f32(gid.x) + 0.5, f32(gid.y) + 0.5) - out_half) / u.scale;
-  let uv = img_px / vec2<f32>(u.img_w, u.img_h);
+  let out_px = vec2<f32>(f32(gid.x) + 0.5, f32(gid.y) + 0.5);
+  let cm = crop_map_out_px(
+    out_px, out_half,
+    u.img_w, u.img_h, u.scale, vec2(u.center_x, u.center_y),
+    u.crop_left, u.crop_top, u.crop_right, u.crop_bottom,
+    u.crop_angle, u.crop_rotate_90, u.crop_flip_h, u.crop_flip_v, u.crop_mode,
+  );
+  let uv = cm.uv; // normalized ORIGINAL image coords (model-mask space)
 
   var m = 0.0;
-  if (uv.x >= 0.0 && uv.x <= 1.0 && uv.y >= 0.0 && uv.y <= 1.0) {
+  if (cm.inside == 1u) {
     // joint bilateral: sample the small mask around uv, weight by guide
     // luma similarity at viewport res
     let center = textureLoad(guide, vec2<i32>(gid.xy), 0).rgb;

@@ -860,6 +860,7 @@ code { background: #222; padding: 1px 4px; border-radius: 3px; }
   z-index: 4;
 }
 .crop-overlay svg { pointer-events: none; }
+.crop-overlay .crop-dim,
 .crop-overlay .crop-frame,
 .crop-overlay .crop-handle { pointer-events: all; }
 .crop-dim { fill: rgba(0, 0, 0, 0.5); }

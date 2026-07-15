@@ -163,7 +163,7 @@ impl Engine {
                 _ => EditDoc::new(path),
             };
             apply_meta_patch(&mut doc, patch);
-            if let Err(e) = sidecar::write_sidecar(&doc) {
+            if let Err(e) = sidecar::write_sidecar(p, &doc) {
                 tracing::warn!(error = %e, path, "sidecar mirror failed");
             }
             // live doc update if this image is open

@@ -385,6 +385,13 @@ pub async fn wb_from_point(
     engine.wb_from_point(x, y).await?.map_err(AppError::from)
 }
 
+/// Crop-tool auto-level: dominant line deviation in degrees (original image
+/// space, mod-90 folded); 0.0 = no dominant direction found.
+#[tauri::command]
+pub async fn auto_level(engine: State<'_, EngineHandle>) -> Result<f32, AppError> {
+    engine.auto_level().await?.map_err(AppError::from)
+}
+
 // ---- Phase 7: export + presets + perf ----
 
 #[tauri::command]
@@ -814,30 +821,5 @@ pub async fn report_problem(message: String, from: Option<String>) -> Result<(),
         pct_encode("MeraRAW beta — problem report"),
         pct_encode(&body),
     );
-    // Hand the mailto URL to the OS default mail handler.
-    let spawn = |mut cmd: std::process::Command| {
-        cmd.spawn()
-            .map(|_| ())
-            .map_err(|e| AppError::Internal(format!("open mail client: {e}")))
-    };
-    #[cfg(target_os = "macos")]
-    {
-        let mut c = std::process::Command::new("open");
-        c.arg(&url);
-        spawn(c)?;
-    }
-    #[cfg(target_os = "windows")]
-    {
-        // `start` is a cmd builtin; empty "" is the window-title arg.
-        let mut c = std::process::Command::new("cmd");
-        c.args(["/C", "start", "", &url]);
-        spawn(c)?;
-    }
-    #[cfg(all(unix, not(target_os = "macos")))]
-    {
-        let mut c = std::process::Command::new("xdg-open");
-        c.arg(&url);
-        spawn(c)?;
-    }
-    Ok(())
+    crate::open_url::open_mailto_url(&url)
 }

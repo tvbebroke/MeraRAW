@@ -1,9 +1,13 @@
 import { applyParamBatch, redo, setParam, snapshot, undo } from "../ipc/commands";
 import { applyCropParams, resetCropModule } from "../crop/cropActions";
+import { copyCropToClipboard, readCropClipboard } from "../crop/cropClipboard";
 import {
   applyAspectToRect,
+  constrainRectToImage,
   flipOrientation,
+  panCrop,
   readCropFromDoc,
+  rotatedDims,
 } from "../crop/cropMath";
 import { useDocStore } from "../state/docStore";
 import { useUiStore } from "../state/uiStore";
@@ -266,19 +270,108 @@ const HANDLERS: Record<string, (b: ResolvedBinding) => void | Promise<void>> = {
     const crop = readCropFromDoc(doc?.modules);
     if (!dims || crop.aspectW <= 0) return;
     const [w, h] = flipOrientation(crop.aspectW, crop.aspectH);
-    void applyCropParams({
+    const [rw, rh] = rotatedDims(crop, dims.w, dims.h);
+    let next = {
       ...crop,
       aspectW: w,
       aspectH: h,
       aspectLocked: true,
-      rect: applyAspectToRect(crop.rect, w / h, dims.w, dims.h),
-    }).then(reconcile());
+      rect: applyAspectToRect(crop.rect, w / h, rw, rh),
+    };
+    if (next.constrainCrop) {
+      next = { ...next, rect: constrainRectToImage(next.rect, next, dims.w, dims.h) };
+    }
+    ui().setCropPreviousAspect(w, h);
+    void applyCropParams(next).then(reconcile());
+  },
+  "develop-module---tools:crop-to-previous-ratio": () => {
+    const prev = ui().cropPreviousAspect;
+    const dims = ui().imageDims;
+    if (!prev || !dims) return;
+    const crop = readCropFromDoc(useDocStore.getState().doc?.modules);
+    const [rw, rh] = rotatedDims(crop, dims.w, dims.h);
+    let next = {
+      ...crop,
+      aspectW: prev.w,
+      aspectH: prev.h,
+      aspectLocked: true,
+      rect: applyAspectToRect(crop.rect, prev.w / prev.h, rw, rh),
+    };
+    if (next.constrainCrop) {
+      next = { ...next, rect: constrainRectToImage(next.rect, next, dims.w, dims.h) };
+    }
+    void applyCropParams(next).then(reconcile());
   },
   "develop-module---tools:reset-crop": () => {
     void resetCropModule().then(reconcile());
   },
   "develop-module---tools:cycle-crop-grid-overlay": () => ui().cycleCropOverlay(),
   "develop-module---tools:cycle-crop-overlay-orientation": () => ui().rotateCropOverlay(),
+  "develop-module---tools:copy-crop": () => {
+    const crop = readCropFromDoc(useDocStore.getState().doc?.modules);
+    copyCropToClipboard(crop);
+    notify("Crop copied");
+  },
+  "develop-module---tools:paste-crop": () => {
+    const pasted = readCropClipboard();
+    const dims = ui().imageDims;
+    if (!pasted || !dims) {
+      notify("No crop on clipboard");
+      return;
+    }
+    const crop = readCropFromDoc(useDocStore.getState().doc?.modules);
+    let next = { ...pasted, constrainCrop: crop.constrainCrop };
+    if (next.constrainCrop) {
+      next = { ...next, rect: constrainRectToImage(next.rect, next, dims.w, dims.h) };
+    }
+    void applyCropParams(next).then(reconcile());
+  },
+  "develop-module---tools:nudge-crop": (b) => {
+    if (!ui().cropActive) return;
+    const dims = ui().imageDims;
+    if (!dims) return;
+    const crop = readCropFromDoc(useDocStore.getState().doc?.modules);
+    const [rw, rh] = rotatedDims(crop, dims.w, dims.h);
+    const step = b.chord.toLowerCase().includes("shift") ? 10 : 1;
+    const chord = b.chord.toLowerCase();
+    let dx = 0;
+    let dy = 0;
+    if (chord.includes("left")) dx = -step / rw;
+    else if (chord.includes("right")) dx = step / rw;
+    else if (chord.includes("up")) dy = -step / rh;
+    else if (chord.includes("down")) dy = step / rh;
+    else return;
+    let next = { ...crop, rect: panCrop(crop.rect, dx, dy) };
+    if (next.constrainCrop) {
+      next = { ...next, rect: constrainRectToImage(next.rect, next, dims.w, dims.h) };
+    }
+    void applyCropParams(next).then(reconcile());
+  },
+  "develop-module---tools:nudge-crop-angle": (b) => {
+    if (!ui().cropActive) return;
+    const dims = ui().imageDims;
+    const crop = readCropFromDoc(useDocStore.getState().doc?.modules);
+    const chord = b.chord.toLowerCase();
+    const dir =
+      chord.includes("left") || chord.includes("up") ? -1 : chord.includes("right") || chord.includes("down") ? 1 : 0;
+    if (!dir) return;
+    const angle = Math.max(-45, Math.min(45, crop.angle + dir * 0.1));
+    let next = { ...crop, angle };
+    if (dims && next.constrainCrop) {
+      next = { ...next, rect: constrainRectToImage(next.rect, next, dims.w, dims.h) };
+    }
+    void applyCropParams(next).then(reconcile());
+  },
+  "develop-module---tools:reset-crop-angle": () => {
+    if (!ui().cropActive) return;
+    const dims = ui().imageDims;
+    const crop = readCropFromDoc(useDocStore.getState().doc?.modules);
+    let next = { ...crop, angle: 0 };
+    if (dims && next.constrainCrop) {
+      next = { ...next, rect: constrainRectToImage(next.rect, next, dims.w, dims.h) };
+    }
+    void applyCropParams(next).then(reconcile());
+  },
   "develop-module---targeted-adjustment--tat----masks:crop-to-original": () => {
     void resetCropModule().then(reconcile());
   },

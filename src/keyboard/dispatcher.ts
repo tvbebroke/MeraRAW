@@ -35,6 +35,25 @@ export function unregisterCommandHandler(id: string) {
   handlers.delete(id);
 }
 
+/** Invoke a registered handler by id with a synthetic chord (crop arrow nudges, etc.). */
+export async function invokeCommand(id: string, chord = ""): Promise<boolean> {
+  const handler = handlers.get(id);
+  if (!handler) return false;
+  const binding: ResolvedBinding = {
+    id,
+    section: "",
+    action: id,
+    chord,
+    scope: "module:develop",
+    relevance: "core",
+    description: "",
+    note: "",
+    inputKind: "key",
+  };
+  await handler(binding);
+  return true;
+}
+
 function resolveBinding(
   chord: string,
   scopes: KeymapScope[],

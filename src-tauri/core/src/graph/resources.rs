@@ -4,6 +4,38 @@ use super::{FinalTag, RenderGraph, NODES};
 use crate::gpu::GpuContext;
 use std::collections::HashMap;
 
+/// Crop mapping fields shared by extract/mask uniforms — one struct so the
+/// three shaders can never drift apart on the coordinate contract.
+#[repr(C)]
+#[derive(Clone, Copy, Default, bytemuck::Pod, bytemuck::Zeroable)]
+pub(super) struct CropUniform {
+    pub crop_left: f32,
+    pub crop_top: f32,
+    pub crop_right: f32,
+    pub crop_bottom: f32,
+    pub crop_angle: f32,
+    pub crop_rotate_90: u32,
+    pub crop_flip_h: u32,
+    pub crop_flip_v: u32,
+    pub crop_mode: u32,
+}
+
+impl CropUniform {
+    pub fn new(crop: &crate::crop::CropParams, mode: u32) -> Self {
+        Self {
+            crop_left: crop.left,
+            crop_top: crop.top,
+            crop_right: crop.right,
+            crop_bottom: crop.bottom,
+            crop_angle: crop.angle.to_radians(),
+            crop_rotate_90: crop.rotate_90,
+            crop_flip_h: u32::from(crop.flip_h),
+            crop_flip_v: u32::from(crop.flip_v),
+            crop_mode: mode,
+        }
+    }
+}
+
 #[repr(C)]
 #[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 pub(super) struct ExtractUniforms {
@@ -14,15 +46,7 @@ pub(super) struct ExtractUniforms {
     pub scale: f32,
     pub center_x: f32,
     pub center_y: f32,
-    pub crop_left: f32,
-    pub crop_top: f32,
-    pub crop_right: f32,
-    pub crop_bottom: f32,
-    pub crop_angle: f32,
-    pub crop_rotate_90: u32,
-    pub crop_flip_h: u32,
-    pub crop_flip_v: u32,
-    pub crop_enabled: u32,
+    pub crop: CropUniform,
 }
 
 #[repr(C)]
@@ -52,9 +76,11 @@ pub(super) struct MaskGeomUniforms {
     pub opacity: f32,
     pub invert: u32,
     pub stroke_count: u32,
+    pub crop: CropUniform,
     pub _p0: u32,
     pub _p1: u32,
     pub _p2: u32,
+    pub _p3: u32,
 }
 
 #[repr(C)]
@@ -70,6 +96,7 @@ pub(super) struct MaskSampleUniforms {
     pub feather: f32,
     pub opacity: f32,
     pub invert: u32,
+    pub crop: CropUniform,
     pub _p0: u32,
     pub _p1: u32,
 }
@@ -356,10 +383,14 @@ impl RenderGraph {
             bgl_storage_tex(1, wgpu::TextureFormat::Rgba16Float),
             bgl_uniform(2),
         ];
+        // crop_common.wgsl holds the shared view→original-uv mapping; WGSL has
+        // no include, so prepend it to every shader that inverse-maps the view.
+        let with_crop =
+            |src: &str| -> String { format!("{}\n{}", include_str!("crop_common.wgsl"), src) };
         let extract = make_pass(
             gpu,
             "extract",
-            include_str!("extract.wgsl"),
+            &with_crop(include_str!("extract.wgsl")),
             &[
                 bgl_tex(0, true),
                 bgl_sampler(1),
@@ -415,7 +446,7 @@ impl RenderGraph {
         let mask_geom = make_pass(
             gpu,
             "mask-geom",
-            include_str!("mask_geom.wgsl"),
+            &with_crop(include_str!("mask_geom.wgsl")),
             &[
                 bgl_storage_tex(0, wgpu::TextureFormat::R32Float),
                 bgl_uniform(1),
@@ -425,7 +456,7 @@ impl RenderGraph {
         let mask_sample = make_pass(
             gpu,
             "mask-sample",
-            include_str!("mask_sample.wgsl"),
+            &with_crop(include_str!("mask_sample.wgsl")),
             &[
                 bgl_tex(0, true),
                 bgl_sampler(1),

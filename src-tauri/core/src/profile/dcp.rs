@@ -108,15 +108,34 @@ fn read_u16_scalar(_data: &[u8], typ: u16, count: u32, val: u32) -> Result<Optio
     }
 }
 
+/// Cap tag array lengths so a malicious DCP cannot force giant allocations.
+const MAX_TAG_COUNT: u32 = 1_048_576;
+const MAX_IFD_ENTRIES: usize = 512;
+const MAX_DCP_BYTES: u64 = 16 * 1024 * 1024;
+const MAX_HUE_DIV: u32 = 360;
+const MAX_SAT_DIV: u32 = 256;
+const MAX_VAL_DIV: u32 = 256;
+
 fn read_u32_array(data: &[u8], typ: u16, count: u32, val: u32) -> Result<Vec<u32>, CoreError> {
     if typ != TIFF_LONG || count == 0 {
         return Ok(Vec::new());
+    }
+    if count > MAX_TAG_COUNT {
+        return Err(CoreError::InvalidOp("DCP tag count too large".into()));
     }
     let count = count as usize;
     if count <= 1 {
         return Ok(vec![val]);
     }
     let off = val as usize;
+    let need = off
+        .checked_add(count.checked_mul(4).ok_or_else(|| {
+            CoreError::InvalidOp("DCP array size overflow".into())
+        })?)
+        .ok_or_else(|| CoreError::InvalidOp("DCP array size overflow".into()))?;
+    if need > data.len() {
+        return Err(CoreError::InvalidOp("DCP array out of bounds".into()));
+    }
     (0..count)
         .map(|i| read_u32(data, off + i * 4))
         .collect()
@@ -126,8 +145,19 @@ fn read_float_array(data: &[u8], typ: u16, count: u32, val: u32) -> Result<Vec<f
     if typ != TIFF_FLOAT || count == 0 {
         return Ok(Vec::new());
     }
+    if count > MAX_TAG_COUNT {
+        return Err(CoreError::InvalidOp("DCP tag count too large".into()));
+    }
     let count = count as usize;
     let off = val as usize;
+    let need = off
+        .checked_add(count.checked_mul(4).ok_or_else(|| {
+            CoreError::InvalidOp("DCP array size overflow".into())
+        })?)
+        .ok_or_else(|| CoreError::InvalidOp("DCP array size overflow".into()))?;
+    if need > data.len() {
+        return Err(CoreError::InvalidOp("DCP array out of bounds".into()));
+    }
     (0..count)
         .map(|i| read_u32(data, off + i * 4).map(f32::from_bits))
         .collect()
@@ -147,11 +177,25 @@ fn parse_hue_sat_map(
         return Ok(None);
     }
     let (hue_div, sat_div, val_div) = (dims[0], dims[1], dims[2]);
+    if hue_div == 0
+        || sat_div == 0
+        || val_div == 0
+        || hue_div > MAX_HUE_DIV
+        || sat_div > MAX_SAT_DIV
+        || val_div > MAX_VAL_DIV
+    {
+        return Ok(None);
+    }
     let Some(&(dtyp, dcount, dval)) = tags.get(&data_tag) else {
         return Ok(None);
     };
     let floats = read_float_array(data, dtyp, dcount, dval)?;
-    let expected = (hue_div * sat_div * val_div * 3) as usize;
+    let expected = hue_div
+        .checked_mul(sat_div)
+        .and_then(|v| v.checked_mul(val_div))
+        .and_then(|v| v.checked_mul(3))
+        .ok_or_else(|| CoreError::InvalidOp("DCP HueSat dims overflow".into()))?
+        as usize;
     if floats.len() < expected {
         return Ok(None);
     }
@@ -171,6 +215,9 @@ fn parse_hue_sat_map(
 /// Parse Adobe DCP IFD at byte offset 8 (after the IIRC/MMCR header).
 fn parse_ifd(data: &[u8], ifd_off: usize) -> Result<HashMap<u16, (u16, u32, u32)>, CoreError> {
     let n = read_u16(data, ifd_off)? as usize;
+    if n > MAX_IFD_ENTRIES {
+        return Err(CoreError::InvalidOp("DCP IFD too large".into()));
+    }
     let mut tags = HashMap::new();
     for i in 0..n {
         let e = ifd_off + 2 + i * 12;
@@ -225,11 +272,19 @@ pub struct DcpLookData {
 
 impl DcpProfile {
     pub fn load(path: &Path) -> Result<Self, CoreError> {
+        let meta = std::fs::metadata(path)?;
+        if meta.len() > MAX_DCP_BYTES {
+            return Err(CoreError::InvalidOp("DCP file too large".into()));
+        }
         let data = std::fs::read(path)?;
         Self::parse(&data, path)
     }
 
     pub fn read_header(path: &Path) -> Result<(String, String), CoreError> {
+        let meta = std::fs::metadata(path)?;
+        if meta.len() > MAX_DCP_BYTES {
+            return Err(CoreError::InvalidOp("DCP file too large".into()));
+        }
         let data = std::fs::read(path)?;
         let tags = parse_ifd(&data, 8)?;
         let model = tags

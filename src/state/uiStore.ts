@@ -1,7 +1,7 @@
 // UI-only state. Never holds pixels or canonical edit state.
 import { create } from "zustand";
 import type { RightToolTab } from "../components/lr/RightRail";
-import type { CropOverlayKind } from "../crop/cropConstants";
+import { CROP_OVERLAY_CYCLE, type CropOverlayKind } from "../crop/cropConstants";
 import type { CropParams } from "../crop/cropMath";
 import { readCropFromDoc } from "../crop/cropMath";
 import { applyCropParams } from "../crop/cropActions";
@@ -43,6 +43,22 @@ interface UiState {
   cropOverlayVisible: boolean;
   cropOverlayVariant: number;
   cropLightsOut: boolean;
+  /** Guide engine settings (shared subsystem — plan P4). */
+  cropGuideMode: "auto" | "always" | "never";
+  cropGuideColor: string;
+  cropGuideOpacity: number;
+  cropGridSize: number;
+  cropAspectPreviewRatios: string[];
+  /** Crop-mask (dimmed region) opacity preference (plan P5). */
+  cropMaskOpacity: number;
+  /** Crop-mask fill color (plan P5). */
+  cropMaskColor: string;
+  /** Last applied aspect ratio (w,h) for Shift+A "previous ratio". */
+  cropPreviousAspect: { w: number; h: number } | null;
+  /** Remembered custom ratios, most recent first (max 5 — plan P2). */
+  cropCustomRatios: string[];
+  /** PPI for the physical-print-size readout (plan P5); 0 = hidden. */
+  cropPpi: number;
   enterCropTool: () => void;
   exitCropTool: (apply: boolean) => void;
   setCropAspectPreset: (id: string) => void;
@@ -51,6 +67,16 @@ interface UiState {
   rotateCropOverlay: () => void;
   toggleCropOverlayVisible: () => void;
   toggleCropLightsOut: () => void;
+  setCropGuideMode: (m: "auto" | "always" | "never") => void;
+  setCropGuideColor: (c: string) => void;
+  setCropGuideOpacity: (o: number) => void;
+  setCropGridSize: (n: number) => void;
+  setCropAspectPreviewRatios: (r: string[]) => void;
+  setCropMaskOpacity: (o: number) => void;
+  setCropMaskColor: (c: string) => void;
+  setCropPreviousAspect: (w: number, h: number) => void;
+  rememberCustomRatio: (r: string) => void;
+  setCropPpi: (ppi: number) => void;
   selectedMask: string | null;
   setSelectedMask: (id: string | null) => void;
   brushRadius: number;
@@ -106,6 +132,23 @@ interface UiState {
   setZoomLabel: (z: string) => void;
 }
 
+// crop preferences persisted per-machine (not per-image — sidecar owns those)
+function cropPref<T>(key: string, def: T): T {
+  try {
+    const raw = localStorage.getItem(`meraraw.crop.${key}`);
+    return raw === null ? def : (JSON.parse(raw) as T);
+  } catch {
+    return def;
+  }
+}
+function saveCropPref(key: string, value: unknown) {
+  try {
+    localStorage.setItem(`meraraw.crop.${key}`, JSON.stringify(value));
+  } catch {
+    // best-effort
+  }
+}
+
 export const useUiStore = create<UiState>((set, get) => ({
   engineReady: false,
   gpuAdapter: null,
@@ -119,12 +162,23 @@ export const useUiStore = create<UiState>((set, get) => ({
   setTool: (t) => set({ tool: t }),
   cropActive: false,
   cropSnapshot: null,
-  cropAspectPreset: "as-shot",
+  // Original is the user-expected default ratio (plan §4.5 / RapidRAW lesson)
+  cropAspectPreset: "original",
   cropAspectLocked: false,
-  cropOverlay: "thirds",
+  cropOverlay: cropPref<CropOverlayKind>("overlay", "thirds"),
   cropOverlayVisible: true,
   cropOverlayVariant: 0,
   cropLightsOut: false,
+  cropGuideMode: cropPref<"auto" | "always" | "never">("guideMode", "always"),
+  cropGuideColor: cropPref("guideColor", "#ffffff"),
+  cropGuideOpacity: cropPref("guideOpacity", 0.55),
+  cropGridSize: cropPref("gridSize", 6),
+  cropAspectPreviewRatios: cropPref("aspectPreview", ["1:1", "4:5", "16:9"]),
+  cropMaskOpacity: cropPref("maskOpacity", 0.5),
+  cropMaskColor: cropPref("maskColor", "#000000"),
+  cropPreviousAspect: cropPref<{ w: number; h: number } | null>("previousAspect", null),
+  cropCustomRatios: cropPref<string[]>("customRatios", []),
+  cropPpi: cropPref("ppi", 0),
   enterCropTool: () => {
     const doc = useDocStore.getState().doc;
     const snap = readCropFromDoc(doc?.modules);
@@ -151,19 +205,12 @@ export const useUiStore = create<UiState>((set, get) => ({
   setCropAspectPreset: (id) => set({ cropAspectPreset: id }),
   setCropAspectLocked: (on) => set({ cropAspectLocked: on }),
   cycleCropOverlay: (reverse) => {
-    const kinds: CropOverlayKind[] = [
-      "grid",
-      "thirds",
-      "diagonal",
-      "triangle",
-      "golden",
-      "spiral",
-      "aspects",
-    ];
+    const kinds = CROP_OVERLAY_CYCLE;
     const cur = get().cropOverlay;
     const idx = kinds.indexOf(cur === "none" ? "thirds" : cur);
     const next =
       kinds[(idx + (reverse ? -1 : 1) + kinds.length) % kinds.length] ?? "thirds";
+    saveCropPref("overlay", next);
     set({ cropOverlay: next, cropOverlayVisible: true });
   },
   rotateCropOverlay: () =>
@@ -171,6 +218,55 @@ export const useUiStore = create<UiState>((set, get) => ({
   toggleCropOverlayVisible: () =>
     set((s) => ({ cropOverlayVisible: !s.cropOverlayVisible })),
   toggleCropLightsOut: () => set((s) => ({ cropLightsOut: !s.cropLightsOut })),
+  setCropGuideMode: (m) => {
+    saveCropPref("guideMode", m);
+    set({ cropGuideMode: m });
+  },
+  setCropGuideColor: (c) => {
+    saveCropPref("guideColor", c);
+    set({ cropGuideColor: c });
+  },
+  setCropGuideOpacity: (o) => {
+    const v = Math.min(1, Math.max(0.05, o));
+    saveCropPref("guideOpacity", v);
+    set({ cropGuideOpacity: v });
+  },
+  setCropGridSize: (n) => {
+    const v = Math.min(20, Math.max(2, Math.round(n)));
+    saveCropPref("gridSize", v);
+    set({ cropGridSize: v });
+  },
+  setCropAspectPreviewRatios: (r) => {
+    const v = r.slice(0, 4);
+    saveCropPref("aspectPreview", v);
+    set({ cropAspectPreviewRatios: v });
+  },
+  setCropMaskOpacity: (o) => {
+    const v = Math.min(0.95, Math.max(0.1, o));
+    saveCropPref("maskOpacity", v);
+    set({ cropMaskOpacity: v });
+  },
+  setCropMaskColor: (c) => {
+    saveCropPref("maskColor", c);
+    set({ cropMaskColor: c });
+  },
+  setCropPreviousAspect: (w, h) => {
+    if (w <= 0 || h <= 0) return;
+    const v = { w, h };
+    saveCropPref("previousAspect", v);
+    set({ cropPreviousAspect: v });
+  },
+  rememberCustomRatio: (r) => {
+    const cur = get().cropCustomRatios.filter((x) => x !== r);
+    const next = [r, ...cur].slice(0, 5);
+    saveCropPref("customRatios", next);
+    set({ cropCustomRatios: next });
+  },
+  setCropPpi: (ppi) => {
+    const v = Math.max(0, Math.min(1200, Math.round(ppi)));
+    saveCropPref("ppi", v);
+    set({ cropPpi: v });
+  },
   selectedMask: null,
   setSelectedMask: (id) => set({ selectedMask: id }),
   brushRadius: 0.04,

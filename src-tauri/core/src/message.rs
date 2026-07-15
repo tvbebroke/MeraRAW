@@ -318,6 +318,12 @@ pub enum EngineMsg {
         y: f32,
         reply: oneshot::Sender<Result<SampledColor, CoreError>>,
     },
+    /// Crop-tool auto-level: dominant near-horizontal/vertical edge deviation
+    /// (degrees, ORIGINAL image space, mod-90 folded into [-45, 45)).
+    /// Returns 0.0 when no dominant line direction is found.
+    AutoLevel {
+        reply: oneshot::Sender<Result<f32, CoreError>>,
+    },
     // ---- Phase 7: export + presets + perf ----
     /// Export the OPEN image: tiled full-res linear render on the actor,
     /// then transform/encode on a worker. Replies when the file is written.

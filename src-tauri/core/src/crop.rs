@@ -68,38 +68,83 @@ impl CropParams {
             && !self.flip_v
     }
 
-    pub fn apply_enabled(&self, crop_preview: bool) -> bool {
-        !crop_preview && !self.is_identity()
+    /// Angle/rotate-90/flip only (rect ignored).
+    pub fn geometry_identity(&self) -> bool {
+        self.angle.abs() < 0.001 && self.rotate_90 == 0 && !self.flip_h && !self.flip_v
+    }
+
+    /// Extract-shader crop mode: 0 = none, 1 = full crop (rect + geometry),
+    /// 2 = geometry only (crop-tool editing preview: the image rotates/flips
+    /// live but the full frame stays visible; the rect is drawn by the UI).
+    pub fn mode(&self, crop_preview: bool) -> u32 {
+        if !crop_preview && !self.is_identity() {
+            1
+        } else if crop_preview && !self.geometry_identity() {
+            2
+        } else {
+            0
+        }
+    }
+
+    /// Physical pixel dims of the post-rotate-90 image space (the space the
+    /// crop rect and straighten angle live in).
+    pub fn rotated_dims(&self, img_w: u32, img_h: u32) -> (f32, f32) {
+        if self.rotate_90 % 2 == 1 {
+            (img_h as f32, img_w as f32)
+        } else {
+            (img_w as f32, img_h as f32)
+        }
+    }
+
+    /// Pixel dims of the displayed content for a given crop mode:
+    /// mode 0 = full image, 1 = crop rect region, 2 = rotated full image.
+    pub fn content_dims(&self, img_w: u32, img_h: u32, mode: u32) -> (f32, f32) {
+        let (rw, rh) = self.rotated_dims(img_w, img_h);
+        match mode {
+            1 => (
+                ((self.right - self.left).max(0.01) * rw).max(1.0),
+                ((self.bottom - self.top).max(0.01) * rh).max(1.0),
+            ),
+            2 => (rw, rh),
+            _ => (img_w as f32, img_h as f32),
+        }
     }
 
     /// Cache key for extract pass invalidation.
+    /// In crop-preview (tool open) the rect is drawn by the UI overlay, so
+    /// only geometry (angle/flip/rotate90) invalidates the GPU extract pass.
     pub fn signature(&self, crop_preview: bool) -> u64 {
         let mut h = 0u64;
         let mix = |h: &mut u64, v: u32| {
             *h = (*h).wrapping_mul(31).wrapping_add(v as u64);
         };
         mix(&mut h, if crop_preview { 1 } else { 0 });
+        if !crop_preview {
+            for v in [
+                self.left.to_bits(),
+                self.top.to_bits(),
+                self.right.to_bits(),
+                self.bottom.to_bits(),
+            ] {
+                mix(&mut h, v);
+            }
+        }
         for v in [
-            self.left.to_bits(),
-            self.top.to_bits(),
-            self.right.to_bits(),
-            self.bottom.to_bits(),
             self.angle.to_bits(),
             self.rotate_90,
             self.flip_h as u32,
             self.flip_v as u32,
-            self.aspect_w.to_bits(),
-            self.aspect_h.to_bits(),
         ] {
             mix(&mut h, v);
         }
         h
     }
 
+    /// Pixel dims of the cropped output (rotate-90 aware: the rect is
+    /// normalized in post-rotation space, so a 90° turn swaps the axes the
+    /// rect scales against).
     pub fn effective_size(&self, img_w: u32, img_h: u32) -> (f32, f32) {
-        let w = (self.right - self.left).max(0.01) * img_w as f32;
-        let h = (self.bottom - self.top).max(0.01) * img_h as f32;
-        (w, h)
+        self.content_dims(img_w, img_h, 1)
     }
 }
 
@@ -120,5 +165,36 @@ mod tests {
         let mut doc = EditDoc::new("/x.ARW");
         doc.set("crop", "right", ParamValue::F32(0.8));
         assert!(!CropParams::from_doc(&doc).is_identity());
+    }
+
+    #[test]
+    fn mode_selection() {
+        let mut c = CropParams::default();
+        assert_eq!(c.mode(false), 0);
+        assert_eq!(c.mode(true), 0);
+        c.right = 0.8;
+        assert_eq!(c.mode(false), 1);
+        assert_eq!(c.mode(true), 0); // rect-only crop: editing preview shows plain full frame
+        c.angle = 2.0;
+        assert_eq!(c.mode(true), 2); // geometry present: editing preview rotates live
+    }
+
+    #[test]
+    fn rotate90_swaps_content_dims() {
+        let mut c = CropParams {
+            left: 0.0,
+            top: 0.0,
+            right: 0.5,
+            bottom: 1.0,
+            ..CropParams::default()
+        };
+        // 6000×4000, rect covers left half of rotated space
+        let (w, h) = c.effective_size(6000, 4000);
+        assert_eq!((w.round() as u32, h.round() as u32), (3000, 4000));
+        c.rotate_90 = 1; // rotated space is 4000×6000
+        let (w, h) = c.effective_size(6000, 4000);
+        assert_eq!((w.round() as u32, h.round() as u32), (2000, 6000));
+        let (rw, rh) = c.content_dims(6000, 4000, 2);
+        assert_eq!((rw as u32, rh as u32), (4000, 6000));
     }
 }

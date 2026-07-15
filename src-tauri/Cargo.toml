@@ -24,6 +24,8 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 base64 = "0.22"
 jsonwebtoken = "9"
+open = "5"
+url = "2"
 
 [profile.release]
 lto = true

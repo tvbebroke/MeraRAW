@@ -33,7 +33,7 @@
       }
     ],
     "security": {
-      "freezePrototype": false,
+      "freezePrototype": true,
       "csp": {
         "default-src": "'self' customprotocol: asset:",
         "script-src": "'self'",

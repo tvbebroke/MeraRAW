@@ -5,10 +5,24 @@ use std::sync::Arc;
 
 const TILE: u32 = 1024;
 
+/// Output dims for an export: the crop content size when a crop is committed
+/// (rotate-90 aware), otherwise the working-master size. Tiling and the tile
+/// view centers run in this content space (extract maps content → source).
+fn export_dims(doc: &EditDoc, src_w: u32, src_h: u32) -> (u32, u32) {
+    let crop = crate::crop::CropParams::from_doc(doc);
+    if crop.mode(false) == 1 {
+        let (cw, ch) = crop.effective_size(src_w, src_h);
+        ((cw.round() as u32).max(1), (ch.round() as u32).max(1))
+    } else {
+        (src_w, src_h)
+    }
+}
+
 pub(super) struct ExportJob {
     settings: crate::export::ExportSettings,
     reply: Option<oneshot::Sender<Result<String, CoreError>>>,
     full: Vec<f32>,
+    /// content-space output dims (see `export_dims`)
     w: u32,
     h: u32,
     tile_tx: u32,
@@ -47,9 +61,15 @@ impl Engine {
             if self.export_graph.is_none() {
                 self.export_graph = Some(RenderGraph::new(gpu));
             }
-            let tiles_x = w.div_ceil(TILE);
-            let tiles_y = h.div_ceil(TILE);
             let display_look = self.display_look;
+            // look 4 (Original) renders a fresh doc — no crop, full frame
+            let (out_w, out_h) = if display_look == 4 {
+                (w, h)
+            } else {
+                export_dims(cur.doc(), w, h)
+            };
+            let tiles_x = out_w.div_ceil(TILE);
+            let tiles_y = out_h.div_ceil(TILE);
             let dcp = if display_look == 4 {
                 None
             } else {
@@ -66,9 +86,9 @@ impl Engine {
             Ok(ExportJob {
                 settings,
                 reply: None,
-                full: vec![0.0f32; (w as usize) * (h as usize) * 3],
-                w,
-                h,
+                full: vec![0.0f32; (out_w as usize) * (out_h as usize) * 3],
+                w: out_w,
+                h: out_h,
                 tile_tx: 0,
                 tile_ty: 0,
                 tiles_done: 0,
@@ -130,14 +150,16 @@ impl Engine {
                 .as_mut()
                 .ok_or(CoreError::Engine("export graph".into()))?;
 
-            let tw = TILE.min(*w - tx);
-            let th = TILE.min(*h - ty);
+            // tile grid + centers live in content space (job dims); the
+            // working-master dims only parameterize the source texture
+            let tw = TILE.min(job_w - tx);
+            let th = TILE.min(job_h - ty);
             let view = ViewParams {
                 out_w: tw,
                 out_h: th,
                 scale: Some(1.0),
-                center_x: (tx as f32 + tw as f32 / 2.0) / *w as f32,
-                center_y: (ty as f32 + th as f32 / 2.0) / *h as f32,
+                center_x: (tx as f32 + tw as f32 / 2.0) / job_w as f32,
+                center_y: (ty as f32 + th as f32 / 2.0) / job_h as f32,
                 crop_preview: false,
             };
             let base_doc;
@@ -319,8 +341,12 @@ struct BatchImage {
     /// keeps the working texture alive for `view`
     _tex: wgpu::Texture,
     view: wgpu::TextureView,
+    /// content-space output dims (see `export_dims`)
     w: u32,
     h: u32,
+    /// working-master texture dims
+    src_w: u32,
+    src_h: u32,
     doc: EditDoc,
     dcp: Option<Arc<DcpProfile>>,
     lut: Option<Arc<crate::lut::CubeLut>>,
@@ -525,23 +551,26 @@ impl Engine {
             g.set_look(look);
         }
         let (w, h) = (payload.width, payload.height);
-        let tiles_x = w.div_ceil(TILE);
-        let tiles_y = h.div_ceil(TILE);
+        let (out_w, out_h) = export_dims(&doc, w, h);
+        let tiles_x = out_w.div_ceil(TILE);
+        let tiles_y = out_h.div_ceil(TILE);
         let cct = payload.meta.estimated_cct.unwrap_or(5200.0);
         let img = BatchImage {
             index,
             path: path.clone(),
             _tex: tex,
             view,
-            w,
-            h,
+            w: out_w,
+            h: out_h,
+            src_w: w,
+            src_h: h,
             doc,
             dcp,
             lut,
             cct,
             meta: payload.meta,
             masks_gpu,
-            full: vec![0.0f32; (w as usize) * (h as usize) * 3],
+            full: vec![0.0f32; (out_w as usize) * (out_h as usize) * 3],
             tile_tx: 0,
             tile_ty: 0,
             tiles_done: 0,
@@ -562,12 +591,14 @@ impl Engine {
         if img.encoding {
             return;
         }
-        let (index, tx, ty, img_w, img_h, cct, look) = (
+        let (index, tx, ty, img_w, img_h, src_w, src_h, cct, look) = (
             img.index,
             img.tile_tx,
             img.tile_ty,
             img.w,
             img.h,
+            img.src_w,
+            img.src_h,
             img.cct,
             batch.look,
         );
@@ -601,8 +632,8 @@ impl Engine {
             let mut tile = graph.render_linear_tile(
                 gpu,
                 &img.view,
-                img_w,
-                img_h,
+                src_w,
+                src_h,
                 &view,
                 &img.doc,
                 cct,

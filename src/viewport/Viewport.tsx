@@ -8,9 +8,50 @@ import {
   wbFromPoint,
 } from "../ipc/commands";
 import { onEngineReady, onFrameReady } from "../ipc/events";
+import {
+  contentDims,
+  contentNormToImageNorm,
+  cropModeFor,
+  readCropFromDoc,
+} from "../crop/cropMath";
 import { useDocStore } from "../state/docStore";
 import { useUiStore } from "../state/uiStore";
 import { CropOverlay } from "./CropOverlay";
+
+/**
+ * Dims of the displayed content — the engine's pan/zoom space (crop region
+ * once a crop is committed, rotated full frame while the crop tool is open).
+ */
+function viewContentDims(): { w: number; h: number } | null {
+  const ui = useUiStore.getState();
+  if (!ui.imageDims) return null;
+  const crop = readCropFromDoc(useDocStore.getState().doc?.modules);
+  const mode = cropModeFor(crop, ui.cropActive);
+  const [w, h] = contentDims(crop, ui.imageDims.w, ui.imageDims.h, mode);
+  return { w, h };
+}
+
+/** Screen-space point → original-image normalized coords (mask/WB space). */
+function screenToOriginalNorm(
+  clientX: number,
+  clientY: number,
+  wrap: HTMLElement,
+  effScale: number,
+  view: { centerX: number; centerY: number },
+): [number, number] | null {
+  const ui = useUiStore.getState();
+  if (!ui.imageDims) return null;
+  const crop = readCropFromDoc(useDocStore.getState().doc?.modules);
+  const mode = cropModeFor(crop, ui.cropActive);
+  const [cw, ch] = contentDims(crop, ui.imageDims.w, ui.imageDims.h, mode);
+  const rect = wrap.getBoundingClientRect();
+  const dpr = window.devicePixelRatio;
+  const px = (clientX - rect.left) * dpr;
+  const py = (clientY - rect.top) * dpr;
+  const nx = (view.centerX * cw + (px - (rect.width * dpr) / 2) / effScale) / cw;
+  const ny = (view.centerY * ch + (py - (rect.height * dpr) / 2) / effScale) / ch;
+  return contentNormToImageNorm(nx, ny, crop, ui.imageDims.w, ui.imageDims.h, mode);
+}
 
 const FRAME_BASE = "frame://localhost";
 
@@ -101,7 +142,7 @@ export function Viewport() {
   const brushPoints = useRef<[number, number][]>([]);
 
   const updateZoomLabel = useCallback(() => {
-    const dims = useUiStore.getState().imageDims;
+    const dims = viewContentDims();
     const wrap = wrapRef.current;
     const m = wrap && dims ? measureWrap(wrap) : null;
     if (!dims || !m) return;
@@ -136,12 +177,14 @@ export function Viewport() {
     [updateZoomLabel],
   );
 
-  const refresh = useCallback(async () => {
+  const forceNext = useRef(false);
+  const refresh = useCallback(async (force = false) => {
     if (useUiStore.getState().decodeState !== "ready") return;
     const wrap = wrapRef.current;
     if (!wrap) return;
     const m = measureWrap(wrap);
     if (!m) return;
+    if (force) forceNext.current = true;
     if (inFlight.current) {
       pending.current = true;
       return;
@@ -149,10 +192,11 @@ export function Viewport() {
     inFlight.current = true;
     try {
       const v = view.current;
-      if (!isCustomView(v) && shownVer.current > 0) {
+      if (!forceNext.current && !isCustomView(v) && shownVer.current > 0) {
         updateZoomLabel();
         return;
       }
+      forceNext.current = false;
       const info = await requestFrame({
         outW: m.outW,
         outH: m.outH,
@@ -183,6 +227,19 @@ export function Viewport() {
       objUrl.current = null;
     }
   }, [lastOpenedPath]);
+
+  // Entering/leaving the crop tool changes the content space (full rotated
+  // frame vs. crop region): reset to fit and force a re-request so the
+  // engine re-renders with the right cropPreview flag.
+  const firstCropToggle = useRef(true);
+  useEffect(() => {
+    if (firstCropToggle.current) {
+      firstCropToggle.current = false;
+      return;
+    }
+    view.current = { scale: null, centerX: 0.5, centerY: 0.5 };
+    void refresh(true);
+  }, [cropActive, refresh]);
 
   useEffect(() => {
     const un = onFrameReady((version) => showFrame(version));
@@ -269,21 +326,14 @@ export function Viewport() {
 
   const toImageCoords = useCallback(
     (e: { clientX: number; clientY: number }): [number, number] | null => {
-      const ui = useUiStore.getState();
-      if (!ui.imageDims || !wrapRef.current) return null;
-      const rect = wrapRef.current.getBoundingClientRect();
-      const dpr = window.devicePixelRatio;
-      const px = (e.clientX - rect.left) * dpr;
-      const py = (e.clientY - rect.top) * dpr;
-      const s = effScale.current;
-      const v = view.current;
-      const nx =
-        (v.centerX * ui.imageDims.w + (px - (rect.width * dpr) / 2) / s) /
-        ui.imageDims.w;
-      const ny =
-        (v.centerY * ui.imageDims.h + (py - (rect.height * dpr) / 2) / s) /
-        ui.imageDims.h;
-      return [nx, ny];
+      if (!wrapRef.current) return null;
+      return screenToOriginalNorm(
+        e.clientX,
+        e.clientY,
+        wrapRef.current,
+        effScale.current,
+        view.current,
+      );
     },
     [],
   );
@@ -299,20 +349,15 @@ export function Viewport() {
       }
       if (ui.tool === "crop" && ui.cropActive) return;
       if (ui.tool === "wb" && ui.imageDims && wrapRef.current) {
-        const rect = wrapRef.current.getBoundingClientRect();
-        const dpr = window.devicePixelRatio;
-        const px = (e.clientX - rect.left) * dpr;
-        const py = (e.clientY - rect.top) * dpr;
-        const outW = rect.width * dpr;
-        const outH = rect.height * dpr;
-        const s = effScale.current;
-        const v = view.current;
-        const imgX = v.centerX * ui.imageDims.w + (px - outW / 2) / s;
-        const imgY = v.centerY * ui.imageDims.h + (py - outH / 2) / s;
-        const nx = imgX / ui.imageDims.w;
-        const ny = imgY / ui.imageDims.h;
-        if (nx >= 0 && nx <= 1 && ny >= 0 && ny <= 1) {
-          wbFromPoint(nx, ny)
+        const p = screenToOriginalNorm(
+          e.clientX,
+          e.clientY,
+          wrapRef.current,
+          effScale.current,
+          view.current,
+        );
+        if (p) {
+          wbFromPoint(p[0], p[1])
             .then((delta) => useDocStore.getState().reconcile(delta))
             .catch(() => {});
         }
@@ -335,13 +380,15 @@ export function Viewport() {
         return;
       }
       if (!dragging.current || !imageOpen || !imageDims) return;
+      const content = viewContentDims();
+      if (!content) return;
       const dpr = window.devicePixelRatio;
       const dx = (e.clientX - dragging.current.x) * dpr;
       const dy = (e.clientY - dragging.current.y) * dpr;
       dragging.current = { x: e.clientX, y: e.clientY };
       const s = effScale.current;
-      view.current.centerX -= dx / s / imageDims.w;
-      view.current.centerY -= dy / s / imageDims.h;
+      view.current.centerX -= dx / s / content.w;
+      view.current.centerY -= dy / s / content.h;
       view.current.centerX = Math.min(1, Math.max(0, view.current.centerX));
       view.current.centerY = Math.min(1, Math.max(0, view.current.centerY));
       void refresh();

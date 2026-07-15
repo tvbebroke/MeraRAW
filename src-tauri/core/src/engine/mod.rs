@@ -370,6 +370,10 @@ impl EngineHandle {
             .await
     }
 
+    pub async fn auto_level(&self) -> Result<Result<f32, CoreError>, EngineError> {
+        self.request(|reply| EngineMsg::AutoLevel { reply }).await
+    }
+
     // ---- Phase 7 ----
 
     pub async fn export_image(
@@ -1181,6 +1185,9 @@ impl Engine {
             }
             EngineMsg::SampleColor { x, y, reply } => {
                 let _ = reply.send(self.sample_color(x, y));
+            }
+            EngineMsg::AutoLevel { reply } => {
+                let _ = reply.send(self.auto_level());
             }
             EngineMsg::SegmentDone {
                 generation,

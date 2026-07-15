@@ -157,6 +157,11 @@ export function wbFromPoint(x: number, y: number): Promise<DocDelta> {
   return invoke<DocDelta>("wb_from_point", { x, y });
 }
 
+/** Crop auto-level: dominant line deviation (deg, original space); 0 = none. */
+export function autoLevel(): Promise<number> {
+  return invoke<number>("auto_level");
+}
+
 // ---- Phase 5: catalog ----
 
 export function importFolder(path: string): Promise<number> {

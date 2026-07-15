@@ -135,7 +135,7 @@ fn load_yuv(coord: vec2<i32>) -> vec3<f32> {
 
 /// Separable B3 smooth of YUV at dilated step, sampled from impulse+VST source.
 fn atrous_smooth_yuv(coord: vec2<i32>, level: i32) -> vec3<f32> {
-  let step = 1u << u32(level);
+  let step = i32(1u << u32(level));
   // horizontal into registers via nested vertical (full 5×5 separable)
   var tmp: array<vec3<f32>, 5>;
   for (var i = 0; i < 5; i++) {

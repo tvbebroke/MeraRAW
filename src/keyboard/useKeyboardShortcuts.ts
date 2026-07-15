@@ -2,7 +2,12 @@ import { useEffect } from "react";
 import { useUiStore } from "../state/uiStore";
 import { registerAllCommandHandlers } from "./commands";
 import { getAppKeyboardContext } from "./context";
-import { dispatchKeyEvent, initKeyboardDispatcher, setScopeProvider } from "./dispatcher";
+import {
+  dispatchKeyEvent,
+  initKeyboardDispatcher,
+  invokeCommand,
+  setScopeProvider,
+} from "./dispatcher";
 import { allKeyBindings, buildBindingIndex } from "./loadKeymap";
 import type { KeymapScope } from "./types";
 
@@ -31,6 +36,10 @@ function ensureInit() {
   });
 }
 
+function isMacPlatform(): boolean {
+  return typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform);
+}
+
 /** Mount once at app root — single global keydown dispatcher. */
 export function useKeyboardShortcuts(enabled = true) {
   useEffect(() => {
@@ -39,7 +48,12 @@ export function useKeyboardShortcuts(enabled = true) {
 
     function onKeyDown(e: KeyboardEvent) {
       const ui = useUiStore.getState();
-      if (ui.cropActive && getAppKeyboardContext()?.getMode() === "develop") {
+      const tag = (e.target as HTMLElement | null)?.tagName;
+      const typing =
+        tag === "INPUT" ||
+        tag === "TEXTAREA" ||
+        (e.target as HTMLElement | null)?.isContentEditable;
+      if (ui.cropActive && getAppKeyboardContext()?.getMode() === "develop" && !typing) {
         if (e.key === "Enter") {
           ui.exitCropTool(true);
           e.preventDefault();
@@ -52,6 +66,50 @@ export function useKeyboardShortcuts(enabled = true) {
         }
         if (e.key === "h" || e.key === "H") {
           ui.toggleCropOverlayVisible();
+          e.preventDefault();
+          return;
+        }
+        // Spec: L toggles lights-out while cropping
+        if ((e.key === "l" || e.key === "L") && !e.metaKey && !e.ctrlKey && !e.altKey) {
+          ui.toggleCropLightsOut();
+          e.preventDefault();
+          return;
+        }
+        // Arrow nudge: 1px (Shift = 10px); Ctrl/Cmd+arrows nudge angle 0.1°
+        if (
+          e.key === "ArrowLeft" ||
+          e.key === "ArrowRight" ||
+          e.key === "ArrowUp" ||
+          e.key === "ArrowDown"
+        ) {
+          const id =
+            e.metaKey || e.ctrlKey
+              ? "develop-module---tools:nudge-crop-angle"
+              : "develop-module---tools:nudge-crop";
+          const chord = [
+            e.metaKey || e.ctrlKey ? (isMacPlatform() ? "Cmd" : "Ctrl") : null,
+            e.shiftKey ? "Shift" : null,
+            e.key.replace("Arrow", ""),
+          ]
+            .filter(Boolean)
+            .join("+");
+          void invokeCommand(id, chord);
+          e.preventDefault();
+          return;
+        }
+        if (e.key === "0" && !e.metaKey && !e.ctrlKey && !e.altKey) {
+          void invokeCommand("develop-module---tools:reset-crop-angle", "0");
+          e.preventDefault();
+          return;
+        }
+        // Ctrl/Cmd+Alt+C/V — copy/paste crop
+        if ((e.metaKey || e.ctrlKey) && e.altKey && (e.key === "c" || e.key === "C")) {
+          void invokeCommand("develop-module---tools:copy-crop", "Cmd+Alt+C");
+          e.preventDefault();
+          return;
+        }
+        if ((e.metaKey || e.ctrlKey) && e.altKey && (e.key === "v" || e.key === "V")) {
+          void invokeCommand("develop-module---tools:paste-crop", "Cmd+Alt+V");
           e.preventDefault();
           return;
         }

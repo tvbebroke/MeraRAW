@@ -36,17 +36,16 @@ impl ViewParams {
         })
     }
 
+    /// Fit scale against the displayed CONTENT (crop region when a crop is
+    /// committed, rotated full image while the crop tool edits geometry).
     pub fn effective_scale_crop(
         &self,
         img_w: u32,
         img_h: u32,
         crop: &crate::crop::CropParams,
     ) -> f32 {
-        let (ew, eh) = if crop.apply_enabled(self.crop_preview) {
-            crop.effective_size(img_w, img_h)
-        } else {
-            (img_w as f32, img_h as f32)
-        };
+        let mode = crop.mode(self.crop_preview);
+        let (ew, eh) = crop.content_dims(img_w, img_h, mode);
         self.scale
             .unwrap_or_else(|| (self.out_w as f32 / ew).min(self.out_h as f32 / eh))
     }
