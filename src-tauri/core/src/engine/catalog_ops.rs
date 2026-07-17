@@ -37,14 +37,19 @@ impl Engine {
         let cat = self.catalog_mut()?;
         let selected_only = only_paths.is_some();
         let files = only_paths.unwrap_or_else(|| crate::catalog::scan_folder(&root));
+        let root_canon = root.canonicalize().unwrap_or_else(|_| root.clone());
         let todo: Vec<PathBuf> = files
             .into_iter()
             .filter(|p| {
                 if !p.exists() {
                     return false;
                 }
+                // Selected-only imports must stay under the chosen root.
                 if selected_only {
-                    return true;
+                    let Ok(pc) = p.canonicalize() else {
+                        return false;
+                    };
+                    return pc.starts_with(&root_canon);
                 }
                 let m = std::fs::metadata(p)
                     .ok()

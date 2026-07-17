@@ -832,8 +832,8 @@ fn prepare_batch_image(path: &Path, skip_edits: bool) -> Result<BatchPrepared, C
     let lut = if skip_edits {
         None
     } else {
-        doc.meta.lut_file.as_ref().and_then(|p| {
-            match crate::lut::CubeLut::load_cube(Path::new(p)) {
+        crate::path_safety::sanitize_lut_path(doc.meta.lut_file.clone()).and_then(|p| {
+            match crate::lut::CubeLut::load_cube(Path::new(&p)) {
                 Ok(c) => Some(Arc::new(c)),
                 Err(e) => {
                     tracing::warn!(error = %e, path = %p, "batch: LUT load failed; exporting without it");

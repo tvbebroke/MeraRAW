@@ -67,14 +67,8 @@ commands.allow = [
   "assistant_available",
   "assistant_send",
   "report_problem",
-  "autoopen_path",
-  "selftest_enabled",
-  "live_assistant_enabled",
-  "verify_slider_enabled",
-  "report_frontend_status",
   "reveal_in_finder",
   "license_check_local",
-  "license_save_token",
   "license_clear_token",
   "license_verify_token_locally",
   "license_sign_in_and_activate",
@@ -85,7 +79,12 @@ commands.allow = [
 
 [[permission]]
 identifier = "allow-dev-probes"
-description = "Debug-only intentional error probe."
+description = "Debug/dig-only IPC probes (selftest, autoopen, frontend status). Not granted in production meraraw-ipc."
 commands.allow = [
   "fail_on_purpose",
+  "autoopen_path",
+  "selftest_enabled",
+  "live_assistant_enabled",
+  "verify_slider_enabled",
+  "report_frontend_status",
 ]

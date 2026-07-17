@@ -250,8 +250,8 @@ export function setAssetMeta(
   return invoke("set_asset_meta", { ids, patch });
 }
 
-export function rebuildIndex(): Promise<number> {
-  return invoke<number>("rebuild_index");
+export function rebuildIndex(confirm = true): Promise<number> {
+  return invoke<number>("rebuild_index", { confirm });
 }
 
 /** Toggle viewport mask overlay (null = off). */

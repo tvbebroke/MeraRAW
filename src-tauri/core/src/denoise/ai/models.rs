@@ -72,12 +72,17 @@ impl ModelRegistry {
         let dir = self.dir();
         let path = dir.join("nind-utnet-v2.onnx");
         let on_disk = path.is_file();
-        // When a pinned digest is configured, require a match for `ready`.
-        // None for now — stand-in until the real weight file is published.
+        // Pin before ready=true. None until the published weight digest is set.
+        // Unpinned on-disk files are treated as not-ready unless explicitly
+        // allowed (tests / local dig via MERARAW_DENOISE_ALLOW_UNPINNED=1 or
+        // MERARAW_DENOISE_MODELS_DIR).
         let expected_sha256: Option<&'static str> = None;
+        let allow_unpinned = std::env::var_os("MERARAW_DENOISE_ALLOW_UNPINNED")
+            .is_some_and(|v| v == "1")
+            || std::env::var_os("MERARAW_DENOISE_MODELS_DIR").is_some_and(|v| !v.is_empty());
         let hash_ok = match (on_disk, expected_sha256) {
             (false, _) => false,
-            (true, None) => true,
+            (true, None) => allow_unpinned,
             (true, Some(expect)) => verify_sha256(&path, expect),
         };
         let ready = hash_ok;

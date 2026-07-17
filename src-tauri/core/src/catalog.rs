@@ -129,6 +129,10 @@ pub struct MetaPatch {
     pub remove_keyword: Option<String>,
 }
 
+fn is_allowed_flag(flag: &str) -> bool {
+    matches!(flag, "none" | "pick" | "reject")
+}
+
 pub struct Catalog {
     conn: Connection,
     dir: PathBuf,
@@ -746,6 +750,9 @@ impl Catalog {
                 .map_err(db_err)?;
             }
             if let Some(f) = &patch.flag {
+                if !is_allowed_flag(f) {
+                    return Err(CoreError::InvalidOp(format!("invalid flag: {f}")));
+                }
                 tx.execute(
                     "UPDATE assets SET flag = ?1 WHERE id = ?2",
                     rusqlite::params![f, id],

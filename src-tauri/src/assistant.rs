@@ -14,12 +14,69 @@ use meratech_core::engine::EngineHandle;
 use meratech_core::ops::Op;
 use meratech_core::registry;
 use serde_json::{json, Value};
+use std::sync::Mutex;
+use std::time::{Duration, Instant};
 use tauri::{AppHandle, Emitter};
 
 const API_URL: &str = "https://api.anthropic.com/v1/messages";
 const MAX_LOOP_TURNS: usize = 8;
 const PREVIEW_DIM: u32 = 576; // smaller = far fewer image tokens per turn
 const MAX_TOKENS: u32 = 1024;
+/// Min gap between assistant_send calls (API burn + preview egress).
+const ASSISTANT_MIN_INTERVAL: Duration = Duration::from_secs(3);
+/// Rolling window cap.
+const ASSISTANT_MAX_PER_MINUTE: u32 = 12;
+
+struct RateLimit {
+    last: Option<Instant>,
+    window_start: Instant,
+    window_count: u32,
+}
+
+impl RateLimit {
+    fn new() -> Self {
+        Self {
+            last: None,
+            window_start: Instant::now(),
+            window_count: 0,
+        }
+    }
+
+    fn check_and_record(&mut self) -> Result<(), AppError> {
+        let now = Instant::now();
+        if let Some(last) = self.last {
+            if now.duration_since(last) < ASSISTANT_MIN_INTERVAL {
+                return Err(AppError::InvalidOp(
+                    "Assistant is cooling down — wait a few seconds.".into(),
+                ));
+            }
+        }
+        if now.duration_since(self.window_start) >= Duration::from_secs(60) {
+            self.window_start = now;
+            self.window_count = 0;
+        }
+        if self.window_count >= ASSISTANT_MAX_PER_MINUTE {
+            return Err(AppError::InvalidOp(
+                "Assistant rate limit reached — try again in a minute.".into(),
+            ));
+        }
+        self.last = Some(now);
+        self.window_count += 1;
+        Ok(())
+    }
+}
+
+static ASSISTANT_RATE: Mutex<Option<RateLimit>> = Mutex::new(None);
+
+fn take_assistant_slot() -> Result<(), AppError> {
+    let mut guard = ASSISTANT_RATE
+        .lock()
+        .map_err(|_| AppError::Internal("assistant rate lock poisoned".into()))?;
+    if guard.is_none() {
+        *guard = Some(RateLimit::new());
+    }
+    guard.as_mut().unwrap().check_and_record()
+}
 
 fn model() -> String {
     std::env::var("ANTHROPIC_MODEL").unwrap_or_else(|_| "claude-sonnet-4-6".into())
@@ -560,6 +617,14 @@ pub async fn assistant_send(
     message: String,
     mode: Option<String>,
 ) -> Result<String, AppError> {
+    take_assistant_slot()?;
+    let message = message.trim().to_string();
+    if message.is_empty() {
+        return Err(AppError::InvalidOp("Empty assistant message.".into()));
+    }
+    if message.len() > 8_192 {
+        return Err(AppError::InvalidOp("Assistant message too long.".into()));
+    }
     let text = run(
         app.clone(),
         engine.inner().clone(),

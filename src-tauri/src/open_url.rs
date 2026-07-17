@@ -10,9 +10,10 @@ fn host_allowed(host: &str) -> bool {
     h == "meratech.co"
         || h == "www.meratech.co"
         || h.ends_with(".meratech.co")
-        || h.ends_with(".supabase.co")
-        || h == "stripe.com"
-        || h.ends_with(".stripe.com")
+        // Exact project host + Stripe checkout only (no broad *.supabase.co).
+        || h == "kaanlfnxoyrjrgqrxcuz.supabase.co"
+        || h == "checkout.stripe.com"
+        || h == "billing.stripe.com"
 }
 
 fn is_blocked_ip(ip: IpAddr) -> bool {
@@ -106,6 +107,7 @@ mod tests {
         assert!(host_allowed("www.meratech.co"));
         assert!(host_allowed("checkout.stripe.com"));
         assert!(host_allowed("kaanlfnxoyrjrgqrxcuz.supabase.co"));
+        assert!(!host_allowed("evil.supabase.co"));
         assert!(!host_allowed("evil.example"));
     }
 }

@@ -34,7 +34,13 @@ pub fn ensure_readable(path: &Path) -> Result<(), AppError> {
         Err(e) if is_permission_denied(&e) => {
             Err(AppError::Decode(permission_denied_message(path)))
         }
-        Err(e) => Err(AppError::Io(format!("cannot open {}: {e}", path.display()))),
+        Err(e) => {
+            let name = path
+                .file_name()
+                .map(|n| n.to_string_lossy().into_owned())
+                .unwrap_or_else(|| "file".into());
+            Err(AppError::Io(format!("cannot open {name}: {e}")))
+        }
     }
 }
 
@@ -184,5 +190,13 @@ mod tests {
     fn normalizes_dotdot() {
         let p = validate_user_path("/tmp/a/../b").unwrap();
         assert!(!p.to_string_lossy().contains(".."));
+    }
+
+    #[test]
+    fn rejects_ssh_denylist() {
+        assert!(validate_user_path("/Users/test/.ssh/id_rsa").is_err());
+        assert!(validate_user_path("/home/x/.ssh/config").is_err());
+        assert!(validate_user_path("/Users/test/.gnupg/secring.gpg").is_err());
+        assert!(validate_user_path("/etc/passwd").is_err());
     }
 }

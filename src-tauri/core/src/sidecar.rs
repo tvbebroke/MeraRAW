@@ -49,6 +49,12 @@ pub fn load_sidecar(source: &Path) -> Result<Option<EditDoc>, CoreError> {
     let mut doc = EditDoc::from_json(value).map_err(CoreError::Io)?;
     // Bind to the opened image — ignore any attacker-controlled source_ref.path.
     doc.source_ref.path = source.to_string_lossy().into_owned();
+    // Sidecar lut_file never went through IPC path validation — drop unsafe paths.
+    let before = doc.meta.lut_file.clone();
+    doc.meta.lut_file = crate::path_safety::sanitize_lut_path(doc.meta.lut_file.take());
+    if before.is_some() && doc.meta.lut_file.is_none() {
+        tracing::warn!("sidecar lut_file rejected by path safety; cleared");
+    }
     Ok(Some(doc))
 }
 

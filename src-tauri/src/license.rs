@@ -8,6 +8,10 @@ use tauri::{AppHandle, Manager};
 
 const LICENSE_PUBLIC_KEY_PEM: &str = include_str!("../license-public.pem");
 const TOKEN_FILE: &str = "license.jwt";
+/// Must match the issuer written by verify-license (Supabase Edge Function).
+const LICENSE_ISS: &str = "https://meratech.co";
+/// Audience bound to this desktop app.
+const LICENSE_AUD: &str = "meraraw";
 
 #[derive(Debug, Deserialize)]
 struct LicenseClaims {
@@ -51,6 +55,15 @@ fn verify_token(token: &str) -> Result<LicenseClaims, AppError> {
         .map_err(|e| AppError::Internal(format!("license public key: {e}")))?;
     let mut validation = Validation::new(Algorithm::ES256);
     validation.validate_exp = true;
+    // Default: require iss/aud (must match verify-license Edge Function).
+    // MERARAW_LICENSE_RELAX_ISS_AUD=1 keeps older tokens working during migration.
+    let relax = std::env::var("MERARAW_LICENSE_RELAX_ISS_AUD").as_deref() == Ok("1");
+    if relax {
+        validation.validate_aud = false;
+    } else {
+        validation.set_issuer(&[LICENSE_ISS]);
+        validation.set_audience(&[LICENSE_AUD]);
+    }
     let data = decode::<LicenseClaims>(token, &key, &validation)
         .map_err(|e| AppError::Internal(format!("invalid license token: {e}")))?;
     if data.claims.status != "active" {
@@ -119,16 +132,22 @@ pub fn license_check_local(app: AppHandle) -> LicenseCheckResult {
     }
 }
 
-#[tauri::command]
-pub fn license_save_token(app: AppHandle, token: String) -> Result<(), AppError> {
+/// Persist a verified license token. Not exposed over IPC — only called from
+/// the native sign-in / activate path.
+fn save_token(app: &AppHandle, token: &str) -> Result<(), AppError> {
     verify_token(token.trim())?;
-    let path = token_path(&app)?;
+    let path = token_path(app)?;
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent)
             .map_err(|e| AppError::Internal(format!("create app data dir: {e}")))?;
     }
     std::fs::write(&path, token.trim())
         .map_err(|e| AppError::Internal(format!("write license token: {e}")))?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let _ = std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600));
+    }
     Ok(())
 }
 
@@ -150,8 +169,27 @@ pub fn license_verify_token_locally(token: String) -> Result<bool, AppError> {
 const DEFAULT_SUPABASE_URL: &str = "https://kaanlfnxoyrjrgqrxcuz.supabase.co";
 const DEFAULT_SUPABASE_ANON_KEY: &str = "sb_publishable_7HICr8pQlJLALuYJzMrhjQ_mzaQt_4U";
 
-fn supabase_url() -> String {
-    std::env::var("VITE_SUPABASE_URL").unwrap_or_else(|_| DEFAULT_SUPABASE_URL.into())
+fn supabase_host_allowed(host: &str) -> bool {
+    host.eq_ignore_ascii_case("kaanlfnxoyrjrgqrxcuz.supabase.co")
+}
+
+fn supabase_url() -> Result<String, AppError> {
+    let raw = std::env::var("VITE_SUPABASE_URL").unwrap_or_else(|_| DEFAULT_SUPABASE_URL.into());
+    let parsed = url::Url::parse(&raw)
+        .map_err(|_| AppError::Internal("Invalid VITE_SUPABASE_URL.".into()))?;
+    if parsed.scheme() != "https" {
+        return Err(AppError::Internal("VITE_SUPABASE_URL must be https.".into()));
+    }
+    let host = parsed
+        .host_str()
+        .ok_or_else(|| AppError::Internal("Invalid VITE_SUPABASE_URL host.".into()))?;
+    if !supabase_host_allowed(host) {
+        return Err(AppError::Internal(
+            "VITE_SUPABASE_URL host not allowed.".into(),
+        ));
+    }
+    // Normalize to origin (no credentials / fragment).
+    Ok(format!("https://{host}"))
 }
 
 fn supabase_anon_key() -> String {
@@ -170,8 +208,8 @@ async fn http_text(resp: reqwest::Response) -> Result<String, AppError> {
     if status.is_success() {
         Ok(body)
     } else {
-        // Keep a short body snippet for known config probes; log the rest.
-        tracing::warn!(%status, body = %body, "license http error");
+        // Never log full error bodies (may contain tokens / PII).
+        tracing::warn!(%status, body_len = body.len(), "license http error");
         let hint = if body.contains("No active license") {
             "No beta license yet. Sign up and log in on meratech.co first, then try again."
         } else if body.contains("STRIPE_PRICE_ID") {
@@ -201,7 +239,7 @@ pub async fn license_sign_in_and_activate(
         return Err(AppError::Internal("Enter email and password.".into()));
     }
 
-    let base = supabase_url();
+    let base = supabase_url()?;
     let anon = supabase_anon_key();
     let client = reqwest::Client::new();
 
@@ -270,7 +308,7 @@ pub async fn license_sign_in_and_activate(
         .as_str()
         .ok_or_else(|| AppError::Internal("Activation did not return a license token.".into()))?;
 
-    license_save_token(app, token.to_string())?;
+    save_token(&app, token)?;
     Ok(user_id)
 }
 
@@ -337,7 +375,7 @@ pub async fn license_start_checkout(email: String, password: String) -> Result<S
         return Err(AppError::Internal("Enter email and password.".into()));
     }
 
-    let base = supabase_url();
+    let base = supabase_url()?;
     let anon = supabase_anon_key();
     let client = reqwest::Client::new();
 

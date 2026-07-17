@@ -16,6 +16,7 @@ pub mod image;
 pub mod lut;
 pub mod message;
 pub mod ops;
+pub mod path_safety;
 pub mod profile;
 pub mod raw;
 pub mod registry;

@@ -362,10 +362,21 @@ pub async fn switch_doc(
     engine.switch_doc(docId).await?.map_err(AppError::from)
 }
 
+fn dig_surface_enabled() -> bool {
+    cfg!(debug_assertions)
+        || std::env::var("MERATECH_SELFTEST").is_ok_and(|v| !v.is_empty())
+        || std::env::var("MERATECH_LIVE_ASSISTANT").is_ok_and(|v| !v.is_empty())
+        || std::env::var("MERATECH_VERIFY_SLIDER").is_ok_and(|v| !v.is_empty())
+        || std::env::var("MERATECH_OPEN").is_ok_and(|v| !v.is_empty())
+}
+
 /// Dev/test hook: MERATECH_OPEN=<path> auto-opens a file on launch.
 /// Frontend polls this once at boot (deterministic, no event race).
 #[tauri::command]
 pub async fn autoopen_path() -> Result<Option<String>, AppError> {
+    if !dig_surface_enabled() {
+        return Ok(None);
+    }
     Ok(std::env::var("MERATECH_OPEN").ok().filter(|s| !s.is_empty()))
 }
 
@@ -423,6 +434,8 @@ pub async fn export_image(
 /// Batch export: engine decodes + renders each path off the open image.
 /// Returns the accepted queue length; progress arrives as
 /// export-batch-progress / export-batch-done events.
+const MAX_EXPORT_BATCH: usize = 500;
+
 #[tauri::command]
 pub async fn export_batch(
     app: AppHandle,
@@ -430,6 +443,14 @@ pub async fn export_batch(
     paths: Vec<String>,
     mut settings: meratech_core::export::ExportSettings,
 ) -> Result<u32, AppError> {
+    if paths.is_empty() {
+        return Err(AppError::InvalidOp("export batch empty".into()));
+    }
+    if paths.len() > MAX_EXPORT_BATCH {
+        return Err(AppError::InvalidOp(format!(
+            "export batch too large (max {MAX_EXPORT_BATCH})"
+        )));
+    }
     if settings.dest_dir.trim().is_empty() {
         let app2 = app.clone();
         let picked = tauri::async_runtime::spawn_blocking(move || {
@@ -574,9 +595,19 @@ pub async fn import_selected(
     paths: Vec<String>,
 ) -> Result<u64, AppError> {
     let root = crate::paths::validate_existing_path(&root)?;
+    let root_canon = root
+        .canonicalize()
+        .unwrap_or_else(|_| root.clone());
     let mut validated = Vec::with_capacity(paths.len());
     for p in paths {
-        validated.push(crate::paths::validate_existing_path(&p)?);
+        let path = crate::paths::validate_existing_path(&p)?;
+        let canon = path.canonicalize().unwrap_or_else(|_| path.clone());
+        if !canon.starts_with(&root_canon) {
+            return Err(AppError::InvalidOp(
+                "import path outside selected folder".into(),
+            ));
+        }
+        validated.push(path);
     }
     engine
         .import_selected(root, validated)
@@ -702,7 +733,15 @@ pub async fn set_asset_meta(
 }
 
 #[tauri::command]
-pub async fn rebuild_index(engine: State<'_, EngineHandle>) -> Result<u64, AppError> {
+pub async fn rebuild_index(
+    engine: State<'_, EngineHandle>,
+    confirm: bool,
+) -> Result<u64, AppError> {
+    if !confirm {
+        return Err(AppError::InvalidOp(
+            "rebuild_index requires confirm: true".into(),
+        ));
+    }
     engine.rebuild_index().await?.map_err(AppError::from)
 }
 
@@ -734,22 +773,34 @@ pub async fn set_display_look(
 
 #[tauri::command]
 pub async fn selftest_enabled() -> Result<bool, AppError> {
+    if !dig_surface_enabled() {
+        return Ok(false);
+    }
     Ok(std::env::var("MERATECH_SELFTEST").is_ok_and(|v| !v.is_empty()))
 }
 
 #[tauri::command]
 pub async fn live_assistant_enabled() -> Result<bool, AppError> {
+    if !dig_surface_enabled() {
+        return Ok(false);
+    }
     Ok(std::env::var("MERATECH_LIVE_ASSISTANT").is_ok_and(|v| !v.is_empty()))
 }
 
 #[tauri::command]
 pub async fn verify_slider_enabled() -> Result<bool, AppError> {
+    if !dig_surface_enabled() {
+        return Ok(false);
+    }
     Ok(std::env::var("MERATECH_VERIFY_SLIDER").is_ok_and(|v| !v.is_empty()))
 }
 
 /// DoD item 7: intentional error → typed AppError in the frontend.
 #[tauri::command]
 pub async fn fail_on_purpose() -> Result<(), AppError> {
+    if !dig_surface_enabled() {
+        return Err(AppError::InvalidOp("probe disabled".into()));
+    }
     Err(AppError::Internal("intentional error probe".into()))
 }
 
@@ -757,6 +808,10 @@ pub async fn fail_on_purpose() -> Result<(), AppError> {
 /// frontend booted and the frame:// path worked, by grepping dev output.
 #[tauri::command]
 pub async fn report_frontend_status(status: String) -> Result<(), AppError> {
+    if !dig_surface_enabled() {
+        return Ok(());
+    }
+    let status = status.chars().take(512).collect::<String>();
     tracing::info!(status = %status, "FRONTEND-REPORT");
     Ok(())
 }

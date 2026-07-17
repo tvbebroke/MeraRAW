@@ -88,6 +88,8 @@ impl Engine {
         });
 
         // Restore a previously-applied look LUT from the sidecar path, if any.
+        // Re-check path safety here (defense in depth vs. older sidecars).
+        doc.meta.lut_file = crate::path_safety::sanitize_lut_path(doc.meta.lut_file.take());
         let lut_cube = doc.meta.lut_file.as_ref().and_then(|p| {
             match crate::lut::CubeLut::load_cube(std::path::Path::new(p)) {
                 Ok(c) => Some(std::sync::Arc::new(c)),
@@ -345,17 +347,24 @@ impl Engine {
             return;
         };
         match path {
-            Some(p) => match crate::lut::CubeLut::load_cube(std::path::Path::new(&p)) {
-                Ok(cube) => {
-                    cur.lut_cube = Some(std::sync::Arc::new(cube));
-                    cur.doc_mut().meta.lut_file = Some(p);
-                    cur.doc_dirty = true;
-                }
-                Err(e) => {
-                    let _ = reply.send(Err(e));
+            Some(p) => {
+                let Some(safe) = crate::path_safety::sanitize_user_path(&p) else {
+                    let _ = reply.send(Err(CoreError::InvalidOp("path not allowed".into())));
                     return;
+                };
+                let safe_s = safe.to_string_lossy().into_owned();
+                match crate::lut::CubeLut::load_cube(&safe) {
+                    Ok(cube) => {
+                        cur.lut_cube = Some(std::sync::Arc::new(cube));
+                        cur.doc_mut().meta.lut_file = Some(safe_s);
+                        cur.doc_dirty = true;
+                    }
+                    Err(e) => {
+                        let _ = reply.send(Err(e));
+                        return;
+                    }
                 }
-            },
+            }
             None => {
                 cur.lut_cube = None;
                 cur.doc_mut().meta.lut_file = None;

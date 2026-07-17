@@ -115,9 +115,13 @@ export function LicenseGate({ children }: { children: React.ReactNode }) {
         <h1>Sign in to activate beta</h1>
         <p className="muted">
           Use your free{" "}
-          <a href={PURCHASE_URL} target="_blank" rel="noreferrer">
+          <button
+            type="button"
+            className="license-link"
+            onClick={() => void invoke("open_external_url", { url: PURCHASE_URL })}
+          >
             meratech.co
-          </a>{" "}
+          </button>{" "}
           account (sign up there first if you haven&apos;t). Activation checks online once,
           then works offline.
         </p>
@@ -164,9 +168,13 @@ export function LicenseGate({ children }: { children: React.ReactNode }) {
 
         <p className="muted sm license-foot">
           No account yet?{" "}
-          <a href={PURCHASE_URL} target="_blank" rel="noreferrer">
+          <button
+            type="button"
+            className="license-link"
+            onClick={() => void invoke("open_external_url", { url: PURCHASE_URL })}
+          >
             Sign up free on meratech.co
-          </a>
+          </button>
           <br />
           <span style={{ opacity: 0.6 }}>Build 0.1.0 · native sign-in</span>
         </p>

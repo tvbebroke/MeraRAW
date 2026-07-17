@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-auto-level"
+description = "Enables the auto_level command without any pre-configured scope."
+commands.allow = ["auto_level"]
+
+[[permission]]
+identifier = "deny-auto-level"
+description = "Denies the auto_level command without any pre-configured scope."
+commands.deny = ["auto_level"]

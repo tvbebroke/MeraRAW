@@ -307,22 +307,22 @@ fn main() {
             assistant::assistant_available,
             assistant::assistant_send,
             commands::report_problem,
-            commands::autoopen_path,
-            commands::selftest_enabled,
-            commands::live_assistant_enabled,
-            commands::verify_slider_enabled,
-            #[cfg(debug_assertions)]
-            commands::fail_on_purpose,
-            commands::report_frontend_status,
             commands::reveal_in_finder,
             license::license_check_local,
-            license::license_save_token,
             license::license_clear_token,
             license::license_verify_token_locally,
             license::license_sign_in_and_activate,
             license::license_supporter_status,
             license::license_start_checkout,
             license::open_external_url,
+            // Dig / selftest probes — ACL-gated to allow-dev-probes (debug capability).
+            commands::autoopen_path,
+            commands::selftest_enabled,
+            commands::live_assistant_enabled,
+            commands::verify_slider_enabled,
+            commands::report_frontend_status,
+            #[cfg(debug_assertions)]
+            commands::fail_on_purpose,
         ])
         .setup(move |app| {
             if std::env::var("MERATECH_BUNDLED_PRESETS").is_err() {
