@@ -1,0 +1,35 @@
+[package]
+name = "merawler"
+version = "0.1.0"
+edition = "2021"
+description = "Custom RAW demosaic engine (RCD, LMMSE, AMaZE, IGV, DDFAPD) for MeraRAW"
+license = "LicenseRef-proprietary"
+publish = false
+
+[features]
+# Core lib has zero dependencies and is fully unit-testable on synthetic mosaics.
+# The `decode` feature adds the rawler-backed adapter + the CLI (real RAW -> PNG).
+default = []
+decode = ["dep:rawler", "dep:image"]
+# `bench` adds the synthetic ground-truth benchmark binary (needs image I/O only).
+bench = ["dep:image"]
+
+[dependencies]
+rawler = { version = "0.7", optional = true }
+image = { version = "0.25", optional = true, default-features = false, features = ["png"] }
+
+[[bin]]
+name = "merawler"
+required-features = ["decode"]
+
+[[bin]]
+name = "bench"
+required-features = ["bench"]
+
+[[bin]]
+name = "montage"
+required-features = ["bench"]
+
+[profile.release]
+opt-level = 3
+lto = "thin"

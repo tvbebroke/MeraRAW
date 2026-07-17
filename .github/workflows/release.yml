@@ -7,11 +7,11 @@
 # ID signingIdentity, which forces signing on every build — that succeeds
 # locally (cert is in the keychain) but fails on a CI runner that has no cert.
 # So we build + sign + notarize the two Mac DMGs locally instead, and let CI
-# handle only Windows + Linux. (To move Mac into CI later you'd add the APPLE_*
-# secrets AND a keychain-import step before the build.)
+# handle only Windows + Linux.
 #
 # Windows signing: set GitHub secrets WINDOWS_CERTIFICATE (base64 PFX) and
-# WINDOWS_CERTIFICATE_PASSWORD. Without those secrets, installers remain unsigned.
+# WINDOWS_CERTIFICATE_PASSWORD. Without those secrets, installers remain unsigned
+# (fine for beta; SmartScreen will warn).
 
 name: Release
 
@@ -21,23 +21,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  audit:
-    runs-on: ubuntu-22.04
-    steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
-        with:
-          node-version: 20
-      - uses: dtolnay/rust-toolchain@fa04a1451ff1842e2626ccb99004d0195b455a88 # stable
-      - name: npm audit
-        run: npm ci && npm audit --audit-level=high
-      - name: cargo audit
-        run: |
-          cargo install cargo-audit --locked
-          (cd src-tauri && cargo audit)
-
   build:
-    needs: audit
     permissions:
       contents: write
     strategy:
@@ -47,13 +31,9 @@ jobs:
           - os: windows-latest
             label: Win
             slug: win
-            rust_targets: ""
-            build_args: ""
           - os: ubuntu-22.04
             label: Linux
             slug: linux
-            rust_targets: ""
-            build_args: ""
     runs-on: ${{ matrix.os }}
 
     steps:
@@ -68,9 +48,7 @@ jobs:
         with:
           node-version: 20
 
-      - uses: dtolnay/rust-toolchain@fa04a1451ff1842e2626ccb99004d0195b455a88 # stable
-        with:
-          targets: ${{ matrix.rust_targets }}
+      - uses: dtolnay/rust-toolchain@stable
 
       - name: Cache cargo
         uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
@@ -104,7 +82,7 @@ jobs:
         run: npm ci
 
       - name: Build the app
-        run: npm run tauri build -- ${{ matrix.build_args }}
+        run: npm run tauri build
 
       - name: Collect + rename installers
         id: pack

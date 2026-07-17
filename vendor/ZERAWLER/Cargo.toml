@@ -1,0 +1,34 @@
+[package]
+name = "zerawler"
+version = "0.1.0"
+edition = "2021"
+description = "Sidecar RAW engine — delegates demosaicing to external reference binaries (RawTherapee CLI, LibRaw dcraw_emu) across a process boundary"
+license = "LicenseRef-proprietary"
+publish = false
+
+# The zerawler crate itself contains no GPL code: it only spawns external
+# executables (Tauri-sidecar style) and parses their image output. The
+# workers keep their own licenses:
+#   rawtherapee-cli  — GPL-3.0 (RCD / LMMSE / AMaZE)
+#   dcraw_emu/LibRaw — LGPL-2.1 OR CDDL-1.0 (DHT / AHD / DCB / AAHD)
+
+[features]
+# `validate` pulls in merawler (our in-process engine) as colorimetric ground
+# truth for certifying the RT backend's Native output contract.
+validate = ["dep:merawler", "dep:rawler"]
+
+[dependencies]
+image = { version = "0.25", default-features = false, features = ["png", "tiff"] }
+tempfile = "3"
+merawler = { path = "../MERAWLER", features = ["decode"], optional = true }
+rawler = { version = "0.7", optional = true }
+
+[[bin]]
+name = "zerawler"
+
+[[bin]]
+name = "validate_rt"
+required-features = ["validate"]
+
+[profile.release]
+opt-level = 3

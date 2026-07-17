@@ -1,0 +1,6 @@
+/target
+*.png
+*.tif
+.DS_Store
+# resigned worker binaries (30MB copies; recreate per README "macOS gotcha")
+/workers/

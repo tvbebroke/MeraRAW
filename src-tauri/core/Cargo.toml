@@ -16,12 +16,13 @@ wgpu = "24"
 rawler = "0.7"
 # Custom demosaic engine (RCD/LMMSE/AMaZE/IGV/DDFAPD). Core only — we feed it a
 # CfaImage built from rawler's rescaled mosaic, so no merawler `decode` feature.
-merawler = { path = "../../../MERAWLER" }
+# Vendored under repo `vendor/` so CI/Windows/Linux builds don't need sibling checkouts.
+merawler = { path = "../../vendor/MERAWLER" }
 # Sidecar demosaic engine: spawns external reference binaries (rawtherapee-cli,
 # dcraw_emu) across a process boundary. Contracts validated 2026-07-05:
 #   RT native  = Rec.2020 primaries + sRGB TRC + camera WB (decode TRC → working)
 #   DHT native = linear camera-native, unity WB, levels forced to rawler's
-zerawler = { path = "../../../ZERAWLER" }
+zerawler = { path = "../../vendor/ZERAWLER" }
 image = { version = "0.25", default-features = false, features = ["jpeg", "png", "tiff", "webp", "bmp", "gif"] }
 # Direct handles to image's own codec crates so we can embed ICC profiles
 # (png iCCP / tiff ICCProfile tag) that image::save doesn't expose.
