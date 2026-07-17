@@ -1,0 +1,54 @@
+@import "tailwindcss";
+
+@theme {
+  --color-window: #272727;
+  --color-panel: #111113;
+  --color-panel-2: #232325;
+  --color-panel-3: #2e2e30;
+  --color-accent: #ffffff;
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro", "Segoe UI",
+    system-ui, sans-serif;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: transparent;
+  font-family: var(--font-sans);
+  color: rgba(255, 255, 255, 0.9);
+  overflow: hidden;
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: default;
+}
+
+/* Super minimal and thin scrollbars for a premium, clean UI */
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+/* Standard cross-browser properties */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.12) transparent;
+}
+

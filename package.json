@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
+    "build": "svelte-check --tsconfig ./tsconfig.json && vite build",
+    "check": "svelte-check --tsconfig ./tsconfig.json",
     "preview": "vite preview",
     "tauri": "tauri",
     "import-presets": "node scripts/import-lightroom-presets.mjs",
@@ -16,15 +17,16 @@
   },
   "dependencies": {
     "@tauri-apps/api": "^2",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "zustand": "^5"
+    "nanostores": "^1.0.1",
+    "svelte-spa-router": "^5"
   },
   "devDependencies": {
+    "@sveltejs/vite-plugin-svelte": "^5.0.0",
+    "@tailwindcss/vite": "^4.0.0",
     "@tauri-apps/cli": "^2",
-    "@types/react": "^18.3.3",
-    "@types/react-dom": "^18.3.0",
-    "@vitejs/plugin-react": "^4.3.1",
+    "svelte": "^5.0.0",
+    "svelte-check": "^4.0.0",
+    "tailwindcss": "^4.0.0",
     "typescript": "^5.5.3",
     "vite": "^6",
     "vitest": "^4.1.10"

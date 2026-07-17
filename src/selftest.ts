@@ -15,7 +15,7 @@ import {
   wbFromPoint,
 } from "./ipc/commands";
 import { onFrameReady, onMaskReady } from "./ipc/events";
-import { frameUrl } from "./viewport/Viewport";
+import { frameUrl } from "./lib/engine/frame";
 
 function nextMaskReady(timeoutMs = 30000): Promise<string> {
   return new Promise((resolve, reject) => {
