@@ -11,6 +11,10 @@ impl Engine {
         reply: oneshot::Sender<Result<ImageMeta, CoreError>>,
     ) {
         self.flush_sidecar_now();
+        // A running AI denoise job belongs to the outgoing image — its result
+        // would be dropped as stale anyway, so stop burning the CPU.
+        self.ai_denoise.cancel_active();
+        self.pending_denoise = None;
         self.generation += 1;
         let generation = self.generation;
 
@@ -204,10 +208,14 @@ impl Engine {
             cur.meta.available_profiles = available_profiles;
             cur.meta.available_profile_files = available_profile_files;
         }
-        // The graph caches by view key + module dirtiness and never tracks the
-        // working texture's identity. On a re-decode (set_demosaic) the view is
-        // unchanged, so without a full invalidation the render below serves the
-        // previous decode's cached pixels.
+        self.rerender_after_base_change();
+    }
+
+    /// The working master was replaced (re-decode, AI denoise). The graph
+    /// caches by view key + module dirtiness and never tracks the working
+    /// texture's identity — on an unchanged view a render without full
+    /// invalidation serves the previous base's cached pixels.
+    pub(super) fn rerender_after_base_change(&mut self) {
         if let Some(g) = &mut self.graph {
             g.invalidate_all();
         }
@@ -402,7 +410,7 @@ impl Engine {
 
 /// CPU preview when wgpu is unavailable — fit the downscaled working buffer
 /// and apply the same display look as export/present.
-fn cpu_preview_frame(
+pub(super) fn cpu_preview_frame(
     src: &RgbF32Buf,
     camera_look: bool,
     out_w: u32,

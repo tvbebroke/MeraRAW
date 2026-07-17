@@ -44,6 +44,12 @@ impl ModelRegistry {
 
     fn dir(&self) -> PathBuf {
         self.models_dir.clone().unwrap_or_else(|| {
+            // Test/selftest hook: point the default registry somewhere else.
+            if let Some(d) = std::env::var_os("MERARAW_DENOISE_MODELS_DIR") {
+                if !d.is_empty() {
+                    return PathBuf::from(d);
+                }
+            }
             let mut p = dirs_fallback();
             p.push("models");
             p.push("denoise");

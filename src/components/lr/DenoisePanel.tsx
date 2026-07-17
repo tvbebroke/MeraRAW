@@ -1,12 +1,18 @@
 // Noise Reduction panel — Lightroom-simple by default, advanced disclosure
 // for engine/strength/impulse/NLM (denoise/06-ui-ux-spec.md).
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   denoiseAiCancel,
+  denoiseAiReset,
   denoiseAiStart,
   denoiseModelsList,
   setParam,
 } from "../../ipc/commands";
+import {
+  onDenoiseDone,
+  onDenoiseError,
+  onDenoiseProgress,
+} from "../../ipc/events";
 import type { ImageMeta, ParamSpec } from "../../ipc/types";
 import { Panel, ParamSlider, useParam, useRegistry } from "./widgets";
 
@@ -15,11 +21,13 @@ function CheckRow({
   path,
   label,
   meta,
+  onAfterCommit,
 }: {
   specs: ParamSpec[];
   path: string;
   label: string;
   meta: ImageMeta | null;
+  onAfterCommit?: (on: boolean) => void;
 }) {
   const spec = specs.find((s) => s.path === path);
   const safe = spec ?? {
@@ -38,7 +46,10 @@ function CheckRow({
       <input
         type="checkbox"
         checked={on}
-        onChange={(e) => h.commit(e.target.checked ? 1 : 0)}
+        onChange={(e) => {
+          h.commit(e.target.checked ? 1 : 0);
+          onAfterCommit?.(e.target.checked);
+        }}
       />
       <span>{label}</span>
     </label>
@@ -105,13 +116,44 @@ export function DenoisePanel({ meta }: { meta: ImageMeta | null }) {
       .catch(() => setStandIn(false));
   }, []);
 
+  // Cache hits emit denoise-done before denoiseAiStart() resolves; remember
+  // finished jobs so the late resolution doesn't resurrect a Cancel button.
+  const settledJobs = useRef<Set<number>>(new Set());
+
+  // Job lifecycle events (single-flight engine-side, so no job filtering).
+  useEffect(() => {
+    const subs = [
+      onDenoiseProgress((p) => {
+        setAiStatus(
+          `Denoising… ${Math.round(p.pct)}%` +
+            (p.tiles > 0 ? ` (tile ${p.tile}/${p.tiles})` : ""),
+        );
+      }),
+      onDenoiseDone((job) => {
+        settledJobs.current.add(job);
+        setAiJob(null);
+        setAiStatus("Applied ✓");
+      }),
+      onDenoiseError((p) => {
+        settledJobs.current.add(p.job);
+        setAiJob(null);
+        setAiStatus(p.message === "cancelled" ? "Cancelled" : p.message);
+      }),
+    ];
+    return () => {
+      for (const s of subs) void s.then((un) => un());
+    };
+  }, []);
+
   async function runAi() {
     try {
       await setParam("detail.ai_enabled", 1);
       setAiStatus(standIn ? "Queuing (classical stand-in)…" : "Queuing…");
       const job = await denoiseAiStart();
-      setAiJob(job);
-      setAiStatus(`Running job #${job}`);
+      if (!settledJobs.current.has(job)) {
+        setAiJob(job);
+        setAiStatus(`Running job #${job}`);
+      }
     } catch (e) {
       setAiStatus(e instanceof Error ? e.message : String(e));
       setAiJob(null);
@@ -132,7 +174,19 @@ export function DenoisePanel({ meta }: { meta: ImageMeta | null }) {
       )}
 
       <div className="lr-denoise-section">
-        <CheckRow specs={specs} path="detail.ai_enabled" label="AI Denoise" meta={meta} />
+        <CheckRow
+          specs={specs}
+          path="detail.ai_enabled"
+          label="AI Denoise"
+          meta={meta}
+          onAfterCommit={(on) => {
+            if (!on) {
+              setAiJob(null);
+              setAiStatus("");
+              void denoiseAiReset().catch(() => undefined);
+            }
+          }}
+        />
         <ParamSlider specs={specs} path="detail.ai_amount" label="Amount" meta={meta} />
         <div style={{ display: "flex", gap: 6, alignItems: "center", marginTop: 4 }}>
           <button type="button" className="lr-mini-btn" onClick={() => void runAi()}>

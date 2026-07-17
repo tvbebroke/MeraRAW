@@ -280,6 +280,7 @@ fn main() {
             commands::denoise_models_list,
             commands::denoise_ai_start,
             commands::denoise_ai_cancel,
+            commands::denoise_ai_reset,
             commands::get_stats,
             commands::wb_from_point,
             commands::auto_level,

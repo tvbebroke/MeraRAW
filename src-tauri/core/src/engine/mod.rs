@@ -24,6 +24,7 @@ use tokio::sync::{mpsc, oneshot};
 
 mod catalog_ops;
 mod decode;
+mod denoise_ops;
 mod doc_ops;
 mod export;
 mod render;
@@ -459,6 +460,11 @@ impl EngineHandle {
             .await
     }
 
+    pub async fn denoise_ai_reset(&self) -> Result<Result<(), CoreError>, EngineError> {
+        self.request(|reply| EngineMsg::DenoiseAiReset { reply })
+            .await
+    }
+
     pub async fn denoise_ai_cancel(&self, job: u64) -> Result<(), EngineError> {
         self.request(|reply| EngineMsg::DenoiseAiCancel { job, reply })
             .await
@@ -565,6 +571,9 @@ struct Engine {
     perf: crate::message::PerfStats,
     /// AI denoise job manager (tiled inference + cache).
     ai_denoise: crate::denoise::ai::AiJobManager,
+    /// (job id, image path) of the in-flight AI denoise job — results for a
+    /// different job or a since-closed image are dropped.
+    pending_denoise: Option<(u64, PathBuf)>,
 }
 
 struct ImportState {
@@ -590,6 +599,46 @@ async fn run(
             None
         }
     };
+    // Worker → engine adapter: denoise notifications become internal actor
+    // messages (fired from the worker thread only, so blocking_send is safe).
+    let mut ai_denoise = crate::denoise::ai::AiJobManager::new();
+    {
+        let tx = self_tx.clone();
+        ai_denoise.set_notify(move |n| {
+            use crate::denoise::ai::JobNotify as N;
+            use crate::message::DenoiseOutcome as O;
+            let msg = match n {
+                N::Progress(p) => EngineMsg::DenoiseJobProgress {
+                    job: p.job.0,
+                    pct: p.pct,
+                    tile: p.tile,
+                    tiles: p.tiles,
+                },
+                N::Done {
+                    job,
+                    rgb,
+                    width,
+                    height,
+                } => EngineMsg::DenoiseJobFinished {
+                    job: job.0,
+                    outcome: O::Done {
+                        rgb,
+                        width: width as u32,
+                        height: height as u32,
+                    },
+                },
+                N::Cancelled { job } => EngineMsg::DenoiseJobFinished {
+                    job: job.0,
+                    outcome: O::Cancelled,
+                },
+                N::Failed { job, message } => EngineMsg::DenoiseJobFinished {
+                    job: job.0,
+                    outcome: O::Failed { message },
+                },
+            };
+            let _ = tx.blocking_send(msg);
+        });
+    }
     let mut engine = Engine {
         gpu,
         graph: None,
@@ -613,7 +662,8 @@ async fn run(
         export_batch: None,
         batch_seq: 0,
         perf: Default::default(),
-        ai_denoise: crate::denoise::ai::AiJobManager::new(),
+        ai_denoise,
+        pending_denoise: None,
     };
     tracing::info!("engine actor up");
 
@@ -1145,39 +1195,31 @@ impl Engine {
                 let _ = reply.send(self.ai_denoise.models());
             }
             EngineMsg::DenoiseAiStart { reply } => {
-                let result = (|| {
-                    let cur = self.current.as_ref().ok_or(CoreError::NoImage)?;
-                    let small = cur
-                        .small_cpu
-                        .as_ref()
-                        .ok_or_else(|| CoreError::Decode("image not fully decoded".into()))?;
-                    let settings = crate::denoise::DenoiseSettings::from_doc(
-                        cur.doc(),
-                        &crate::denoise::NoiseProfile::from_iso(cur.meta.iso.unwrap_or(800)),
-                    );
-                    // Content-addressed cache key (audit F6) — path hash alone
-                    // served stale results when the file was replaced in place.
-                    let mut hasher = blake3::Hasher::new();
-                    hasher.update(&(small.width as u32).to_le_bytes());
-                    hasher.update(&(small.height as u32).to_le_bytes());
-                    hasher.update(bytemuck::cast_slice::<f32, u8>(&small.data));
-                    let hash = hasher.finalize().to_hex().to_string();
-                    let job = self.ai_denoise.enqueue(
-                        &hash,
-                        &settings.ai_model,
-                        settings.ai_amount,
-                        std::sync::Arc::new(small.data.clone()),
-                        small.width,
-                        small.height,
-                    )?;
-                    Ok(job.0)
-                })();
-                let _ = reply.send(result);
+                let _ = reply.send(self.denoise_ai_start());
             }
             EngineMsg::DenoiseAiCancel { job, reply } => {
                 self.ai_denoise
                     .cancel(crate::denoise::ai::JobId(job));
                 let _ = reply.send(());
+            }
+            EngineMsg::DenoiseAiReset { reply } => {
+                self.denoise_ai_reset(reply);
+            }
+            EngineMsg::DenoiseJobProgress {
+                job,
+                pct,
+                tile,
+                tiles,
+            } => {
+                self.emit(EngineEvent::DenoiseProgress {
+                    job,
+                    pct,
+                    tile,
+                    tiles,
+                });
+            }
+            EngineMsg::DenoiseJobFinished { job, outcome } => {
+                self.finish_denoise(job, outcome);
             }
             // ---- Phase 6: assistant eyes ----
             EngineMsg::RenderPreviewJpeg { max_dim, reply } => {

@@ -124,6 +124,11 @@ export function denoiseAiCancel(job: number): Promise<void> {
   return invoke<void>("denoise_ai_cancel", { job });
 }
 
+/** Revert the working master to a plain re-decode (AI Denoise unchecked). */
+export function denoiseAiReset(): Promise<void> {
+  return invoke<void>("denoise_ai_reset");
+}
+
 export function snapshot(name: string): Promise<void> {
   return invoke<void>("snapshot", { name });
 }

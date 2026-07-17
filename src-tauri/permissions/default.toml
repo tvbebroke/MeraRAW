@@ -40,6 +40,7 @@ commands.allow = [
   "denoise_models_list",
   "denoise_ai_start",
   "denoise_ai_cancel",
+  "denoise_ai_reset",
   "get_stats",
   "wb_from_point",
   "auto_level",

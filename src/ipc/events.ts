@@ -23,7 +23,37 @@ export const EVENTS = {
   importRequested: "import-requested",
   settingsRequested: "settings-requested",
   assistantProgress: "assistant-progress",
+  denoiseProgress: "denoise-progress",
+  denoiseDone: "denoise-done",
+  denoiseError: "denoise-error",
 } as const;
+
+export interface DenoiseProgressPayload {
+  job: number;
+  pct: number;
+  tile: number;
+  tiles: number;
+}
+
+export function onDenoiseProgress(
+  cb: (p: DenoiseProgressPayload) => void,
+): Promise<UnlistenFn> {
+  return listen<DenoiseProgressPayload>(EVENTS.denoiseProgress, (e) =>
+    cb(e.payload),
+  );
+}
+
+export function onDenoiseDone(cb: (job: number) => void): Promise<UnlistenFn> {
+  return listen<number>(EVENTS.denoiseDone, (e) => cb(e.payload));
+}
+
+export function onDenoiseError(
+  cb: (p: { job: number; message: string }) => void,
+): Promise<UnlistenFn> {
+  return listen<{ job: number; message: string }>(EVENTS.denoiseError, (e) =>
+    cb(e.payload),
+  );
+}
 
 export function onMaskReady(cb: (id: string) => void): Promise<UnlistenFn> {
   return listen<string>(EVENTS.maskReady, (e) => cb(e.payload));

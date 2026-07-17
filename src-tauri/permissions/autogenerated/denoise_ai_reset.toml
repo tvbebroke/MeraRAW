@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-denoise-ai-reset"
+description = "Enables the denoise_ai_reset command without any pre-configured scope."
+commands.allow = ["denoise_ai_reset"]
+
+[[permission]]
+identifier = "deny-denoise-ai-reset"
+description = "Denies the denoise_ai_reset command without any pre-configured scope."
+commands.deny = ["denoise_ai_reset"]

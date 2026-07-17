@@ -375,6 +375,10 @@ pub enum EngineMsg {
         job: u64,
         reply: oneshot::Sender<()>,
     },
+    /// Revert the working master to a plain re-decode (AI Denoise unchecked).
+    DenoiseAiReset {
+        reply: oneshot::Sender<Result<(), CoreError>>,
+    },
     // ---- internal (workers → engine) ----
     PreviewDone {
         generation: u64,
@@ -415,6 +419,31 @@ pub enum EngineMsg {
     },
     /// Continue incremental tiled batch render (one tile per actor tick).
     ExportBatchStep,
+    /// AI denoise worker progress (forwarded to the UI as DenoiseProgress).
+    DenoiseJobProgress {
+        job: u64,
+        pct: f32,
+        tile: u32,
+        tiles: u32,
+    },
+    /// AI denoise worker terminal state.
+    DenoiseJobFinished {
+        job: u64,
+        outcome: DenoiseOutcome,
+    },
+}
+
+/// Terminal outcome carried from the denoise worker thread.
+pub enum DenoiseOutcome {
+    Done {
+        rgb: std::sync::Arc<Vec<f32>>,
+        width: u32,
+        height: u32,
+    },
+    Cancelled,
+    Failed {
+        message: String,
+    },
 }
 
 /// Carried from the batch-prepare worker: decoded working image plus

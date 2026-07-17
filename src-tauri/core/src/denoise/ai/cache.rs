@@ -7,11 +7,12 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
 const AMOUNT_STEP: f32 = 5.0;
-const MAX_DIM: usize = 8192;
-/// Hard cap on a single cache blob (~512 MiB).
-const MAX_FILE_BYTES: usize = 512 * 1024 * 1024;
+/// Full-res denoise bases are cached now — sized for 100 MP-class sensors.
+const MAX_DIM: usize = 16384;
+/// Hard cap on a single cache blob (100 MP × RGB f32 ≈ 1.2 GiB).
+const MAX_FILE_BYTES: usize = 2 * 1024 * 1024 * 1024;
 /// Soft cap on total cache directory size before LRU prune.
-const MAX_CACHE_DIR_BYTES: u64 = 1024 * 1024 * 1024;
+const MAX_CACHE_DIR_BYTES: u64 = 4 * 1024 * 1024 * 1024;
 
 #[derive(Clone, Default)]
 pub struct CacheStore {

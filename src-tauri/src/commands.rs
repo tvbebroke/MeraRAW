@@ -536,6 +536,11 @@ pub async fn denoise_ai_cancel(
     Ok(engine.denoise_ai_cancel(job).await?)
 }
 
+#[tauri::command]
+pub async fn denoise_ai_reset(engine: State<'_, EngineHandle>) -> Result<(), AppError> {
+    engine.denoise_ai_reset().await?.map_err(AppError::from)
+}
+
 // ---- Phase 5: catalog ----
 
 #[tauri::command]
