@@ -21,3 +21,4 @@ dist-local/
 dist-release/
 src-tauri/rust_out
 .self-eval-scores.jsonl
+RELEASE-HANDOFF.md
