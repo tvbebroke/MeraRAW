@@ -114,6 +114,7 @@ impl Engine {
             doc.meta.demosaic = Some(demosaic.name().to_string());
         }
         meta.demosaic = demosaic.name().to_string();
+        meta.available_demosaic = available;
 
         self.current = Some(CurrentImage {
             path: path.clone(),
@@ -209,6 +210,9 @@ impl Engine {
             cur.meta.camera_profile = camera_profile;
             cur.meta.available_profiles = available_profiles;
             cur.meta.available_profile_files = available_profile_files;
+            // Keep sidecar demosaic in sync with the effective decode algo
+            // (fallback may have remapped an unavailable zerawler choice).
+            cur.doc_mut().meta.demosaic = Some(cur.meta.demosaic.clone());
         }
         self.rerender_after_base_change();
     }
@@ -261,6 +265,7 @@ impl Engine {
             cur.meta.camera_profile = camera_profile;
             cur.meta.available_profiles = available_profiles;
             cur.meta.available_profile_files = available_profile_files;
+            cur.doc_mut().meta.demosaic = Some(cur.meta.demosaic.clone());
         }
         let vw = self
             .last_view
@@ -393,6 +398,15 @@ impl Engine {
             ))));
             return;
         };
+        let available = crate::raw::Demosaic::available();
+        if !available.iter().any(|n| n == demosaic.name()) {
+            let _ = reply.send(Err(CoreError::InvalidOp(format!(
+                "demosaic '{}' unavailable — sidecar worker not found on this system \
+                 (in-process merawler algos still work)",
+                demosaic.name()
+            ))));
+            return;
+        }
         // Update the doc + meta, then gather what the re-decode needs (ending the
         // &mut self.current borrow before we call spawn_full_decode).
         let (path, profile_path, out_meta) = {
@@ -403,6 +417,7 @@ impl Engine {
             cur.doc_mut().meta.demosaic = Some(demosaic.name().to_string());
             cur.doc_dirty = true;
             cur.meta.demosaic = demosaic.name().to_string();
+            cur.meta.available_demosaic = available;
             let profile_file = cur.doc().meta.profile_file.clone();
             let index = crate::profile::ProfileIndex::embedded();
             let profile_path =

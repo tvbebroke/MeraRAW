@@ -212,26 +212,28 @@ impl Engine {
     /// Embedding hosts should skip detection and fill the fields directly
     /// with their resolved sidecar paths.
     pub fn detect() -> Self {
-        let workers_dir = std::env::var("ZERAWLER_WORKERS_DIR")
-            .ok()
-            .map(PathBuf::from)
-            .or_else(|| {
-                // dev fallback: the ZERAWLER checkout's own workers dir
-                std::env::var("HOME")
-                    .ok()
-                    .map(|h| PathBuf::from(h).join("Desktop/ZERAWLER/workers"))
-            });
+        let mut workers_dirs: Vec<PathBuf> = Vec::new();
+        if let Ok(d) = std::env::var("ZERAWLER_WORKERS_DIR") {
+            workers_dirs.push(PathBuf::from(d));
+        }
+        // Dev checkouts (macOS / Unix home layouts).
+        for home_key in ["HOME", "USERPROFILE"] {
+            if let Ok(h) = std::env::var(home_key) {
+                workers_dirs.push(PathBuf::from(&h).join("Desktop/ZERAWLER/workers"));
+                workers_dirs.push(PathBuf::from(&h).join("ZERAWLER/workers"));
+            }
+        }
 
         let mut rt_known: Vec<PathBuf> = Vec::new();
         let mut dc_known: Vec<PathBuf> = Vec::new();
-        if let Some(d) = &workers_dir {
+        for d in &workers_dirs {
             rt_known.push(d.join(exe_name("rawtherapee-cli")));
             dc_known.push(d.join(exe_name("dcraw_emu")));
         }
         // Bundled next to the host app (Tauri sidecar / release layout).
         if let Ok(exe) = std::env::current_exe() {
             if let Some(dir) = exe.parent() {
-                for sub in ["", "workers", "bin"] {
+                for sub in ["", "workers", "bin", "resources", "resources/workers"] {
                     let base = if sub.is_empty() {
                         dir.to_path_buf()
                     } else {
@@ -247,9 +249,29 @@ impl Engine {
         ));
         dc_known.push(PathBuf::from("/opt/homebrew/bin/dcraw_emu"));
         dc_known.push(PathBuf::from("/usr/local/bin/dcraw_emu"));
+        dc_known.push(PathBuf::from("/usr/bin/dcraw_emu"));
         #[cfg(windows)]
         {
             rt_known.push(PathBuf::from(r"C:\Program Files\RawTherapee\rawtherapee-cli.exe"));
+            rt_known.push(PathBuf::from(
+                r"C:\Program Files\RawTherapee\rawtherapee-cli",
+            ));
+            rt_known.push(PathBuf::from(
+                r"C:\Program Files (x86)\RawTherapee\rawtherapee-cli.exe",
+            ));
+            if let Ok(local) = std::env::var("LOCALAPPDATA") {
+                rt_known.push(
+                    PathBuf::from(local)
+                        .join("Programs")
+                        .join("RawTherapee")
+                        .join("rawtherapee-cli.exe"),
+                );
+            }
+        }
+        #[cfg(target_os = "linux")]
+        {
+            rt_known.push(PathBuf::from("/usr/bin/rawtherapee-cli"));
+            rt_known.push(PathBuf::from("/usr/local/bin/rawtherapee-cli"));
         }
 
         Engine {

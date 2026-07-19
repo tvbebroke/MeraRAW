@@ -251,3 +251,21 @@ pub trait Decoder: Send + Sync {
         self.decode_with_profile(path, profile_path)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn available_always_includes_in_process_merawler() {
+        let a = Demosaic::available();
+        for name in [
+            "rawler", "bilinear", "malvar", "rcd", "lmmse", "amaze", "igv", "ddfapd",
+        ] {
+            assert!(
+                a.iter().any(|n| n == name),
+                "available() missing in-process demosaic '{name}' (got {a:?})"
+            );
+        }
+    }
+}

@@ -1,13 +1,25 @@
 <script lang="ts">
   import CollapsibleSection from "./CollapsibleSection.svelte";
   import { setDemosaic } from "../../../ipc/commands";
-  import { imageMeta } from "../../../stores/app";
+  import { imageMeta, statusMessage } from "../../../stores/app";
+
+  /** In-process engines (merawler + rawler) — always usable on every OS. */
+  const IN_PROCESS = new Set([
+    "rawler",
+    "bilinear",
+    "malvar",
+    "rcd",
+    "lmmse",
+    "amaze",
+    "igv",
+    "ddfapd",
+  ]);
 
   const algorithms = [
     { value: "rawler", label: "Rawler (built-in)" },
     { value: "bilinear", label: "Bilinear" },
     { value: "malvar", label: "Malvar" },
-    { value: "rcd", label: "RCD — darktable default" },
+    { value: "rcd", label: "RCD — merawler default" },
     { value: "lmmse", label: "LMMSE — best for noise" },
     { value: "amaze", label: "AMaZE — max detail" },
     { value: "igv", label: "IGV — anti-aliasing" },
@@ -21,13 +33,28 @@
   const current = $derived($imageMeta?.demosaic || "rcd");
   const isRaw = $derived($imageMeta?.kind === "raw");
 
+  /** Prefer engine-reported availability; fall back to in-process only. */
+  const options = $derived.by(() => {
+    const avail = $imageMeta?.availableDemosaic;
+    if (avail && avail.length > 0) {
+      const set = new Set(avail);
+      return algorithms.filter((a) => set.has(a.value));
+    }
+    return algorithms.filter((a) => IN_PROCESS.has(a.value));
+  });
+
   async function onChange(e: Event) {
     const algo = (e.currentTarget as HTMLSelectElement).value;
     try {
       const m = await setDemosaic(algo);
       imageMeta.set(m);
-    } catch {
-      /* ignore */
+      statusMessage.set(`demosaic → ${m.demosaic}`);
+    } catch (err) {
+      statusMessage.set(
+        err && typeof err === "object" && "message" in err
+          ? String((err as { message: string }).message)
+          : `demosaic failed: ${String(err)}`,
+      );
     }
   }
 </script>
@@ -42,11 +69,18 @@
           onchange={onChange}
           class="demosaic-select h-[26px] w-full text-[8px] text-white/90 focus:outline-none"
         >
-          {#each algorithms as alg}
+          {#each options as alg}
             <option value={alg.value}>{alg.label}</option>
           {/each}
         </select>
       </div>
+      {#if options.length <= IN_PROCESS.size}
+        <p class="text-[7px] leading-snug text-white/35">
+          Merawler demosaic runs in-process on every platform. RawTherapee / LibRaw
+          sidecar options appear when their CLI workers are installed next to the app
+          or on PATH.
+        </p>
+      {/if}
     </div>
   </CollapsibleSection>
 {/if}
