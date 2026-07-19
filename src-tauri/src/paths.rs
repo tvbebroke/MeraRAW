@@ -73,6 +73,9 @@ fn is_denied(path: &Path) -> bool {
             "/etc",
             "/private/etc",
             "/var/root",
+            // macOS resolves /var -> /private/var, so the canonicalized form
+            // must be denied too (same reason /private/etc is listed).
+            "/private/var/root",
             "/root",
             "/System",
             "/usr/bin",
@@ -198,5 +201,14 @@ mod tests {
         assert!(validate_user_path("/home/x/.ssh/config").is_err());
         assert!(validate_user_path("/Users/test/.gnupg/secring.gpg").is_err());
         assert!(validate_user_path("/etc/passwd").is_err());
+    }
+
+    /// `/var` and `/etc` are symlinks on macOS; the denylist must match the
+    /// canonicalized `/private/...` form, not just the pre-resolution path.
+    #[test]
+    fn rejects_symlinked_system_dirs() {
+        assert!(validate_user_path("/var/root/anything").is_err());
+        assert!(validate_user_path("/private/var/root/anything").is_err());
+        assert!(validate_user_path("/private/etc/passwd").is_err());
     }
 }

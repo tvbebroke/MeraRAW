@@ -56,8 +56,10 @@ fn verify_token(token: &str) -> Result<LicenseClaims, AppError> {
     let mut validation = Validation::new(Algorithm::ES256);
     validation.validate_exp = true;
     // Default: require iss/aud (must match verify-license Edge Function).
-    // MERARAW_LICENSE_RELAX_ISS_AUD=1 keeps older tokens working during migration.
-    let relax = std::env::var("MERARAW_LICENSE_RELAX_ISS_AUD").as_deref() == Ok("1");
+    // MERARAW_LICENSE_RELAX_ISS_AUD=1 keeps older tokens working during migration;
+    // debug-only, like MERARAW_SKIP_LICENSE, so a release build always binds
+    // tokens to this issuer+audience.
+    let relax = license_relax_iss_aud_enabled();
     if relax {
         validation.validate_aud = false;
     } else {
@@ -79,6 +81,16 @@ fn license_skip_enabled() -> bool {
 
 #[cfg(not(debug_assertions))]
 fn license_skip_enabled() -> bool {
+    false
+}
+
+#[cfg(debug_assertions)]
+fn license_relax_iss_aud_enabled() -> bool {
+    std::env::var("MERARAW_LICENSE_RELAX_ISS_AUD").ok().as_deref() == Some("1")
+}
+
+#[cfg(not(debug_assertions))]
+fn license_relax_iss_aud_enabled() -> bool {
     false
 }
 
