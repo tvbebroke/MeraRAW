@@ -14,6 +14,7 @@ impl Engine {
         root: PathBuf,
         only_paths: Option<Vec<PathBuf>>,
     ) -> Result<u64, CoreError> {
+        let root = crate::path_safety::simplify_path(root);
         if !root.exists() {
             return Err(CoreError::Io(format!("folder not found: {}", root.display())));
         }
@@ -37,7 +38,9 @@ impl Engine {
         let cat = self.catalog_mut()?;
         let selected_only = only_paths.is_some();
         let files = only_paths.unwrap_or_else(|| crate::catalog::scan_folder(&root));
-        let root_canon = root.canonicalize().unwrap_or_else(|_| root.clone());
+        let root_canon = crate::path_safety::simplify_path(
+            root.canonicalize().unwrap_or_else(|_| root.clone()),
+        );
         let todo: Vec<PathBuf> = files
             .into_iter()
             .filter(|p| {
@@ -49,6 +52,7 @@ impl Engine {
                     let Ok(pc) = p.canonicalize() else {
                         return false;
                     };
+                    let pc = crate::path_safety::simplify_path(pc);
                     return pc.starts_with(&root_canon);
                 }
                 let m = std::fs::metadata(p)
@@ -60,7 +64,9 @@ impl Engine {
                 !cat.is_current(&p.to_string_lossy(), m)
             })
             .collect();
-        cat.remember_folder(crate::catalog::trim_path_root(&root.to_string_lossy()))?;
+        cat.remember_folder(&crate::path_safety::simplify_path_str(
+            crate::catalog::trim_path_root(&root.to_string_lossy()),
+        ))?;
         let total = todo.len() as u64;
         let import_id = self.generation.wrapping_add(1000) + total;
         self.import_state = Some(ImportState {
@@ -148,8 +154,9 @@ impl Engine {
             Err(e) => tracing::warn!(error = %e, "import file failed"),
         }
         self.emit(EngineEvent::ImportProgress { done, total });
-        if done % 8 == 0 {
-            self.emit(EngineEvent::CatalogChanged); // stream the grid in
+        // Stream grid updates — small imports never hit the old every-8 cadence.
+        if done == total || done <= 3 || done % 4 == 0 {
+            self.emit(EngineEvent::CatalogChanged);
         }
     }
 

@@ -162,8 +162,6 @@ pub fn trim_path_root(root: &str) -> &str {
 
 /// `(root, like_forward, like_backslash)` for SQL
 /// `path = root OR path LIKE root/% OR path LIKE root\%`.
-///
-/// Windows stores `C:\photos\IMG.ARW`; a Unix-only `root/%` LIKE never matches.
 fn path_under_root_patterns(root: &str) -> (String, String, String) {
     let root = trim_path_root(root).to_string();
     let like_fwd = format!("{root}/%");
@@ -171,14 +169,44 @@ fn path_under_root_patterns(root: &str) -> (String, String, String) {
     (root, like_fwd, like_back)
 }
 
+/// Query roots that may appear in the DB for the same folder.
+/// Covers picker paths, `\\?\` canonicalize leftovers, and mixed separators.
+fn folder_root_variants(root: &str) -> Vec<String> {
+    let simple = crate::path_safety::simplify_path_str(root);
+    let mut out = vec![simple.clone()];
+    // Legacy rows stored before verbatim-prefix stripping.
+    if !simple.starts_with(r"\\?\")
+        && simple.len() >= 2
+        && simple.as_bytes().get(1) == Some(&b':')
+    {
+        out.push(format!(r"\\?\{simple}"));
+    }
+    let raw = trim_path_root(root).to_string();
+    if !raw.is_empty() && !out.iter().any(|x| x == &raw) {
+        out.push(raw);
+    }
+    out
+}
+
 /// SQL fragment + bound params: asset is the folder root or anywhere under it.
-fn sql_under_folder(root: &str) -> (String, [String; 3]) {
-    let (root, like_fwd, like_back) = path_under_root_patterns(root);
-    (
-        "(path = ? OR path LIKE ? OR path LIKE ? OR folder = ? OR folder LIKE ? OR folder LIKE ?)"
-            .into(),
-        [root, like_fwd, like_back],
-    )
+fn sql_under_folder(root: &str) -> (String, Vec<String>) {
+    let variants = folder_root_variants(root);
+    let mut parts = Vec::with_capacity(variants.len());
+    let mut params = Vec::with_capacity(variants.len() * 6);
+    for v in variants {
+        let (r, fwd, back) = path_under_root_patterns(&v);
+        parts.push(
+            "(path = ? OR path LIKE ? OR path LIKE ? OR folder = ? OR folder LIKE ? OR folder LIKE ?)"
+                .to_string(),
+        );
+        params.push(r.clone());
+        params.push(fwd.clone());
+        params.push(back.clone());
+        params.push(r);
+        params.push(fwd);
+        params.push(back);
+    }
+    (format!("({})", parts.join(" OR ")), params)
 }
 
 pub struct Catalog {
@@ -337,20 +365,14 @@ impl Catalog {
     pub fn list_folders(&self) -> Result<Vec<FolderItem>, CoreError> {
         let mut out = Vec::new();
         for root in self.folders()? {
-            let (clause, [root_trim, like_fwd, like_back]) = sql_under_folder(&root);
+            let root_trim = crate::path_safety::simplify_path_str(&root);
+            let (clause, params) = sql_under_folder(&root_trim);
             let sql = format!("SELECT COUNT(*) FROM assets WHERE {clause}");
             let photo_count: i64 = self
                 .conn
                 .query_row(
                     &sql,
-                    rusqlite::params![
-                        root_trim,
-                        like_fwd,
-                        like_back,
-                        root_trim,
-                        like_fwd,
-                        like_back
-                    ],
+                    rusqlite::params_from_iter(params.iter()),
                     |r| r.get(0),
                 )
                 .unwrap_or(0);
@@ -556,15 +578,12 @@ impl Catalog {
             params.push(Box::new(h as i64));
         }
         if let Some(f) = q.folder.as_ref().filter(|f| !f.is_empty()) {
-            let (clause, [root, like_fwd, like_back]) = sql_under_folder(f);
+            let (clause, folder_params) = sql_under_folder(f);
             sql.push_str(" AND ");
             sql.push_str(&clause);
-            params.push(Box::new(root.clone()));
-            params.push(Box::new(like_fwd.clone()));
-            params.push(Box::new(like_back.clone()));
-            params.push(Box::new(root));
-            params.push(Box::new(like_fwd));
-            params.push(Box::new(like_back));
+            for p in folder_params {
+                params.push(Box::new(p));
+            }
         }
         if q.blurry_only {
             sql.push_str(" AND blur_score IS NOT NULL AND blur_score < 35.0");
@@ -888,21 +907,29 @@ pub struct ImportedFile {
     pub preview_jpeg: Option<Vec<u8>>,
 }
 
-/// Scan a folder for RAW files (recursive).
+/// Scan a folder for importable images (RAW + rendered; recursive).
 pub fn scan_folder(root: &Path) -> Vec<PathBuf> {
     let mut out = Vec::new();
-    let mut stack = vec![root.to_path_buf()];
-    let dec = RawlerDecoder::default();
+    let root = crate::path_safety::simplify_path(root.to_path_buf());
+    let mut stack = vec![root];
+    let raw_dec = RawlerDecoder::default();
+    let std_dec = crate::raw::StandardDecoder;
     while let Some(dir) = stack.pop() {
-        let Ok(rd) = std::fs::read_dir(&dir) else { continue };
+        let rd = match std::fs::read_dir(&dir) {
+            Ok(rd) => rd,
+            Err(e) => {
+                tracing::warn!(error = %e, path = %dir.display(), "scan_folder: read_dir failed");
+                continue;
+            }
+        };
         for entry in rd.flatten() {
-            let p = entry.path();
+            let p = crate::path_safety::simplify_path(entry.path());
             if p.is_dir() {
                 let name = p.file_name().map(|n| n.to_string_lossy().into_owned());
                 if !name.map(|n| n.starts_with('.')).unwrap_or(true) {
                     stack.push(p);
                 }
-            } else if dec.probe(&p) {
+            } else if raw_dec.probe(&p) || std_dec.probe(&p) {
                 out.push(p);
             }
         }
@@ -914,8 +941,9 @@ pub fn scan_folder(root: &Path) -> Vec<PathBuf> {
 /// Process one file: metadata + sidecar + previews + cull signals.
 /// Pure worker fn — no DB access (engine owns the catalog connection).
 pub fn import_one(path: &Path) -> Result<ImportedFile, CoreError> {
-    let dec = RawlerDecoder::default();
-    let md = std::fs::metadata(path)?;
+    let path = crate::path_safety::simplify_path(path.to_path_buf());
+    let dec = crate::raw::decoder_for(&path);
+    let md = std::fs::metadata(&path)?;
     let modified_ms = md
         .modified()
         .ok()
@@ -926,7 +954,7 @@ pub fn import_one(path: &Path) -> Result<ImportedFile, CoreError> {
     // partial hash: first 1MB + size (dedupe-grade, fast)
     let partial_hash = {
         use std::io::Read;
-        let mut f = std::fs::File::open(path)?;
+        let mut f = std::fs::File::open(&path)?;
         let mut buf = vec![0u8; 1 << 20];
         let n = f.read(&mut buf)?;
         let mut h = blake3::Hasher::new();
@@ -935,15 +963,15 @@ pub fn import_one(path: &Path) -> Result<ImportedFile, CoreError> {
         h.finalize().to_hex().to_string()
     };
 
-    let meta = dec.metadata(path)?;
-    let doc = sidecar::load_sidecar(path).ok().flatten();
+    let meta = dec.metadata(&path)?;
+    let doc = sidecar::load_sidecar(&path).ok().flatten();
     let has_edits = doc.as_ref().map(|d| !d.modules.is_empty() || !d.masks.is_empty()).unwrap_or(false);
     let sidecar_meta = doc.map(|d| d.meta);
 
     // previews from the embedded JPEG (fast path)
     let (mut thumb_jpeg, mut preview_jpeg) = (None, None);
     let (mut phash, mut blur) = (None, None);
-    if let Ok(Some((rgba, w, h))) = dec.embedded_preview(path, 1600) {
+    if let Ok(Some((rgba, w, h))) = dec.embedded_preview(&path, 1600) {
         if let Some(img) = image::RgbaImage::from_raw(w, h, rgba) {
             let dynimg = image::DynamicImage::ImageRgba8(img);
             let preview = dynimg.thumbnail(1600, 1600).to_rgb8();
@@ -957,12 +985,15 @@ pub fn import_one(path: &Path) -> Result<ImportedFile, CoreError> {
         }
     }
 
+    let path_str = path.to_string_lossy().into_owned();
+    let folder = path
+        .parent()
+        .map(|p| crate::path_safety::simplify_path_str(&p.to_string_lossy()))
+        .unwrap_or_default();
+
     Ok(ImportedFile {
-        path: path.to_string_lossy().into_owned(),
-        folder: path
-            .parent()
-            .map(|p| p.to_string_lossy().into_owned())
-            .unwrap_or_default(),
+        path: path_str,
+        folder,
         partial_hash,
         size: md.len() as i64,
         modified_ms,
@@ -1104,6 +1135,37 @@ mod tests {
         assert_eq!(folders.len(), 1);
         assert_eq!(folders[0].photo_count, 2);
 
+        // Legacy DB rows with \\?\ must still match a picker-style query.
+        let (mut cat_v, dir_v) = tmp_cat("win-verbatim");
+        let verbatim_root = r"\\?\C:\Users\test\photos";
+        let verbatim_path = format!(r"{verbatim_root}\IMG_0001.ARW");
+        cat_v
+            .upsert_asset(
+                &verbatim_path,
+                verbatim_root,
+                "h",
+                100,
+                0,
+                &meta_stub(&verbatim_path),
+                None,
+                false,
+                None,
+                None,
+            )
+            .unwrap();
+        cat_v.remember_folder(verbatim_root).unwrap();
+        let grid_v = cat_v
+            .grid(&GridQuery {
+                folder: Some(root.into()),
+                ..Default::default()
+            })
+            .unwrap();
+        assert_eq!(
+            grid_v.len(),
+            1,
+            "picker path must match legacy \\\\?\\ catalog rows"
+        );
+
         // Unix-style still works
         let (mut cat2, dir2) = tmp_cat("unix-paths");
         cat2.upsert_asset(
@@ -1128,6 +1190,7 @@ mod tests {
         assert_eq!(grid2.len(), 1);
 
         std::fs::remove_dir_all(dir).ok();
+        std::fs::remove_dir_all(dir_v).ok();
         std::fs::remove_dir_all(dir2).ok();
     }
 

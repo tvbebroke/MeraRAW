@@ -5,7 +5,6 @@ import {
   autoopenPath,
   getDoc,
   openImage,
-  pickFolder,
   pingEngine,
   reportFrontendStatus,
 } from "../../ipc/commands";
@@ -24,6 +23,7 @@ import {
   onSettingsRequested,
   onExportRequested,
 } from "../../ipc/events";
+import { importAndBrowse, initBrowseBridge, pickAndImportFolder } from "../../stores/browse";
 import {
   decodeState,
   engineReady,
@@ -50,7 +50,8 @@ let autoOpened = false;
 
 export async function openPath(path: string): Promise<void> {
   try {
-    statusMessage.set(`opening ${path.split("/").pop()}…`);
+    const name = path.split(/[/\\]/).pop() || path;
+    statusMessage.set(`opening ${name}…`);
     decodeState.set("preview");
     selectedMask.set(null);
     clearDoc();
@@ -116,14 +117,19 @@ export function initEngineBridge(): () => void {
       statusMessage.set(`decode error: ${m}`);
     }),
     onDocUpdated((delta) => reconcile(delta)),
-    onFolderOpened(() => push("/library")),
+    onFolderOpened((path) => {
+      push("/library");
+      void importAndBrowse(path).catch(() => null);
+    }),
     onImportRequested(() => {
       push("/library");
-      void pickFolder().catch(() => null);
+      void pickAndImportFolder().catch(() => null);
     }),
     onExportRequested(() => isExportOpen.set(true)),
     onSettingsRequested(() => isSettingsOpen.set(true)),
   ];
+
+  const stopBrowse = initBrowseBridge();
 
   pingEngine()
     .then((s) => {
@@ -168,6 +174,7 @@ export function initEngineBridge(): () => void {
 
   return () => {
     window.clearInterval(retry);
+    stopBrowse();
     unlistens.forEach((u) => u.then((f) => f()));
   };
 }

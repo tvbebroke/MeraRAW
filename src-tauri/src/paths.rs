@@ -162,7 +162,9 @@ pub fn validate_user_path(path: &str) -> Result<PathBuf, AppError> {
         return Err(AppError::InvalidOp("path not allowed".into()));
     }
 
-    Ok(resolved)
+    // Windows canonicalize() yields `\\?\C:\…`; the picker returns `C:\…`.
+    // Strip so catalog keys match what the UI queries with.
+    Ok(meratech_core::path_safety::simplify_path(resolved))
 }
 
 /// Same as [`validate_user_path`], but the path must already exist.

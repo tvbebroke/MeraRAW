@@ -1,7 +1,35 @@
 //! Path denylist for sidecar-sourced paths (LUT, etc.) that never pass
 //! through the Tauri `validate_user_path` IPC gate.
+//! Also: Windows verbatim-prefix stripping so catalog keys match picker paths.
 
 use std::path::{Component, Path, PathBuf};
+
+/// Strip Windows `\\?\` / `\\?\UNC\` prefixes from a path string.
+/// Rust `canonicalize()` on Windows yields these; the file picker does not.
+pub fn simplify_path_str(path: &str) -> String {
+    let path = path.trim().trim_end_matches(['/', '\\']);
+    if let Some(rest) = path.strip_prefix(r"\\?\") {
+        if let Some(unc) = rest.strip_prefix("UNC\\") {
+            return format!(r"\\{unc}");
+        }
+        if let Some(unc) = rest.strip_prefix("UNC/") {
+            return format!(r"\\{unc}");
+        }
+        return rest.to_string();
+    }
+    path.to_string()
+}
+
+/// Strip Windows verbatim prefixes from a [`PathBuf`].
+pub fn simplify_path(path: PathBuf) -> PathBuf {
+    let s = path.to_string_lossy();
+    let simple = simplify_path_str(&s);
+    if simple.as_str() == s.as_ref() {
+        path
+    } else {
+        PathBuf::from(simple)
+    }
+}
 
 /// Sensitive prefixes we never open from sidecar / edit-doc paths.
 fn is_denied(path: &Path) -> bool {
@@ -105,7 +133,7 @@ pub fn sanitize_user_path(path: &str) -> Option<PathBuf> {
     if is_denied(&resolved) {
         return None;
     }
-    Some(resolved)
+    Some(simplify_path(resolved))
 }
 
 /// Clear or rewrite `lut_file` when the sidecar path is unsafe.
@@ -149,5 +177,18 @@ mod tests {
         let p = sanitize_user_path("/tmp/looks/photo.cube");
         assert!(p.is_some());
         assert!(!p.unwrap().to_string_lossy().contains(".."));
+    }
+
+    #[test]
+    fn strips_windows_verbatim_prefix() {
+        assert_eq!(
+            simplify_path_str(r"\\?\C:\Users\test\photos"),
+            r"C:\Users\test\photos"
+        );
+        assert_eq!(
+            simplify_path_str(r"\\?\UNC\server\share\folder"),
+            r"\\server\share\folder"
+        );
+        assert_eq!(simplify_path_str("/Users/mac/photos"), "/Users/mac/photos");
     }
 }
