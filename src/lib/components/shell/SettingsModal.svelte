@@ -1,6 +1,6 @@
 <script lang="ts">
   import { fade, scale } from "svelte/transition";
-  import { isSettingsOpen } from "../../../stores/ui";
+  import { isSettingsOpen, classicLook, triggerThemeTransition } from "../../../stores/ui";
   import ToggleSwitch from "../primitives/ToggleSwitch.svelte";
   import { folder, importAndBrowse } from "../../../stores/browse";
   import { pickFolder } from "../../fs";
@@ -187,6 +187,15 @@
                 <p class="setting-desc">Generate low-resolution previews in background</p>
               </div>
               <ToggleSwitch checked={autoThumbnails} label="Auto-generate Thumbnails" onchange={(v) => autoThumbnails = v} />
+            </div>
+
+            <!-- Classic Look -->
+            <div class="flex items-center justify-between py-2 border-t border-white/[0.03]">
+              <div class="space-y-0.5">
+                <span class="setting-label">Classic Look</span>
+                <p class="setting-desc">Use sharp corners, a dense Lightroom-style grid layout, and flat panels</p>
+              </div>
+              <ToggleSwitch checked={$classicLook} label="Classic Look" onchange={triggerThemeTransition} />
             </div>
           </div>
         {:else if activeTab === "editor"}

@@ -10,7 +10,7 @@
   import exportIcon from "../../icons/export.svg";
   import pencilIcon from "../../icons/pencil.svg";
   import logoIcon from "../../icons/logo.png";
-  import { isSettingsOpen, isExportOpen } from "../../../stores/ui";
+  import { isSettingsOpen, isExportOpen, classicLook } from "../../../stores/ui";
   import { isZenMode } from "../../../stores/editor";
   import { pickFile } from "../../fs";
   import { openPath } from "../../engine/boot";
@@ -149,11 +149,13 @@
         iconClass="h-[17px] w-[21px]"
         onclick={() => safePush("/library")}
       />
-      <ToggleSwitch
-        checked={$isZenMode}
-        label="Zen / Expert mode"
-        onchange={(zen) => isZenMode.set(zen)}
-      />
+      {#if !$classicLook}
+        <ToggleSwitch
+          checked={$isZenMode}
+          label="Zen / Expert mode"
+          onchange={(zen) => isZenMode.set(zen)}
+        />
+      {/if}
       <IconButton
         icon={exportIcon}
         label="Export"

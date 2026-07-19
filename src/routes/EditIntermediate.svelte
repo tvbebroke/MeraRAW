@@ -19,6 +19,7 @@
   import BottomBar from "../lib/components/shell/BottomBar.svelte";
   import GlassPanel from "../lib/components/primitives/GlassPanel.svelte";
   import { activeTool, leftRailCollapsed, isZenMode, imageBrowserCollapsed } from "../stores/editor";
+  import { classicLook } from "../stores/ui";
   import { fade, fly } from "svelte/transition";
   import { cubicOut } from "svelte/easing";
   import aiIcon from "../lib/icons/tool-ai.svg";
@@ -305,14 +306,10 @@
         <div class="w-[2px] h-[40px] rounded-full bg-white/5 group-hover:bg-white/25 group-active:bg-accent transition-all duration-200"></div>
       </div>
     {/if}
-    <div
-      style="transition: opacity 350ms cubic-bezier(0.16, 1, 0.3, 1);"
-      class="flex h-full min-h-0 flex-col gap-[11px] {isZen ? 'opacity-0' : 'opacity-100'}"
-    >
-      <EditTypeSelector />
+    {#snippet settingsPanel(glassBg: string)}
       <GlassPanel
         class="flex min-h-0 flex-1 flex-col overflow-hidden {isResizingRight || isResizingHistogram ? 'transition-none' : ''}"
-        style="--glass-bg: #171717;"
+        style="--glass-bg: {glassBg};"
       >
         <!-- Grid/Cell overlay strategy for zero layout jump settings transitions -->
         <div class="flex-1 min-h-0 overflow-y-auto p-[7px] grid grid-cols-1 grid-rows-1">
@@ -358,7 +355,24 @@
           {/key}
         </div>
       </GlassPanel>
-      <Histogram onResizeStart={handleHistogramResizeStart} height={histogramHeight} class={isResizingHistogram ? 'transition-none' : ''} />
+    {/snippet}
+
+    <div
+      style="transition: opacity 350ms cubic-bezier(0.16, 1, 0.3, 1);"
+      class="flex h-full min-h-0 {isZen ? 'opacity-0' : 'opacity-100'} {$classicLook ? 'flex-row gap-0' : 'flex-col gap-[11px]'}"
+    >
+      {#if $classicLook}
+        <!-- Classic: panel + histogram on the left, tool strip docked right -->
+        <div class="flex flex-1 min-w-0 flex-col gap-0 border-r border-[#121212]">
+          {@render settingsPanel("#1e1e20")}
+          <Histogram onResizeStart={handleHistogramResizeStart} height={histogramHeight} class={isResizingHistogram ? 'transition-none' : ''} />
+        </div>
+        <EditTypeSelector />
+      {:else}
+        <EditTypeSelector />
+        {@render settingsPanel("#171717")}
+        <Histogram onResizeStart={handleHistogramResizeStart} height={histogramHeight} class={isResizingHistogram ? 'transition-none' : ''} />
+      {/if}
     </div>
   </div>
   <!-- Filmstrip: collapses to a slim bar so the expand control stays bottom-left, not over the photo -->
