@@ -60,7 +60,7 @@ impl Engine {
                 !cat.is_current(&p.to_string_lossy(), m)
             })
             .collect();
-        cat.remember_folder(root.to_string_lossy().trim_end_matches('/'))?;
+        cat.remember_folder(crate::catalog::trim_path_root(&root.to_string_lossy()))?;
         let total = todo.len() as u64;
         let import_id = self.generation.wrapping_add(1000) + total;
         self.import_state = Some(ImportState {

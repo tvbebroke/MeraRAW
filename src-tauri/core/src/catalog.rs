@@ -15,15 +15,37 @@ fn db_err(e: impl std::fmt::Display) -> CoreError {
     CoreError::Io(format!("catalog: {e}"))
 }
 
-/// App data dir (macOS-first; MERATECH_DATA_DIR overrides for tests/dev).
+/// App data dir (`MERATECH_DATA_DIR` overrides for tests/dev).
 pub fn data_dir() -> PathBuf {
     if let Ok(d) = std::env::var("MERATECH_DATA_DIR") {
         if !d.is_empty() {
             return PathBuf::from(d);
         }
     }
-    let home = std::env::var("HOME").unwrap_or_else(|_| ".".into());
-    PathBuf::from(home).join("Library/Application Support/MeraRAW")
+    #[cfg(target_os = "macos")]
+    {
+        let home = std::env::var("HOME").unwrap_or_else(|_| ".".into());
+        return PathBuf::from(home).join("Library/Application Support/MeraRAW");
+    }
+    #[cfg(target_os = "windows")]
+    {
+        if let Ok(base) = std::env::var("LOCALAPPDATA").or_else(|_| std::env::var("APPDATA")) {
+            return PathBuf::from(base).join("MeraRAW");
+        }
+        let home = std::env::var("USERPROFILE").unwrap_or_else(|_| ".".into());
+        return PathBuf::from(home)
+            .join("AppData")
+            .join("Local")
+            .join("MeraRAW");
+    }
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+    {
+        if let Ok(xdg) = std::env::var("XDG_DATA_HOME") {
+            return PathBuf::from(xdg).join("MeraRAW");
+        }
+        let home = std::env::var("HOME").unwrap_or_else(|_| ".".into());
+        PathBuf::from(home).join(".local/share/MeraRAW")
+    }
 }
 
 #[derive(Debug, Clone, serde::Serialize)]
@@ -131,6 +153,32 @@ pub struct MetaPatch {
 
 fn is_allowed_flag(flag: &str) -> bool {
     matches!(flag, "none" | "pick" | "reject")
+}
+
+/// Strip trailing `/` or `\` so Windows and Unix roots compare cleanly.
+pub fn trim_path_root(root: &str) -> &str {
+    root.trim_end_matches(['/', '\\'])
+}
+
+/// `(root, like_forward, like_backslash)` for SQL
+/// `path = root OR path LIKE root/% OR path LIKE root\%`.
+///
+/// Windows stores `C:\photos\IMG.ARW`; a Unix-only `root/%` LIKE never matches.
+fn path_under_root_patterns(root: &str) -> (String, String, String) {
+    let root = trim_path_root(root).to_string();
+    let like_fwd = format!("{root}/%");
+    let like_back = format!("{root}\\%");
+    (root, like_fwd, like_back)
+}
+
+/// SQL fragment + bound params: asset is the folder root or anywhere under it.
+fn sql_under_folder(root: &str) -> (String, [String; 3]) {
+    let (root, like_fwd, like_back) = path_under_root_patterns(root);
+    (
+        "(path = ? OR path LIKE ? OR path LIKE ? OR folder = ? OR folder LIKE ? OR folder LIKE ?)"
+            .into(),
+        [root, like_fwd, like_back],
+    )
 }
 
 pub struct Catalog {
@@ -289,13 +337,20 @@ impl Catalog {
     pub fn list_folders(&self) -> Result<Vec<FolderItem>, CoreError> {
         let mut out = Vec::new();
         for root in self.folders()? {
-            let root_trim = root.trim_end_matches('/').to_string();
-            let like = format!("{root_trim}/%");
+            let (clause, [root_trim, like_fwd, like_back]) = sql_under_folder(&root);
+            let sql = format!("SELECT COUNT(*) FROM assets WHERE {clause}");
             let photo_count: i64 = self
                 .conn
                 .query_row(
-                    "SELECT COUNT(*) FROM assets WHERE path = ?1 OR path LIKE ?2",
-                    rusqlite::params![root_trim, like],
+                    &sql,
+                    rusqlite::params![
+                        root_trim,
+                        like_fwd,
+                        like_back,
+                        root_trim,
+                        like_fwd,
+                        like_back
+                    ],
                     |r| r.get(0),
                 )
                 .unwrap_or(0);
@@ -501,10 +556,15 @@ impl Catalog {
             params.push(Box::new(h as i64));
         }
         if let Some(f) = q.folder.as_ref().filter(|f| !f.is_empty()) {
-            let root = f.trim_end_matches('/');
-            sql.push_str(" AND (path = ? OR path LIKE ?)");
-            params.push(Box::new(root.to_string()));
-            params.push(Box::new(format!("{root}/%")));
+            let (clause, [root, like_fwd, like_back]) = sql_under_folder(f);
+            sql.push_str(" AND ");
+            sql.push_str(&clause);
+            params.push(Box::new(root.clone()));
+            params.push(Box::new(like_fwd.clone()));
+            params.push(Box::new(like_back.clone()));
+            params.push(Box::new(root));
+            params.push(Box::new(like_fwd));
+            params.push(Box::new(like_back));
         }
         if q.blurry_only {
             sql.push_str(" AND blur_score IS NOT NULL AND blur_score < 35.0");
@@ -1002,6 +1062,73 @@ mod tests {
         let dir = std::env::temp_dir().join(format!("meratech-cat-{name}-{}", std::process::id()));
         std::fs::remove_dir_all(&dir).ok();
         (Catalog::open_at(dir.clone()).unwrap(), dir)
+    }
+
+    #[test]
+    fn grid_folder_filter_matches_windows_backslash_paths() {
+        let (mut cat, dir) = tmp_cat("win-paths");
+        let root = r"C:\Users\test\photos";
+        let p = format!(r"{root}\IMG_0001.ARW");
+        let nested_folder = format!(r"{root}\trip");
+        let nested = format!(r"{nested_folder}\IMG_0002.ARW");
+        cat.upsert_asset(&p, root, "h", 100, 0, &meta_stub(&p), None, false, None, None)
+            .unwrap();
+        cat.upsert_asset(
+            &nested,
+            &nested_folder,
+            "h",
+            100,
+            0,
+            &meta_stub(&nested),
+            None,
+            false,
+            None,
+            None,
+        )
+        .unwrap();
+        cat.remember_folder(root).unwrap();
+
+        let grid = cat
+            .grid(&GridQuery {
+                folder: Some(root.into()),
+                ..Default::default()
+            })
+            .unwrap();
+        assert_eq!(
+            grid.len(),
+            2,
+            "folder filter must match Windows backslash paths"
+        );
+
+        let folders = cat.list_folders().unwrap();
+        assert_eq!(folders.len(), 1);
+        assert_eq!(folders[0].photo_count, 2);
+
+        // Unix-style still works
+        let (mut cat2, dir2) = tmp_cat("unix-paths");
+        cat2.upsert_asset(
+            "/photos/a/IMG_0001.ARW",
+            "/photos/a",
+            "h",
+            100,
+            0,
+            &meta_stub("/photos/a/IMG_0001.ARW"),
+            None,
+            false,
+            None,
+            None,
+        )
+        .unwrap();
+        let grid2 = cat2
+            .grid(&GridQuery {
+                folder: Some("/photos/a".into()),
+                ..Default::default()
+            })
+            .unwrap();
+        assert_eq!(grid2.len(), 1);
+
+        std::fs::remove_dir_all(dir).ok();
+        std::fs::remove_dir_all(dir2).ok();
     }
 
     #[test]
