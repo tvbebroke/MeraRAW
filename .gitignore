@@ -12,3 +12,12 @@ src-tauri/gen/schemas/
 scripts/license-private.pem
 meraraw-derivatives/
 .preset-import-tmp/
+
+# Third-party skills bundle — not part of the product
+claude-skills-main/
+
+# Release/build artifacts — never commit binaries
+dist-local/
+dist-release/
+src-tauri/rust_out
+.self-eval-scores.jsonl
