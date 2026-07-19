@@ -3,6 +3,7 @@
 import { atom, computed } from "nanostores";
 import { getGrid, importFolder, listFolders, pickFolder } from "../ipc/commands";
 import type { FolderItem, GridItem } from "../ipc/types";
+import { customSchemeUrl } from "../lib/engine/customScheme";
 import { currentFolder, lastOpenedPath } from "./app";
 
 export const folders = atom<FolderItem[]>([]);
@@ -13,7 +14,7 @@ export const browseBusy = atom(false);
 export const folder = currentFolder;
 
 export function thumbUrl(id: number, tier: "t" | "p" = "t"): string {
-  return `thumb://localhost/${id}?tier=${tier}`;
+  return customSchemeUrl("thumb", `${id}?tier=${tier}`);
 }
 
 /** Grid item matching the currently open image (if visible in the strip). */

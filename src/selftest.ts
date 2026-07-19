@@ -300,8 +300,9 @@ export async function runSelfTest(latestVersion: number): Promise<void> {
     }
     if (!item) return void (await fail("import produced no thumbed grid item"));
 
-    // 13) thumb:// serves bytes
-    const tres = await fetch(`thumb://localhost/${item.id}?tier=t`);
+    // 13) thumb protocol serves bytes (frame:// on macOS, http://thumb.localhost on Win)
+    const { customSchemeUrl } = await import("./lib/engine/customScheme");
+    const tres = await fetch(customSchemeUrl("thumb", `${item.id}?tier=t`));
     if (!tres.ok) return void (await fail(`thumb fetch ${tres.status}`));
     if ((await tres.arrayBuffer()).byteLength < 500) {
       return void (await fail("thumb too small"));

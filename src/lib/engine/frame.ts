@@ -1,13 +1,13 @@
 // frame:// transport helpers — shared by the viewport and the selftest rig.
-const FRAME_BASE = "frame://localhost";
+import { customSchemeUrl } from "./customScheme";
 
 export function frameUrl(version: number, fmt?: "jpeg"): string {
   const q = fmt === "jpeg" ? "&fmt=jpeg" : "";
-  return `${FRAME_BASE}/current?v=${version}${q}`;
+  return customSchemeUrl("frame", `current?v=${version}${q}`);
 }
 
 /**
- * Prefetch a frame:// JPEG the same way filmstrip thumbs load thumb:// —
+ * Prefetch a frame JPEG the same way filmstrip thumbs load —
  * via <img>, not fetch. Custom-protocol fetch is cross-origin from the
  * Vite/dev page and used to fail CORS; <img> only needs img-src CSP.
  */
