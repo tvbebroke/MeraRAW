@@ -2,6 +2,10 @@
 
 All notable changes to MeraRAW are documented here.
 
+## [0.1.6] — unreleased
+
+In progress. Download server (`get-download-url`) now probes both spaced and dotted R2 object keys (`MeraRAW Win 0.1.6.exe` / `MeraRAW.Win.0.1.6.exe`) and returns a clear JSON 404 instead of a signed URL that surfaces raw S3 `NoSuchKey` XML in the browser.
+
 ## [0.1.5] — 2026-07-19
 
 Beta release focused on a full UI shell overhaul, cross-platform installers, Windows reliability, and demosaic engine clarity. Tag: `v0.1.5` (`bb70495` on `svelte-ui`).
