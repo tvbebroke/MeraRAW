@@ -541,6 +541,83 @@ mod integration_tests {
     use super::*;
     use crate::raw::Demosaic;
 
+    /// Decode every RAW in the sample corpus and print a per-file report.
+    ///
+    /// Corpus = github.com/f-spot/raw-samples (CC-licensed), one body per
+    /// vendor container: ARW, CR2, DNG, NEF, PEF, RW2 and Leica's bare .RAW.
+    ///
+    /// All eight must decode, including `sample_canon_350d_broken.cr2`. That
+    /// corpus is TagLib#'s *metadata* test suite, so "broken" there means a
+    /// tag that tripped up TagLib#, not damaged sensor data — the frame itself
+    /// is intact and macOS reads its EXIF fine. Do not "fix" a failure here by
+    /// excusing that file; if it stops decoding, something regressed.
+    ///
+    /// Ignored by default: needs ~86MB of files that are not in the repo.
+    ///   cargo test -p meratech-core corpus_decodes -- --ignored --nocapture
+    #[test]
+    #[ignore]
+    fn corpus_decodes_every_vendor_format() {
+        let Ok(home) = std::env::var("HOME") else { return };
+        let dir = std::path::PathBuf::from(home).join("Desktop/test-claude-raw/raw-samples");
+        if !dir.exists() {
+            eprintln!("skip: corpus not present at {}", dir.display());
+            return;
+        }
+
+        let mut files: Vec<_> = std::fs::read_dir(&dir)
+            .expect("read corpus dir")
+            .filter_map(|e| e.ok().map(|e| e.path()))
+            .filter(|p| p.is_file() && !p.file_name().is_some_and(|n| n.to_string_lossy().starts_with('.')))
+            .collect();
+        files.sort();
+        assert!(!files.is_empty(), "corpus dir is empty");
+
+        let dec = RawlerDecoder::default();
+        let mut failures = Vec::new();
+        let mut decoded = 0usize;
+
+        for path in &files {
+            let name = path.file_name().unwrap().to_string_lossy().to_string();
+
+            // catch_unwind: a panic in a decoder is itself a defect worth
+            // reporting per-file rather than aborting the whole run.
+            let res = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                dec.decode_with_options(path, None, Demosaic::default())
+            }));
+
+            match res {
+                Ok(Ok(img)) => {
+                    let m = &img.meta;
+                    let finite = img.working.data.iter().all(|v| v.is_finite());
+                    println!(
+                        "  OK    {name:<32} {fmt:<5} {w}x{h} {depth}bit  {make} {model}  wb={wb:?} finite={finite}",
+                        fmt = m.format, w = m.width, h = m.height, depth = m.bit_depth,
+                        make = m.camera_make, model = m.camera_model, wb = m.as_shot_wb,
+                    );
+                    if m.width == 0 || m.height == 0 {
+                        failures.push(format!("{name}: zero dimensions"));
+                    }
+                    if !finite {
+                        failures.push(format!("{name}: non-finite pixels"));
+                    }
+                    decoded += 1;
+                }
+                Ok(Err(e)) => {
+                    println!("  FAIL  {name:<32} {e}");
+                    failures.push(format!("{name}: {e}"));
+                }
+                Err(_) => {
+                    println!("  PANIC {name}");
+                    failures.push(format!("{name}: decoder PANICKED"));
+                }
+            }
+        }
+
+        println!("\n  {decoded}/{} decoded", files.len());
+        assert_eq!(decoded, files.len(), "every corpus file must decode");
+        assert!(failures.is_empty(), "corpus failures:\n  - {}", failures.join("\n  - "));
+    }
+
     /// End-to-end: the merawler path must produce the same cropped dimensions as
     /// rawler (crop correctness) and a genuinely different image (algo applied),
     /// with finite values. Skips when the sample RAW isn't present.

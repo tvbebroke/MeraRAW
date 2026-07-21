@@ -23,11 +23,8 @@
         "minWidth": 1024,
         "minHeight": 700,
         "resizable": true,
-        "decorations": true,
+        "decorations": false,
         "transparent": true,
-        "hiddenTitle": true,
-        "titleBarStyle": "Overlay",
-        "trafficLightPosition": { "x": 16, "y": 18 },
         "backgroundColor": "#272727",
         "dragDropEnabled": true
       }
@@ -39,7 +36,7 @@
         "script-src": "'self'",
         "style-src": "'self' 'unsafe-inline'",
         "img-src": "'self' data: blob: asset: http://asset.localhost https://asset.localhost frame: thumb: http://frame.localhost https://frame.localhost http://thumb.localhost https://thumb.localhost",
-        "connect-src": "'self' ipc: http://ipc.localhost frame: thumb: http://frame.localhost https://frame.localhost http://thumb.localhost https://thumb.localhost https://kaanlfnxoyrjrgqrxcuz.supabase.co https://*.supabase.co wss://*.supabase.co https://www.meratech.co",
+        "connect-src": "'self' ipc: http://ipc.localhost frame: thumb: http://frame.localhost https://frame.localhost http://thumb.localhost https://thumb.localhost https://kaanlfnxoyrjrgqrxcuz.supabase.co https://*.supabase.co wss://*.supabase.co https://www.meratech.co https://us.i.posthog.com https://us-assets.i.posthog.com",
         "font-src": "'self' data:",
         "object-src": "'none'",
         "base-uri": "'self'",

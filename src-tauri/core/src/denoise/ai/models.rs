@@ -76,9 +76,16 @@ impl ModelRegistry {
         // Unpinned on-disk files are treated as not-ready unless explicitly
         // allowed (tests / local dig via MERARAW_DENOISE_ALLOW_UNPINNED=1 or
         // MERARAW_DENOISE_MODELS_DIR).
+        //
+        // `with_dir` counts as that explicit opt-in too: it is the programmatic
+        // form of MERARAW_DENOISE_MODELS_DIR, and `dir()` already honours it.
+        // Checking only the env vars here meant a caller-supplied directory
+        // found the file but was never granted unpinned permission, so `ready`
+        // stayed false. Production builds construct via `default()`, leaving
+        // models_dir None, so this cannot loosen shipped integrity checks.
         let expected_sha256: Option<&'static str> = None;
-        let allow_unpinned = std::env::var_os("MERARAW_DENOISE_ALLOW_UNPINNED")
-            .is_some_and(|v| v == "1")
+        let allow_unpinned = self.models_dir.is_some()
+            || std::env::var_os("MERARAW_DENOISE_ALLOW_UNPINNED").is_some_and(|v| v == "1")
             || std::env::var_os("MERARAW_DENOISE_MODELS_DIR").is_some_and(|v| !v.is_empty());
         let hash_ok = match (on_disk, expected_sha256) {
             (false, _) => false,

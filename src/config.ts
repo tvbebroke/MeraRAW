@@ -36,3 +36,20 @@ export const EARLY_SUPPORTER_PRICE = "$20";
 export function supabaseConfigured(): boolean {
   return Boolean(SUPABASE_URL && SUPABASE_ANON_KEY && !SUPABASE_ANON_KEY.includes("YOUR_"));
 }
+
+/**
+ * PostHog product telemetry. The project API key is a write-only ingest key
+ * and is safe to ship in the binary (same class as the Supabase anon key).
+ * Absent key = telemetry disabled entirely, including the consent prompt.
+ *
+ * Changing POSTHOG_HOST also requires updating `connect-src` in
+ * src-tauri/tauri.conf.json, or requests are blocked by CSP.
+ */
+export const POSTHOG_KEY = import.meta.env.VITE_POSTHOG_KEY ?? "";
+
+export const POSTHOG_HOST =
+  import.meta.env.VITE_POSTHOG_HOST ?? "https://us.i.posthog.com";
+
+export function telemetryConfigured(): boolean {
+  return POSTHOG_KEY.startsWith("phc_");
+}

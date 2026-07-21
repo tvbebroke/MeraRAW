@@ -18,6 +18,7 @@
   "dependencies": {
     "@tauri-apps/api": "^2",
     "nanostores": "^1.0.1",
+    "posthog-js": "^1.405.2",
     "svelte-spa-router": "^5"
   },
   "devDependencies": {

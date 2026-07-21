@@ -4,6 +4,11 @@
   import ToggleSwitch from "../primitives/ToggleSwitch.svelte";
   import { folder, importAndBrowse } from "../../../stores/browse";
   import { pickFolder } from "../../fs";
+  import {
+    telemetryConsent,
+    setTelemetryConsent,
+  } from "../../../analytics/telemetry";
+  import { telemetryConfigured } from "../../../config";
 
   // Modal active tab state
   type Tab = "general" | "editor" | "performance" | "export";
@@ -197,6 +202,24 @@
               </div>
               <ToggleSwitch checked={$classicLook} label="Classic Look" onchange={triggerThemeTransition} />
             </div>
+
+            <!-- Anonymous usage data -->
+            {#if telemetryConfigured()}
+              <div class="flex items-center justify-between py-2 border-t border-white/[0.03]">
+                <div class="space-y-0.5">
+                  <span class="setting-label">Share Anonymous Usage Data</span>
+                  <p class="setting-desc">
+                    Tool and export usage, render timings, and decode errors. Never
+                    your photos, filenames, or folder paths.
+                  </p>
+                </div>
+                <ToggleSwitch
+                  checked={$telemetryConsent === "granted"}
+                  label="Share Anonymous Usage Data"
+                  onchange={setTelemetryConsent}
+                />
+              </div>
+            {/if}
           </div>
         {:else if activeTab === "editor"}
           <div class="space-y-5">

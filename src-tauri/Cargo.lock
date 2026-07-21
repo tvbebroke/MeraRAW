@@ -2624,7 +2624,7 @@ dependencies = [
 
 [[package]]
 name = "meratech-core"
-version = "0.1.5"
+version = "0.1.6"
 dependencies = [
  "blake3",
  "bytemuck",
@@ -2650,7 +2650,7 @@ dependencies = [
 
 [[package]]
 name = "meratech-editor"
-version = "0.1.5"
+version = "0.1.6"
 dependencies = [
  "base64 0.22.1",
  "jsonwebtoken",

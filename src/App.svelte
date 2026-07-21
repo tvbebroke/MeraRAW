@@ -5,6 +5,7 @@
   import TitleBar from "./lib/components/shell/TitleBar.svelte";
   import SettingsModal from "./lib/components/shell/SettingsModal.svelte";
   import ExportModal from "./lib/components/shell/ExportModal.svelte";
+  import TelemetryConsent from "./lib/components/shell/TelemetryConsent.svelte";
   import {
     isSettingsOpen,
     isExportOpen,
@@ -15,6 +16,7 @@
   } from "./stores/ui";
   import { fade } from "svelte/transition";
   import { initEngineBridge } from "./lib/engine/boot";
+  import { initTelemetry } from "./analytics/telemetry";
   import { undo, redo } from "./ipc/commands";
   import { reconcile } from "./stores/doc";
   import { refreshFolders } from "./stores/browse";
@@ -28,6 +30,7 @@
     }
 
     const teardown = initEngineBridge();
+    initTelemetry();
     void refreshFolders();
 
     function onKey(e: KeyboardEvent) {
@@ -77,6 +80,8 @@
   {#if $isExportOpen}
     <ExportModal />
   {/if}
+
+  <TelemetryConsent />
 
   <!-- Shutter flash: CSS opacity transition, not {#if}, so it fades instead of popping -->
   <div
