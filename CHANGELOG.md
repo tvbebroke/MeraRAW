@@ -2,9 +2,23 @@
 
 All notable changes to MeraRAW are documented here.
 
-## [0.1.6] — unreleased
+## [0.1.6] — 2026-07-21
 
-In progress. Download server (`get-download-url`) now probes both spaced and dotted R2 object keys (`MeraRAW Win 0.1.6.exe` / `MeraRAW.Win.0.1.6.exe`) and returns a clear JSON 404 instead of a signed URL that surfaces raw S3 `NoSuchKey` XML in the browser.
+Small polish release on top of the 0.1.5 cross-platform shell. Tag: `v0.1.6`.
+
+### Highlights
+
+- **Opt-in telemetry** — PostHog product analytics, frontend-only, off until the user consents. Prop whitelist so filenames/paths never leave the machine; no autocapture or session replay.
+- **Window sizing** — rejects runaway restored geometry (oversized / below-minimum) and opens maximized when there is no usable saved size.
+- **Single frameless title bar** — native macOS decorations stay off so only the Svelte traffic lights show (fixes “seeing double” when an old window-state file re-enabled decorations).
+- **Denoise model-dir fix** — `ModelRegistry::with_dir()` grants unpinned-model permission so a caller-supplied models directory is marked ready.
+- **Download server** — `get-download-url` probes spaced and dotted R2 keys and returns a clear JSON 404 instead of raw S3 `NoSuchKey` XML.
+
+### Known limitations (carried)
+
+- Svelte shell still does not call `license_check_local` (in-app license gate lost in the React → Svelte migration). Download gating on meratech.co / R2 is separate.
+
+---
 
 ## [0.1.5] — 2026-07-19
 

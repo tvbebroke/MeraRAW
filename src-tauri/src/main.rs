@@ -386,7 +386,18 @@ fn main() {
 
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
-        .plugin(tauri_plugin_window_state::Builder::default().build())
+        // Never restore/save decorations — the Svelte TitleBar draws its own
+        // traffic lights (`decorations: false` in tauri.conf.json). Persisting
+        // `decorated: true` from an older session re-enables the native title
+        // bar and shows a second set of controls ("seeing double").
+        .plugin(
+            tauri_plugin_window_state::Builder::default()
+                .with_state_flags(
+                    tauri_plugin_window_state::StateFlags::all()
+                        - tauri_plugin_window_state::StateFlags::DECORATIONS,
+                )
+                .build(),
+        )
         .manage(engine)
         .register_asynchronous_uri_scheme_protocol("frame", protocol::handle_frame_request)
         .register_asynchronous_uri_scheme_protocol("thumb", protocol::handle_thumb_request)
@@ -496,7 +507,10 @@ fn main() {
             // Window-state restore can leave the frame oversized / hanging off
             // the right edge (common when moving from a large display to a
             // 13" MacBook). Clamp into the current monitor work area.
+            // Also pin decorations off so a stale `.window-state.json` cannot
+            // resurrect the native title bar beside the custom traffic lights.
             if let Some(win) = app.get_webview_window("main") {
+                let _ = win.set_decorations(false);
                 ensure_main_window_visible(&win);
             }
 
