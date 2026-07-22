@@ -115,7 +115,7 @@
 
     {#if active}
       <div class="my-2 h-[1px] bg-white/5"></div>
-      <div class="mb-1 px-1 text-[10px] font-bold text-white/50">REFINE SPOT</div>
+      <div class="mb-1 px-1 text-[10px] font-bold text-white/50">Refine Spot</div>
       <div class="flex flex-col gap-[10px] px-1">
         <div class="grid h-[15px] grid-cols-[64px_1fr] items-center gap-x-[10px]">
           <span class="text-[9px] text-white/70">Feather</span>

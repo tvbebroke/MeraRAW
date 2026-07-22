@@ -642,8 +642,8 @@
     width: 240px;
     padding: 0 4px 0 16px;
     border-radius: 9999px;
-    border: 1px solid var(--color-border-input, rgba(255, 255, 255, 0.06));
-    background: var(--color-surface-input, rgba(33, 33, 35, 0.65));
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    background: rgba(33, 33, 35, 0.65);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
     box-shadow:
@@ -655,8 +655,8 @@
   }
 
   .search-wrap:focus-within {
-    background: rgba(0, 0, 0, 0.4);
-    border-color: var(--color-border-hover, rgba(255, 255, 255, 0.25));
+    background: rgba(47, 47, 49, 0.85);
+    border-color: rgba(255, 255, 255, 0.15);
   }
 
   .search-icon-circle {

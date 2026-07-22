@@ -78,7 +78,7 @@
 <CollapsibleSection id="detail" title="Detail">
   <div class="flex flex-col gap-[10px]">
     <div>
-      <div class="mb-2 text-[11px] font-bold tracking-wider text-white/60 uppercase">
+      <div class="mb-2 text-[11px] font-bold tracking-wider text-white/60">
         Sharpening
       </div>
       <div class="flex flex-col gap-[6px]">
@@ -101,7 +101,7 @@
     <div class="my-1 h-[1px] bg-white/5"></div>
 
     <div>
-      <div class="mb-2 text-[11px] font-bold tracking-wider text-white/60 uppercase">
+      <div class="mb-2 text-[11px] font-bold tracking-wider text-white/60">
         Noise Reduction
       </div>
       <div class="flex flex-col gap-[6px]">
@@ -118,7 +118,7 @@
 
     <div>
       <div class="mb-2 flex items-center justify-between">
-        <div class="text-[11px] font-bold tracking-wider text-white/60 uppercase">
+        <div class="text-[11px] font-bold tracking-wider text-white/60">
           AI Denoise
         </div>
         <label class="flex items-center gap-2 text-[11px] text-white/70">

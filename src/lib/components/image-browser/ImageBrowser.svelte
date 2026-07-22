@@ -61,6 +61,16 @@
     return () => window.removeEventListener("keydown", handleKeydown);
   });
 
+  // Automatically scroll filmstrip to keep selected photo centered
+  $effect(() => {
+    const current = $activePhoto;
+    if (!current || !scrollEl) return;
+    const activeEl = scrollEl.querySelector<HTMLElement>(".filmstrip-card--active");
+    if (activeEl) {
+      activeEl.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
+    }
+  });
+
   // ── Context Menu ─────────────────────────────────────────────
   let ctxMenu = $state<{ x: number; y: number } | null>(null);
   let ctxPhoto = $state<(typeof $photos)[0] | null>(null);
@@ -163,7 +173,7 @@
   <div
     bind:this={scrollEl}
     onwheel={handleWheel}
-    class="flex min-w-0 flex-1 items-stretch gap-[8px] overflow-x-auto pl-[28px] transition-[opacity,transform] duration-200 {$imageBrowserCollapsed ? 'pointer-events-none opacity-0' : 'opacity-100'}"
+    class="flex min-w-0 flex-1 items-center gap-[24px] overflow-x-auto pl-[28px] transition-[opacity,transform] duration-200 {$imageBrowserCollapsed ? 'pointer-events-none opacity-0' : 'opacity-100'}"
   >
     {#each $photos as photo (photo.path)}
       <button
@@ -181,7 +191,7 @@
             class="filmstrip-img"
           />
         {:else}
-          <span class="filmstrip-placeholder text-[9px] text-white/50">RAW</span>
+          <span class="filmstrip-placeholder text-[11px] text-white/60">RAW</span>
         {/if}
       </button>
     {/each}
@@ -203,54 +213,60 @@
     -webkit-appearance: none;
     outline: none;
     position: relative;
-    height: 100%;
+    height: 92%;
+    aspect-ratio: 3 / 2;
     flex-shrink: 0;
     cursor: pointer;
     overflow: hidden;
     border-radius: 12px;
-    border: 1px solid rgba(255, 255, 255, 0.06);
-    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid transparent;
+    background: transparent;
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 0;
+    padding: 14px;
     margin: 0;
+    box-shadow: none;
     transition:
-      border-color 200ms ease,
-      box-shadow 200ms ease;
+      border-color 150ms ease,
+      background-color 150ms ease,
+      opacity 150ms ease;
   }
 
   .filmstrip-card:hover {
-    border-color: rgba(255, 255, 255, 0.16);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+    background: rgba(255, 255, 255, 0.05);
+    border-color: rgba(255, 255, 255, 0.06);
+    box-shadow: none;
   }
 
   .filmstrip-card:active {
-    transform: scale(0.97);
+    opacity: 0.85;
+    box-shadow: none;
   }
 
   .filmstrip-card--active {
-    border-color: rgba(255, 255, 255, 0.8);
-    box-shadow:
-      0 0 0 1px rgba(255, 255, 255, 0.25),
-      0 6px 15px rgba(0, 0, 0, 0.4);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.12);
+    box-shadow: none;
   }
 
   .filmstrip-img {
     height: 100%;
-    width: auto;
-    max-width: 220px;
+    width: 100%;
     object-fit: cover;
     display: block;
+    border-radius: 0px;
   }
 
   .filmstrip-placeholder {
     display: flex;
     height: 100%;
-    width: 100px;
+    width: 100%;
     align-items: center;
     justify-content: center;
-    background: rgba(255, 255, 255, 0.025);
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 0px;
     transition: background-color 200ms ease;
   }
 
