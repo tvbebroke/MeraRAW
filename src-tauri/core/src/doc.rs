@@ -104,6 +104,10 @@ pub struct EditDoc {
     pub modules: ModuleParams,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub masks: Vec<Mask>,
+    /// Object-removal / heal spots (phase 10). Pixels live in the working
+    /// master; the sidecar stores brush strokes so fills can be rebuilt.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub retouch: Vec<crate::retouch::RetouchSpot>,
     #[serde(default)]
     pub meta: DocMeta,
     /// Forward-compat: unknown future fields round-trip unharmed (§6).
@@ -124,6 +128,7 @@ impl EditDoc {
             },
             modules: BTreeMap::new(),
             masks: Vec::new(),
+            retouch: Vec::new(),
             meta: DocMeta {
                 created_at: Some(now.clone()),
                 modified_at: Some(now),
@@ -163,6 +168,14 @@ impl EditDoc {
 
     pub fn mask_mut(&mut self, id: &str) -> Option<&mut Mask> {
         self.masks.iter_mut().find(|m| m.id == id)
+    }
+
+    pub fn retouch(&self, id: &str) -> Option<&crate::retouch::RetouchSpot> {
+        self.retouch.iter().find(|s| s.id == id)
+    }
+
+    pub fn retouch_mut(&mut self, id: &str) -> Option<&mut crate::retouch::RetouchSpot> {
+        self.retouch.iter_mut().find(|s| s.id == id)
     }
 
     pub fn touch(&mut self) {

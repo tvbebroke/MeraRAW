@@ -269,6 +269,10 @@ export function setDisplayLook(look: number): Promise<void> {
   return invoke<void>("set_display_look", { look });
 }
 
+export function setClipWarnings(hi: boolean, lo: boolean): Promise<void> {
+  return invoke<void>("set_clip_warnings", { hi, lo });
+}
+
 // ---- Phase 7: export + presets ----
 
 export function exportImage(settings: ExportSettings): Promise<string> {

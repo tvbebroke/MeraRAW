@@ -18,6 +18,11 @@ pub(super) struct CropUniform {
     pub crop_flip_h: u32,
     pub crop_flip_v: u32,
     pub crop_mode: u32,
+    /// Vertical keystone (−1..1). Composed into the same extract sample.
+    pub persp_v: f32,
+    /// Horizontal keystone (−1..1).
+    pub persp_h: f32,
+    pub _pad0: u32,
 }
 
 impl CropUniform {
@@ -32,6 +37,9 @@ impl CropUniform {
             crop_flip_h: u32::from(crop.flip_h),
             crop_flip_v: u32::from(crop.flip_v),
             crop_mode: mode,
+            persp_v: crop.persp_vertical,
+            persp_h: crop.persp_horizontal,
+            _pad0: 0,
         }
     }
 }
@@ -56,6 +64,13 @@ pub(super) struct PresentUniforms {
     pub height: u32,
     pub overlay: f32,
     pub look: u32,
+    /// 1 = paint clipped highlights (display-referred blinkies).
+    pub clip_hi: u32,
+    /// 1 = paint crushed shadows.
+    pub clip_lo: u32,
+    /// Milliseconds (for blink pulse in present.wgsl).
+    pub _p0: u32,
+    pub _p1: u32,
 }
 
 #[repr(C)]
@@ -349,6 +364,7 @@ pub(super) enum PipeKind {
     Curve,
     Lut3d,
     Sharpen,
+    Effects,
 }
 
 impl PipeKind {
@@ -368,6 +384,7 @@ pub(super) const NODE_PIPES: &[PipeKind] = &[
     PipeKind::Curve,
     PipeKind::Lut3d,
     PipeKind::Sharpen,
+    PipeKind::Effects,
 ];
 
 /// Storage-buffer size for the 3D LUT node: MAX_SIZE³ × 3 channels × f32.
@@ -417,6 +434,7 @@ impl RenderGraph {
             ("grade", include_str!("grade.wgsl")),
             ("hsl", include_str!("hsl.wgsl")),
             ("sharpen", include_str!("sharpen.wgsl")),
+            ("effects", include_str!("effects.wgsl")),
         ] {
             simple_pipes.insert(name, make_pass(gpu, name, src, &simple_bgl));
         }
@@ -554,6 +572,8 @@ impl RenderGraph {
             last_passes_run: Vec::new(),
             last_final: FinalTag::Extract,
             look: 0,
+            clip_hi: false,
+            clip_lo: false,
             dcp_look,
             dcp_look_uniforms: mk_uniform(
                 std::mem::size_of::<DcpLookUniforms>() as u64,

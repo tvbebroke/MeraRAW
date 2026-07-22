@@ -28,6 +28,7 @@ mod denoise_ops;
 mod doc_ops;
 mod export;
 mod render;
+mod retouch_ops;
 
 use doc_ops::{list_preset_catalog, list_presets, load_preset};
 
@@ -205,6 +206,11 @@ impl EngineHandle {
 
     pub async fn set_display_look(&self, look: u32) -> Result<(), EngineError> {
         self.request(|reply| EngineMsg::SetDisplayLook { look, reply })
+            .await
+    }
+
+    pub async fn set_clip_warnings(&self, hi: bool, lo: bool) -> Result<(), EngineError> {
+        self.request(|reply| EngineMsg::SetClipWarnings { hi, lo, reply })
             .await
     }
 
@@ -502,6 +508,8 @@ struct CurrentImage {
     working: Option<(wgpu::Texture, wgpu::TextureView, u32, u32)>,
     /// Retained downsized CPU copy (histogram / segmentation / fallback).
     small_cpu: Option<std::sync::Arc<RgbF32Buf>>,
+    /// Full-res clean master (pre-retouch). None until decode finishes.
+    clean_rgb: Option<std::sync::Arc<RgbF32Buf>>,
     /// All docs for this image: [0] = primary, rest = virtual copies.
     docs: Vec<EditDoc>,
     active_doc: usize,
@@ -526,7 +534,12 @@ impl CurrentImage {
     fn as_shot_cct(&self) -> f32 {
         self.meta.estimated_cct.unwrap_or(5200.0)
     }
-    fn delta(&self, label: String, new_mask_id: Option<String>) -> DocDelta {
+    fn delta(
+        &self,
+        label: String,
+        new_mask_id: Option<String>,
+        new_retouch_id: Option<String>,
+    ) -> DocDelta {
         let (u, r) = self.history.depths();
         DocDelta {
             doc: self.doc().to_json(),
@@ -534,6 +547,7 @@ impl CurrentImage {
             undo_depth: u,
             redo_depth: r,
             new_mask_id,
+            new_retouch_id,
         }
     }
 }
@@ -557,6 +571,9 @@ struct Engine {
     preview_bypass: bool,
     /// Display look applied to preview + export: 0 Neutral, 1 Camera, 2 AgX, 4 Original.
     display_look: u32,
+    /// Viewport clipping blinkies (highlight / shadow).
+    clip_hi: bool,
+    clip_lo: bool,
     /// Dedicated graph for assistant previews (own small caches — never
     /// thrashes the viewport graph).
     preview_graph: Option<RenderGraph>,
@@ -656,6 +673,8 @@ async fn run(
         import_state: None,
         preview_bypass: false,
         display_look: 1, // Camera by default (matches export; preview now WYSIWYG)
+        clip_hi: false,
+        clip_lo: false,
         preview_graph: None,
         export_graph: None,
         export_job: None,
@@ -882,7 +901,7 @@ impl Engine {
                     c.history.record(before, format!("restore '{name}'"));
                     *c.doc_mut() = snap;
                     c.doc_dirty = true;
-                    Ok(c.delta(format!("restore '{name}'"), None))
+                    Ok(c.delta(format!("restore '{name}'"), None, None))
                 })();
                 if result.is_ok() {
                     self.full_redraw();
@@ -916,7 +935,7 @@ impl Engine {
                         .ok_or_else(|| CoreError::InvalidOp(format!("no doc {doc_id}")))?;
                     c.active_doc = idx;
                     c.history.clear();
-                    Ok(c.delta(format!("switch to {doc_id}"), None))
+                    Ok(c.delta(format!("switch to {doc_id}"), None, None))
                 })();
                 if result.is_ok() {
                     self.full_redraw();
@@ -975,6 +994,17 @@ impl Engine {
                         if let Some(g) = &mut self.graph {
                             g.invalidate_all();
                         }
+                    }
+                    self.render_now();
+                }
+                let _ = reply.send(());
+            }
+            EngineMsg::SetClipWarnings { hi, lo, reply } => {
+                if self.clip_hi != hi || self.clip_lo != lo {
+                    self.clip_hi = hi;
+                    self.clip_lo = lo;
+                    if let Some(g) = &mut self.graph {
+                        g.set_clip_warnings(hi, lo);
                     }
                     self.render_now();
                 }

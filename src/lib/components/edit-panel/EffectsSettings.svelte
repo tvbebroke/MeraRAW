@@ -87,6 +87,19 @@
         {/each}
       </div>
     </div>
+
+    <div class="my-1 h-[1px] bg-white/5"></div>
+
+    <div class="flex flex-col gap-[6px]">
+      <p class="mb-[2px] text-[7px] font-bold tracking-wider text-white/40 uppercase">
+        Texture &amp; Optics
+      </p>
+      <ParamRow path="effects.clarity" label="Clarity" labelWidth={72} />
+      <ParamRow path="effects.grain_amount" label="Grain" labelWidth={72} />
+      <ParamRow path="effects.grain_size" label="Grain Size" labelWidth={72} />
+      <ParamRow path="effects.vignette_amount" label="Vignette" labelWidth={72} />
+      <ParamRow path="effects.vignette_midpoint" label="Vignette Mid" labelWidth={72} />
+    </div>
   </div>
 
   <img src={divider} alt="" class="mt-[10px] h-[10px] w-full" />

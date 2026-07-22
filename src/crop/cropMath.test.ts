@@ -10,6 +10,7 @@ import {
   contentNormToImageNorm,
   cropModeFor,
   dragHandle,
+  invPerspective,
   isGeometryIdentity,
   maxCenteredRect,
   maxInscribedSize,
@@ -28,6 +29,8 @@ const baseParams: CropParams = {
   aspectW: 0,
   aspectH: 0,
   constrainCrop: true,
+  perspVertical: 0,
+  perspHorizontal: 0,
 };
 
 // deterministic LCG so failures reproduce
@@ -73,6 +76,18 @@ describe("content dims / mode", () => {
     const withAngle = { ...rectOnly, angle: 3 };
     expect(cropModeFor(withAngle, true)).toBe(2);
     expect(isGeometryIdentity(withAngle)).toBe(false);
+    const withPersp = { ...baseParams, perspVertical: 25 };
+    expect(isGeometryIdentity(withPersp)).toBe(false);
+    expect(cropModeFor(withPersp, true)).toBe(2);
+    expect(cropModeFor(withPersp, false)).toBe(1);
+  });
+
+  it("invPerspective is identity at zero and invertible at center", () => {
+    expect(invPerspective(0.5, 0.5, 0, 0)).toEqual([0.5, 0.5]);
+    expect(invPerspective(0.5, 0.5, 40, -30)).toEqual([0.5, 0.5]);
+    const p = invPerspective(0.25, 0.3, 20, 0);
+    expect(p).not.toBeNull();
+    expect(p![0]).not.toBeCloseTo(0.25, 3);
   });
 
   it("rotate-90 swaps rotated + content dims", () => {

@@ -124,6 +124,9 @@ pub enum EngineEvent {
     },
     DenoiseDone { job: u64 },
     DenoiseError { job: u64, message: String },
+    /// Object-removal / heal rebuild finished.
+    RetouchDone,
+    RetouchError { message: String },
 }
 
 pub enum EngineMsg {
@@ -230,6 +233,12 @@ pub enum EngineMsg {
     /// Display look: 0 = Neutral, 1 = Camera/punchy, 2 = Filmic/AgX, 4 = Original.
     SetDisplayLook {
         look: u32,
+        reply: oneshot::Sender<()>,
+    },
+    /// Toggle highlight / shadow clipping blinkies on the viewport present pass.
+    SetClipWarnings {
+        hi: bool,
+        lo: bool,
         reply: oneshot::Sender<()>,
     },
     // ---- Phase 5: catalog ----
@@ -465,6 +474,8 @@ pub struct DecodedPayload {
     pub width: u32,
     pub height: u32,
     pub small_cpu: std::sync::Arc<crate::image::RgbF32Buf>,
+    /// Full-res clean master (pre-retouch). Kept so heal spots can rebuild.
+    pub clean_rgb: std::sync::Arc<crate::image::RgbF32Buf>,
     pub meta: ImageMeta,
 }
 
@@ -472,11 +483,13 @@ impl DecodedPayload {
     pub fn from_decoded(img: DecodedImage) -> Self {
         let rgba_f16 = img.working.to_rgba_f16_bytes();
         let small_cpu = std::sync::Arc::new(img.working.downscale_to(2048));
+        let clean_rgb = std::sync::Arc::new(img.working);
         Self {
             rgba_f16,
-            width: img.working.width as u32,
-            height: img.working.height as u32,
+            width: clean_rgb.width as u32,
+            height: clean_rgb.height as u32,
             small_cpu,
+            clean_rgb,
             meta: img.meta,
         }
     }

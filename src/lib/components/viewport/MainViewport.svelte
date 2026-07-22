@@ -9,6 +9,7 @@
     wbFromPoint,
   } from "../../../ipc/commands";
   import { onEngineReady, onFrameReady } from "../../../ipc/events";
+  import CropOverlay from "../../../crop/CropOverlay.svelte";
   import {
     contentDims,
     contentNormToImageNorm,
@@ -27,6 +28,7 @@
     previewBypass,
     sendViewCmd,
     selectedMask,
+    selectedRetouch,
     viewportTool,
     viewCmdNonce,
     viewCmd,
@@ -64,6 +66,18 @@
   let brushPoints: [number, number][] = [];
   let forceNext = false;
   let firstCropToggle = true;
+
+  /** Split before/after (phase 12). */
+  let compareSplit = $state(false);
+  let beforeSrc = $state<string | null>(null);
+  let splitRatio = $state(0.5);
+  let splitDragging = false;
+  let compareBusy = $state(false);
+
+  /** Cursor loupe (magnifier), not full-viewport 1:1. */
+  let loupeOn = $state(false);
+  let loupePos = $state<{ x: number; y: number } | null>(null);
+  let loupeCanvas = $state<HTMLCanvasElement | null>(null);
 
   function appZoom(): number {
     return (
@@ -196,9 +210,128 @@
   }
 
   function toggleAfter() {
+    if (compareSplit) {
+      compareSplit = false;
+      beforeSrc = null;
+    }
     const next = !previewBypass.get();
     previewBypass.set(next);
     void setPreviewBypass(next).catch(() => {});
+  }
+
+  function waitForNewerFrame(prev: number, timeoutMs = 3500): Promise<void> {
+    return new Promise((resolve) => {
+      const t0 = Date.now();
+      const id = window.setInterval(() => {
+        if (shownVer > prev || Date.now() - t0 > timeoutMs) {
+          window.clearInterval(id);
+          resolve();
+        }
+      }, 40);
+    });
+  }
+
+  function snapshotDisplay(): string | null {
+    const img = wrapEl?.querySelector("img.viewport-frame") as HTMLImageElement | null;
+    if (!img?.naturalWidth) return null;
+    const c = document.createElement("canvas");
+    c.width = img.naturalWidth;
+    c.height = img.naturalHeight;
+    const ctx = c.getContext("2d");
+    if (!ctx) return null;
+    ctx.drawImage(img, 0, 0);
+    return c.toDataURL("image/jpeg", 0.9);
+  }
+
+  async function toggleCompare() {
+    if (compareBusy) return;
+    if (compareSplit) {
+      compareSplit = false;
+      beforeSrc = null;
+      return;
+    }
+    if (decodeState.get() !== "ready" || !displaySrc) return;
+    compareBusy = true;
+    try {
+      const v0 = shownVer;
+      previewBypass.set(true);
+      await setPreviewBypass(true);
+      await refresh(true);
+      await waitForNewerFrame(v0);
+      beforeSrc = snapshotDisplay();
+      const v1 = shownVer;
+      previewBypass.set(false);
+      await setPreviewBypass(false);
+      await refresh(true);
+      await waitForNewerFrame(v1);
+      if (beforeSrc) {
+        compareSplit = true;
+        splitRatio = 0.5;
+      }
+    } catch {
+      beforeSrc = null;
+      compareSplit = false;
+    } finally {
+      compareBusy = false;
+    }
+  }
+
+  function onSplitPointerDown(e: PointerEvent) {
+    e.stopPropagation();
+    splitDragging = true;
+    (e.currentTarget as Element).setPointerCapture(e.pointerId);
+    moveSplit(e);
+  }
+  function moveSplit(e: PointerEvent) {
+    if (!splitDragging || !wrapEl) return;
+    const rect = wrapEl.getBoundingClientRect();
+    splitRatio = Math.min(0.92, Math.max(0.08, (e.clientX - rect.left) / rect.width));
+  }
+  function endSplitDrag() {
+    splitDragging = false;
+  }
+
+  function toggleLoupe() {
+    loupeOn = !loupeOn;
+    if (!loupeOn) loupePos = null;
+  }
+
+  function paintLoupe(clientX: number, clientY: number) {
+    if (!loupeOn || !wrapEl || !loupeCanvas) return;
+    const img = wrapEl.querySelector("img.viewport-frame") as HTMLImageElement | null;
+    if (!img?.naturalWidth) return;
+    const rect = img.getBoundingClientRect();
+    if (clientX < rect.left || clientX > rect.right || clientY < rect.top || clientY > rect.bottom) {
+      loupePos = null;
+      return;
+    }
+    loupePos = { x: clientX - wrapEl.getBoundingClientRect().left, y: clientY - wrapEl.getBoundingClientRect().top };
+    const nx = (clientX - rect.left) / rect.width;
+    const ny = (clientY - rect.top) / rect.height;
+    const srcX = nx * img.naturalWidth;
+    const srcY = ny * img.naturalHeight;
+    const zoom = 2.5;
+    const size = loupeCanvas.width;
+    const half = size / (2 * zoom);
+    const ctx = loupeCanvas.getContext("2d");
+    if (!ctx) return;
+    ctx.clearRect(0, 0, size, size);
+    ctx.fillStyle = "#111";
+    ctx.fillRect(0, 0, size, size);
+    ctx.drawImage(
+      img,
+      srcX - half,
+      srcY - half,
+      half * 2,
+      half * 2,
+      0,
+      0,
+      size,
+      size,
+    );
+    ctx.strokeStyle = "rgba(255,255,255,0.5)";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(1, 1, size - 2, size - 2);
   }
 
   function toggleFullscreen() {
@@ -218,14 +351,23 @@
   }
 
   function onPointerDown(e: PointerEvent) {
+    if (compareSplit && (e.target as HTMLElement).dataset?.splitHandle === "1") {
+      onSplitPointerDown(e);
+      return;
+    }
     const tool = viewportTool.get();
-    if (tool === "brush" && selectedMask.get()) {
+    if (tool === "brush" && (selectedMask.get() || selectedRetouch.get())) {
       const p = toImageCoords(e);
       if (p) brushPoints = [p];
       (e.currentTarget as Element).setPointerCapture(e.pointerId);
       return;
     }
     if (tool === "crop" && cropActive.get()) return;
+    if (loupeOn) {
+      paintLoupe(e.clientX, e.clientY);
+      (e.currentTarget as Element).setPointerCapture(e.pointerId);
+      return;
+    }
     if (tool === "wb" && imageDims.get() && wrapEl) {
       const p = screenToOriginalNorm(
         e.clientX,
@@ -247,6 +389,14 @@
   }
 
   function onPointerMove(e: PointerEvent) {
+    if (splitDragging) {
+      moveSplit(e);
+      return;
+    }
+    if (loupeOn) {
+      paintLoupe(e.clientX, e.clientY);
+      return;
+    }
     const tool = viewportTool.get();
     if (tool === "crop" && cropActive.get()) return;
     if (tool === "brush" && brushPoints.length > 0) {
@@ -271,31 +421,53 @@
 
   function onPointerUp() {
     dragging = null;
+    endSplitDrag();
     const tool = viewportTool.get();
-    if (tool === "brush" && selectedMask.get() && brushPoints.length > 0) {
-      const pts = brushPoints;
-      brushPoints = [];
-      const d = doc.get();
-      const maskId = selectedMask.get();
-      const mask = d?.masks?.find((m) => m.id === maskId);
-      if (mask && mask.source.type === "brush") {
-        const strokes = Array.isArray(mask.source.strokes)
-          ? [...(mask.source.strokes as unknown[])]
+    if (tool !== "brush" || brushPoints.length === 0) return;
+    const pts = brushPoints;
+    brushPoints = [];
+    const d = doc.get();
+    const stroke = {
+      points: pts,
+      radius: brushRadius.get(),
+      hardness: 0.6,
+      mode: "add",
+    };
+
+    const retouchId = selectedRetouch.get();
+    if (retouchId) {
+      const spot = d?.retouch?.find((s) => s.id === retouchId);
+      if (spot && spot.source.type === "brush") {
+        const strokes = Array.isArray(spot.source.strokes)
+          ? [...(spot.source.strokes as unknown[])]
           : [];
-        strokes.push({
-          points: pts,
-          radius: brushRadius.get(),
-          hardness: 0.6,
-          mode: "add",
-        });
+        strokes.push(stroke);
         applyOp({
-          op: "set_mask_source",
-          id: mask.id,
+          op: "set_retouch_source",
+          id: spot.id,
           source: { type: "brush", strokes },
         })
           .then((delta) => reconcile(delta))
           .catch(() => {});
       }
+      return;
+    }
+
+    const maskId = selectedMask.get();
+    if (!maskId) return;
+    const mask = d?.masks?.find((m) => m.id === maskId);
+    if (mask && mask.source.type === "brush") {
+      const strokes = Array.isArray(mask.source.strokes)
+        ? [...(mask.source.strokes as unknown[])]
+        : [];
+      strokes.push(stroke);
+      applyOp({
+        op: "set_mask_source",
+        id: mask.id,
+        source: { type: "brush", strokes },
+      })
+        .then((delta) => reconcile(delta))
+        .catch(() => {});
     }
   }
 
@@ -413,7 +585,7 @@
   variant="viewport"
   class="flex min-h-0 flex-1 flex-col overflow-hidden px-[10px] py-[8px]"
 >
-  <!-- Main Viewport — frame:// JPEG transport (CropOverlay not ported yet) -->
+  <!-- Main Viewport — frame:// JPEG transport -->
   <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div
     bind:this={wrapEl}
@@ -428,13 +600,38 @@
     ondblclick={onDoubleClick}
   >
     {#if displaySrc}
-      <img
-        src={displaySrc}
-        alt=""
-        draggable={false}
-        class="block max-h-full max-w-full object-contain pointer-events-none"
-        onerror={() => (error = "frame transport failed")}
-      />
+      <div class="relative max-h-full max-w-full">
+        <img
+          src={displaySrc}
+          alt=""
+          draggable={false}
+          class="viewport-frame block max-h-full max-w-full object-contain pointer-events-none"
+          onerror={() => (error = "frame transport failed")}
+        />
+        {#if compareSplit && beforeSrc}
+          <img
+            src={beforeSrc}
+            alt=""
+            draggable={false}
+            class="pointer-events-none absolute inset-0 h-full w-full object-contain"
+            style="clip-path: inset(0 {(1 - splitRatio) * 100}% 0 0)"
+          />
+          <!-- svelte-ignore a11y_no_static_element_interactions -->
+          <div
+            data-split-handle="1"
+            class="absolute top-0 bottom-0 z-10 w-[12px] -translate-x-1/2 cursor-col-resize"
+            style="left: {splitRatio * 100}%"
+            onpointerdown={onSplitPointerDown}
+          >
+            <div class="absolute inset-y-0 left-1/2 w-[2px] -translate-x-1/2 bg-white/85 shadow-[0_0_6px_rgba(0,0,0,0.6)]"></div>
+            <div class="absolute top-1/2 left-1/2 flex size-[18px] -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-white/40 bg-black/50 text-[8px] text-white/90">
+              ‖
+            </div>
+          </div>
+          <span class="absolute left-2 top-2 rounded bg-black/50 px-1.5 py-0.5 text-[8px] text-white/70">Before</span>
+          <span class="absolute right-2 top-2 rounded bg-black/50 px-1.5 py-0.5 text-[8px] text-white/70">After</span>
+        {/if}
+      </div>
     {:else if $imageOpen && $decodeState !== "ready"}
       <div class="flex flex-col items-center justify-center gap-[6px] text-white/30">
         <span class="rounded-[8px] bg-panel-3 px-[10px] py-[6px] text-[11px]">
@@ -446,6 +643,22 @@
       <div class="flex items-center justify-center text-[12px] text-white/25">
         No photo selected
       </div>
+    {/if}
+
+    {#if $cropActive && displaySrc}
+      <CropOverlay {wrapEl} />
+    {/if}
+
+    {#if loupeOn}
+      <canvas
+        bind:this={loupeCanvas}
+        width={140}
+        height={140}
+        class="pointer-events-none absolute z-20 rounded-full border border-white/40 shadow-lg {loupePos ? '' : 'opacity-0'}"
+        style={loupePos
+          ? `left: ${loupePos.x + 16}px; top: ${loupePos.y + 16}px; width: 140px; height: 140px;`
+          : "left: 0; top: 0; width: 140px; height: 140px;"}
+      ></canvas>
     {/if}
 
     {#if error}
@@ -523,26 +736,42 @@
         <button
           type="button"
           onclick={toggleAfter}
-          class="flex items-center gap-[5px] text-[9px] cursor-pointer transition-colors {!$previewBypass ? 'text-white/95 font-medium' : 'text-white/40 hover:text-white/80'}"
+          class="flex items-center gap-[5px] text-[9px] cursor-pointer transition-colors {!$previewBypass && !compareSplit ? 'text-white/95 font-medium' : 'text-white/40 hover:text-white/80'}"
+          title="Toggle full before/after"
+        >
+          <span>{$previewBypass ? "Before" : "After"}</span>
+        </button>
+
+        <button
+          type="button"
+          onclick={() => void toggleCompare()}
+          disabled={compareBusy}
+          class="flex items-center gap-[5px] text-[9px] cursor-pointer transition-colors {compareSplit ? 'text-white/95 font-medium' : 'text-white/40 hover:text-white/80'}"
+          title="Split before/after"
+          aria-pressed={compareSplit}
         >
           <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.2">
             <rect x="1.5" y="1.5" width="9" height="9" rx="1" />
             <line x1="6" y1="1.5" x2="6" y2="10.5" />
           </svg>
-          <span>After</span>
+          <span>Split</span>
         </button>
 
         <button
           type="button"
-          onclick={() => sendViewCmd("oneToOne")}
+          onclick={toggleLoupe}
           aria-label="Toggle Zoom Loupe"
-          class="flex items-center justify-center cursor-pointer transition-colors {$zoomLabel === '100%' ? 'text-white/95' : 'text-white/40 hover:text-white/80'}"
+          aria-pressed={loupeOn}
+          title="Cursor loupe (2.5×)"
+          class="flex items-center justify-center cursor-pointer transition-colors {loupeOn ? 'text-white/95' : 'text-white/40 hover:text-white/80'}"
         >
           <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5">
             <circle cx="5" cy="5" r="3.5" />
             <line x1="7.5" y1="7.5" x2="10.5" y2="10.5" stroke-linecap="round" />
           </svg>
         </button>
+
+        <span class="text-[9px] text-white/35 tabular-nums">{$zoomLabel}</span>
       </div>
     </div>
   {/if}

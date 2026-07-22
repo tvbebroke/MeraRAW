@@ -3,9 +3,17 @@ use super::*;
 
 impl Engine {
     pub(super) fn do_apply_op(&mut self, op: Op, live: bool) -> Result<DocDelta, CoreError> {
+        let retouch_op = matches!(
+            op,
+            Op::AddRetouchSpot { .. }
+                | Op::RemoveRetouchSpot { .. }
+                | Op::SetRetouchSource { .. }
+                | Op::RefineRetouchSpot { .. }
+                | Op::ResetAll
+        );
         let c = self.current.as_mut().ok_or(CoreError::NoImage)?;
         let before = c.doc().clone();
-        let new_mask_id = ops::apply_op(c.doc_mut(), &op)?;
+        let new_id = ops::apply_op(c.doc_mut(), &op)?;
         let label = op.label();
         // Undo coalescing: a live drag records nothing per-tick — it just stashes
         // the pre-gesture state once. The committing (non-live) op folds the whole
@@ -19,7 +27,12 @@ impl Engine {
             c.history.record(base, label.clone());
         }
         c.doc_dirty = true;
-        let delta = c.delta(label, new_mask_id);
+        let (new_mask_id, new_retouch_id) = match &op {
+            Op::AddMask { .. } => (new_id, None),
+            Op::AddRetouchSpot { .. } => (None, new_id),
+            _ => (None, None),
+        };
+        let delta = c.delta(label, new_mask_id, new_retouch_id);
         match op.affected_module() {
             Some(m) => {
                 if let Some(g) = &mut self.graph {
@@ -32,7 +45,13 @@ impl Engine {
                 }
             }
         }
-        self.schedule_render();
+        // Heal spots rewrite the working master (non-live commits only).
+        if retouch_op && !live {
+            self.rebuild_retouch();
+            self.rerender_after_base_change();
+        } else {
+            self.schedule_render();
+        }
         self.schedule_settle();
         Ok(delta)
     }
@@ -52,7 +71,8 @@ impl Engine {
         };
         *c.doc_mut() = doc;
         c.doc_dirty = true;
-        let delta = c.delta(label, None);
+        let delta = c.delta(label, None, None);
+        self.rebuild_retouch();
         self.full_redraw();
         self.schedule_settle();
         self.emit(EngineEvent::DocUpdated {

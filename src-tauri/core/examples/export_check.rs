@@ -94,6 +94,7 @@ fn main() {
             max_dim: Some(2048),
             sharpen: 35.0,
             dest_dir: format!("{out_dir}/{name}"),
+            metadata_policy: Default::default(),
             strip_metadata: false,
             copyright: None,
         };

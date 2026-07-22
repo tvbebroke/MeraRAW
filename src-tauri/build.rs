@@ -45,6 +45,7 @@ fn main() {
                 "set_mask_overlay",
                 "set_preview_bypass",
                 "set_display_look",
+                "set_clip_warnings",
                 "import_folder",
                 "scan_import_folder",
                 "import_selected",

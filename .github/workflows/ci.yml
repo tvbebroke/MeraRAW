@@ -3,7 +3,7 @@ name: CI
 
 on:
   push:
-    branches: [main, "MeraRAW-*"]
+    branches: [main, master, "MeraRAW-*", "release/*", "svelte-ui"]
   pull_request:
 
 jobs:
@@ -58,9 +58,19 @@ jobs:
       - name: Install frontend deps
         run: npm ci
 
+      # svelte-check, not bare tsc: `tsc --noEmit` silently skips every .svelte
+      # file, so the whole component tree went unchecked.
       - name: Typecheck frontend
-        run: npx tsc --noEmit
+        run: npm run check
+
+      - name: Test frontend
+        run: npx vitest run
 
       - name: Check Rust
         working-directory: src-tauri
-        run: cargo check
+        run: cargo check --workspace
+
+      # Ignored tests need local RAW fixtures / a GPU; they stay opt-in.
+      - name: Test Rust
+        working-directory: src-tauri
+        run: cargo test --workspace

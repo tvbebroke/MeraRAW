@@ -127,3 +127,42 @@
     </button>
   </div>
 </CollapsibleSection>
+
+<div class="h-2"></div>
+
+<CollapsibleSection id="cropPerspective" title="Perspective">
+  <div class="flex flex-col gap-[12px] pt-1">
+    <div class="grid h-[15px] grid-cols-[64px_1fr] items-center gap-x-[10px]">
+      <span class="text-[9px] text-white/70">Vertical</span>
+      <Slider
+        label="Vertical"
+        min={-100}
+        max={100}
+        step={1}
+        value={crop.perspVertical}
+        resetValue={0}
+        oninput={(v) => void patch({ perspVertical: v }, true)}
+        onchange={(v) => void patch({ perspVertical: v }, false)}
+      />
+    </div>
+    <div class="grid h-[15px] grid-cols-[64px_1fr] items-center gap-x-[10px]">
+      <span class="text-[9px] text-white/70">Horizontal</span>
+      <Slider
+        label="Horizontal"
+        min={-100}
+        max={100}
+        step={1}
+        value={crop.perspHorizontal}
+        resetValue={0}
+        oninput={(v) => void patch({ perspHorizontal: v }, true)}
+        onchange={(v) => void patch({ perspHorizontal: v }, false)}
+      />
+    </div>
+    <button
+      onclick={() => void patch({ perspVertical: 0, perspHorizontal: 0 })}
+      class="h-[28px] rounded-[14px] border border-white/5 bg-white/[0.02] text-[10px] font-medium text-white/55 transition-all hover:bg-white/5"
+    >
+      Reset Perspective
+    </button>
+  </div>
+</CollapsibleSection>

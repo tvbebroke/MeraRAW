@@ -5,6 +5,7 @@
   import ProfileSettings from "../lib/components/edit-panel/ProfileSettings.svelte";
   import LightSettings from "../lib/components/edit-panel/LightSettings.svelte";
   import ColorSettings from "../lib/components/edit-panel/ColorSettings.svelte";
+  import CalibrationSettings from "../lib/components/edit-panel/CalibrationSettings.svelte";
   import DetailSettings from "../lib/components/edit-panel/DetailSettings.svelte";
   import EffectsSettings from "../lib/components/edit-panel/EffectsSettings.svelte";
   import OpticsSettings from "../lib/components/edit-panel/OpticsSettings.svelte";
@@ -13,6 +14,7 @@
   import CropSettings from "../lib/components/edit-panel/CropSettings.svelte";
   import MaskSettings from "../lib/components/edit-panel/MaskSettings.svelte";
   import AiSettings from "../lib/components/edit-panel/AiSettings.svelte";
+  import RetouchSettings from "../lib/components/edit-panel/RetouchSettings.svelte";
   import PresetSettings from "../lib/components/edit-panel/PresetSettings.svelte";
   import ImageBrowser from "../lib/components/image-browser/ImageBrowser.svelte";
   import Histogram from "../lib/components/histogram/Histogram.svelte";
@@ -20,6 +22,10 @@
   import GlassPanel from "../lib/components/primitives/GlassPanel.svelte";
   import { activeTool, leftRailCollapsed, isZenMode, imageBrowserCollapsed } from "../stores/editor";
   import { classicLook } from "../stores/ui";
+  import { doc, reconcile } from "../stores/doc";
+  import { applyCropParams } from "../crop/cropActions";
+  import { readCropFromDoc } from "../crop/cropMath";
+  import { autoLevel } from "../ipc/commands";
   import { fade, fly } from "svelte/transition";
   import { cubicOut } from "svelte/easing";
   import aiIcon from "../lib/icons/tool-ai.svg";
@@ -33,6 +39,17 @@
     if (!promptText.trim()) return;
     console.log("Zen prompt submitted:", promptText);
     promptText = "";
+  }
+
+  async function onAutoLevel() {
+    try {
+      const deg = await autoLevel();
+      if (!deg) return;
+      const crop = readCropFromDoc($doc?.modules);
+      reconcile(await applyCropParams({ ...crop, angle: crop.angle + deg }));
+    } catch {
+      /* ignore */
+    }
   }
 
   // Window dimensions for responsive boundaries
@@ -323,7 +340,11 @@
                 <div class="flex items-center justify-between mb-[10px] mt-[4px] px-[8px] shrink-0">
                   <span class="text-[12px] font-semibold text-white/90">Edit</span>
                   <div class="flex items-center gap-[6px]">
-                    <button class="h-[20px] rounded-[10px] bg-white/[0.06] border border-white/[0.04] px-[8px] text-[8px] font-semibold text-white/80 hover:bg-white/[0.12] hover:text-white active:scale-95 transition-all">Auto</button>
+                    <button
+                      type="button"
+                      onclick={() => void onAutoLevel()}
+                      class="h-[20px] rounded-[10px] bg-white/[0.06] border border-white/[0.04] px-[8px] text-[8px] font-semibold text-white/80 hover:bg-white/[0.12] hover:text-white active:scale-95 transition-all"
+                    >Auto</button>
                     <button class="h-[20px] rounded-[10px] bg-white/[0.06] border border-white/[0.04] px-[8px] text-[8px] font-semibold text-white/80 hover:bg-white/[0.12] hover:text-white active:scale-95 transition-all">B&W</button>
                   </div>
                 </div>
@@ -332,6 +353,8 @@
                 <LightSettings />
                 <div class="h-2 shrink-0"></div>
                 <ColorSettings />
+                <div class="h-2 shrink-0"></div>
+                <CalibrationSettings />
                 <div class="h-2 shrink-0"></div>
                 <DetailSettings />
                 <div class="h-2 shrink-0"></div>
@@ -348,6 +371,8 @@
                 <MaskSettings />
               {:else if $activeTool === "ai"}
                 <AiSettings />
+                <div class="h-2 shrink-0"></div>
+                <RetouchSettings />
               {:else if $activeTool === "presets"}
                 <PresetSettings />
               {/if}

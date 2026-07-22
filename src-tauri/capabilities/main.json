@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "main-capability",
-  "description": "Least-privilege grants for the main window. Custom commands gated via permissions/default.toml (meraraw-ipc); filesystem I/O stays in Rust with path validation.",
+  "description": "Production ACL for the main window (sole capability in release). Dig/selftest probes are registered only in debug via capabilities-dev + add_capability. Custom commands: permissions/default.toml (meraraw-ipc); filesystem I/O stays in Rust with path validation.",
   "windows": ["main"],
   "permissions": [
     "core:path:default",

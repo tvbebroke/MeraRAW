@@ -848,7 +848,21 @@ fn prepare_batch_image(path: &Path, skip_edits: bool) -> Result<BatchPrepared, C
         demosaic = crate::raw::Demosaic::Rcd;
     }
     let img = decoder.decode_with_options(path, profile_path.as_deref(), demosaic)?;
-    let payload = DecodedPayload::from_decoded(img);
+    let mut payload = DecodedPayload::from_decoded(img);
+    // Heal spots rewrite the working master before export (same as viewport).
+    if !skip_edits && doc.retouch.iter().any(|s| s.enabled) {
+        match crate::retouch::apply_all(&payload.clean_rgb, &doc.retouch) {
+            Ok(healed) => {
+                payload.rgba_f16 = healed.to_rgba_f16_bytes();
+                payload.width = healed.width as u32;
+                payload.height = healed.height as u32;
+                payload.small_cpu = Arc::new(healed.downscale_to(2048));
+            }
+            Err(e) => {
+                tracing::warn!(error = %e, "batch: retouch apply failed; exporting without heal");
+            }
+        }
+    }
 
     // Segmented masks are inferred here, synchronously — the render can't
     // start without them and this thread is already off the actor.

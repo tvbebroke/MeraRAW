@@ -10,18 +10,6 @@ mod open_url;
 mod paths;
 mod protocol;
 
-// Reference RAW-pipeline scaffold (mirrors the documented stage layout). The
-// live, GPU-accelerated pipeline runs in the `meratech-core` crate; each module
-// below points at its real counterpart. See `pipeline.rs`.
-mod color;
-mod export;
-mod gpu;
-mod grading;
-mod isp;
-mod pipeline;
-mod raw;
-mod tone;
-
 use tauri::Manager;
 use tauri::window::Monitor;
 use tracing_subscriber::EnvFilter;
@@ -454,6 +442,7 @@ fn main() {
             commands::set_mask_overlay,
             commands::set_preview_bypass,
             commands::set_display_look,
+            commands::set_clip_warnings,
             commands::import_folder,
             commands::scan_import_folder,
             commands::import_selected,
@@ -482,7 +471,7 @@ fn main() {
             license::license_supporter_status,
             license::license_start_checkout,
             license::open_external_url,
-            // Dig / selftest probes — ACL-gated to allow-dev-probes (debug capability).
+            // Dig / selftest probes — ACL only in debug (capabilities-dev + add_capability).
             commands::autoopen_path,
             commands::selftest_enabled,
             commands::live_assistant_enabled,
@@ -492,6 +481,14 @@ fn main() {
             commands::fail_on_purpose,
         ])
         .setup(move |app| {
+            // Dig probes live in capabilities-dev/ and are not part of the
+            // release ACL (tauri.conf → capabilities: [main-capability] only).
+            #[cfg(debug_assertions)]
+            {
+                app.add_capability(include_str!("../capabilities-dev/debug.json"))
+                    .map_err(|e| format!("debug-probes capability: {e}"))?;
+            }
+
             if std::env::var("MERATECH_BUNDLED_PRESETS").is_err() {
                 if let Ok(res) = app.path().resolve(
                     "presets/bundled",

@@ -3,7 +3,6 @@
 
 use super::Engine;
 use crate::error::CoreError;
-use crate::gpu::display::upload_working_texture;
 use crate::image::RgbF32Buf;
 use crate::message::{DenoiseOutcome, EngineEvent};
 use std::sync::Arc;
@@ -106,24 +105,27 @@ impl Engine {
             height: height as usize,
             data: Arc::try_unwrap(rgb).unwrap_or_else(|a| (*a).clone()),
         };
-        let small = Arc::new(buf.downscale_to(2048));
+        // Denoise becomes the new clean master; heal spots re-apply on top.
+        let clean = Arc::new(buf);
+        if let Some(cur) = &mut self.current {
+            cur.clean_rgb = Some(clean.clone());
+        }
+        self.upload_working_rgb(RgbF32Buf {
+            width: clean.width,
+            height: clean.height,
+            data: clean.data.clone(),
+        });
+        self.rebuild_retouch();
         match &self.gpu {
-            Some(gpu) => {
-                let bytes = buf.to_rgba_f16_bytes();
-                let tex = upload_working_texture(gpu, &bytes, width, height);
-                let view = tex.create_view(&Default::default());
-                if let Some(cur) = &mut self.current {
-                    cur.working = Some((tex, view, width, height));
-                    cur.small_cpu = Some(small);
-                }
+            Some(_) => {
                 self.rerender_after_base_change();
             }
             None => {
-                // CPU fallback (mirrors finish_decode_cpu): no working
-                // texture to swap — refresh the CPU-tonemapped preview.
-                if let Some(cur) = &mut self.current {
-                    cur.small_cpu = Some(small.clone());
-                }
+                let small = self
+                    .current
+                    .as_ref()
+                    .and_then(|c| c.small_cpu.clone())
+                    .expect("small_cpu set by upload_working_rgb");
                 let vw = self
                     .last_view
                     .filter(|v| v.out_w >= 64 && v.out_h >= 64)

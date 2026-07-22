@@ -4,7 +4,8 @@
 // masks detach from image content under crop/rotation.
 //
 // Forward pipeline: original → rotate-90/flip (discrete) → straighten angle
-// → crop rect. Shaders inverse-map per output pixel.
+// → perspective (keystone) → crop rect. Shaders inverse-map per output pixel
+// so geometry resamples exactly once.
 //
 // View contract: `scale` = output px per content px; `center` = view center
 // normalized in CONTENT space, where content is
@@ -53,11 +54,29 @@ fn crop_content_dims(
   return vec2(img_w, img_h);
 }
 
+// Inverse keystone: display-normalized → pre-perspective normalized.
+// Forward shrinks top (persp_v>0) / left (persp_h>0) relative to the opposite edge.
+fn crop_inv_perspective(uv: vec2<f32>, persp_v: f32, persp_h: f32) -> vec2<f32> {
+  var p = uv;
+  // Vertical: x scale varies with y. At y=0 scale=1+v, at y=1 scale=1−v.
+  if (abs(persp_v) > 1e-5) {
+    let sx = max(1.0 + persp_v * (1.0 - 2.0 * p.y), 0.05);
+    p.x = 0.5 + (p.x - 0.5) / sx;
+  }
+  // Horizontal: y scale varies with x.
+  if (abs(persp_h) > 1e-5) {
+    let sy = max(1.0 + persp_h * (1.0 - 2.0 * p.x), 0.05);
+    p.y = 0.5 + (p.y - 0.5) / sy;
+  }
+  return p;
+}
+
 fn crop_map_out_px(
   out_px: vec2<f32>, out_half: vec2<f32>,
   img_w: f32, img_h: f32, scale: f32, center: vec2<f32>,
   l: f32, t: f32, r: f32, b: f32,
   angle: f32, rot90: u32, fh: u32, fv: u32, mode: u32,
+  persp_v: f32, persp_h: f32,
 ) -> CropSample {
   var res: CropSample;
   res.uv = vec2(0.0, 0.0);
@@ -76,6 +95,11 @@ fn crop_map_out_px(
   var rot_norm = cuv;
   if (mode == 1u) {
     rot_norm = vec2(l, t) + cuv * vec2(max(r - l, 0.01), max(b - t, 0.01));
+  }
+  // inverse perspective (after crop, before straighten — matches forward order)
+  rot_norm = crop_inv_perspective(rot_norm, persp_v, persp_h);
+  if (rot_norm.x < 0.0 || rot_norm.x > 1.0 || rot_norm.y < 0.0 || rot_norm.y > 1.0) {
+    return res;
   }
   // straighten: true rotation in physical px about the rotated-image center
   let rot_dims = crop_rotated_dims(img_w, img_h, rot90);

@@ -5,6 +5,7 @@
 use crate::doc::{new_mask_id, EditDoc, Mask, ParamValue, PartialDoc};
 use crate::error::CoreError;
 use crate::registry::{self, ParamType};
+use crate::retouch::{new_retouch_id, RetouchSpot};
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(tag = "op", rename_all = "snake_case")]
@@ -24,6 +25,17 @@ pub enum Op {
     },
     /// Replace mask geometry/source (move a radial, re-stroke a brush…).
     SetMaskSource { id: String, source: serde_json::Value },
+    /// Object removal: new heal spot (brush source).
+    AddRetouchSpot { source: serde_json::Value },
+    RemoveRetouchSpot { id: String },
+    SetRetouchSource { id: String, source: serde_json::Value },
+    RefineRetouchSpot {
+        id: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        feather: Option<f32>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        enabled: Option<bool>,
+    },
     ResetModule { module: String },
     ResetAll,
     ApplyPreset { preset: PartialDoc },
@@ -38,6 +50,10 @@ impl Op {
             Op::RemoveMask { .. } => "remove mask".into(),
             Op::RefineMask { .. } => "refine mask".into(),
             Op::SetMaskSource { .. } => "edit mask shape".into(),
+            Op::AddRetouchSpot { .. } => "add heal spot".into(),
+            Op::RemoveRetouchSpot { .. } => "remove heal spot".into(),
+            Op::SetRetouchSource { .. } => "edit heal brush".into(),
+            Op::RefineRetouchSpot { .. } => "refine heal spot".into(),
             Op::ResetModule { module } => format!("reset {module}"),
             Op::ResetAll => "reset all".into(),
             Op::ApplyPreset { .. } => "apply preset".into(),
@@ -60,6 +76,10 @@ impl Op {
             | Op::RemoveMask { .. }
             | Op::RefineMask { .. }
             | Op::SetMaskSource { .. } => Some("masks".into()),
+            Op::AddRetouchSpot { .. }
+            | Op::RemoveRetouchSpot { .. }
+            | Op::SetRetouchSource { .. }
+            | Op::RefineRetouchSpot { .. } => Some("retouch".into()),
             Op::ResetModule { module } => Some(module.clone()),
             _ => None,
         }
@@ -79,6 +99,19 @@ fn check_mask_source(source: &serde_json::Value) -> Result<(), CoreError> {
     Ok(())
 }
 
+fn check_retouch_source(source: &serde_json::Value) -> Result<(), CoreError> {
+    let ty = source
+        .get("type")
+        .and_then(|t| t.as_str())
+        .ok_or_else(|| CoreError::InvalidOp("retouch source needs a type".into()))?;
+    if ty != "brush" {
+        return Err(CoreError::InvalidOp(
+            "retouch spot source must be brush".into(),
+        ));
+    }
+    Ok(())
+}
+
 /// Outcome of an accepted op, sent to the frontend mirror.
 #[derive(Debug, Clone, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -90,6 +123,9 @@ pub struct DocDelta {
     /// id of a mask created by this op, if any
     #[serde(skip_serializing_if = "Option::is_none")]
     pub new_mask_id: Option<String>,
+    /// id of a retouch spot created by this op, if any
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub new_retouch_id: Option<String>,
 }
 
 /// Validate a JSON value against a spec: type-check + clamp + structure.
@@ -253,6 +289,60 @@ pub fn apply_op(doc: &mut EditDoc, op: &Op) -> Result<Option<String>, CoreError>
             doc.touch();
             Ok(None)
         }
+        Op::AddRetouchSpot { source } => {
+            check_retouch_source(source)?;
+            let id = new_retouch_id();
+            doc.retouch.push(RetouchSpot {
+                id: id.clone(),
+                enabled: true,
+                feather: 25.0,
+                source: source.clone(),
+            });
+            doc.touch();
+            Ok(Some(id))
+        }
+        Op::RemoveRetouchSpot { id } => {
+            let before = doc.retouch.len();
+            doc.retouch.retain(|s| s.id != *id);
+            if doc.retouch.len() == before {
+                return Err(CoreError::InvalidOp(format!("retouch spot not found: {id}")));
+            }
+            doc.touch();
+            Ok(None)
+        }
+        Op::SetRetouchSource { id, source } => {
+            check_retouch_source(source)?;
+            let spot = doc
+                .retouch
+                .iter_mut()
+                .find(|s| s.id == *id)
+                .ok_or_else(|| CoreError::InvalidOp(format!("retouch spot not found: {id}")))?;
+            spot.source = source.clone();
+            doc.touch();
+            Ok(None)
+        }
+        Op::RefineRetouchSpot {
+            id,
+            feather,
+            enabled,
+        } => {
+            let spot = doc
+                .retouch
+                .iter_mut()
+                .find(|s| s.id == *id)
+                .ok_or_else(|| CoreError::InvalidOp(format!("retouch spot not found: {id}")))?;
+            if let Some(f) = feather {
+                if !f.is_finite() {
+                    return Err(CoreError::InvalidOp("feather non-finite".into()));
+                }
+                spot.feather = f.clamp(0.0, 100.0);
+            }
+            if let Some(e) = enabled {
+                spot.enabled = *e;
+            }
+            doc.touch();
+            Ok(None)
+        }
         Op::ResetModule { module } => {
             doc.modules.remove(module.as_str());
             doc.touch();
@@ -261,6 +351,7 @@ pub fn apply_op(doc: &mut EditDoc, op: &Op) -> Result<Option<String>, CoreError>
         Op::ResetAll => {
             doc.modules.clear();
             doc.masks.clear();
+            doc.retouch.clear();
             doc.touch();
             Ok(None)
         }
@@ -440,6 +531,41 @@ mod tests {
         assert!(d.mask(&id).is_none());
         // removing again rejects
         assert!(apply_op(&mut d, &Op::RemoveMask { id }).is_err());
+    }
+
+    #[test]
+    fn retouch_spot_lifecycle() {
+        let mut d = doc();
+        let id = apply_op(
+            &mut d,
+            &Op::AddRetouchSpot {
+                source: json!({"type":"brush","strokes":[]}),
+            },
+        )
+        .unwrap()
+        .unwrap();
+        assert!(d.retouch(&id).is_some());
+        apply_op(
+            &mut d,
+            &Op::RefineRetouchSpot {
+                id: id.clone(),
+                feather: Some(40.0),
+                enabled: Some(true),
+            },
+        )
+        .unwrap();
+        assert_eq!(d.retouch(&id).unwrap().feather, 40.0);
+        apply_op(
+            &mut d,
+            &Op::SetRetouchSource {
+                id: id.clone(),
+                source: json!({"type":"brush","strokes":[{"points":[[0.5,0.5]],"radius":0.05,"mode":"add"}]}),
+            },
+        )
+        .unwrap();
+        apply_op(&mut d, &Op::RemoveRetouchSpot { id: id.clone() }).unwrap();
+        assert!(d.retouch(&id).is_none());
+        assert!(apply_op(&mut d, &Op::RemoveRetouchSpot { id }).is_err());
     }
 
     #[test]

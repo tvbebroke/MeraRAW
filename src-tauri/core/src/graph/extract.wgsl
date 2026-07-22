@@ -17,6 +17,9 @@ struct ExtractUniforms {
   crop_flip_h: u32,
   crop_flip_v: u32,
   crop_mode: u32,
+  crop_persp_v: f32,
+  crop_persp_h: f32,
+  _pad0: u32,
 };
 
 @group(0) @binding(0) var src: texture_2d<f32>;
@@ -36,6 +39,7 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
     u.img_w, u.img_h, u.scale, vec2(u.center_x, u.center_y),
     u.crop_left, u.crop_top, u.crop_right, u.crop_bottom,
     u.crop_angle, u.crop_rotate_90, u.crop_flip_h, u.crop_flip_v, u.crop_mode,
+    u.crop_persp_v, u.crop_persp_h,
   );
   var out = vec4<f32>(0.0, 0.0, 0.0, 0.0);
   if (m.inside == 1u) {

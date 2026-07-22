@@ -93,6 +93,7 @@
         <ParamRow path="detail.noise_chroma" label="Color" />
         <ParamRow path="detail.nr_strength" label="Strength" />
         <ParamRow path="detail.impulse" label="Impulse" />
+        <ParamRow path="detail.hot_pixels" label="Hot Pixels" />
       </div>
     </div>
 

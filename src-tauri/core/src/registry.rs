@@ -50,6 +50,7 @@ pub const MODULE_ORDER: &[&str] = &[
     "tone_curve",    // 7 (P3)
     "lut",           // 8a: 3D look LUT (opacity param; cube path in meta)
                      // 8: sharpen (detail module, second pass)
+    "effects",       // 9: grain / vignette / clarity
 ];
 
 fn f32_spec(
@@ -154,6 +155,12 @@ fn build_registry() -> BTreeMap<&'static str, ParamSpec> {
         // ---- slot 8a: lut (3D look LUT). The .cube path lives in
         // meta.lut_file (set via set_lut); only opacity is a doc param. ----
         f32_spec("lut.opacity", 0.0, 100.0, 100.0, "LUT Opacity", 1.0, "LUT"),
+        // ---- slot 9: effects (grain / vignette / clarity) ----
+        f32_spec("effects.clarity", 0.0, 100.0, 0.0, "Clarity", 1.0, "Effects"),
+        f32_spec("effects.grain_amount", 0.0, 100.0, 0.0, "Grain", 1.0, "Effects"),
+        f32_spec("effects.grain_size", 1.0, 8.0, 2.0, "Grain Size", 0.1, "Effects"),
+        f32_spec("effects.vignette_amount", 0.0, 100.0, 0.0, "Vignette", 1.0, "Effects"),
+        f32_spec("effects.vignette_midpoint", 0.0, 100.0, 50.0, "Vignette Mid", 1.0, "Effects"),
     ];
     // tone curve point list (Curve type — UI widget later; ops/assistant now)
     specs.push(ParamSpec {
@@ -221,6 +228,24 @@ fn build_registry() -> BTreeMap<&'static str, ParamSpec> {
         f32_spec("crop.aspect_w", 0.0, 100.0, 0.0, "Aspect W", 1.0, "Crop"),
         f32_spec("crop.aspect_h", 0.0, 100.0, 0.0, "Aspect H", 1.0, "Crop"),
         f32_spec("crop.constrain_crop", 0.0, 1.0, 1.0, "Constrain", 1.0, "Crop"),
+        f32_spec(
+            "crop.persp_vertical",
+            -100.0,
+            100.0,
+            0.0,
+            "Vertical",
+            1.0,
+            "Perspective",
+        ),
+        f32_spec(
+            "crop.persp_horizontal",
+            -100.0,
+            100.0,
+            0.0,
+            "Horizontal",
+            1.0,
+            "Perspective",
+        ),
     ]);
     for s in specs {
         m.insert(s.path, s);

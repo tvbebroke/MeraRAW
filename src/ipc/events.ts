@@ -26,6 +26,8 @@ export const EVENTS = {
   denoiseProgress: "denoise-progress",
   denoiseDone: "denoise-done",
   denoiseError: "denoise-error",
+  retouchDone: "retouch-done",
+  retouchError: "retouch-error",
 } as const;
 
 export interface DenoiseProgressPayload {
@@ -53,6 +55,14 @@ export function onDenoiseError(
   return listen<{ job: number; message: string }>(EVENTS.denoiseError, (e) =>
     cb(e.payload),
   );
+}
+
+export function onRetouchDone(cb: () => void): Promise<UnlistenFn> {
+  return listen(EVENTS.retouchDone, () => cb());
+}
+
+export function onRetouchError(cb: (message: string) => void): Promise<UnlistenFn> {
+  return listen<string>(EVENTS.retouchError, (e) => cb(e.payload));
 }
 
 export function onMaskReady(cb: (id: string) => void): Promise<UnlistenFn> {

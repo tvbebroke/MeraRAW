@@ -30,6 +30,19 @@ pub enum ExportFormat {
     Heic,
 }
 
+/// What metadata to embed on export (phase 11).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum MetadataPolicy {
+    /// Camera/exposure (+ GPS when present) + copyright.
+    #[default]
+    Preserve,
+    /// Same as preserve but omit GPS tags.
+    StripGps,
+    /// Write no EXIF / IPTC-style tags.
+    StripAll,
+}
+
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ExportSettings {
@@ -42,7 +55,10 @@ pub struct ExportSettings {
     /// output sharpen 0-100, applied AFTER resize (spec 7.2)
     pub sharpen: f32,
     pub dest_dir: String,
-    /// strip all metadata for privacy (default false = write EXIF).
+    /// Preferred policy. Takes effect unless `strip_metadata` is true.
+    #[serde(default)]
+    pub metadata_policy: MetadataPolicy,
+    /// Legacy boolean: when true, forces [`MetadataPolicy::StripAll`].
     #[serde(default)]
     pub strip_metadata: bool,
     /// optional copyright/artist string written to EXIF + TIFF.
@@ -59,8 +75,19 @@ impl Default for ExportSettings {
             max_dim: Some(2560),
             sharpen: 30.0,
             dest_dir: String::new(),
+            metadata_policy: MetadataPolicy::Preserve,
             strip_metadata: false,
             copyright: None,
+        }
+    }
+}
+
+impl ExportSettings {
+    pub fn effective_policy(&self) -> MetadataPolicy {
+        if self.strip_metadata {
+            MetadataPolicy::StripAll
+        } else {
+            self.metadata_policy
         }
     }
 }
@@ -380,6 +407,8 @@ enum ExifVal {
     Short(u16),
     Long(u32),
     Rational(u32, u32),
+    /// Multiple rationals (GPS lat/lon DMS).
+    Rationals(Vec<(u32, u32)>),
     Undef(Vec<u8>),
 }
 
@@ -389,7 +418,7 @@ impl ExifVal {
             ExifVal::Ascii(_) => 2,
             ExifVal::Short(_) => 3,
             ExifVal::Long(_) => 4,
-            ExifVal::Rational(..) => 5,
+            ExifVal::Rational(..) | ExifVal::Rationals(_) => 5,
             ExifVal::Undef(_) => 7,
         }
     }
@@ -399,6 +428,7 @@ impl ExifVal {
             ExifVal::Short(_) => 1,
             ExifVal::Long(_) => 1,
             ExifVal::Rational(..) => 1,
+            ExifVal::Rationals(v) => v.len() as u32,
             ExifVal::Undef(b) => b.len() as u32,
         }
     }
@@ -414,6 +444,14 @@ impl ExifVal {
             ExifVal::Rational(n, d) => {
                 let mut v = n.to_le_bytes().to_vec();
                 v.extend_from_slice(&d.to_le_bytes());
+                v
+            }
+            ExifVal::Rationals(vals) => {
+                let mut v = Vec::with_capacity(vals.len() * 8);
+                for (n, d) in vals {
+                    v.extend_from_slice(&n.to_le_bytes());
+                    v.extend_from_slice(&d.to_le_bytes());
+                }
                 v
             }
             ExifVal::Undef(b) => b.clone(),
@@ -456,6 +494,11 @@ fn serialize_ifd(
 /// Build a raw EXIF/TIFF blob (no "Exif\0\0" prefix) from capture metadata.
 fn build_exif(meta: &ImageMeta, settings: &ExportSettings) -> Vec<u8> {
     const EXIF_IFD_PTR: u16 = 0x8769;
+    const GPS_IFD_PTR: u16 = 0x8825;
+
+    let include_gps = settings.effective_policy() == MetadataPolicy::Preserve
+        && meta.gps_lat.is_some()
+        && meta.gps_lon.is_some();
 
     let mut ifd0: Vec<(u16, ExifVal)> = Vec::new();
     if !meta.camera_make.is_empty() {
@@ -474,6 +517,9 @@ fn build_exif(meta: &ImageMeta, settings: &ExportSettings) -> Vec<u8> {
     }
     // ExifIFD pointer (LONG) — value patched once IFD0 size is known.
     ifd0.push((EXIF_IFD_PTR, ExifVal::Long(0)));
+    if include_gps {
+        ifd0.push((GPS_IFD_PTR, ExifVal::Long(0)));
+    }
 
     let mut exif: Vec<(u16, ExifVal)> = Vec::new();
     exif.push((0x9000, ExifVal::Undef(b"0230".to_vec()))); // ExifVersion
@@ -496,34 +542,80 @@ fn build_exif(meta: &ImageMeta, settings: &ExportSettings) -> Vec<u8> {
         exif.push((0xA434, ExifVal::Ascii(l.to_string()))); // LensModel
     }
 
-    // Layout: header(8) | IFD0 | ExifIFD | data.  Entry size is a fixed 12
-    // bytes regardless of value type, so IFD sizes depend only on counts.
+    let mut gps: Vec<(u16, ExifVal)> = Vec::new();
+    if include_gps {
+        let lat = meta.gps_lat.unwrap();
+        let lon = meta.gps_lon.unwrap();
+        gps.push((0x0000, ExifVal::Undef(vec![2, 3, 0, 0]))); // GPSVersionID
+        gps.push((
+            0x0001,
+            ExifVal::Ascii(if lat >= 0.0 { "N" } else { "S" }.into()),
+        ));
+        gps.push((0x0002, ExifVal::Rationals(deg_to_dms(lat.abs()))));
+        gps.push((
+            0x0003,
+            ExifVal::Ascii(if lon >= 0.0 { "E" } else { "W" }.into()),
+        ));
+        gps.push((0x0004, ExifVal::Rationals(deg_to_dms(lon.abs()))));
+    }
+
+    // Layout: header(8) | IFD0 | ExifIFD | [GPS IFD] | data.
     let n0 = ifd0.len();
     let s0 = 2 + 12 * n0 + 4;
     let exif_off = 8 + s0;
     let se = 2 + 12 * exif.len() + 4;
-    let data_base = 8 + s0 + se;
+    let gps_off = exif_off + se;
+    let sg = if gps.is_empty() {
+        0
+    } else {
+        2 + 12 * gps.len() + 4
+    };
+    let data_base = 8 + s0 + se + sg;
 
-    // Patch the ExifIFD pointer now that its target offset is known.
     if let Some(e) = ifd0.iter_mut().find(|e| e.0 == EXIF_IFD_PTR) {
         e.1 = ExifVal::Long(exif_off as u32);
+    }
+    if include_gps {
+        if let Some(e) = ifd0.iter_mut().find(|e| e.0 == GPS_IFD_PTR) {
+            e.1 = ExifVal::Long(gps_off as u32);
+        }
     }
 
     ifd0.sort_by_key(|e| e.0);
     exif.sort_by_key(|e| e.0);
+    gps.sort_by_key(|e| e.0);
 
     let mut data = Vec::new();
     let ifd0_bytes = serialize_ifd(&ifd0, data_base, &mut data, 0);
     let exif_bytes = serialize_ifd(&exif, data_base, &mut data, 0);
+    let gps_bytes = if gps.is_empty() {
+        Vec::new()
+    } else {
+        serialize_ifd(&gps, data_base, &mut data, 0)
+    };
 
-    let mut out = Vec::with_capacity(8 + ifd0_bytes.len() + exif_bytes.len() + data.len());
+    let mut out =
+        Vec::with_capacity(8 + ifd0_bytes.len() + exif_bytes.len() + gps_bytes.len() + data.len());
     out.extend_from_slice(b"II"); // little-endian
     out.extend_from_slice(&42u16.to_le_bytes());
     out.extend_from_slice(&8u32.to_le_bytes()); // IFD0 at offset 8
     out.extend_from_slice(&ifd0_bytes);
     out.extend_from_slice(&exif_bytes);
+    out.extend_from_slice(&gps_bytes);
     out.extend_from_slice(&data);
     out
+}
+
+fn deg_to_dms(abs_deg: f64) -> Vec<(u32, u32)> {
+    let deg = abs_deg.floor();
+    let min_f = (abs_deg - deg) * 60.0;
+    let min = min_f.floor();
+    let sec = (min_f - min) * 60.0;
+    vec![
+        (deg as u32, 1),
+        (min as u32, 1),
+        ((sec * 10_000.0).round() as u32, 10_000),
+    ]
 }
 
 fn exif_datetime(captured: Option<&str>) -> Option<String> {
@@ -640,7 +732,7 @@ fn encode_tiff16(
             if let Some(icc) = icc {
                 dir.write_tag(Tag::Unknown(34675), icc).map_err(map)?; // ICCProfile
             }
-            if !settings.strip_metadata {
+            if settings.effective_policy() != MetadataPolicy::StripAll {
                 if !meta.camera_make.is_empty() {
                     let _ = dir.write_tag(Tag::Make, meta.camera_make.as_str());
                 }
@@ -684,7 +776,7 @@ pub fn encode_and_write(
     std::fs::create_dir_all(&dir)?;
 
     let icc = icc_bytes(settings.target);
-    let exif = if settings.strip_metadata {
+    let exif = if settings.effective_policy() == MetadataPolicy::StripAll {
         None
     } else {
         Some(build_exif(meta, settings))
@@ -786,7 +878,39 @@ mod tests {
             available_profile_files: Vec::new(),
             demosaic: String::new(),
             available_demosaic: Vec::new(),
+            gps_lat: Some(37.7749),
+            gps_lon: Some(-122.4194),
+            input_color_space: None,
         }
+    }
+
+    #[test]
+    fn strip_gps_omits_gps_ifd_pointer() {
+        let meta = test_meta();
+        let preserve = build_exif(
+            &meta,
+            &ExportSettings {
+                metadata_policy: MetadataPolicy::Preserve,
+                ..Default::default()
+            },
+        );
+        let stripped = build_exif(
+            &meta,
+            &ExportSettings {
+                metadata_policy: MetadataPolicy::StripGps,
+                ..Default::default()
+            },
+        );
+        // GPS IFD pointer tag 0x8825
+        let has_gps = |blob: &[u8]| {
+            let n0 = u16::from_le_bytes([blob[8], blob[9]]) as usize;
+            (0..n0).any(|i| {
+                let off = 10 + i * 12;
+                u16::from_le_bytes([blob[off], blob[off + 1]]) == 0x8825
+            })
+        };
+        assert!(has_gps(&preserve), "preserve should embed GPS IFD ptr");
+        assert!(!has_gps(&stripped), "stripGps must omit GPS IFD ptr");
     }
 
     #[test]
@@ -966,6 +1090,7 @@ mod tests {
                     max_dim: None,
                     sharpen: 30.0,
                     dest_dir: dir.into(),
+                    metadata_policy: MetadataPolicy::Preserve,
                     strip_metadata: false,
                     copyright: Some("© Test Photographer".into()),
                 };

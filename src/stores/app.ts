@@ -23,8 +23,54 @@ export const displayLook = atom(1);
 /** Before/after: render the un-edited base when true. */
 export const previewBypass = atom(false);
 
+/** Histogram display mode (phase 12). Persisted via settings. */
+export type HistMode = "rgb" | "luma" | "parade";
+export type HistScale = "sqrt" | "linear" | "log";
+
+function readHistMode(): HistMode {
+  try {
+    const v = localStorage.getItem("hist-mode");
+    if (v === "luma" || v === "parade" || v === "rgb") return v;
+  } catch {
+    /* ignore */
+  }
+  return "rgb";
+}
+function readHistScale(): HistScale {
+  try {
+    const v = localStorage.getItem("hist-scale");
+    if (v === "linear" || v === "log" || v === "sqrt") return v;
+  } catch {
+    /* ignore */
+  }
+  return "sqrt";
+}
+
+export const histMode = atom<HistMode>(readHistMode());
+export const histScale = atom<HistScale>(readHistScale());
+
+export function setHistMode(mode: HistMode): void {
+  histMode.set(mode);
+  try {
+    localStorage.setItem("hist-mode", mode);
+  } catch {
+    /* ignore */
+  }
+}
+export function setHistScale(scale: HistScale): void {
+  histScale.set(scale);
+  try {
+    localStorage.setItem("hist-scale", scale);
+  } catch {
+    /* ignore */
+  }
+}
+
 /** Mask scoping for panel edits: params target mask.<id>.<path> when set. */
 export const selectedMask = atom<string | null>(null);
+
+/** Selected object-removal / heal spot (phase 10). */
+export const selectedRetouch = atom<string | null>(null);
 
 /** Viewport tool (pan / white-balance eyedropper / brush / crop). */
 export type ViewportTool = "pan" | "wb" | "brush" | "crop";

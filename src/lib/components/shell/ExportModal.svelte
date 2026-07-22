@@ -2,23 +2,37 @@
   import { fade, scale } from "svelte/transition";
   import { isExportOpen } from "../../../stores/ui";
   import ToggleSwitch from "../primitives/ToggleSwitch.svelte";
-  import { folder } from "../../../stores/browse";
+  import { folder, photos } from "../../../stores/browse";
   import { decodeState } from "../../../stores/app";
   import { pickFolder } from "../../fs";
   import {
+    cancelExportBatch,
+    exportBatch,
     exportImage,
     revealInFinder,
   } from "../../../ipc/commands";
-  import { onExportProgress } from "../../../ipc/events";
-  import { formatAppError, type ExportSettings } from "../../../ipc/types";
+  import {
+    onExportBatchDone,
+    onExportBatchProgress,
+    onExportProgress,
+  } from "../../../ipc/events";
+  import {
+    formatAppError,
+    type ExportSettings,
+    type MetadataPolicy,
+  } from "../../../ipc/types";
+
+  type Scope = "current" | "folder";
 
   let format = $state<ExportSettings["format"]>("jpeg");
   let quality = $state(90);
   let target = $state<ExportSettings["target"]>("srgb");
   let maxDim = $state(2560);
   let resizeImage = $state(false);
-  let stripMetadata = $state(false);
+  let metadataPolicy = $state<MetadataPolicy>("preserve");
+  let copyright = $state("");
   let exportPath = $state("");
+  let scope = $state<Scope>("current");
   let busy = $state(false);
   let status = $state<string | null>(null);
   let progress = $state<{ phase: string; pct: number } | null>(null);
@@ -26,6 +40,8 @@
 
   const decodeReady = $derived($decodeState === "ready");
   const lossy = $derived(format === "jpeg" || format === "heic");
+  const folderCount = $derived($photos.length);
+  const batchMode = $derived(scope === "folder");
 
   $effect(() => {
     if ($folder && !exportPath) {
@@ -35,19 +51,43 @@
 
   $effect(() => {
     let cancelled = false;
-    let unlisten: (() => void) | undefined;
+    const unlistens: (() => void)[] = [];
     onExportProgress((p) => {
+      if (batchMode) return;
       const pct = p.total > 0 ? Math.round((p.done / p.total) * 100) : 0;
       progress = { phase: p.phase, pct };
       if (p.phase === "render") status = `Rendering tiles ${p.done}/${p.total}…`;
       else if (p.phase === "encode") status = "Encoding…";
     }).then((u) => {
       if (cancelled) u();
-      else unlisten = u;
+      else unlistens.push(u);
+    });
+    onExportBatchProgress((p) => {
+      const filePct = p.total > 0 ? p.done / p.total : 0;
+      const pct = Math.round(((p.index + filePct) / Math.max(p.count, 1)) * 100);
+      progress = { phase: p.phase, pct };
+      const name = p.path.split("/").pop() ?? p.path;
+      status = `Batch ${p.index + 1}/${p.count}: ${name} (${p.phase})`;
+    }).then((u) => {
+      if (cancelled) u();
+      else unlistens.push(u);
+    });
+    onExportBatchDone((d) => {
+      busy = false;
+      progress = { phase: "done", pct: 100 };
+      if (d.cancelled) {
+        status = `Batch cancelled — ${d.ok.length} saved, ${d.failed.length} failed`;
+      } else {
+        status = `Batch done — ${d.ok.length} saved, ${d.failed.length} failed`;
+      }
+      if (d.ok[0]) savedPath = d.ok[0];
+    }).then((u) => {
+      if (cancelled) u();
+      else unlistens.push(u);
     });
     return () => {
       cancelled = true;
-      unlisten?.();
+      unlistens.forEach((u) => u());
     };
   });
 
@@ -76,21 +116,48 @@
       maxDim: resizeImage ? maxDim || null : null,
       sharpen: 25,
       destDir: exportPath,
-      stripMetadata,
-      copyright: null,
+      metadataPolicy,
+      stripMetadata: metadataPolicy === "stripAll",
+      copyright: copyright.trim() || null,
       watermarkText: null,
     };
   }
 
   async function handleExport() {
-    if (!decodeReady) {
-      status = "Wait until the image is ready to export.";
-      return;
-    }
-
     busy = true;
     savedPath = null;
     progress = null;
+
+    if (batchMode) {
+      const paths = $photos.map((p) => p.path).filter(Boolean);
+      if (paths.length === 0) {
+        status = "No photos in the current folder to export.";
+        busy = false;
+        return;
+      }
+      if (!exportPath) {
+        status = "Choose a save folder…";
+        busy = false;
+        return;
+      }
+      status = `Queuing ${paths.length} exports…`;
+      try {
+        const n = await exportBatch(paths, buildSettings());
+        status = `Exporting ${n} photos…`;
+      } catch (e) {
+        status = `Export failed: ${formatAppError(e)}`;
+        progress = null;
+        busy = false;
+      }
+      return;
+    }
+
+    if (!decodeReady) {
+      status = "Wait until the image is ready to export.";
+      busy = false;
+      return;
+    }
+
     status = exportPath ? "Starting export…" : "Choose a save folder…";
 
     try {
@@ -107,6 +174,14 @@
       progress = null;
     } finally {
       busy = false;
+    }
+  }
+
+  async function handleCancelBatch() {
+    try {
+      await cancelExportBatch();
+    } catch {
+      /* ignore */
     }
   }
 </script>
@@ -136,6 +211,33 @@
 
     <div class="flex-1 overflow-y-auto px-6 py-5">
       <div class="space-y-5">
+        <div class="setting-group">
+          <span class="setting-label">Scope</span>
+          <div class="mt-1 flex gap-2">
+            <button
+              type="button"
+              class="action-btn {scope === 'current' ? 'ring-1 ring-accent' : ''}"
+              disabled={busy}
+              onclick={() => (scope = "current")}
+            >
+              Current photo
+            </button>
+            <button
+              type="button"
+              class="action-btn {scope === 'folder' ? 'ring-1 ring-accent' : ''}"
+              disabled={busy}
+              onclick={() => (scope = "folder")}
+            >
+              Folder ({folderCount})
+            </button>
+          </div>
+          <p class="setting-desc">
+            {batchMode
+              ? "Exports every photo in the current library folder with its own sidecar edits."
+              : "Exports the photo currently open in the editor."}
+          </p>
+        </div>
+
         <div class="setting-group">
           <label for="export-folder" class="setting-label">Destination Directory</label>
           <div class="flex gap-2">
@@ -223,11 +325,27 @@
           {/if}
         </div>
 
-        <div class="setting-group border-t border-white/[0.03] pt-4">
-          <label class="setting-label flex items-center gap-2 cursor-pointer">
-            <input type="checkbox" bind:checked={stripMetadata} disabled={busy} />
-            Remove all metadata (EXIF, IPTC, GPS)
-          </label>
+        <div class="setting-group border-t border-white/[0.03] pt-4 flex flex-col gap-3">
+          <label for="meta-policy" class="setting-label">Metadata</label>
+          <select
+            id="meta-policy"
+            class="setting-input"
+            bind:value={metadataPolicy}
+            disabled={busy}
+          >
+            <option value="preserve">Preserve (incl. GPS)</option>
+            <option value="stripGps">Preserve, strip GPS</option>
+            <option value="stripAll">Strip all metadata</option>
+          </select>
+          <label for="copyright" class="setting-label">Copyright / Artist</label>
+          <input
+            id="copyright"
+            type="text"
+            class="setting-input"
+            placeholder="© Your Name"
+            bind:value={copyright}
+            disabled={busy || metadataPolicy === "stripAll"}
+          />
         </div>
 
         {#if busy && progress && progress.phase !== "done"}
@@ -239,9 +357,14 @@
           </div>
         {/if}
 
-        {#if !decodeReady && !busy}
+        {#if !batchMode && !decodeReady && !busy}
           <p class="text-[10px] text-red-400/90">
             Image still decoding — export unlocks when status says ready.
+          </p>
+        {/if}
+        {#if batchMode && folderCount === 0 && !busy}
+          <p class="text-[10px] text-red-400/90">
+            No photos in the current folder.
           </p>
         {/if}
 
@@ -263,13 +386,19 @@
           Reveal in Finder
         </button>
       {/if}
-      <button class="action-btn" onclick={close} disabled={busy}>Cancel</button>
+      {#if busy && batchMode}
+        <button class="action-btn" onclick={() => void handleCancelBatch()}>
+          Cancel batch
+        </button>
+      {:else}
+        <button class="action-btn" onclick={close} disabled={busy}>Cancel</button>
+      {/if}
       <button
         class="footer-btn footer-btn--primary"
         onclick={handleExport}
-        disabled={busy || !decodeReady}
+        disabled={busy || (!batchMode && !decodeReady) || (batchMode && folderCount === 0)}
       >
-        {busy ? "Exporting…" : "Export"}
+        {busy ? "Exporting…" : batchMode ? `Export ${folderCount}` : "Export"}
       </button>
     </footer>
   </div>

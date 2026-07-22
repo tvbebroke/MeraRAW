@@ -318,6 +318,9 @@ mod tests {
             available_profile_files: Vec::new(),
             demosaic: String::new(),
             available_demosaic: Vec::new(),
+            gps_lat: None,
+            gps_lon: None,
+            input_color_space: None,
         };
         let profiles = resolve_profiles(&meta, &index);
         assert!(

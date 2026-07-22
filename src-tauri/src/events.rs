@@ -3,7 +3,6 @@
 use tauri::{AppHandle, Emitter};
 
 pub const ENGINE_READY: &str = "engine-ready";
-pub const LOG: &str = "log";
 pub const FILE_OPENED: &str = "file-opened";
 pub const FOLDER_OPENED: &str = "folder-opened";
 pub const PREVIEW_READY: &str = "preview-ready";
@@ -26,6 +25,8 @@ pub const ASSISTANT_PROGRESS: &str = "assistant-progress";
 pub const DENOISE_PROGRESS: &str = "denoise-progress";
 pub const DENOISE_DONE: &str = "denoise-done";
 pub const DENOISE_ERROR: &str = "denoise-error";
+pub const RETOUCH_DONE: &str = "retouch-done";
+pub const RETOUCH_ERROR: &str = "retouch-error";
 
 /// Forward core EngineEvents to the webview as named events (contract C3).
 pub fn forward_engine_event(app: &AppHandle, ev: meratech_core::message::EngineEvent) {
@@ -89,6 +90,8 @@ pub fn forward_engine_event(app: &AppHandle, ev: meratech_core::message::EngineE
             DENOISE_ERROR,
             serde_json::json!({"job": job, "message": message}),
         ),
+        E::RetouchDone => app.emit(RETOUCH_DONE, ()),
+        E::RetouchError { message } => app.emit(RETOUCH_ERROR, message.clone()),
     };
     if let Err(e) = result {
         tracing::error!(error = %e, "forward engine event failed");

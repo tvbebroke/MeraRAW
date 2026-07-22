@@ -11,6 +11,10 @@ export type CropParams = {
   aspectW: number;
   aspectH: number;
   constrainCrop: boolean;
+  /** Vertical keystone −100..100 (engine maps to −1..1). */
+  perspVertical: number;
+  /** Horizontal keystone −100..100. */
+  perspHorizontal: number;
 };
 
 export function readCropFromDoc(
@@ -40,6 +44,8 @@ export function readCropFromDoc(
     aspectW: num("aspect_w", 0),
     aspectH: num("aspect_h", 0),
     constrainCrop: bool("constrain_crop", true),
+    perspVertical: num("persp_vertical", 0),
+    perspHorizontal: num("persp_horizontal", 0),
   };
 }
 
@@ -57,6 +63,8 @@ export function cropModulesPatch(p: CropParams): Record<string, number> {
     "crop.aspect_w": p.aspectW,
     "crop.aspect_h": p.aspectH,
     "crop.constrain_crop": p.constrainCrop ? 1 : 0,
+    "crop.persp_vertical": p.perspVertical,
+    "crop.persp_horizontal": p.perspHorizontal,
   };
 }
 
@@ -211,76 +219,44 @@ export function dragHandle(
   return clampRect({ left, top, right, bottom });
 }
 
-export function panCrop(r: CropRect, dx: number, dy: number): CropRect {
-  const w = r.right - r.left;
-  const h = r.bottom - r.top;
-  let left = r.left + dx;
-  let top = r.top + dy;
-  left = Math.max(0, Math.min(1 - w, left));
-  top = Math.max(0, Math.min(1 - h, top));
-  return { left, top, right: left + w, bottom: top + h };
-}
-
-export function angleFromDrag(start: [number, number], cur: [number, number], center: [number, number]): number {
-  const a0 = Math.atan2(start[1] - center[1], start[0] - center[0]);
-  const a1 = Math.atan2(cur[1] - center[1], cur[0] - center[0]);
-  return ((a1 - a0) * 180) / Math.PI;
-}
-
-export function straightenFromLine(
-  a: [number, number],
-  b: [number, number],
-  currentAngle: number,
-): number {
-  const dx = b[0] - a[0];
-  const dy = b[1] - a[1];
-  if (Math.hypot(dx, dy) < 0.001) return currentAngle;
-  const lineAngle = (Math.atan2(dy, dx) * 180) / Math.PI;
-  const target = Math.abs(lineAngle) < 45 ? -lineAngle : lineAngle > 0 ? 90 - lineAngle : -90 - lineAngle;
-  return Math.max(-45, Math.min(45, currentAngle + target));
-}
-
-export function flipOrientation(aspectW: number, aspectH: number): [number, number] {
-  if (aspectW <= 0 || aspectH <= 0) return [aspectW, aspectH];
-  return [aspectH, aspectW];
-}
-
-export function screenToImageNorm(
-  px: number,
-  py: number,
-  view: { scale: number; centerX: number; centerY: number },
-  imgW: number,
-  imgH: number,
-  outW: number,
-  outH: number,
-): [number, number] {
-  const nx = (view.centerX * imgW + (px - outW / 2) / view.scale) / imgW;
-  const ny = (view.centerY * imgH + (py - outH / 2) / view.scale) / imgH;
-  return [nx, ny];
-}
-
-export function imageNormToScreen(
-  nx: number,
-  ny: number,
-  view: { scale: number; centerX: number; centerY: number },
-  imgW: number,
-  imgH: number,
-  outW: number,
-  outH: number,
-): [number, number] {
-  const px = (nx * imgW - view.centerX * imgW) * view.scale + outW / 2;
-  const py = (ny * imgH - view.centerY * imgH) * view.scale + outH / 2;
-  return [px, py];
-}
-
 // ---------------------------------------------------------------------------
 // Content-space + rotation geometry (mirrors the engine's crop_common.wgsl /
 // crop.rs contract — keep in lockstep).
 // ---------------------------------------------------------------------------
 
-/** Angle/rotate-90/flip only (rect ignored) — mirrors Rust geometry_identity. */
+/** Angle/rotate-90/flip/perspective only (rect ignored) — mirrors Rust. */
 export function isGeometryIdentity(p: CropParams): boolean {
-  return Math.abs(p.angle) < 0.001 && p.rotate90 === 0 && !p.flipH && !p.flipV;
+  return (
+    Math.abs(p.angle) < 0.001 &&
+    p.rotate90 === 0 &&
+    !p.flipH &&
+    !p.flipV &&
+    Math.abs(p.perspVertical) < 0.1 &&
+    Math.abs(p.perspHorizontal) < 0.1
+  );
+}
+
+/** Inverse keystone — mirrors crop_inv_perspective in crop_common.wgsl. */
+export function invPerspective(
+  nx: number,
+  ny: number,
+  perspV: number,
+  perspH: number,
+): [number, number] | null {
+  let x = nx;
+  let y = ny;
+  const v = perspV / 100;
+  const h = perspH / 100;
+  if (Math.abs(v) > 1e-5) {
+    const sx = Math.max(1 + v * (1 - 2 * y), 0.05);
+    x = 0.5 + (x - 0.5) / sx;
+  }
+  if (Math.abs(h) > 1e-5) {
+    const sy = Math.max(1 + h * (1 - 2 * x), 0.05);
+    y = 0.5 + (y - 0.5) / sy;
+  }
+  if (x < 0 || x > 1 || y < 0 || y > 1) return null;
+  return [x, y];
 }
 
 /** Extract crop mode: 0 = none, 1 = committed crop, 2 = geometry-only preview. */
@@ -453,6 +429,10 @@ export function contentNormToImageNorm(
     rx = p.rect.left + nx * Math.max(p.rect.right - p.rect.left, 0.01);
     ry = p.rect.top + ny * Math.max(p.rect.bottom - p.rect.top, 0.01);
   }
+  const persp = invPerspective(rx, ry, p.perspVertical, p.perspHorizontal);
+  if (!persp) return null;
+  rx = persp[0];
+  ry = persp[1];
   const [rw, rh] = rotatedDims(p, imgW, imgH);
   const t = (-p.angle * Math.PI) / 180; // shader rotates by −angle
   const c = Math.cos(t);
@@ -471,7 +451,8 @@ export function contentNormToImageNorm(
   return [ux, uy];
 }
 
-export function isDefaultCrop(p: CropParams): boolean {
+/** Internal — only `cropModeFor` needs this; not part of the module's API. */
+function isDefaultCrop(p: CropParams): boolean {
   const r = p.rect;
   return (
     r.left <= 0.001 &&
@@ -481,6 +462,8 @@ export function isDefaultCrop(p: CropParams): boolean {
     Math.abs(p.angle) < 0.01 &&
     p.rotate90 === 0 &&
     !p.flipH &&
-    !p.flipV
+    !p.flipV &&
+    Math.abs(p.perspVertical) < 0.1 &&
+    Math.abs(p.perspHorizontal) < 0.1
   );
 }

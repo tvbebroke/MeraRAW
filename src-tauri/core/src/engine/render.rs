@@ -3,7 +3,11 @@ use super::*;
 
 impl Engine {
     pub(super) fn compute_stats(&self) -> Option<crate::message::FrameStats> {
-        const BINS: usize = 64;
+        // 256 bins match 8-bit display encoding 1:1 (phase 12).
+        const BINS: usize = 256;
+        // Match present.wgsl blinkies: hi ≥ 0.995 (~254/255), lo ≤ 0.004 (~1/255).
+        const HI_THR: u8 = 254;
+        const LO_THR: u8 = 1;
         let frame = self.latest_frame.as_ref()?;
         let mut r = vec![0u32; BINS];
         let mut g = vec![0u32; BINS];
@@ -15,16 +19,16 @@ impl Engine {
                 continue; // letterbox bg
             }
             n += 1;
-            r[px[0] as usize * BINS / 256] += 1;
-            g[px[1] as usize * BINS / 256] += 1;
-            b[px[2] as usize * BINS / 256] += 1;
+            r[px[0] as usize] += 1;
+            g[px[1] as usize] += 1;
+            b[px[2] as usize] += 1;
             let l =
                 (0.2126 * px[0] as f32 + 0.7152 * px[1] as f32 + 0.0722 * px[2] as f32) as usize;
-            luma[(l * BINS / 256).min(BINS - 1)] += 1;
-            if px[0] >= 254 || px[1] >= 254 || px[2] >= 254 {
+            luma[l.min(BINS - 1)] += 1;
+            if px[0] >= HI_THR || px[1] >= HI_THR || px[2] >= HI_THR {
                 hi += 1;
             }
-            if px[0] <= 1 && px[1] <= 1 && px[2] <= 1 {
+            if px[0] <= LO_THR && px[1] <= LO_THR && px[2] <= LO_THR {
                 lo += 1;
             }
         }
@@ -86,7 +90,7 @@ impl Engine {
         )?;
         c.history.record(before, "wb eyedropper".into());
         c.doc_dirty = true;
-        let delta = c.delta("wb eyedropper".into(), None);
+        let delta = c.delta("wb eyedropper".into(), None, None);
         if let Some(g) = &mut self.graph {
             g.invalidate_from_module("white_balance");
         }
@@ -136,7 +140,11 @@ impl Engine {
             }
             _ => self.display_look,
         };
-        self.graph.as_mut().unwrap().set_look(display_look);
+        {
+            let g = self.graph.as_mut().unwrap();
+            g.set_look(display_look);
+            g.set_clip_warnings(self.clip_hi, self.clip_lo);
+        }
         let (w, h) = (*w, *h);
         let seg_views: std::collections::HashMap<String, wgpu::TextureView> = cur
             .masks_gpu

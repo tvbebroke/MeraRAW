@@ -9,6 +9,7 @@
     setTelemetryConsent,
   } from "../../../analytics/telemetry";
   import { telemetryConfigured } from "../../../config";
+  import { histMode, setHistMode, type HistMode } from "../../../stores/app";
 
   // Modal active tab state
   type Tab = "general" | "editor" | "performance" | "export";
@@ -20,8 +21,13 @@
   let autoThumbnails = $state(true);
   
   let rawDecoder = $state("libraw");
-  let histogramType = $state("rgb");
   let colorSpace = $state("srgb");
+
+  const histogramType = $derived($histMode);
+  function onHistogramType(e: Event) {
+    const v = (e.currentTarget as HTMLSelectElement).value as HistMode;
+    if (v === "rgb" || v === "luma" || v === "parade") setHistMode(v);
+  }
   
   let gpuAcceleration = $state(true);
   let cacheSize = $state(10); // GB
@@ -237,7 +243,12 @@
             <!-- Histogram Type -->
             <div class="setting-group">
               <label for="histogram-select" class="setting-label">Default Histogram</label>
-              <select id="histogram-select" bind:value={histogramType} class="setting-select">
+              <select
+                id="histogram-select"
+                value={histogramType}
+                onchange={onHistogramType}
+                class="setting-select"
+              >
                 <option value="rgb">RGB Overlay</option>
                 <option value="luma">Luminance Channel</option>
                 <option value="parade">RGB Parade</option>

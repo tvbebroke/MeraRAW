@@ -79,6 +79,11 @@ impl RenderGraph {
         self.look = look;
     }
 
+    pub fn set_clip_warnings(&mut self, hi: bool, lo: bool) {
+        self.clip_hi = hi;
+        self.clip_lo = lo;
+    }
+
     fn original_look(&self) -> bool {
         self.look == 4
     }
@@ -677,11 +682,19 @@ impl RenderGraph {
                 .and_then(|id| self.mask_tex.get(id))
                 .unwrap_or(&self.dummy_mask)
                 .create_view(&Default::default());
+            let millis = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| (d.as_millis() % u32::MAX as u128) as u32)
+                .unwrap_or(0);
             let u = PresentUniforms {
                 width: out_w,
                 height: out_h,
                 overlay: if overlay_mask.is_some() { 0.55 } else { 0.0 },
                 look: self.look,
+                clip_hi: u32::from(self.clip_hi),
+                clip_lo: u32::from(self.clip_lo),
+                _p0: millis,
+                _p1: 0,
             };
             gpu.queue
                 .write_buffer(&self.present_uniforms, 0, bytemuck::bytes_of(&u));
@@ -734,6 +747,7 @@ impl RenderGraph {
             PipeKind::Grade => &self.simple_pipes["grade"],
             PipeKind::Hsl => &self.simple_pipes["hsl"],
             PipeKind::Sharpen => &self.simple_pipes["sharpen"],
+            PipeKind::Effects => &self.simple_pipes["effects"],
             PipeKind::Curve => &self.curve_pipe,
             PipeKind::Lut3d => &self.lut_pipe,
         }

@@ -123,6 +123,7 @@ impl Engine {
             lut_cube,
             working: None,
             small_cpu: None,
+            clean_rgb: None,
             docs: vec![doc],
             active_doc: 0,
             history: History::default(),
@@ -206,6 +207,7 @@ impl Engine {
             let available_profile_files = cur.meta.available_profile_files.clone();
             cur.working = Some((tex, view, payload.width, payload.height));
             cur.small_cpu = Some(payload.small_cpu);
+            cur.clean_rgb = Some(payload.clean_rgb);
             cur.meta = payload.meta;
             cur.meta.camera_profile = camera_profile;
             cur.meta.available_profiles = available_profiles;
@@ -213,6 +215,15 @@ impl Engine {
             // Keep sidecar demosaic in sync with the effective decode algo
             // (fallback may have remapped an unavailable zerawler choice).
             cur.doc_mut().meta.demosaic = Some(cur.meta.demosaic.clone());
+        }
+        // Sidecar may already have heal spots — rebuild onto the clean master.
+        let needs_heal = self
+            .current
+            .as_ref()
+            .map(|c| c.doc().retouch.iter().any(|s| s.enabled))
+            .unwrap_or(false);
+        if needs_heal {
+            self.rebuild_retouch();
         }
         self.rerender_after_base_change();
     }
@@ -261,19 +272,33 @@ impl Engine {
             let available_profiles = cur.meta.available_profiles.clone();
             let available_profile_files = cur.meta.available_profile_files.clone();
             cur.small_cpu = Some(payload.small_cpu.clone());
+            cur.clean_rgb = Some(payload.clean_rgb);
             cur.meta = payload.meta;
             cur.meta.camera_profile = camera_profile;
             cur.meta.available_profiles = available_profiles;
             cur.meta.available_profile_files = available_profile_files;
             cur.doc_mut().meta.demosaic = Some(cur.meta.demosaic.clone());
         }
+        let needs_heal = self
+            .current
+            .as_ref()
+            .map(|c| c.doc().retouch.iter().any(|s| s.enabled))
+            .unwrap_or(false);
+        if needs_heal {
+            self.rebuild_retouch();
+        }
+        let small = self
+            .current
+            .as_ref()
+            .and_then(|c| c.small_cpu.clone())
+            .unwrap_or(payload.small_cpu);
         let vw = self
             .last_view
             .filter(|v| v.out_w >= 64 && v.out_h >= 64)
             .map(|v| (v.out_w, v.out_h))
             .unwrap_or((1440, 860));
         let frame = cpu_preview_frame(
-            &payload.small_cpu,
+            &small,
             self.display_look == 1,
             vw.0,
             vw.1,

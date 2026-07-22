@@ -771,6 +771,16 @@ pub async fn set_display_look(
     Ok(engine.set_display_look(look).await?)
 }
 
+/// Toggle highlight / shadow clipping blinkies on the viewport.
+#[tauri::command]
+pub async fn set_clip_warnings(
+    engine: State<'_, EngineHandle>,
+    hi: bool,
+    lo: bool,
+) -> Result<(), AppError> {
+    Ok(engine.set_clip_warnings(hi, lo).await?)
+}
+
 #[tauri::command]
 pub async fn selftest_enabled() -> Result<bool, AppError> {
     if !dig_surface_enabled() {

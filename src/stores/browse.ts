@@ -1,9 +1,15 @@
 // Catalog-backed browsing state: current folder listing feeds the
 // filmstrip + file browser; clicking a photo opens it in the engine.
 import { atom, computed } from "nanostores";
-import { getGrid, importFolder, listFolders, pickFolder } from "../ipc/commands";
+import {
+  getGrid,
+  importFolder,
+  listFolders,
+  pickFolder,
+  setAssetMeta,
+} from "../ipc/commands";
 import { onCatalogChanged, onImportDone } from "../ipc/events";
-import type { FolderItem, GridItem } from "../ipc/types";
+import type { FolderItem, GridItem, MetaPatch } from "../ipc/types";
 import { customSchemeUrl } from "../lib/engine/customScheme";
 import { currentFolder, lastOpenedPath } from "./app";
 
@@ -160,6 +166,17 @@ export function initBrowseBridge(): () => void {
     cancelled = true;
     un?.();
   };
+}
+
+/** Apply rating/flag/label/keywords and refresh the open folder grid. */
+export async function patchPhotoMeta(
+  ids: number[],
+  patch: MetaPatch,
+): Promise<void> {
+  await setAssetMeta(ids, patch);
+  const root = currentFolder.get();
+  if (root) await loadFolder(root);
+  else await refreshFolders();
 }
 
 /** Open a catalog photo in the develop engine. */

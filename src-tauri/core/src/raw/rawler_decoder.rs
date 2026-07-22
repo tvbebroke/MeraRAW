@@ -89,7 +89,7 @@ impl RawlerDecoder {
             && raw.cpp == 3
             && md.make.to_lowercase().contains("apple");
         let format = if is_proraw { "ProRAW".into() } else { ext };
-        ImageMeta {
+        let mut meta = ImageMeta {
             path: path.to_string_lossy().into_owned(),
             kind: crate::raw::ImageKind::Raw,
             format,
@@ -128,7 +128,13 @@ impl RawlerDecoder {
             available_profile_files: Vec::new(),
             demosaic: String::new(), // set by decode_impl once the algo is known
             available_demosaic: crate::raw::Demosaic::available(),
-        }
+            gps_lat: None,
+            gps_lon: None,
+            input_color_space: None, // RAW → camera→Rec.2020 via DCP, not ICC
+        };
+        // GPS (and any missing tags) from container EXIF when readable (DNG/JPEG…).
+        crate::metadata::enrich_from_file(path, &mut meta);
+        meta
     }
 }
 

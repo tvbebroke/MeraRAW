@@ -18,6 +18,7 @@ pub const NODES: &[(&str, &str)] = &[
     ("tone_curve", "tone_curve"),
     ("lut", "lut"),
     ("sharpen", "detail"),
+    ("effects", "effects"),
 ];
 
 pub enum NodeConfig {
@@ -164,6 +165,19 @@ struct SharpenU {
     height: u32,
     _p0: u32,
     _p1: u32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
+struct EffectsU {
+    clarity: f32,
+    grain_amount: f32,
+    grain_size: f32,
+    vignette_amount: f32,
+    vignette_midpoint: f32,
+    width: u32,
+    height: u32,
+    _pad: u32,
 }
 
 fn rows(m: &Mat3) -> ([f32; 4], [f32; 4], [f32; 4]) {
@@ -604,6 +618,27 @@ pub fn node_configs(
                 height: h,
                 _p0: 0,
                 _p1: 0,
+            }));
+        }
+    }
+
+    // effects (grain / vignette / clarity) — identity when all amounts are 0
+    {
+        let clarity = eff(doc, "effects", "clarity");
+        let grain = eff(doc, "effects", "grain_amount");
+        let vignette = eff(doc, "effects", "vignette_amount");
+        if clarity == 0.0 && grain == 0.0 && vignette == 0.0 {
+            out.push(NodeConfig::Skip);
+        } else {
+            out.push(run(EffectsU {
+                clarity: clarity / 100.0,
+                grain_amount: grain / 100.0,
+                grain_size: eff(doc, "effects", "grain_size"),
+                vignette_amount: vignette / 100.0,
+                vignette_midpoint: eff(doc, "effects", "vignette_midpoint") / 100.0,
+                width: w,
+                height: h,
+                _pad: 0,
             }));
         }
     }

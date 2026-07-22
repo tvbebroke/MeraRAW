@@ -17,6 +17,10 @@ pub struct CropParams {
     pub aspect_w: f32,
     pub aspect_h: f32,
     pub constrain_crop: bool,
+    /// Vertical keystone in −1..1 (registry stores −100..100).
+    pub persp_vertical: f32,
+    /// Horizontal keystone in −1..1.
+    pub persp_horizontal: f32,
 }
 
 impl Default for CropParams {
@@ -34,6 +38,8 @@ impl Default for CropParams {
             aspect_w: 0.0,
             aspect_h: 0.0,
             constrain_crop: true,
+            persp_vertical: 0.0,
+            persp_horizontal: 0.0,
         }
     }
 }
@@ -54,6 +60,10 @@ impl CropParams {
             aspect_w: effective_f32(doc, "crop", "aspect_w"),
             aspect_h: effective_f32(doc, "crop", "aspect_h"),
             constrain_crop: b("constrain_crop"),
+            persp_vertical: (effective_f32(doc, "crop", "persp_vertical") / 100.0)
+                .clamp(-1.0, 1.0),
+            persp_horizontal: (effective_f32(doc, "crop", "persp_horizontal") / 100.0)
+                .clamp(-1.0, 1.0),
         }
     }
 
@@ -66,11 +76,18 @@ impl CropParams {
             && self.rotate_90 == 0
             && !self.flip_h
             && !self.flip_v
+            && self.persp_vertical.abs() < 0.001
+            && self.persp_horizontal.abs() < 0.001
     }
 
-    /// Angle/rotate-90/flip only (rect ignored).
+    /// Angle/rotate-90/flip/perspective only (rect ignored).
     pub fn geometry_identity(&self) -> bool {
-        self.angle.abs() < 0.001 && self.rotate_90 == 0 && !self.flip_h && !self.flip_v
+        self.angle.abs() < 0.001
+            && self.rotate_90 == 0
+            && !self.flip_h
+            && !self.flip_v
+            && self.persp_vertical.abs() < 0.001
+            && self.persp_horizontal.abs() < 0.001
     }
 
     /// Extract-shader crop mode: 0 = none, 1 = full crop (rect + geometry),
@@ -134,6 +151,8 @@ impl CropParams {
             self.rotate_90,
             self.flip_h as u32,
             self.flip_v as u32,
+            self.persp_vertical.to_bits(),
+            self.persp_horizontal.to_bits(),
         ] {
             mix(&mut h, v);
         }
@@ -177,6 +196,10 @@ mod tests {
         assert_eq!(c.mode(true), 0); // rect-only crop: editing preview shows plain full frame
         c.angle = 2.0;
         assert_eq!(c.mode(true), 2); // geometry present: editing preview rotates live
+        c.angle = 0.0;
+        c.persp_vertical = 0.2;
+        assert!(!c.geometry_identity());
+        assert_eq!(c.mode(true), 2); // keystone alone is live geometry
     }
 
     #[test]

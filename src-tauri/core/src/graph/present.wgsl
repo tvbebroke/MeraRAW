@@ -8,6 +8,10 @@ struct PresentUniforms {
   height: u32,
   overlay: f32, // 0 = off; else mask-overlay tint strength
   look: u32,    // 0 = Neutral, 1 = Camera (punchy)
+  clip_hi: u32, // 1 = highlight blinkies on
+  clip_lo: u32, // 1 = shadow blinkies on
+  _p0: u32,
+  _p1: u32,
 };
 
 @group(0) @binding(0) var src: texture_2d<f32>;
@@ -115,6 +119,21 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
     if (u.overlay > 0.0) {
       let m = textureLoad(overlay_mask, vec2<i32>(gid.xy), 0).r;
       encoded = mix(encoded, vec3<f32>(1.0, 0.15, 0.15), clamp(m, 0.0, 1.0) * u.overlay);
+    }
+    // Clipping blinkies on display-encoded output (matches histogram clip %).
+    // Pulse via _p0 = millis so warnings flash while frames keep updating.
+    let pulse = 0.55 + 0.45 * abs(sin(f32(u._p0) * 0.012566)); // ~2 Hz
+    if (u.clip_hi != 0u) {
+      let hi = encoded.r >= 0.995 || encoded.g >= 0.995 || encoded.b >= 0.995;
+      if (hi) {
+        encoded = mix(encoded, vec3<f32>(1.0, 0.05, 0.05), pulse);
+      }
+    }
+    if (u.clip_lo != 0u) {
+      let lo = encoded.r <= 0.004 && encoded.g <= 0.004 && encoded.b <= 0.004;
+      if (lo) {
+        encoded = mix(encoded, vec3<f32>(0.15, 0.45, 1.0), pulse);
+      }
     }
   }
   textureStore(dst, vec2<i32>(gid.xy), vec4<f32>(encoded, 1.0));

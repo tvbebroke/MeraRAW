@@ -1,24 +1,35 @@
 <script lang="ts">
   import CollapsibleSection from "./CollapsibleSection.svelte";
+  import Slider from "./Slider.svelte";
   import { applyOp, setMaskOverlay } from "../../../ipc/commands";
   import { doc, reconcile } from "../../../stores/doc";
-  import { selectedMask, viewportTool, brushRadius } from "../../../stores/app";
+  import { selectedMask, selectedRetouch, viewportTool, brushRadius } from "../../../stores/app";
 
   const masks = $derived($doc?.masks ?? []);
+  const active = $derived(
+    $selectedMask ? (masks.find((m) => m.id === $selectedMask) ?? null) : null,
+  );
 
-  async function addMask(kind: "brush" | "linear" | "radial") {
+  type MaskKind = "brush" | "linear" | "radial" | "subject" | "sky" | "background";
+
+  async function addMask(kind: MaskKind) {
     const source =
       kind === "brush"
         ? { type: "brush", strokes: [] }
         : kind === "linear"
           ? { type: "linear", x0: 0.5, y0: 0.2, x1: 0.5, y1: 0.8 }
-          : { type: "radial", cx: 0.5, cy: 0.5, rx: 0.3, ry: 0.3 };
+          : kind === "radial"
+            ? { type: "radial", cx: 0.5, cy: 0.5, rx: 0.3, ry: 0.3 }
+            : kind === "sky"
+              ? { type: "segmented", model: "sky_v1", hint: null }
+              : { type: "segmented", model: "subject_v1", hint: null };
     try {
       const delta = await applyOp({ op: "add_mask", kind, source });
       reconcile(delta);
       if (delta.newMaskId) {
+        selectedRetouch.set(null);
         selectedMask.set(delta.newMaskId);
-        viewportTool.set("brush");
+        viewportTool.set(kind === "brush" ? "brush" : "pan");
         void setMaskOverlay(delta.newMaskId);
       }
     } catch {
@@ -39,9 +50,28 @@
   }
 
   function select(id: string) {
+    selectedRetouch.set(null);
     selectedMask.set(id);
-    viewportTool.set("brush");
+    const m = masks.find((x) => x.id === id);
+    viewportTool.set(m?.kind === "brush" ? "brush" : "pan");
     void setMaskOverlay(id);
+  }
+
+  async function refine(
+    partial: { opacity?: number; feather?: number; invert?: boolean },
+    live = false,
+  ) {
+    if (!$selectedMask) return;
+    try {
+      reconcile(
+        await applyOp(
+          { op: "refine_mask", id: $selectedMask, ...partial },
+          live,
+        ),
+      );
+    } catch {
+      /* ignore */
+    }
   }
 </script>
 
@@ -67,6 +97,24 @@
       >
         <span class="font-medium">Radial Gradient</span>
       </button>
+      <button
+        onclick={() => void addMask("subject")}
+        class="flex h-[36px] flex-col items-center justify-center rounded-[12px] border border-white/5 bg-white/[0.02] text-[10px] text-white/80 transition-all hover:bg-white/5"
+      >
+        <span class="font-medium">Subject</span>
+      </button>
+      <button
+        onclick={() => void addMask("sky")}
+        class="flex h-[36px] flex-col items-center justify-center rounded-[12px] border border-white/5 bg-white/[0.02] text-[10px] text-white/80 transition-all hover:bg-white/5"
+      >
+        <span class="font-medium">Sky</span>
+      </button>
+      <button
+        onclick={() => void addMask("background")}
+        class="flex h-[36px] flex-col items-center justify-center rounded-[12px] border border-white/5 bg-white/[0.02] text-[10px] text-white/80 transition-all hover:bg-white/5"
+      >
+        <span class="font-medium">Background</span>
+      </button>
     </div>
 
     <div class="grid h-[15px] grid-cols-[64px_1fr] items-center gap-x-[10px] px-1">
@@ -82,6 +130,48 @@
         class="w-full"
       />
     </div>
+
+    {#if active}
+      <div class="my-2 h-[1px] bg-white/5"></div>
+      <div class="mb-1 px-1 text-[10px] font-bold text-white/50">REFINE SELECTED</div>
+      <div class="flex flex-col gap-[10px] px-1">
+        <div class="grid h-[15px] grid-cols-[64px_1fr] items-center gap-x-[10px]">
+          <span class="text-[9px] text-white/70">Opacity</span>
+          <Slider
+            label="Opacity"
+            min={0}
+            max={100}
+            step={1}
+            value={active.opacity}
+            resetValue={100}
+            oninput={(v) => void refine({ opacity: v }, true)}
+            onchange={(v) => void refine({ opacity: v }, false)}
+          />
+        </div>
+        <div class="grid h-[15px] grid-cols-[64px_1fr] items-center gap-x-[10px]">
+          <span class="text-[9px] text-white/70">Feather</span>
+          <Slider
+            label="Feather"
+            min={0}
+            max={100}
+            step={1}
+            value={active.feather}
+            resetValue={0}
+            oninput={(v) => void refine({ feather: v }, true)}
+            onchange={(v) => void refine({ feather: v }, false)}
+          />
+        </div>
+        <label class="flex items-center gap-2 px-0 text-[9px] text-white/70">
+          <input
+            type="checkbox"
+            checked={active.invert}
+            onchange={(e) =>
+              void refine({ invert: (e.currentTarget as HTMLInputElement).checked })}
+          />
+          Invert mask
+        </label>
+      </div>
+    {/if}
 
     <div class="my-2 h-[1px] bg-white/5"></div>
 

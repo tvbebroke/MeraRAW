@@ -1,16 +1,15 @@
 //! Standard (already-rendered) image decode — JPEG/PNG/TIFF/WebP/BMP/GIF via
 //! the `image` crate. Contract B1 sibling of the RAW decoder.
 //!
-//! These are display-referred: sRGB-encoded, already white-balanced and
-//! tone-mapped. We linearize (sRGB EOTF) and convert into the app's linear
-//! Rec.2020 working space so the edit nodes operate correctly, and tag the
-//! image `Rendered` so the pipeline skips the camera stages (WB / DCP look /
-//! filmic view transform) that would double-process it.
+//! These are display-referred (already white-balanced / tone-mapped). We
+//! honor an embedded ICC when present (phase 11.2), otherwise assume sRGB,
+//! then convert into linear Rec.2020 so edit nodes operate correctly. Tagged
+//! `Rendered` so the pipeline skips camera stages (WB / DCP / filmic).
 
 use super::{DecodedImage, Decoder, ImageKind, ImageMeta};
-use crate::color::{mat_mul, mat_vec, Mat3, SRGB_TO_XYZ, XYZ_TO_REC2020};
 use crate::error::CoreError;
 use crate::image::RgbF32Buf;
+use crate::metadata;
 use std::path::Path;
 
 pub const STD_EXTENSIONS: &[&str] = &[
@@ -210,20 +209,6 @@ fn heic_dimensions(path: &Path) -> Result<(u32, u32), CoreError> {
     }
 }
 
-/// linear sRGB → linear Rec.2020, from the pinned color-science matrices.
-fn srgb_to_rec2020() -> Mat3 {
-    mat_mul(&XYZ_TO_REC2020, &SRGB_TO_XYZ)
-}
-
-/// sRGB EOTF: gamma-encoded [0,1] → linear light (color-science-reference §3).
-fn srgb_eotf(c: f32) -> f32 {
-    if c <= 0.04045 {
-        c / 12.92
-    } else {
-        ((c + 0.055) / 1.055).powf(2.4)
-    }
-}
-
 fn format_tag(path: &Path) -> String {
     let e = path
         .extension()
@@ -239,26 +224,8 @@ fn format_tag(path: &Path) -> String {
     }
 }
 
-/// linear Rec.2020 working data from interleaved sRGB-encoded RGB f32.
-fn srgb_rgb_to_working(src: &[f32], w: usize, h: usize) -> Vec<f32> {
-    let m = srgb_to_rec2020();
-    let mut data = vec![0f32; w * h * 3];
-    for i in 0..(w * h) {
-        let lin = [
-            srgb_eotf(src[i * 3]),
-            srgb_eotf(src[i * 3 + 1]),
-            srgb_eotf(src[i * 3 + 2]),
-        ];
-        let rec = mat_vec(&m, lin);
-        data[i * 3] = rec[0].max(0.0);
-        data[i * 3 + 1] = rec[1].max(0.0);
-        data[i * 3 + 2] = rec[2].max(0.0);
-    }
-    data
-}
-
-fn rendered_meta(path: &Path, w: u32, h: u32, bit_depth: u8) -> ImageMeta {
-    ImageMeta {
+fn rendered_meta(path: &Path, w: u32, h: u32, bit_depth: u8, color: &metadata::InputColorInfo) -> ImageMeta {
+    let mut meta = ImageMeta {
         path: path.to_string_lossy().into_owned(),
         kind: ImageKind::Rendered,
         format: format_tag(path),
@@ -281,7 +248,12 @@ fn rendered_meta(path: &Path, w: u32, h: u32, bit_depth: u8) -> ImageMeta {
         available_profile_files: Vec::new(),
         demosaic: String::new(), // n/a for already-rendered images
         available_demosaic: Vec::new(),
-    }
+        gps_lat: None,
+        gps_lon: None,
+        input_color_space: Some(color.label.clone()),
+    };
+    metadata::enrich_from_file(path, &mut meta);
+    meta
 }
 
 #[derive(Default)]
@@ -306,7 +278,8 @@ impl Decoder for StandardDecoder {
             image::image_dimensions(path)
                 .map_err(|e| CoreError::Decode(format!("image dims: {e}")))?
         };
-        Ok(rendered_meta(path, w, h, 8))
+        let color = metadata::probe_input_color(path);
+        Ok(rendered_meta(path, w, h, 8, &color))
     }
 
     fn embedded_preview(
@@ -363,18 +336,27 @@ impl Decoder for StandardDecoder {
                 | image::ColorType::La16 => 16,
                 _ => 8,
             };
-            // to_rgb32f scales samples to [0,1] WITHOUT gamma decoding — sRGB-encoded.
+            // to_rgb32f scales samples to [0,1] WITHOUT TRC decoding — encoded.
             let rgb = dynimg.to_rgb32f();
             let (w, h) = (rgb.width() as usize, rgb.height() as usize);
             (rgb.into_raw(), w, h, bit_depth)
         };
-        let data = srgb_rgb_to_working(&src, w, h);
+        // HEIC/JXL/PSD paths don't carry a reliable ICC yet → sRGB fallback.
+        let color = if is_jxl(path) || is_heic(path) || is_psd(path) {
+            metadata::InputColorInfo {
+                label: "sRGB".into(),
+                icc: None,
+            }
+        } else {
+            metadata::probe_input_color(path)
+        };
+        let data = metadata::encoded_rgb_to_working(&src, w, h, color.icc.as_deref())?;
         let working = RgbF32Buf {
             width: w,
             height: h,
             data,
         };
-        let meta = rendered_meta(path, w as u32, h as u32, bit_depth);
+        let meta = rendered_meta(path, w as u32, h as u32, bit_depth, &color);
         Ok(DecodedImage { working, meta })
     }
 }

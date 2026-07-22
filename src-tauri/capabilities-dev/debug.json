@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "debug-probes",
+  "description": "Dig/selftest IPC probes. Not under capabilities/ (release ACL is main-capability only). Registered at runtime via add_capability when cfg(debug_assertions).",
+  "windows": ["main"],
+  "permissions": ["allow-dev-probes"]
+}

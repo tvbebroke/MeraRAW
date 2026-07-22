@@ -6,6 +6,7 @@
     activePhoto,
     folder,
     openPhoto as browseOpenPhoto,
+    patchPhotoMeta,
     photos,
     thumbUrl,
   } from "../stores/browse";
@@ -116,7 +117,32 @@
     }
   }
 
+  async function ratePhoto(photo: GridItem, rating: number, e: MouseEvent) {
+    e.stopPropagation();
+    const next = photo.rating === rating ? 0 : rating;
+    try {
+      await patchPhotoMeta([photo.id], { rating: next });
+    } catch {
+      /* ignore */
+    }
+  }
+
+  async function cycleFlag(photo: GridItem, e: MouseEvent) {
+    e.stopPropagation();
+    const order = ["none", "pick", "reject"] as const;
+    const i = Math.max(0, order.indexOf(photo.flag as (typeof order)[number]));
+    const next = order[(i + 1) % order.length];
+    try {
+      await patchPhotoMeta([photo.id], { flag: next });
+    } catch {
+      /* ignore */
+    }
+  }
+
   const highlightPath = $derived(selectedPath ?? $activePhoto?.path ?? null);
+  const selected = $derived(
+    filteredPhotos.find((p) => p.path === highlightPath) ?? null,
+  );
 </script>
 
 <svelte:window bind:innerWidth={windowWidth} />
@@ -279,12 +305,48 @@
                 </div>
                 <div class="photo-meta">
                   <span class="photo-name">{photo.filename}</span>
+                  <div class="photo-cull">
+                    {#if photo.flag === "pick"}
+                      <span class="flag-dot flag-dot--pick" title="Pick">●</span>
+                    {:else if photo.flag === "reject"}
+                      <span class="flag-dot flag-dot--reject" title="Reject">✕</span>
+                    {/if}
+                    {#if photo.rating > 0}
+                      <span class="rating-mini">{"★".repeat(photo.rating)}</span>
+                    {/if}
+                  </div>
                 </div>
               </button>
             {/each}
           </div>
         {/if}
       </div>
+
+      {#if selected}
+        <div class="cull-bar">
+          <span class="cull-name">{selected.filename}</span>
+          <div class="cull-stars" role="group" aria-label="Rating">
+            {#each [1, 2, 3, 4, 5] as n}
+              <button
+                type="button"
+                class="star-btn {selected.rating >= n ? 'star-btn--on' : ''}"
+                title="{n} star{n === 1 ? '' : 's'}"
+                onclick={(e) => void ratePhoto(selected, n, e)}
+              >★</button>
+            {/each}
+          </div>
+          <button
+            type="button"
+            class="flag-btn flag-btn--{selected.flag || 'none'}"
+            title="Cycle flag (none → pick → reject)"
+            onclick={(e) => void cycleFlag(selected, e)}
+          >
+            {#if selected.flag === "pick"}Pick
+            {:else if selected.flag === "reject"}Reject
+            {:else}Flag{/if}
+          </button>
+        </div>
+      {/if}
     </GlassPanel>
     {#if $leftRailCollapsed}
       <button 
@@ -527,6 +589,10 @@
   .photo-meta {
     padding: 7px 10px 8px;
     border-top: 1px solid rgba(255, 255, 255, 0.04);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
   }
 
   .photo-name {
@@ -537,6 +603,84 @@
     text-overflow: ellipsis;
     display: block;
     letter-spacing: 0.01em;
+    min-width: 0;
+  }
+
+  .photo-cull {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+  }
+
+  .flag-dot {
+    font-size: 9px;
+    line-height: 1;
+  }
+  .flag-dot--pick { color: rgba(120, 200, 120, 0.9); }
+  .flag-dot--reject { color: rgba(220, 120, 120, 0.9); }
+
+  .rating-mini {
+    font-size: 8px;
+    color: rgba(255, 210, 120, 0.85);
+    letter-spacing: -0.5px;
+  }
+
+  .cull-bar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 18px 14px;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    flex-shrink: 0;
+  }
+
+  .cull-name {
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.55);
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1;
+  }
+
+  .cull-stars {
+    display: flex;
+    gap: 2px;
+  }
+
+  .star-btn {
+    appearance: none;
+    border: none;
+    background: transparent;
+    color: rgba(255, 255, 255, 0.22);
+    font-size: 14px;
+    line-height: 1;
+    padding: 2px 3px;
+    cursor: pointer;
+  }
+  .star-btn--on { color: rgba(255, 210, 120, 0.95); }
+  .star-btn:hover { color: rgba(255, 220, 140, 0.9); }
+
+  .flag-btn {
+    appearance: none;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.04);
+    color: rgba(255, 255, 255, 0.65);
+    font-size: 10px;
+    font-weight: 600;
+    padding: 5px 10px;
+    border-radius: 8px;
+    cursor: pointer;
+  }
+  .flag-btn--pick {
+    border-color: rgba(120, 200, 120, 0.35);
+    color: rgba(160, 220, 160, 0.95);
+  }
+  .flag-btn--reject {
+    border-color: rgba(220, 120, 120, 0.35);
+    color: rgba(230, 150, 150, 0.95);
   }
 </style>
 

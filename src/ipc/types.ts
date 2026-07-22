@@ -63,6 +63,11 @@ export interface ImageMeta {
   /** Algorithms currently usable (sidecar entries absent when their worker
    *  binary is missing). Omitted (empty) for non-RAW sources. */
   availableDemosaic?: string[];
+  /** GPS decimal degrees when present in source EXIF. */
+  gpsLat?: number | null;
+  gpsLon?: number | null;
+  /** Rendered-file input color space label (e.g. "Display P3", "sRGB"). */
+  inputColorSpace?: string | null;
 }
 
 export interface ViewParams {
@@ -103,6 +108,14 @@ export interface MaskMirror {
   modules?: Record<string, Record<string, unknown>>;
 }
 
+/** Object-removal / heal spot (phase 10). */
+export interface RetouchSpotMirror {
+  id: string;
+  enabled: boolean;
+  feather: number;
+  source: { type: string } & Record<string, unknown>;
+}
+
 /** Mirror of the canonical EditDoc (loosely typed; engine is master). */
 export interface EditDocMirror {
   schema_version: number;
@@ -110,6 +123,7 @@ export interface EditDocMirror {
   source_ref: { path: string };
   modules?: Record<string, Record<string, unknown>>;
   masks?: MaskMirror[];
+  retouch?: RetouchSpotMirror[];
   meta?: Record<string, unknown>;
 }
 
@@ -119,6 +133,7 @@ export interface DocDelta {
   undoDepth: number;
   redoDepth: number;
   newMaskId?: string;
+  newRetouchId?: string;
 }
 
 export type Op =
@@ -133,6 +148,15 @@ export type Op =
       invert?: boolean;
     }
   | { op: "set_mask_source"; id: string; source: unknown }
+  | { op: "add_retouch_spot"; source: unknown }
+  | { op: "remove_retouch_spot"; id: string }
+  | { op: "set_retouch_source"; id: string; source: unknown }
+  | {
+      op: "refine_retouch_spot";
+      id: string;
+      feather?: number;
+      enabled?: boolean;
+    }
   | { op: "reset_module"; module: string }
   | { op: "reset_all" }
   | { op: "apply_preset"; preset: { modules: Record<string, Record<string, unknown>> } };
@@ -231,6 +255,8 @@ export interface FrameStats {
   clipLowPct: number;
 }
 
+export type MetadataPolicy = "preserve" | "stripGps" | "stripAll";
+
 export interface ExportSettings {
   format: "jpeg" | "png" | "tiff16" | "heic";
   target: "srgb" | "display-p3" | "adobe-rgb" | "prophoto";
@@ -238,6 +264,8 @@ export interface ExportSettings {
   maxDim: number | null;
   sharpen: number;
   destDir: string;
+  metadataPolicy?: MetadataPolicy;
+  /** Legacy: when true, forces stripAll. Prefer metadataPolicy. */
   stripMetadata?: boolean;
   copyright?: string | null;
   watermarkText?: string | null;

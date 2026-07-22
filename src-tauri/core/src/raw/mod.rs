@@ -75,6 +75,15 @@ pub struct ImageMeta {
     /// their worker binary is missing). Empty for non-RAW sources.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub available_demosaic: Vec<String>,
+    /// GPS latitude in decimal degrees (positive = N), if present in EXIF.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub gps_lat: Option<f64>,
+    /// GPS longitude in decimal degrees (positive = E), if present in EXIF.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub gps_lon: Option<f64>,
+    /// Input color space label for rendered files (e.g. "Display P3", "sRGB").
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub input_color_space: Option<String>,
 }
 
 /// Which demosaic algorithm runs at decode time. `Rawler` = rawler's built-in

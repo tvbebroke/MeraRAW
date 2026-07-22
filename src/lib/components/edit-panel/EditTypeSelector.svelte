@@ -1,7 +1,7 @@
 <script lang="ts">
   import { activeTool, type Tool } from "../../../stores/editor";
   import { classicLook } from "../../../stores/ui";
-  import { cropActive, viewportTool, selectedMask } from "../../../stores/app";
+  import { cropActive, viewportTool, selectedMask, selectedRetouch } from "../../../stores/app";
   import { setMaskOverlay } from "../../../ipc/commands";
   import GlassPanel from "../primitives/GlassPanel.svelte";
   import editIcon from "../../icons/tool-edit.svg";
@@ -25,13 +25,20 @@
     activeTool.set(id);
     cropActive.set(id === "crop");
     if (id === "crop") {
+      selectedRetouch.set(null);
       viewportTool.set("crop");
       void setMaskOverlay(null);
     } else if (id === "mask") {
+      selectedRetouch.set(null);
       viewportTool.set("brush");
       const mid = selectedMask.get();
       void setMaskOverlay(mid);
+    } else if (id === "ai") {
+      selectedMask.set(null);
+      void setMaskOverlay(null);
+      viewportTool.set(selectedRetouch.get() ? "brush" : "pan");
     } else {
+      selectedRetouch.set(null);
       viewportTool.set("pan");
       void setMaskOverlay(null);
     }

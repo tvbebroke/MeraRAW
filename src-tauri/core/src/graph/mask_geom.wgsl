@@ -32,6 +32,9 @@ struct MaskGeomUniforms {
   crop_flip_h: u32,
   crop_flip_v: u32,
   crop_mode: u32,
+  crop_persp_v: f32,
+  crop_persp_h: f32,
+  _pad_crop: u32,
   _p0: u32,
   _p1: u32,
   _p2: u32,
@@ -56,6 +59,7 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
     u.img_w, u.img_h, u.scale, vec2(u.center_x, u.center_y),
     u.crop_left, u.crop_top, u.crop_right, u.crop_bottom,
     u.crop_angle, u.crop_rotate_90, u.crop_flip_h, u.crop_flip_v, u.crop_mode,
+    u.crop_persp_v, u.crop_persp_h,
   );
   if (cm.inside == 0u) {
     textureStore(dst, vec2<i32>(gid.xy), vec4<f32>(0.0, 0.0, 0.0, 0.0));

@@ -61,6 +61,9 @@ pub struct RenderGraph {
     last_final: FinalTag,
     /// Display look: 0 = Neutral, 1 = Camera (punchy).
     look: u32,
+    /// Highlight / shadow clipping overlays (viewport only).
+    clip_hi: bool,
+    clip_lo: bool,
 
     // ---- DCP look (GPU port; replaces the CPU readback pass) ----
     dcp_look: PassResources,

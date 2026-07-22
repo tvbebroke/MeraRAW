@@ -4,18 +4,40 @@
   import {
     applyPreset,
     listPresetCatalog,
+    savePresetNamed,
     type PresetCatalogEntry,
   } from "../../../ipc/commands";
-  import { reconcile } from "../../../stores/doc";
+  import { reconcile, doc } from "../../../stores/doc";
+
+  /** Develop modules worth bundling into a look preset (skip crop/geometry). */
+  const SAVE_MODULES = [
+    "exposure",
+    "white_balance",
+    "calibration",
+    "detail",
+    "color_grade",
+    "hsl",
+    "tone_curve",
+    "lut",
+    "effects",
+  ];
 
   let presets = $state<PresetCatalogEntry[]>([]);
   let selected = $state("");
   let filter = $state("");
+  let saveName = $state("");
+  let saveStatus = $state("");
+
+  async function refresh() {
+    try {
+      presets = await listPresetCatalog();
+    } catch {
+      presets = [];
+    }
+  }
 
   onMount(() => {
-    void listPresetCatalog()
-      .then((p) => (presets = p))
-      .catch(() => (presets = []));
+    void refresh();
   });
 
   const visible = $derived(
@@ -37,10 +59,51 @@
       /* ignore */
     }
   }
+
+  async function save() {
+    const name = saveName.trim();
+    if (!name) {
+      saveStatus = "Enter a name";
+      return;
+    }
+    if (!$doc) {
+      saveStatus = "Open an image first";
+      return;
+    }
+    try {
+      await savePresetNamed(name, SAVE_MODULES);
+      saveStatus = `Saved “${name}”`;
+      saveName = "";
+      await refresh();
+    } catch (e) {
+      saveStatus = `Save failed: ${e}`;
+    }
+  }
 </script>
 
 <CollapsibleSection id="presetList" title="Presets Library">
   <div class="flex flex-col gap-[8px]">
+    <div class="flex gap-[6px]">
+      <input
+        class="h-[24px] min-w-0 flex-1 rounded-[8px] border border-white/5 bg-white/[0.03] px-2 text-[9px] text-white/80 outline-none"
+        placeholder="Preset name…"
+        bind:value={saveName}
+        onkeydown={(e) => {
+          if (e.key === "Enter") void save();
+        }}
+      />
+      <button
+        type="button"
+        class="h-[24px] shrink-0 rounded-[8px] border border-white/5 bg-white/[0.06] px-2 text-[9px] font-medium text-white/80 hover:bg-white/10"
+        onclick={() => void save()}
+      >
+        Save
+      </button>
+    </div>
+    {#if saveStatus}
+      <p class="px-1 text-[8px] text-white/40">{saveStatus}</p>
+    {/if}
+
     <input
       class="h-[24px] rounded-[8px] border border-white/5 bg-white/[0.03] px-2 text-[9px] text-white/80 outline-none"
       placeholder="Filter presets…"
