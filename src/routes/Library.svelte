@@ -279,7 +279,7 @@
   in:fade={{ duration: 200, delay: 100 }}
   out:fade={{ duration: 150 }}
   style="grid-template-columns: auto minmax(0, 1fr) auto;"
-  class="grid h-full min-h-0 gap-[11px] px-[11px] pb-[11px]"
+  class="relative grid h-full min-h-0 gap-[11px] px-[11px] pb-[11px]"
 >
   <!-- Animated Left Rail Container -->
   <div 
@@ -311,6 +311,20 @@
       </div>
     {/if}
   </div>
+
+  {#if $leftRailCollapsed}
+    <button
+      in:fade={{ duration: 150, delay: 300 }}
+      out:fade={{ duration: 100 }}
+      onclick={() => leftRailCollapsed.set(false)}
+      aria-label="Expand Sidebar"
+      class="absolute left-3 top-1/2 -translate-y-1/2 flex size-[26px] items-center justify-center rounded-full border border-white/5 bg-panel-2 backdrop-blur-md text-white/80 hover:bg-white/[0.12] hover:text-white active:scale-95 transition-all cursor-pointer z-50 shadow-md"
+    >
+      <svg width="6" height="10" viewBox="0 0 6 10" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="pointer-events-none">
+        <path d="M1.5 1.5L5 5L1.5 8.5" />
+      </svg>
+    </button>
+  {/if}
 
   <!-- Main Content Area Wrapper -->
   <div class="relative min-h-0 flex flex-col">
@@ -477,28 +491,6 @@
         </div>
       {/if}
     </GlassPanel>
-    {#if $leftRailCollapsed}
-      <button 
-        onclick={() => leftRailCollapsed.set(false)}
-        aria-label="Expand Sidebar"
-        class="absolute left-3 top-1/2 -translate-y-1/2 flex size-[26px] items-center justify-center rounded-full border border-white/5 bg-panel-2 backdrop-blur-md text-white/80 hover:bg-white/[0.12] hover:text-white active:scale-95 transition-all cursor-pointer z-50 shadow-md"
-      >
-        <svg width="6" height="10" viewBox="0 0 6 10" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="pointer-events-none">
-          <path d="M1.5 1.5L5 5L1.5 8.5" />
-        </svg>
-      </button>
-    {/if}
-    {#if $photoDetailsCollapsed}
-      <button
-        onclick={() => photoDetailsCollapsed.set(false)}
-        aria-label="Expand Details"
-        class="absolute right-3 top-1/2 -translate-y-1/2 flex size-[26px] items-center justify-center rounded-full border border-white/5 bg-panel-2 backdrop-blur-md text-white/80 hover:bg-white/[0.12] hover:text-white active:scale-95 transition-all cursor-pointer z-50 shadow-md"
-      >
-        <svg width="6" height="10" viewBox="0 0 6 10" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="pointer-events-none rotate-180">
-          <path d="M1.5 1.5L5 5L1.5 8.5" />
-        </svg>
-      </button>
-    {/if}
   </div>
 
   <!-- Animated Right Rail Container -->
@@ -530,6 +522,20 @@
       </div>
     {/if}
   </div>
+
+  {#if $photoDetailsCollapsed}
+    <button
+      in:fade={{ duration: 150, delay: 300 }}
+      out:fade={{ duration: 100 }}
+      onclick={() => photoDetailsCollapsed.set(false)}
+      aria-label="Expand Details"
+      class="absolute right-3 top-1/2 -translate-y-1/2 flex size-[26px] items-center justify-center rounded-full border border-white/5 bg-panel-2 backdrop-blur-md text-white/80 hover:bg-white/[0.12] hover:text-white active:scale-95 transition-all cursor-pointer z-50 shadow-md"
+    >
+      <svg width="6" height="10" viewBox="0 0 6 10" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="pointer-events-none rotate-180">
+        <path d="M1.5 1.5L5 5L1.5 8.5" />
+      </svg>
+    </button>
+  {/if}
 </div>
 
 {#if ctxMenu}
@@ -720,16 +726,16 @@
     padding: 0;
     margin: 0;
     background: rgba(255, 255, 255, 0.03);
-    border-radius: 14px;
     cursor: pointer;
     overflow: hidden;
     text-align: left;
-    transition: border-color 180ms ease, box-shadow 200ms ease;
+    transition: border-color 180ms ease, background 180ms ease, box-shadow 200ms ease;
   }
 
   .photo-card:hover {
-    border-color: rgba(255, 255, 255, 0.2);
-    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.45);
+    border-color: rgba(255, 255, 255, 0.25);
+    background: rgba(255, 255, 255, 0.07);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
   }
 
   .photo-card:active {
@@ -738,8 +744,8 @@
 
   .photo-card--active {
     border-color: rgba(255, 255, 255, 0.85);
-    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.3), 0 8px 24px rgba(0, 0, 0, 0.4);
-    background: rgba(255, 255, 255, 0.05);
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.3), 0 2px 8px rgba(0, 0, 0, 0.2);
+    background: rgba(255, 255, 255, 0.06);
   }
 
   .photo-thumb-wrap {
