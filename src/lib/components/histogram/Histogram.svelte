@@ -23,6 +23,8 @@
   } = $props();
 
   let canvasEl = $state<HTMLCanvasElement | null>(null);
+  let canvasBoxW = $state(256);
+  let canvasBoxH = $state(72);
   let stats = $state<FrameStats | null>(null);
   let clipHi = $state(false);
   let clipLo = $state(false);
@@ -89,6 +91,8 @@
     const s = stats;
     const mode = $histMode;
     const scale = $histScale;
+    const _w = canvasBoxW;
+    const _h = canvasBoxH;
     if (!canvas || !s) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
@@ -137,10 +141,7 @@
   ];
 </script>
 
-<GlassPanel
-  class="relative flex shrink-0 flex-col overflow-hidden {cls}"
-  style="height: {height}px"
->
+<div class="relative shrink-0 {cls}" style="height: {height}px">
   {#if onResizeStart}
     <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
     <div
@@ -155,67 +156,71 @@
     </div>
   {/if}
 
-  <div class="flex min-h-0 flex-1 flex-col justify-center px-[8px] py-[6px]">
-    <div class="mb-[4px] flex items-center justify-between gap-1">
-      <div class="flex gap-[2px]">
-        {#each modes as m}
-          <button
-            type="button"
-            class="rounded px-[5px] py-[1px] text-[8px] {$histMode === m.id
-              ? 'bg-white/12 text-white/90'
-              : 'text-white/35 hover:text-white/60'}"
-            onclick={() => setHistMode(m.id)}
-          >{m.label}</button>
-        {/each}
+  <GlassPanel class="relative flex h-full flex-col overflow-hidden">
+    <div class="flex min-h-0 flex-1 flex-col px-[12px] py-[10px]">
+      <div class="mb-[8px] flex items-center justify-between gap-1 shrink-0">
+        <div class="flex gap-[2px]">
+          {#each modes as m}
+            <button
+              type="button"
+              class="rounded px-[5px] py-[1px] text-[8px] {$histMode === m.id
+                ? 'bg-white/12 text-white/90'
+                : 'text-white/35 hover:text-white/60'}"
+              onclick={() => setHistMode(m.id)}
+            >{m.label}</button>
+          {/each}
+        </div>
+        <div class="flex gap-[2px]">
+          {#each scales as sc}
+            <button
+              type="button"
+              class="rounded px-[5px] py-[1px] text-[8px] {$histScale === sc.id
+                ? 'bg-white/12 text-white/90'
+                : 'text-white/35 hover:text-white/60'}"
+              onclick={() => setHistScale(sc.id)}
+              title="Y scale"
+            >{sc.label}</button>
+          {/each}
+        </div>
       </div>
-      <div class="flex gap-[2px]">
-        {#each scales as sc}
-          <button
-            type="button"
-            class="rounded px-[5px] py-[1px] text-[8px] {$histScale === sc.id
-              ? 'bg-white/12 text-white/90'
-              : 'text-white/35 hover:text-white/60'}"
-            onclick={() => setHistScale(sc.id)}
-            title="Y scale"
-          >{sc.label}</button>
-        {/each}
-      </div>
-    </div>
 
-    <canvas
-      bind:this={canvasEl}
-      width={256}
-      height={72}
-      class="w-full rounded-[4px] border border-white/[0.06] bg-black/40"
-    ></canvas>
-    {#if stats}
-      <div class="mt-[4px] flex items-center justify-between gap-2 text-[8px] text-white/35">
-        <button
-          type="button"
-          class="truncate {clipLo ? 'text-sky-300 animate-pulse' : 'hover:text-white/60'}"
-          title="Toggle shadow clipping overlay"
-          onclick={() => {
-            clipLo = !clipLo;
-            syncClip();
-          }}
-        >
-          ▼ {stats.clipLowPct.toFixed(1)}%
-        </button>
-        <span class="text-white/20">{stats.bins} bins</span>
-        <button
-          type="button"
-          class="truncate {clipHi ? 'text-red-300 animate-pulse' : 'hover:text-white/60'}"
-          title="Toggle highlight clipping overlay"
-          onclick={() => {
-            clipHi = !clipHi;
-            syncClip();
-          }}
-        >
-          ▲ {stats.clipHighPct.toFixed(1)}%
-        </button>
+      <div bind:clientWidth={canvasBoxW} bind:clientHeight={canvasBoxH} class="relative min-h-0 flex-1">
+        <canvas
+          bind:this={canvasEl}
+          width={canvasBoxW}
+          height={canvasBoxH}
+          class="absolute inset-0 h-full w-full rounded-[4px] border border-white/[0.06] bg-black/40"
+        ></canvas>
       </div>
-    {:else}
-      <span class="mt-[4px] text-center text-[9px] text-white/20">Histogram</span>
-    {/if}
-  </div>
-</GlassPanel>
+      {#if stats}
+        <div class="mt-[8px] flex shrink-0 items-center justify-between gap-2 text-[8px] text-white/35">
+          <button
+            type="button"
+            class="truncate {clipLo ? 'text-sky-300 animate-pulse' : 'hover:text-white/60'}"
+            title="Toggle shadow clipping overlay"
+            onclick={() => {
+              clipLo = !clipLo;
+              syncClip();
+            }}
+          >
+            ▼ {stats.clipLowPct.toFixed(1)}%
+          </button>
+          <span class="text-white/20">{stats.bins} bins</span>
+          <button
+            type="button"
+            class="truncate {clipHi ? 'text-red-300 animate-pulse' : 'hover:text-white/60'}"
+            title="Toggle highlight clipping overlay"
+            onclick={() => {
+              clipHi = !clipHi;
+              syncClip();
+            }}
+          >
+            ▲ {stats.clipHighPct.toFixed(1)}%
+          </button>
+        </div>
+      {:else}
+        <span class="mt-[8px] shrink-0 text-center text-[9px] text-white/20">Histogram</span>
+      {/if}
+    </div>
+  </GlassPanel>
+</div>

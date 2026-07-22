@@ -67,8 +67,8 @@
     >
       <div class="flex items-center justify-between gap-2">
         <p class="text-[11px] font-medium text-white shrink-0">Split Toning</p>
-        
-        <div class="split-toning-bar relative flex h-[28px] w-[205px] items-center rounded-full bg-black/50 p-[3px] border border-white/10 select-none">
+
+        <div class="split-toning-bar relative flex h-[28px] w-full max-w-[205px] min-w-0 items-center rounded-full bg-black/50 p-[3px] border border-white/10 select-none">
           <div
             class="absolute top-[3px] bottom-[3px] rounded-full bg-white/20 border border-white/10 shadow-[0_1px_4px_rgba(0,0,0,0.3)] transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] pointer-events-none z-0"
             style="
@@ -79,7 +79,7 @@
 
           {#each modes as m (m.id)}
             <button
-              class="relative z-10 flex h-full flex-1 items-center justify-center rounded-full text-[11px] font-light transition-colors duration-200 cursor-pointer {activeMode ===
+              class="relative z-10 flex h-full min-w-0 flex-1 items-center justify-center overflow-hidden rounded-full px-[2px] text-[11px] font-light truncate transition-colors duration-200 cursor-pointer {activeMode ===
               m.id
                 ? 'text-white font-medium'
                 : 'text-white/50 hover:text-white/85'}"
@@ -93,7 +93,7 @@
 
       <div class="mt-[12px] grid grid-cols-3 gap-x-[12px] px-[6px]">
         {#each wheels as w (w.label)}
-          <img src={w.icon} alt="{w.label} wheel" class="mx-auto size-[72px]" />
+          <img src={w.icon} alt="{w.label} wheel" class="mx-auto aspect-square w-full max-w-[72px]" />
         {/each}
         {#each wheels as w (w.label)}
           <span class="mt-[6px] text-center text-[11px] text-white/90">{w.label}</span>

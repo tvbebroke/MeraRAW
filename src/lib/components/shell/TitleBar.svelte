@@ -83,7 +83,7 @@
     <button
       type="button"
       data-tauri-drag-region="false"
-      class="rounded-full border border-white/5 bg-white/[0.04] px-3 py-1.5 text-[11px] font-medium text-white/80 transition-all hover:bg-white/[0.12] hover:text-white"
+      class="open-btn"
       onclick={() => void openRaw()}
     >
       Open
@@ -147,6 +147,46 @@
 </header>
 
 <style>
+  .open-btn {
+    appearance: none;
+    -webkit-appearance: none;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    margin: 0;
+    font: inherit;
+    color: rgba(255, 255, 255, 0.8);
+    cursor: pointer;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    height: 36px;
+    padding: 0 16px;
+    border-radius: 9999px;
+    font-size: 13px;
+    font-weight: 300;
+    letter-spacing: -0.01em;
+    white-space: nowrap;
+
+    background: rgba(33, 33, 35, 0.65);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.08),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.2),
+      0 2px 6px rgba(0, 0, 0, 0.25);
+    transition: background 150ms cubic-bezier(0.4, 0, 0.2, 1), color 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .open-btn:hover {
+    background: rgba(47, 47, 49, 0.85);
+    color: #ffffff;
+  }
+
+  .open-btn:active {
+    background: rgba(65, 65, 68, 0.9);
+  }
+
   .edit-pill-btn {
     appearance: none;
     -webkit-appearance: none;

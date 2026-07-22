@@ -609,7 +609,10 @@
     };
   });
 
-  // Resize → re-request when using a custom view.
+  // Resize (panel drag, collapse/expand, window resize) → re-request the
+  // frame at the new container size so it stays crisp instead of the
+  // browser just CSS-stretching a stale bitmap. Applies in Fit mode too,
+  // not just when the user has a custom zoom/pan.
   $effect(() => {
     const wrap = wrapEl;
     const open = $imageOpen;
@@ -619,9 +622,12 @@
     let t: ReturnType<typeof setTimeout> | undefined;
     const obs = new ResizeObserver(() => {
       if (!open || ready !== "ready") return;
-      if (!isCustomView(view)) return;
       if (t) clearTimeout(t);
-      t = setTimeout(() => void refresh(), 50);
+      // Wait for the drag to actually settle before re-fetching — CSS
+      // (object-contain) already scales the current bitmap smoothly for
+      // every intermediate size, so a mid-drag round trip would just
+      // stutter the live resize for no visual benefit.
+      t = setTimeout(() => void refresh(true), 300);
     });
     obs.observe(wrap);
     return () => {

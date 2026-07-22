@@ -1,6 +1,8 @@
 <script lang="ts">
   import { fly } from "svelte/transition";
   import { cubicOut } from "svelte/easing";
+  import ContextMenu from "../primitives/ContextMenu.svelte";
+  import type { ContextMenuItem } from "../primitives/ContextMenu.svelte";
 
   let {
     value = 0,
@@ -100,6 +102,26 @@
     if (Math.abs(v) >= 10 || Number.isInteger(v)) return v.toFixed(0);
     return v.toFixed(2);
   }
+
+  function resetToDefault() {
+    const v = quantize(resetValue);
+    localValue = v;
+    if (onchange) onchange(v);
+    else oninput?.(v);
+  }
+
+  let ctxMenu = $state<{ x: number; y: number } | null>(null);
+
+  function oncontextmenu(e: MouseEvent) {
+    if (disabled) return;
+    e.preventDefault();
+    e.stopPropagation();
+    ctxMenu = { x: e.clientX, y: e.clientY };
+  }
+
+  const ctxItems: ContextMenuItem[] = [
+    { type: "item", label: "Reset to Default", onclick: resetToDefault },
+  ];
 </script>
 
 <!-- svelte-ignore a11y_no_noninteractive_element_to_interactive_role -->
@@ -122,13 +144,9 @@
   onpointerenter={() => (isHovered = !disabled)}
   onpointerleave={() => (isHovered = false)}
   {onkeydown}
+  {oncontextmenu}
   ondblclick={() => {
-    if (!disabled) {
-      const reset = quantize(resetValue);
-      localValue = reset;
-      if (onchange) onchange(reset);
-      else oninput?.(reset);
-    }
+    if (!disabled) resetToDefault();
   }}
 >
   <!-- Background Track -->
@@ -163,3 +181,12 @@
     </div>
   {/if}
 </div>
+
+{#if ctxMenu}
+  <ContextMenu
+    x={ctxMenu.x}
+    y={ctxMenu.y}
+    items={ctxItems}
+    onclose={() => (ctxMenu = null)}
+  />
+{/if}
