@@ -17,7 +17,7 @@
     solid: "bg-panel border border-white/[0.04] rounded-[22px]",
     glass:
       "bg-[rgba(20,20,22,0.6)] backdrop-blur-md border border-white/[0.04] rounded-[22px]",
-    viewport: "bg-[#313131] border border-white/[0.04] rounded-[22px]",
+    viewport: "bg-[#171717] border border-white/[0.04] rounded-[22px]",
     liquid: "relative rounded-[22px] transition-all duration-300 isolate"
   };
 </script>

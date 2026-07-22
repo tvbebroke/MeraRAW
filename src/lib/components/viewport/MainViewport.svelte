@@ -665,12 +665,12 @@
     oncontextmenu={handleContextMenu}
   >
     {#if displaySrc}
-      <div class="relative max-h-full max-w-full">
+      <div class="relative max-h-full max-w-full flex items-center justify-center">
         <img
           src={displaySrc}
           alt=""
           draggable={false}
-          class="viewport-frame block max-h-full max-w-full object-contain pointer-events-none"
+          class="viewport-frame block max-h-full max-w-full object-contain pointer-events-none rounded-[14px]"
           onerror={() => (error = "frame transport failed")}
         />
         {#if compareSplit && beforeSrc}
