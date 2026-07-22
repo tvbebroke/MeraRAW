@@ -1,13 +1,86 @@
 @import "tailwindcss";
 
+@font-face {
+  font-family: "Neue Haas Grotesk Text";
+  src: url("/Neue%20Haas%20Grotesk%20Text,%20Linotype_Version%20102/NHaasGroteskTXStd-55Rg.otf") format("opentype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Neue Haas Grotesk Text";
+  src: url("/Neue%20Haas%20Grotesk%20Text,%20Linotype_Version%20102/NHaasGroteskTXStd-56It.otf") format("opentype");
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Neue Haas Grotesk Text";
+  src: url("/Neue%20Haas%20Grotesk%20Text,%20Linotype_Version%20102/NHaasGroteskTXStd-65Md.otf") format("opentype");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Neue Haas Grotesk Text";
+  src: url("/Neue%20Haas%20Grotesk%20Text,%20Linotype_Version%20102/NHaasGroteskTXStd-66MdIt.otf") format("opentype");
+  font-weight: 500;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Neue Haas Grotesk Text";
+  src: url("/Neue%20Haas%20Grotesk%20Text,%20Linotype_Version%20102/NHaasGroteskTXStd-75Bd.otf") format("opentype");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Neue Haas Grotesk Text";
+  src: url("/Neue%20Haas%20Grotesk%20Text,%20Linotype_Version%20102/NHaasGroteskTXStd-76BdIt.otf") format("opentype");
+  font-weight: 700;
+  font-style: italic;
+  font-display: swap;
+}
+
 @theme {
+  /* ─────────────────────────────────────────────────────────
+     SEMANTIC DESIGN TOKENS (Tailwind v4)
+     Centralized palette tokens mapping to UI roles.
+     Edit these tokens to change colors across the app.
+     ───────────────────────────────────────────────────────── */
+
+  /* Surface & Container Colors */
   --color-window: #272727;
-  --color-panel: #111113;
+  --color-panel: #171717;
   --color-panel-2: #232325;
   --color-panel-3: #2e2e30;
+  --color-surface-input: rgba(0, 0, 0, 0.25);
+  --color-card: #1e1e20;
+  --color-card-active: #2b2b2e;
+
+  /* Border & Divider Colors */
+  --color-border-subtle: rgba(255, 255, 255, 0.05);
+  --color-border-input: rgba(255, 255, 255, 0.1);
+  --color-border-hover: rgba(255, 255, 255, 0.25);
+
+  /* Text & Typography Colors */
+  --color-text-primary: rgba(255, 255, 255, 0.92);
+  --color-text-secondary: rgba(255, 255, 255, 0.65);
+  --color-text-muted: rgba(255, 255, 255, 0.4);
+
+  /* Accent & Interactive Colors */
   --color-accent: #ffffff;
-  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro", "Segoe UI",
-    system-ui, sans-serif;
+  --color-button-bg: rgba(255, 255, 255, 0.06);
+  --color-button-hover: rgba(255, 255, 255, 0.12);
+
+  /* Font Families */
+  --font-sans: "Neue Haas Grotesk Text", -apple-system, BlinkMacSystemFont, "SF Pro", "Segoe UI", system-ui, sans-serif;
 }
 
 html,
@@ -20,11 +93,15 @@ body {
   margin: 0;
   background: transparent;
   font-family: var(--font-sans);
-  color: rgba(255, 255, 255, 0.9);
+  color: var(--color-text-primary);
   overflow: hidden;
   user-select: none;
   -webkit-user-select: none;
   cursor: default;
+}
+
+button, input, select, textarea {
+  font-family: inherit;
 }
 
 /* Super minimal and thin scrollbars for a premium, clean UI */
@@ -53,16 +130,25 @@ body {
 }
 
 /* ─────────────────────────────────────────────────────────
-   CLASSIC LOOK OVERRIDES (Lightroom style)
+   CLASSIC LOOK OVERRIDES (Flat Lightroom-style theme)
    ───────────────────────────────────────────────────────── */
 
 .classic-look {
-  /* Flat Lightroom Dark Theme Variables */
+  /* Flat Lightroom Dark Theme Token Overrides */
   --color-window: #161618 !important;
   --color-panel: #1e1e20 !important;
   --color-panel-2: #252528 !important;
   --color-panel-3: #2d2d30 !important;
-
+  --color-surface-input: #121214 !important;
+  --color-card: #1e1e20 !important;
+  --color-card-active: #2b2b2e !important;
+  --color-border-subtle: #141416 !important;
+  --color-border-input: #333336 !important;
+  --color-border-hover: #4a4a4d !important;
+  --color-text-primary: #e0e0e2 !important;
+  --color-button-bg: #252528 !important;
+  --color-button-hover: #313135 !important;
+  
   /* Root window reset */
   border-radius: 0px !important;
   border: none !important;
@@ -74,8 +160,6 @@ body {
 .classic-look .glass-backdrop,
 .classic-look .photo-card,
 .classic-look .photo-thumb-wrap,
-.classic-look .filmstrip-card,
-.classic-look .filmstrip-placeholder,
 .classic-look .rounded-\[33px\],
 .classic-look .rounded-\[22px\]:not(section),
 .classic-look [class*="rounded-\[33px\]"],
@@ -94,7 +178,7 @@ body {
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
   background: var(--color-panel) !important;
-  border: 1px solid #141416 !important;
+  border: 1px solid var(--color-border-subtle) !important;
   box-shadow: none !important;
 }
 
@@ -137,7 +221,7 @@ body {
 
 /* Compact headers and borders in TitleBar */
 .classic-look header {
-  background-color: #161618 !important;
+  background-color: var(--color-window) !important;
   border-bottom: 1px solid #121212 !important;
   height: 44px !important;
 }
@@ -149,27 +233,27 @@ body {
 
 .classic-look .photo-card {
   border: 1px solid #28282b !important;
-  background-color: #1e1e20 !important;
+  background-color: var(--color-card) !important;
   box-shadow: none !important;
 }
 
 .classic-look .photo-card--active {
   border-color: #ffffff !important;
   outline: 1px solid #ffffff !important;
-  background-color: #2b2b2e !important;
+  background-color: var(--color-card-active) !important;
 }
 
 .classic-look .photo-meta {
-  border-top: 1px solid #141416 !important;
-  background-color: #161618 !important;
+  border-top: 1px solid var(--color-border-subtle) !important;
+  background-color: var(--color-window) !important;
 }
 
 /* Form inputs & textareas solid Lightroom style (keeping rounded corners) */
 .classic-look input:not(.search-input):not(.search-input-sidebar):not(.chat-input),
 .classic-look textarea {
-  border: 1px solid #333336 !important;
-  background-color: #121214 !important;
-  color: #e0e0e2 !important;
+  border: 1px solid var(--color-border-input) !important;
+  background-color: var(--color-surface-input) !important;
+  color: var(--color-text-primary) !important;
   box-shadow: none !important;
 }
 
@@ -181,23 +265,23 @@ body {
 .classic-look button.action-btn,
 .classic-look button.footer-btn,
 .classic-look button.toolbar-btn {
-  background-color: #252528 !important;
-  border: 1px solid #333336 !important;
-  color: #e0e0e2 !important;
+  background-color: var(--color-button-bg) !important;
+  border: 1px solid var(--color-border-input) !important;
+  color: var(--color-text-primary) !important;
 }
 
 .classic-look button.action-btn:hover,
 .classic-look button.footer-btn:hover,
 .classic-look button.toolbar-btn:hover {
-  background-color: #313135 !important;
-  border-color: #4a4a4d !important;
+  background-color: var(--color-button-hover) !important;
+  border-color: var(--color-border-hover) !important;
 }
 
 /* Search bar styling */
 .classic-look .search-wrap,
 .classic-look .search-wrap-sidebar {
-  border: 1px solid #333336 !important;
-  background-color: #121214 !important;
+  border: 1px solid var(--color-border-input) !important;
+  background-color: var(--color-surface-input) !important;
   box-shadow: none !important;
 }
 
@@ -210,12 +294,12 @@ body {
 
 /* Sharp Modals & Inputs */
 .classic-look .modal-card {
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5) !important;
-  border: 1px solid #2d2d30 !important;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.5) !important;
+  border: 1px solid var(--color-panel-3) !important;
 }
 
 /* ─────────────────────────────────────────────────────────
-   GEAR SPINNING KEYFRAME ANIMATIONS (theme transition)
+   GEAR SPINNING KEYFRAME ANIMATIONS
    ───────────────────────────────────────────────────────── */
 
 @keyframes spin-cw {
@@ -248,24 +332,26 @@ body {
 
 /* Chat Input Area overrides in Classic Mode */
 .classic-look .chat-input-wrapper {
-  background-color: #121214 !important;
-  border: 1px solid #333336 !important;
+  background-color: var(--color-surface-input) !important;
+  border: 1px solid var(--color-border-input) !important;
 }
 
 .classic-look .chat-send-btn {
-  background-color: #252528 !important;
-  color: #e0e0e2 !important;
-  border: 1px solid #333336 !important;
+  background-color: var(--color-button-bg) !important;
+  color: var(--color-text-primary) !important;
+  border: 1px solid var(--color-border-input) !important;
 }
 
 .classic-look .chat-send-btn:hover {
-  background-color: #313135 !important;
-  border-color: #4a4a4d !important;
+  background-color: var(--color-button-hover) !important;
+  border-color: var(--color-border-hover) !important;
 }
 
 .classic-look .chat-send-btn:disabled {
   opacity: 0.3 !important;
-  background-color: #1e1e20 !important;
-  border-color: #2d2d30 !important;
+  background-color: var(--color-panel) !important;
+  border-color: var(--color-panel-3) !important;
 }
+
+
 

@@ -28,6 +28,7 @@ const WINDOW_MARGIN: i32 = 8;
 
 /// What to do with the main window once its target monitor is known.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[allow(dead_code)]
 enum FitAction {
     /// The saved size is usable — keep it, only nudge the origin on screen.
     Reposition(WinRect),
@@ -61,10 +62,21 @@ fn fit_into_work_area(
     work: WinRect,
     cur: WinRect,
     min: (u32, u32),
+    default_size: (u32, u32),
     has_saved_state: bool,
 ) -> FitAction {
     if !has_saved_state {
-        return FitAction::Maximize;
+        let target_w = default_size.0.min(work.w);
+        let target_h = default_size.1.min(work.h);
+        let target_x = work.x + ((work.w as i32 - target_w as i32) / 2);
+        let target_y = work.y + ((work.h as i32 - target_h as i32) / 2);
+
+        return FitAction::Reposition(WinRect {
+            x: target_x,
+            y: target_y,
+            w: target_w,
+            h: target_h,
+        });
     }
 
     let margin = WINDOW_MARGIN;
@@ -72,13 +84,33 @@ fn fit_into_work_area(
     let avail_h = work.h.saturating_sub(margin as u32 * 2).max(480);
 
     if cur.w > avail_w || cur.h > avail_h {
-        return FitAction::Maximize;
+        let target_w = default_size.0.min(avail_w);
+        let target_h = default_size.1.min(avail_h);
+        let target_x = work.x + ((work.w as i32 - target_w as i32) / 2);
+        let target_y = work.y + ((work.h as i32 - target_h as i32) / 2);
+
+        return FitAction::Reposition(WinRect {
+            x: target_x,
+            y: target_y,
+            w: target_w,
+            h: target_h,
+        });
     }
 
     // Only trust a below-minimum size if the display genuinely can't fit the
     // minimum, in which case the OS legitimately shrank the window.
     if (cur.w < min.0 && min.0 <= avail_w) || (cur.h < min.1 && min.1 <= avail_h) {
-        return FitAction::Maximize;
+        let target_w = default_size.0.min(avail_w);
+        let target_h = default_size.1.min(avail_h);
+        let target_x = work.x + ((work.w as i32 - target_w as i32) / 2);
+        let target_y = work.y + ((work.h as i32 - target_h as i32) / 2);
+
+        return FitAction::Reposition(WinRect {
+            x: target_x,
+            y: target_y,
+            w: target_w,
+            h: target_h,
+        });
     }
 
     let min_x = work.x + margin;
@@ -140,6 +172,9 @@ fn configured_window_sizes(
 /// looks "launched". Clamp size + origin into the chosen monitor's work area.
 fn ensure_main_window_visible(win: &tauri::WebviewWindow) {
     let _ = win.unminimize();
+    if win.is_maximized().unwrap_or(false) {
+        let _ = win.unmaximize();
+    }
     let _ = win.show();
 
     let Ok(pos) = win.outer_position() else {
@@ -197,70 +232,19 @@ fn ensure_main_window_visible(win: &tauri::WebviewWindow) {
 
     let (default_size, min_size) = configured_window_sizes(win, monitor.scale_factor());
 
-    match fit_into_work_area(work, cur, min_size, has_saved_window_state(win)) {
+    match fit_into_work_area(work, cur, min_size, default_size, has_saved_window_state(win)) {
         FitAction::Reposition(fitted) => {
-            let size_changed = fitted.w != size.width || fitted.h != size.height;
-            let pos_changed = fitted.x != pos.x || fitted.y != pos.y;
-
-            if size_changed || pos_changed {
-                tracing::info!(
-                    old_w = size.width,
-                    old_h = size.height,
-                    old_x = pos.x,
-                    old_y = pos.y,
-                    new_w = fitted.w,
-                    new_h = fitted.h,
-                    new_x = fitted.x,
-                    new_y = fitted.y,
-                    monitor = ?monitor.name(),
-                    "nudging main window back into the monitor work area"
-                );
+            if win.is_maximized().unwrap_or(false) {
+                let _ = win.unmaximize();
             }
-
-            if size_changed {
-                let _ = win.set_size(tauri::Size::Physical(tauri::PhysicalSize::new(
-                    fitted.w, fitted.h,
-                )));
-            }
-            if pos_changed {
-                let _ = win.set_position(tauri::Position::Physical(tauri::PhysicalPosition::new(
-                    fitted.x, fitted.y,
-                )));
-            }
-        }
-        FitAction::Maximize if win.is_maximized().unwrap_or(false) => {
-            // Already zoomed — the plugin restored a maximized window, whose
-            // outer_size legitimately exceeds the margin-inset work area.
-            // Re-parking it would un-maximize and visibly flicker every launch.
-            tracing::debug!("main window restored already maximized");
-        }
-        FitAction::Maximize => {
-            tracing::info!(
-                old_w = size.width,
-                old_h = size.height,
-                monitor = ?monitor.name(),
-                "no usable saved window size — opening maximized"
-            );
-
-            // macOS zooms to whichever screen the window currently sits on, so
-            // park it on the target monitor at a modest size first. Without
-            // this, a window restored at junk coordinates maximizes onto the
-            // wrong display.
-            let w = default_size.0.min(work.w);
-            let h = default_size.1.min(work.h);
-            let _ = win.set_size(tauri::Size::Physical(tauri::PhysicalSize::new(w, h)));
-            let _ = win.set_position(tauri::Position::Physical(tauri::PhysicalPosition::new(
-                work.x + (work.w as i32 - w as i32) / 2,
-                work.y + (work.h as i32 - h as i32) / 2,
+            let _ = win.set_size(tauri::Size::Physical(tauri::PhysicalSize::new(
+                fitted.w, fitted.h,
             )));
-
-            // Native zoom rather than set_size(work_area): it keeps the menu
-            // bar and traffic lights, records a real maximized state for the
-            // window-state plugin, and leaves the green button behaving
-            // normally. Deliberately not set_fullscreen — that would put
-            // MeraRAW in its own Space.
-            let _ = win.maximize();
+            let _ = win.set_position(tauri::Position::Physical(tauri::PhysicalPosition::new(
+                fitted.x, fitted.y,
+            )));
         }
+        _ => {}
     }
 
     let _ = win.set_focus();

@@ -65,17 +65,24 @@
     <div
       class="rounded-[8px] border border-[rgba(103,103,103,0.05)] bg-[rgba(103,103,103,0.47)] p-[8px] backdrop-blur-[2px]"
     >
-      <div class="flex items-center justify-between">
-        <p class="text-[8px] font-medium text-white">Split Toning</p>
-        <div
-          class="grid h-[20px] w-[180px] grid-cols-3 items-center rounded-[22px] bg-black/50 px-[8px]"
-        >
+      <div class="flex items-center justify-between gap-2">
+        <p class="text-[11px] font-medium text-white shrink-0">Split Toning</p>
+        
+        <div class="split-toning-bar relative flex h-[28px] w-[205px] items-center rounded-full bg-black/50 p-[3px] border border-white/10 select-none">
+          <div
+            class="absolute top-[3px] bottom-[3px] rounded-full bg-white/20 border border-white/10 shadow-[0_1px_4px_rgba(0,0,0,0.3)] transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] pointer-events-none z-0"
+            style="
+              width: calc((100% - 6px) / 3);
+              left: calc(3px + {modes.findIndex((m) => m.id === activeMode)} * (100% - 6px) / 3);
+            "
+          ></div>
+
           {#each modes as m (m.id)}
             <button
-              class="justify-self-center rounded-[22px] px-[6px] py-[2px] text-[8px] text-white {activeMode ===
+              class="relative z-10 flex h-full flex-1 items-center justify-center rounded-full text-[11px] font-light transition-colors duration-200 cursor-pointer {activeMode ===
               m.id
-                ? 'bg-[#3d3d3d]/80 font-medium'
-                : 'cursor-pointer hover:bg-[#3d3d3d]/40'}"
+                ? 'text-white font-medium'
+                : 'text-white/50 hover:text-white/85'}"
               onclick={() => setMode(m.id)}
             >
               {m.label}
@@ -89,16 +96,16 @@
           <img src={w.icon} alt="{w.label} wheel" class="mx-auto size-[72px]" />
         {/each}
         {#each wheels as w (w.label)}
-          <span class="mt-[6px] text-center text-[8px] text-white/80">{w.label}</span>
+          <span class="mt-[6px] text-center text-[11px] text-white/90">{w.label}</span>
         {/each}
       </div>
 
       <div class="mt-[12px] flex w-full flex-col gap-[6px]">
-        <ParamRow path="color_grade.shadows_lum" label="Shadow Lum" labelWidth={72} />
-        <ParamRow path="color_grade.midtones_lum" label="Midtones Lum" labelWidth={72} />
-        <ParamRow path="color_grade.highlights_lum" label="Highlights Lum" labelWidth={72} />
-        <ParamRow path="color_grade.shadow_range" label="Shadow Range" labelWidth={72} />
-        <ParamRow path="color_grade.highlight_range" label="Highlight Range" labelWidth={72} />
+        <ParamRow path="color_grade.shadows_lum" label="Shadow Lum" labelWidth={84} />
+        <ParamRow path="color_grade.midtones_lum" label="Midtones Lum" labelWidth={84} />
+        <ParamRow path="color_grade.highlights_lum" label="Highlights Lum" labelWidth={84} />
+        <ParamRow path="color_grade.shadow_range" label="Shadow Range" labelWidth={84} />
+        <ParamRow path="color_grade.highlight_range" label="Highlight Range" labelWidth={84} />
       </div>
     </div>
 
@@ -107,33 +114,33 @@
     <div
       class="rounded-[8px] border border-[rgba(103,103,103,0.05)] bg-[rgba(103,103,103,0.47)] p-[8px] backdrop-blur-[2px]"
     >
-      <p class="mb-[8px] text-[8px] font-medium text-white">Zone Hue / Sat</p>
+      <p class="mb-[8px] text-[11px] font-medium text-white">Zone Hue / Sat</p>
       <div class="flex w-full flex-col gap-[6px]">
         {#each wheels as w (w.label)}
-          <ParamRow path={w.hue} label="{w.label} Hue" labelWidth={72} />
-          <ParamRow path={w.sat} label="{w.label} Sat" labelWidth={72} />
+          <ParamRow path={w.hue} label="{w.label} Hue" labelWidth={84} />
+          <ParamRow path={w.sat} label="{w.label} Sat" labelWidth={84} />
         {/each}
       </div>
     </div>
 
     <div class="my-1 h-[1px] bg-white/5"></div>
 
-    <!-- Denoise (upstream addition — cosmetic only, no engine param yet) -->
+    <!-- Denoise (cosmetic UI) -->
     <div
       class="rounded-[8px] border border-[rgba(103,103,103,0.05)] bg-[rgba(103,103,103,0.47)] p-[8px] backdrop-blur-[2px]"
     >
-      <p class="mb-[8px] text-[8px] font-medium text-white">Denoise</p>
+      <p class="mb-[8px] text-[11px] font-medium text-white">Denoise</p>
       <div class="flex w-full flex-col gap-[6px]">
-        <div class="grid h-[13px] grid-cols-[72px_1fr] items-center gap-x-[10px]">
-          <span class="text-[8px] text-white">Denoise Amt</span>
+        <div class="grid h-[16px] grid-cols-[84px_1fr] items-center gap-x-[8px]">
+          <span class="text-[11px] text-white whitespace-nowrap">Denoise Amt</span>
           <Slider label="Denoise Amount" min={0} max={100} value={denoiseAmount} onchange={(v) => (denoiseAmount = v)} />
         </div>
-        <div class="grid h-[13px] grid-cols-[72px_1fr] items-center gap-x-[10px]">
-          <span class="text-[8px] text-white">Detail</span>
+        <div class="grid h-[16px] grid-cols-[84px_1fr] items-center gap-x-[8px]">
+          <span class="text-[11px] text-white whitespace-nowrap">Detail</span>
           <Slider label="Denoise Detail" min={0} max={100} value={denoiseDetail} onchange={(v) => (denoiseDetail = v)} />
         </div>
-        <div class="grid h-[13px] grid-cols-[72px_1fr] items-center gap-x-[10px]">
-          <span class="text-[8px] text-white">Contrast</span>
+        <div class="grid h-[16px] grid-cols-[84px_1fr] items-center gap-x-[8px]">
+          <span class="text-[11px] text-white whitespace-nowrap">Contrast</span>
           <Slider label="Denoise Contrast" min={0} max={100} value={denoiseContrast} onchange={(v) => (denoiseContrast = v)} />
         </div>
       </div>
@@ -141,22 +148,22 @@
 
     <div class="my-1 h-[1px] bg-white/5"></div>
 
-    <!-- Presence (upstream addition — cosmetic only, no engine param yet) -->
+    <!-- Presence (cosmetic UI) -->
     <div
       class="rounded-[8px] border border-[rgba(103,103,103,0.05)] bg-[rgba(103,103,103,0.47)] p-[8px] backdrop-blur-[2px]"
     >
-      <p class="mb-[8px] text-[8px] font-medium text-white">Presence</p>
+      <p class="mb-[8px] text-[11px] font-medium text-white">Presence</p>
       <div class="flex w-full flex-col gap-[6px]">
-        <div class="grid h-[13px] grid-cols-[72px_1fr] items-center gap-x-[10px]">
-          <span class="text-[8px] text-white">Texture</span>
+        <div class="grid h-[16px] grid-cols-[84px_1fr] items-center gap-x-[8px]">
+          <span class="text-[11px] text-white whitespace-nowrap">Texture</span>
           <Slider label="Texture" min={-100} max={100} value={texture} onchange={(v) => (texture = v)} />
         </div>
-        <div class="grid h-[13px] grid-cols-[72px_1fr] items-center gap-x-[10px]">
-          <span class="text-[8px] text-white">Clarity</span>
+        <div class="grid h-[16px] grid-cols-[84px_1fr] items-center gap-x-[8px]">
+          <span class="text-[11px] text-white whitespace-nowrap">Clarity</span>
           <Slider label="Clarity" min={-100} max={100} value={clarity} onchange={(v) => (clarity = v)} />
         </div>
-        <div class="grid h-[13px] grid-cols-[72px_1fr] items-center gap-x-[10px]">
-          <span class="text-[8px] text-white">Dehaze</span>
+        <div class="grid h-[16px] grid-cols-[84px_1fr] items-center gap-x-[8px]">
+          <span class="text-[11px] text-white whitespace-nowrap">Dehaze</span>
           <Slider label="Dehaze" min={-100} max={100} value={dehaze} onchange={(v) => (dehaze = v)} />
         </div>
       </div>
@@ -164,26 +171,26 @@
 
     <div class="my-1 h-[1px] bg-white/5"></div>
 
-    <!-- Vignette (upstream addition — cosmetic only, no engine param yet) -->
+    <!-- Vignette (cosmetic UI) -->
     <div
       class="rounded-[8px] border border-[rgba(103,103,103,0.05)] bg-[rgba(103,103,103,0.47)] p-[8px] backdrop-blur-[2px]"
     >
-      <p class="mb-[8px] text-[8px] font-medium text-white">Vignette</p>
+      <p class="mb-[8px] text-[11px] font-medium text-white">Vignette</p>
       <div class="flex w-full flex-col gap-[6px]">
-        <div class="grid h-[13px] grid-cols-[72px_1fr] items-center gap-x-[10px]">
-          <span class="text-[8px] text-white">Amount</span>
+        <div class="grid h-[16px] grid-cols-[84px_1fr] items-center gap-x-[8px]">
+          <span class="text-[11px] text-white whitespace-nowrap">Amount</span>
           <Slider label="Vignette Amount" min={-100} max={100} value={vignetteAmount} onchange={(v) => (vignetteAmount = v)} />
         </div>
-        <div class="grid h-[13px] grid-cols-[72px_1fr] items-center gap-x-[10px]">
-          <span class="text-[8px] text-white">Midpoint</span>
+        <div class="grid h-[16px] grid-cols-[84px_1fr] items-center gap-x-[8px]">
+          <span class="text-[11px] text-white whitespace-nowrap">Midpoint</span>
           <Slider label="Vignette Midpoint" min={0} max={100} value={vignetteMidpoint} onchange={(v) => (vignetteMidpoint = v)} />
         </div>
-        <div class="grid h-[13px] grid-cols-[72px_1fr] items-center gap-x-[10px]">
-          <span class="text-[8px] text-white">Feather</span>
+        <div class="grid h-[16px] grid-cols-[84px_1fr] items-center gap-x-[8px]">
+          <span class="text-[11px] text-white whitespace-nowrap">Feather</span>
           <Slider label="Vignette Feather" min={0} max={100} value={vignetteFeather} onchange={(v) => (vignetteFeather = v)} />
         </div>
-        <div class="grid h-[13px] grid-cols-[72px_1fr] items-center gap-x-[10px]">
-          <span class="text-[8px] text-white">Roundness</span>
+        <div class="grid h-[16px] grid-cols-[84px_1fr] items-center gap-x-[8px]">
+          <span class="text-[11px] text-white whitespace-nowrap">Roundness</span>
           <Slider label="Vignette Roundness" min={-100} max={100} value={vignetteRoundness} onchange={(v) => (vignetteRoundness = v)} />
         </div>
       </div>

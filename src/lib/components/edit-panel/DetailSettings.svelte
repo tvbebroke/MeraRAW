@@ -78,15 +78,15 @@
 <CollapsibleSection id="detail" title="Detail">
   <div class="flex flex-col gap-[10px]">
     <div>
-      <div class="mb-2 text-[7px] font-bold tracking-wider text-white/40 uppercase">
+      <div class="mb-2 text-[11px] font-bold tracking-wider text-white/60 uppercase">
         Sharpening
       </div>
       <div class="flex flex-col gap-[6px]">
         <ParamRow path="detail.sharpen_amount" label="Amount" />
         <ParamRow path="detail.sharpen_radius" label="Radius" />
         <ParamRow path="detail.sharpen_detail" label="Detail" />
-        <div class="grid h-[13px] grid-cols-[64px_1fr] items-center gap-x-[10px]">
-          <span class="text-[8px] text-white/80">Masking</span>
+        <div class="grid h-[16px] grid-cols-[72px_1fr] items-center gap-x-[10px]">
+          <span class="text-[11px] font-medium text-white/90">Masking</span>
           <Slider
             label="Sharpening Masking"
             min={0}
@@ -101,7 +101,7 @@
     <div class="my-1 h-[1px] bg-white/5"></div>
 
     <div>
-      <div class="mb-2 text-[7px] font-bold tracking-wider text-white/40 uppercase">
+      <div class="mb-2 text-[11px] font-bold tracking-wider text-white/60 uppercase">
         Noise Reduction
       </div>
       <div class="flex flex-col gap-[6px]">
@@ -118,10 +118,10 @@
 
     <div>
       <div class="mb-2 flex items-center justify-between">
-        <div class="text-[7px] font-bold tracking-wider text-white/40 uppercase">
+        <div class="text-[11px] font-bold tracking-wider text-white/60 uppercase">
           AI Denoise
         </div>
-        <label class="flex items-center gap-2 text-[8px] text-white/70">
+        <label class="flex items-center gap-2 text-[11px] text-white/70">
           <input
             type="checkbox"
             checked={aiOn}

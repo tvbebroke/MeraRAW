@@ -9,7 +9,7 @@
   let {
     path,
     label,
-    labelWidth = 64,
+    labelWidth = 72,
     disabled = false,
   }: {
     path: string;
@@ -27,11 +27,11 @@
 
 {#if spec}
   <div
-    class="grid h-[13px] items-center gap-x-[10px]"
+    class="grid h-[16px] items-center gap-x-[10px]"
     style="grid-template-columns: {labelWidth}px 1fr;"
   >
     <span
-      class="truncate text-[8px] text-white/80"
+      class="truncate text-[11px] font-medium text-white/90"
       title="double-click slider to reset"
     >
       {label ?? spec.ui.label}
