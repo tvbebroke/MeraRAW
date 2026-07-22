@@ -3,6 +3,8 @@ import { isZenMode } from "./editor";
 
 export const isSettingsOpen = atom<boolean>(false);
 export const isExportOpen = atom<boolean>(false);
+export const isBugReportOpen = atom<boolean>(false);
+export const isShortcutsOpen = atom<boolean>(false);
 
 const CLASSIC_LOOK_KEY = "classic-look";
 

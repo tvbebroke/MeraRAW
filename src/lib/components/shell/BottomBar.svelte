@@ -1,6 +1,7 @@
 <script lang="ts">
   import { statusMessage, imageMeta } from "../../../stores/app";
   import { activePhoto, folder, photos } from "../../../stores/browse";
+  import { isBugReportOpen } from "../../../stores/ui";
 
   const photoIndex = $derived(
     $activePhoto ? $photos.findIndex((p) => p.path === $activePhoto!.path) + 1 : 0,
@@ -29,9 +30,15 @@
   <span class="shrink-0 truncate max-w-[50%] text-center">
     {exifLine || $statusMessage}
   </span>
-  <span class="shrink-0">
+  <span class="flex shrink-0 items-center gap-3">
     {#if $photos.length}
-      {photoIndex ? `${photoIndex} / ` : ""}{$photos.length} photos
+      <span>{photoIndex ? `${photoIndex} / ` : ""}{$photos.length} photos</span>
     {/if}
+    <button
+      class="cursor-pointer rounded-[4px] border border-white/10 px-[6px] py-[1px] text-white/50 transition-colors hover:bg-white/[0.08] hover:text-white/80"
+      onclick={() => isBugReportOpen.set(true)}
+    >
+      Report Bug
+    </button>
   </span>
 </footer>

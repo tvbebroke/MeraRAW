@@ -10,10 +10,11 @@
   import exportIcon from "../../icons/export.svg";
   import pencilIcon from "../../icons/pencil.svg";
   import logoIcon from "../../icons/logo.png";
-  import { isSettingsOpen, isExportOpen, classicLook } from "../../../stores/ui";
+  import { isSettingsOpen, isExportOpen, classicLook, isShortcutsOpen } from "../../../stores/ui";
   import { isZenMode } from "../../../stores/editor";
   import { pickFile } from "../../fs";
   import { openPath } from "../../engine/boot";
+  import { shortcutLabels } from "../../shortcuts";
 
   // Lazy so the page still renders in a plain browser (no Tauri runtime)
   const win = () => getCurrentWindow();
@@ -61,47 +62,12 @@
 
 <header
   data-tauri-drag-region
-  class="relative flex h-16 shrink-0 items-center pr-4 pl-9"
+  class="relative flex h-[44px] shrink-0 items-center pr-4 {isFullscreen ? 'pl-4' : 'pl-[88px]'}"
 >
-  <!-- Traffic lights: native macOS traffic lights style -->
-  {#if !isFullscreen}
-    <div class="traffic-lights">
-      <button
-        aria-label="Close"
-        class="traffic-btn traffic-btn--close"
-        onclick={() => win().close()}
-      >
-        <svg class="traffic-icon" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M3.5 3.5L8.5 8.5M8.5 3.5L3.5 8.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
-        </svg>
-      </button>
-      <button
-        aria-label="Minimize"
-        class="traffic-btn traffic-btn--minimize"
-        onclick={() => win().minimize()}
-      >
-        <svg class="traffic-icon" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M2.5 6H9.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
-        </svg>
-      </button>
-      <button
-        aria-label="Maximize"
-        class="traffic-btn traffic-btn--maximize"
-        onclick={() => win().toggleMaximize()}
-      >
-        <svg class="traffic-icon" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M3.5 3.5L8.5 8.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
-          <path d="M6 3.5H3.5V6" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
-          <path d="M6 8.5H8.5V6" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-      </button>
-    </div>
-  {/if}
-
   <img
     src={logoIcon}
     alt=""
-    class="{isFullscreen ? 'ml-0' : 'ml-[17px]'} size-[24px] select-none rounded-[4px]"
+    class="size-[20px] select-none rounded-[4px]"
     draggable="false"
     data-tauri-drag-region
   />
@@ -124,16 +90,24 @@
     <IconButton
       icon={settingsIcon}
       label="Settings"
+      title="Settings ({shortcutLabels.settings})"
       iconClass="size-[20px]"
       onclick={() => isSettingsOpen.set(true)}
     />
-    <IconButton icon={helpIcon} label="Help" iconClass="h-[14px] w-[9px]" />
+    <IconButton
+      icon={helpIcon}
+      label="Help"
+      title="Keyboard Shortcuts"
+      iconClass="h-[18px] w-[12px]"
+      onclick={() => isShortcutsOpen.set(true)}
+    />
 
     {#if isLibrary}
       <!-- Library page: show Edit button to go back to editor -->
       <button
         onclick={() => safePush("/edit")}
         aria-label="Edit"
+        title="Edit ({shortcutLabels.edit})"
         class="edit-pill-btn"
       >
         <span class="edit-pill-label">Edit</span>
@@ -146,6 +120,7 @@
       <IconButton
         icon={libraryIcon}
         label="Library"
+        title="Library ({shortcutLabels.library})"
         iconClass="h-[17px] w-[21px]"
         onclick={() => safePush("/library")}
       />
@@ -153,12 +128,14 @@
         <ToggleSwitch
           checked={$isZenMode}
           label="Zen / Expert mode"
+          title="Zen / Expert mode ({shortcutLabels.zenMode})"
           onchange={(zen) => isZenMode.set(zen)}
         />
       {/if}
       <IconButton
         icon={exportIcon}
         label="Export"
+        title="Export ({shortcutLabels.export})"
         iconClass="size-[17px]"
         wide={true}
         onclick={() => isExportOpen.set(true)}
@@ -225,58 +202,5 @@
     width: 14px;
     height: 14px;
     opacity: 0.9;
-  }
-
-  /* macOS Traffic Lights */
-  .traffic-lights {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-
-  .traffic-btn {
-    appearance: none;
-    -webkit-appearance: none;
-    border: 0.5px solid rgba(0, 0, 0, 0.12);
-    padding: 0;
-    margin: 0;
-    width: 12px;
-    height: 12px;
-    border-radius: 50%;
-    position: relative;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: rgba(0, 0, 0, 0.55);
-    transition: filter 150ms ease;
-  }
-
-  .traffic-btn--close {
-    background: #ff5f56;
-  }
-
-  .traffic-btn--minimize {
-    background: #ffbd2e;
-  }
-
-  .traffic-btn--maximize {
-    background: #27c93f;
-  }
-
-  .traffic-icon {
-    width: 12px;
-    height: 12px;
-    opacity: 0;
-    transition: opacity 150ms ease;
-    pointer-events: none;
-  }
-
-  .traffic-lights:hover .traffic-icon {
-    opacity: 1;
-  }
-
-  .traffic-btn:active {
-    filter: brightness(0.8);
   }
 </style>

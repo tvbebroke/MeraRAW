@@ -77,7 +77,7 @@
 
 <CollapsibleSection id="maskList" title="Masking Tools">
   <div class="flex flex-col gap-[8px]">
-    <div class="mb-1 px-1 text-[10px] font-bold text-white/50">CREATE NEW MASK</div>
+    <div class="mb-1 px-1 text-[10px] font-bold text-white/50">Create new mask</div>
     <div class="grid grid-cols-2 gap-[8px]">
       <button
         onclick={() => void addMask("brush")}
@@ -114,6 +114,13 @@
         class="flex h-[36px] flex-col items-center justify-center rounded-[12px] border border-white/5 bg-white/[0.02] text-[10px] text-white/80 transition-all hover:bg-white/5"
       >
         <span class="font-medium">Background</span>
+      </button>
+      <button
+        disabled
+        title="Color Range masks aren't wired yet"
+        class="flex h-[36px] cursor-not-allowed flex-col items-center justify-center rounded-[12px] border border-white/5 bg-white/[0.02] text-[10px] text-white/30"
+      >
+        <span class="font-medium">Color Range</span>
       </button>
     </div>
 
@@ -175,7 +182,7 @@
 
     <div class="my-2 h-[1px] bg-white/5"></div>
 
-    <div class="mb-1 px-1 text-[10px] font-bold text-white/50">ACTIVE MASKS</div>
+    <div class="mb-1 px-1 text-[10px] font-bold text-white/50">Active masks</div>
     {#if masks.length === 0}
       <p class="px-1 text-[9px] text-white/35">No masks yet.</p>
     {:else}

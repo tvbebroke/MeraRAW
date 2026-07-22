@@ -1,6 +1,7 @@
 <script lang="ts">
   import CollapsibleSection from "./CollapsibleSection.svelte";
   import ParamRow from "./ParamRow.svelte";
+  import Slider from "./Slider.svelte";
   import {
     denoiseAiCancel,
     denoiseAiReset,
@@ -17,6 +18,12 @@
   let aiStatus = $state("");
   let aiJob = $state<number | null>(null);
   let standIn = $state(false);
+
+  // Upstream (meraraw-ui-svelte) adds a "Masking" slider under Sharpening.
+  // No corresponding engine param exists (checked src-tauri/core/src/registry.rs
+  // — only sharpen_amount/radius/detail are registered), so this is kept as a
+  // cosmetic, unwired placeholder like upstream's own mockup implementation.
+  let sharpenMasking = $state(0);
 
   const aiOn = $derived((docParam($doc, "detail", "ai_enabled") ?? 0) >= 0.5);
   const iso = $derived($imageMeta?.iso ?? null);
@@ -78,6 +85,16 @@
         <ParamRow path="detail.sharpen_amount" label="Amount" />
         <ParamRow path="detail.sharpen_radius" label="Radius" />
         <ParamRow path="detail.sharpen_detail" label="Detail" />
+        <div class="grid h-[13px] grid-cols-[64px_1fr] items-center gap-x-[10px]">
+          <span class="text-[8px] text-white/80">Masking</span>
+          <Slider
+            label="Sharpening Masking"
+            min={0}
+            max={100}
+            value={sharpenMasking}
+            onchange={(v) => (sharpenMasking = v)}
+          />
+        </div>
       </div>
     </div>
 

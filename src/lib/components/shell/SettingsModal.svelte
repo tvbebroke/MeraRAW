@@ -68,12 +68,11 @@
   <!-- Modal Content Card -->
   <div
     transition:scale={{ duration: 250, start: 0.95 }}
-    class="modal-card flex h-[560px] w-[780px] overflow-hidden rounded-[24px] border border-white/[0.08] bg-[#171717]/95 text-white backdrop-blur-md"
+    class="modal-card relative flex h-[520px] w-[720px] overflow-hidden rounded-[20px] border border-white/[0.06] bg-[#171717]/95 text-white backdrop-blur-md"
     onclick={(e) => e.stopPropagation()}
   >
     <!-- Left Navigation Sidebar -->
-    <aside class="flex w-[180px] shrink-0 flex-col border-r border-white/[0.05] bg-[#111113]/50 p-4">
-      <h2 class="mb-4 px-3 text-[11px] font-bold uppercase tracking-wider text-white/30">Settings</h2>
+    <aside class="sidebar flex w-[180px] shrink-0 flex-col border-r border-white/[0.05] px-3 py-5">
       <nav class="flex flex-1 flex-col gap-[4px]">
         <button
           class="tab-btn {activeTab === 'general' ? 'tab-btn--active' : ''}"
@@ -129,36 +128,32 @@
     </aside>
 
     <!-- Right Content Pane -->
-    <main class="flex flex-1 flex-col overflow-hidden">
-      <!-- Modal Header -->
-      <header class="flex shrink-0 items-center justify-between border-b border-white/[0.05] px-6 py-4">
-        <h3 class="text-sm font-semibold capitalize text-white/90">
-          {activeTab} Settings
-        </h3>
-        <button
-          class="close-btn"
-          onclick={close}
-          aria-label="Close settings"
-        >
-          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M1 1L11 11M11 1L1 11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-          </svg>
-        </button>
-      </header>
+    <main class="flex flex-1 flex-col overflow-hidden relative">
+      <!-- Close Button -->
+      <button
+        class="close-btn"
+        onclick={close}
+        aria-label="Close settings"
+      >
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M1 1L11 11M11 1L1 11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+      </button>
 
       <!-- Settings List -->
-      <div class="flex-1 overflow-y-auto px-6 py-5">
+      <div class="flex-1 overflow-y-auto px-8 pt-7 pb-6">
+        <h2 class="content-title capitalize">{activeTab}</h2>
         {#if activeTab === "general"}
-          <div class="space-y-5">
+          <div class="settings-list">
             <!-- Default Import Folder -->
-            <div class="setting-group">
-              <label for="default-folder" class="setting-label">Default Import Directory</label>
-              <div class="flex gap-2">
+            <div class="setting-row">
+              <span class="setting-label">Default import directory</span>
+              <div class="flex items-center gap-2">
                 <input
                   id="default-folder"
                   type="text"
-                  placeholder="No default directory selected"
-                  class="setting-input flex-1 truncate"
+                  placeholder="No directory selected"
+                  class="setting-input w-[200px] truncate"
                   value={$folder || ""}
                   readonly
                 />
@@ -166,23 +161,21 @@
                   Browse…
                 </button>
               </div>
-              <p class="setting-desc">The folder that automatically loads when opening the library.</p>
             </div>
 
             <!-- Theme Settings -->
-            <div class="setting-group">
-              <label for="theme-select" class="setting-label">Interface Theme</label>
+            <div class="setting-row">
+              <span class="setting-label">Interface theme</span>
               <select id="theme-select" bind:value={theme} class="setting-select">
-                <option value="dark">Dark Mode (Default)</option>
-                <option value="light">Light Mode</option>
-                <option value="system">Follow System</option>
+                <option value="dark">Dark mode</option>
+                <option value="light">Light mode</option>
+                <option value="system">Follow system</option>
               </select>
-              <p class="setting-desc">Choose a visual aesthetic for MeraRAW.</p>
             </div>
 
             <!-- Language Settings -->
-            <div class="setting-group">
-              <label for="lang-select" class="setting-label">Language</label>
+            <div class="setting-row">
+              <span class="setting-label">Language</span>
               <select id="lang-select" bind:value={language} class="setting-select">
                 <option value="en">English (US)</option>
                 <option value="de">Deutsch</option>
@@ -192,20 +185,14 @@
             </div>
 
             <!-- Auto thumbnails -->
-            <div class="flex items-center justify-between py-2 border-t border-white/[0.03]">
-              <div class="space-y-0.5">
-                <span class="setting-label">Auto-generate Thumbnails</span>
-                <p class="setting-desc">Generate low-resolution previews in background</p>
-              </div>
+            <div class="setting-row">
+              <span class="setting-label">Auto-generate thumbnails</span>
               <ToggleSwitch checked={autoThumbnails} label="Auto-generate Thumbnails" onchange={(v) => autoThumbnails = v} />
             </div>
 
             <!-- Classic Look -->
-            <div class="flex items-center justify-between py-2 border-t border-white/[0.03]">
-              <div class="space-y-0.5">
-                <span class="setting-label">Classic Look</span>
-                <p class="setting-desc">Use sharp corners, a dense Lightroom-style grid layout, and flat panels</p>
-              </div>
+            <div class="setting-row">
+              <span class="setting-label">Classic look</span>
               <ToggleSwitch checked={$classicLook} label="Classic Look" onchange={triggerThemeTransition} />
             </div>
 
@@ -228,110 +215,104 @@
             {/if}
           </div>
         {:else if activeTab === "editor"}
-          <div class="space-y-5">
+          <div class="settings-list">
             <!-- Raw Decoder -->
-            <div class="setting-group">
-              <label for="decoder-select" class="setting-label">Default RAW Decoder</label>
+            <div class="setting-row">
+              <span class="setting-label">Default RAW decoder</span>
               <select id="decoder-select" bind:value={rawDecoder} class="setting-select">
-                <option value="libraw">LibRaw Engine (Recommended)</option>
-                <option value="dng">Adobe DNG Converter</option>
-                <option value="native">Camera Native API</option>
+                <option value="libraw">LibRaw engine</option>
+                <option value="dng">Adobe DNG converter</option>
+                <option value="native">Camera native API</option>
               </select>
-              <p class="setting-desc">The engine used to parse raw sensor metadata (NEF, CR3, ARW).</p>
             </div>
 
             <!-- Histogram Type -->
-            <div class="setting-group">
-              <label for="histogram-select" class="setting-label">Default Histogram</label>
+            <div class="setting-row">
+              <span class="setting-label">Default histogram</span>
               <select
                 id="histogram-select"
                 value={histogramType}
                 onchange={onHistogramType}
                 class="setting-select"
               >
-                <option value="rgb">RGB Overlay</option>
-                <option value="luma">Luminance Channel</option>
-                <option value="parade">RGB Parade</option>
+                <option value="rgb">RGB overlay</option>
+                <option value="luma">Luminance channel</option>
+                <option value="parade">RGB parade</option>
               </select>
-              <p class="setting-desc">Preferred style for real-time tone distribution feedback.</p>
             </div>
 
             <!-- Working Color Space -->
-            <div class="setting-group">
-              <label for="colorspace-select" class="setting-label">Working Color Space</label>
+            <div class="setting-row">
+              <span class="setting-label">Working color space</span>
               <select id="colorspace-select" bind:value={colorSpace} class="setting-select">
-                <option value="srgb">sRGB IEC61966-2.1 (Web Standard)</option>
-                <option value="adobe">Adobe RGB 1998 (Print)</option>
-                <option value="p3">Display P3 (Apple Wide Color)</option>
-                <option value="prophoto">ProPhoto RGB (Wide Gamut)</option>
+                <option value="srgb">sRGB IEC61966-2.1</option>
+                <option value="adobe">Adobe RGB 1998</option>
+                <option value="p3">Display P3</option>
+                <option value="prophoto">ProPhoto RGB</option>
               </select>
             </div>
           </div>
         {:else if activeTab === "performance"}
-          <div class="space-y-5">
+          <div class="settings-list">
             <!-- GPU Accel -->
-            <div class="flex items-center justify-between py-2">
-              <div class="space-y-0.5">
-                <span class="setting-label">GPU Hardware Acceleration</span>
-                <p class="setting-desc">Use hardware rendering pipelines for image processing</p>
-              </div>
+            <div class="setting-row">
+              <span class="setting-label">GPU hardware acceleration</span>
               <ToggleSwitch checked={gpuAcceleration} label="GPU Acceleration" onchange={(v) => gpuAcceleration = v} />
             </div>
 
             <!-- Cache Size -->
-            <div class="setting-group border-t border-white/[0.03] pt-4">
-              <div class="flex justify-between">
-                <label for="cache-slider" class="setting-label">Texture Cache Limit</label>
-                <span class="text-[11px] font-semibold text-accent">{cacheSize} GB</span>
+            <div class="setting-row">
+              <span class="setting-label">Texture cache limit</span>
+              <div class="flex items-center gap-3 w-[200px]">
+                <input
+                  id="cache-slider"
+                  type="range"
+                  min="2"
+                  max="50"
+                  step="2"
+                  bind:value={cacheSize}
+                  class="setting-slider flex-1"
+                />
+                <span class="setting-value w-[38px] text-right">{cacheSize} GB</span>
               </div>
-              <input
-                id="cache-slider"
-                type="range"
-                min="2"
-                max="50"
-                step="2"
-                bind:value={cacheSize}
-                class="setting-slider"
-              />
-              <p class="setting-desc">Maximum disk and RAM cache allocated for fast image scrubbing.</p>
             </div>
           </div>
         {:else if activeTab === "export"}
-          <div class="space-y-5">
+          <div class="settings-list">
             <!-- Format -->
-            <div class="setting-group">
-              <label for="format-select" class="setting-label">Default Format</label>
+            <div class="setting-row">
+              <span class="setting-label">Default format</span>
               <select id="format-select" bind:value={exportFormat} class="setting-select">
-                <option value="jpeg">JPEG (8-bit compressed)</option>
-                <option value="tiff">TIFF (16-bit uncompressed)</option>
-                <option value="png">PNG (8-bit lossless)</option>
-                <option value="dng">DNG (RAW digital negative)</option>
+                <option value="jpeg">JPEG</option>
+                <option value="tiff">TIFF</option>
+                <option value="png">PNG</option>
+                <option value="dng">DNG</option>
               </select>
             </div>
 
             <!-- Quality -->
             {#if exportFormat === "jpeg"}
-              <div class="setting-group">
-                <div class="flex justify-between">
-                  <label for="quality-slider" class="setting-label">JPEG Quality</label>
-                  <span class="text-[11px] font-semibold text-accent">{jpegQuality}%</span>
+              <div class="setting-row">
+                <span class="setting-label">JPEG quality</span>
+                <div class="flex items-center gap-3 w-[200px]">
+                  <input
+                    id="quality-slider"
+                    type="range"
+                    min="50"
+                    max="100"
+                    bind:value={jpegQuality}
+                    class="setting-slider flex-1"
+                  />
+                  <span class="setting-value w-[38px] text-right">{jpegQuality}%</span>
                 </div>
-                <input
-                  id="quality-slider"
-                  type="range"
-                  min="50"
-                  max="100"
-                  bind:value={jpegQuality}
-                  class="setting-slider"
-                />
               </div>
             {/if}
 
             <!-- Location -->
-            <div class="setting-group">
-              <label for="location-select" class="setting-label">Export Location</label>
+            <div class="setting-row">
+              <span class="setting-label">Export location</span>
               <select id="location-select" bind:value={exportLocation} class="setting-select">
-                <option value="source">Same as source folder</option>
+                <option value="source">Same as source</option>
                 <option value="ask">Ask every time</option>
               </select>
             </div>
@@ -339,10 +320,10 @@
         {/if}
       </div>
 
-      <!-- Footer Buttons -->
-      <footer class="flex shrink-0 items-center justify-end gap-3 border-t border-white/[0.05] bg-[#111113]/20 px-6 py-4">
+      <!-- Footer -->
+      <footer class="flex shrink-0 items-center justify-end gap-3 border-t border-white/[0.04] px-8 py-4">
         <button class="footer-btn footer-btn--primary" onclick={close}>
-          Done
+          Apply
         </button>
       </footer>
     </main>
@@ -351,19 +332,22 @@
 
 <style>
   .backdrop {
-    background: rgba(0, 0, 0, 0.45);
-    -webkit-backdrop-filter: blur(12px) saturate(120%);
-    backdrop-filter: blur(12px) saturate(120%);
+    background: rgba(0, 0, 0, 0.35);
+    -webkit-backdrop-filter: blur(16px) saturate(120%);
+    backdrop-filter: blur(16px) saturate(120%);
   }
 
   .modal-card {
-    background: rgba(23, 23, 23, 0.95);
+    background: rgba(23, 23, 23, 0.96);
     box-shadow: 
-      inset 0 1px 0 rgba(255, 255, 255, 0.08),
-      0 4px 6px rgba(0, 0, 0, 0.2),
-      0 12px 20px rgba(0, 0, 0, 0.25),
-      0 20px 40px rgba(0, 0, 0, 0.3),
-      0 40px 80px rgba(0, 0, 0, 0.45);
+      0 0 0 0.5px rgba(255, 255, 255, 0.06),
+      0 8px 24px rgba(0, 0, 0, 0.3),
+      0 24px 48px rgba(0, 0, 0, 0.25);
+  }
+
+  /* ── Sidebar ────────────────────────────────────────── */
+  .sidebar {
+    background: transparent;
   }
 
   /* ── Tab Navigation ───────────────────────────────────── */
@@ -379,29 +363,29 @@
     align-items: center;
     gap: 10px;
     width: 100%;
-    padding: 8px 12px;
+    padding: 10px 16px;
     border-radius: 10px;
-    font-size: 12px;
+    font-size: 13px;
     font-weight: 500;
-    color: rgba(255, 255, 255, 0.5);
+    color: rgba(255, 255, 255, 0.45);
     text-align: left;
     transition: background 150ms ease, color 150ms ease;
   }
 
   .tab-btn:hover {
     background: rgba(255, 255, 255, 0.04);
-    color: rgba(255, 255, 255, 0.8);
+    color: rgba(255, 255, 255, 0.75);
   }
 
   .tab-btn--active {
-    background: rgba(255, 255, 255, 0.07);
+    background: rgba(255, 255, 255, 0.08);
     color: #fff;
   }
 
   .tab-icon {
-    width: 14px;
-    height: 14px;
-    opacity: 0.7;
+    width: 15px;
+    height: 15px;
+    opacity: 0.5;
     transition: opacity 150ms ease;
   }
 
@@ -412,95 +396,125 @@
 
   /* ── Close Button ────────────────────────────────────── */
   .close-btn {
+    position: absolute;
+    top: 18px;
+    right: 20px;
+    z-index: 10;
     appearance: none;
     -webkit-appearance: none;
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    background: rgba(255, 255, 255, 0.03);
-    padding: 0;
-    margin: 0;
+    border: none;
+    background: transparent;
+    padding: 6px;
     cursor: pointer;
 
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 26px;
-    height: 26px;
     border-radius: 50%;
-    color: rgba(255, 255, 255, 0.5);
-    transition: background 150ms ease, color 150ms ease, transform 150ms ease;
+    color: rgba(255, 255, 255, 0.35);
+    transition: background 150ms ease, color 150ms ease;
   }
 
   .close-btn:hover {
-    background: rgba(255, 255, 255, 0.08);
-    color: #fff;
+    background: rgba(255, 255, 255, 0.06);
+    color: rgba(255, 255, 255, 0.8);
   }
 
-  .close-btn:active {
-    transform: scale(0.93);
+  /* ── Content Title ──────────────────────────────────── */
+  .content-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.9);
+    letter-spacing: -0.01em;
+    margin-bottom: 8px;
   }
 
-  /* ── Form Controls & Settings Layout ──────────────────── */
-  .setting-group {
+  /* ── Settings List ──────────────────────────────────── */
+  .settings-list {
     display: flex;
     flex-direction: column;
-    gap: 6px;
+  }
+
+  .setting-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    transition: background-color 150ms ease;
+  }
+
+  .setting-row:last-child {
+    border-bottom: none;
   }
 
   .setting-label {
-    font-size: 11px;
-    font-weight: 600;
+    font-size: 13px;
+    font-weight: 400;
     color: rgba(255, 255, 255, 0.75);
-    letter-spacing: -0.01em;
+    letter-spacing: -0.005em;
   }
 
-  .setting-desc {
-    font-size: 10px;
-    color: rgba(255, 255, 255, 0.35);
-    margin: 0;
+  .setting-value {
+    font-size: 12px;
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.5);
   }
 
+  /* ── Form Controls ──────────────────────────────────── */
   .setting-input {
     appearance: none;
     -webkit-appearance: none;
-    border: 1px solid rgba(255, 255, 255, 0.07);
+    border: 1px solid rgba(255, 255, 255, 0.06);
     background: rgba(255, 255, 255, 0.03);
     border-radius: 8px;
-    padding: 8px 12px;
-    font-size: 11px;
+    padding: 7px 12px;
+    font-size: 12px;
     font-family: inherit;
-    color: rgba(255, 255, 255, 0.85);
+    color: rgba(255, 255, 255, 0.6);
     outline: none;
+    transition: border-color 150ms ease, background-color 150ms ease;
+  }
+
+  .setting-input:focus {
+    border-color: rgba(255, 255, 255, 0.15);
+    background: rgba(255, 255, 255, 0.04);
   }
 
   .setting-select {
     appearance: none;
     -webkit-appearance: none;
-    border: 1px solid rgba(255, 255, 255, 0.07);
-    background: rgba(255, 255, 255, 0.03) url("data:image/svg+xml,%3Csvg width='8' height='5' viewBox='0 0 8 5' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L4 4L7 1' stroke='rgba%28255,255,255,0.4%29' stroke-width='1.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 12px center;
+    border: none;
+    background: transparent url("data:image/svg+xml,%3Csvg width='8' height='5' viewBox='0 0 8 5' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L4 4L7 1' stroke='rgba%28255,255,255,0.3%29' stroke-width='1.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 0 center;
     background-size: 8px 5px;
-    border-radius: 8px;
-    padding: 8px 30px 8px 12px;
-    font-size: 11px;
+    padding: 4px 20px 4px 0;
+    font-size: 13px;
     font-family: inherit;
-    color: rgba(255, 255, 255, 0.85);
+    font-weight: 400;
+    color: rgba(255, 255, 255, 0.5);
     outline: none;
     cursor: pointer;
+    transition: color 150ms ease;
+    text-align-last: right;
+  }
+
+  .setting-select:hover {
+    color: rgba(255, 255, 255, 0.7);
   }
 
   .setting-select option {
     background: #1e1e20;
     color: #fff;
+    text-align: left;
   }
 
   .setting-slider {
     appearance: none;
     -webkit-appearance: none;
-    width: 100%;
-    height: 4px;
-    border-radius: 2px;
+    height: 2px;
+    border-radius: 999px;
     background: rgba(255, 255, 255, 0.08);
     outline: none;
-    margin: 8px 0;
   }
 
   .setting-slider::-webkit-slider-thumb {
@@ -509,14 +523,14 @@
     width: 12px;
     height: 12px;
     border-radius: 50%;
-    background: var(--color-accent, #ffffff);
+    background: #ffffff;
     cursor: pointer;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
     transition: transform 150ms ease;
   }
 
   .setting-slider::-webkit-slider-thumb:hover {
-    transform: scale(1.2);
+    transform: scale(1.15);
   }
 
   /* ── Action/Footer Buttons ────────────────────────────── */
@@ -526,22 +540,22 @@
     border: 1px solid rgba(255, 255, 255, 0.08);
     background: rgba(255, 255, 255, 0.04);
     border-radius: 8px;
-    padding: 6px 12px;
-    font-size: 11px;
+    padding: 6px 14px;
+    font-size: 12px;
     font-family: inherit;
     font-weight: 500;
-    color: rgba(255, 255, 255, 0.85);
+    color: rgba(255, 255, 255, 0.7);
     cursor: pointer;
-    transition: background 150ms ease, color 150ms ease, transform 150ms ease;
+    transition: background-color 150ms ease, border-color 150ms ease;
   }
 
   .action-btn:hover {
-    background: rgba(255, 255, 255, 0.08);
-    color: #fff;
+    background-color: rgba(255, 255, 255, 0.07);
+    border-color: rgba(255, 255, 255, 0.12);
   }
 
   .action-btn:active {
-    transform: scale(0.97);
+    transform: scale(0.98);
   }
 
   .footer-btn {
@@ -554,7 +568,7 @@
     font-family: inherit;
     font-weight: 600;
     cursor: pointer;
-    transition: background 150ms ease, transform 150ms ease;
+    transition: background-color 150ms ease, transform 150ms ease;
   }
 
   .footer-btn--primary {
@@ -568,6 +582,6 @@
   }
 
   .footer-btn--primary:active {
-    transform: scale(0.97) translateY(0);
+    transform: scale(0.98) translateY(0);
   }
 </style>

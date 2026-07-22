@@ -58,6 +58,19 @@
     padding: 0 24px 0 10px;
     outline: none;
     cursor: pointer;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.05),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.15),
+      0 2px 4px rgba(0, 0, 0, 0.15);
+    transition:
+      background 150ms ease,
+      border-color 150ms ease;
+  }
+  .profile-select:hover {
+    background-color: rgba(47, 47, 49, 0.85);
+    border-color: rgba(255, 255, 255, 0.12);
   }
   .profile-select option {
     background: #222224;

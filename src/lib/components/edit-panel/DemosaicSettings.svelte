@@ -1,7 +1,10 @@
 <script lang="ts">
   import CollapsibleSection from "./CollapsibleSection.svelte";
+  import Slider from "./Slider.svelte";
   import { setDemosaic } from "../../../ipc/commands";
   import { imageMeta, statusMessage } from "../../../stores/app";
+
+  let falseColorSuppression = $state(0);
 
   /** In-process engines (merawler + rawler) — always usable on every OS. */
   const IN_PROCESS = new Set([
@@ -81,6 +84,17 @@
           or on PATH.
         </p>
       {/if}
+
+      <div class="grid h-[13px] grid-cols-[64px_1fr] items-center gap-x-[10px]">
+        <span class="text-[8px] text-white/80">False Color</span>
+        <Slider
+          label="False Color Suppression"
+          min={0}
+          max={100}
+          value={falseColorSuppression}
+          onchange={(v) => (falseColorSuppression = v)}
+        />
+      </div>
     </div>
   </CollapsibleSection>
 {/if}

@@ -43,6 +43,7 @@
   const folderCount = $derived($photos.length);
   const batchMode = $derived(scope === "folder");
 
+  // Default export path to active folder if set
   $effect(() => {
     if ($folder && !exportPath) {
       exportPath = `${$folder}/exports`;
@@ -188,6 +189,7 @@
 
 <svelte:window onkeydown={handleKeyDown} />
 
+<!-- Modal Backdrop -->
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <!-- svelte-ignore a11y_click_events_have_key_events -->
 <div
@@ -195,9 +197,10 @@
   class="backdrop absolute inset-0 z-[100] flex items-center justify-center bg-black/60 px-4 py-6"
   onclick={close}
 >
+  <!-- Modal Content Card -->
   <div
     transition:scale={{ duration: 250, start: 0.95 }}
-    class="modal-card flex h-[480px] w-[580px] flex-col overflow-hidden rounded-[24px] border border-white/[0.08] bg-[#171717]/95 text-white shadow-2xl backdrop-blur-md"
+    class="modal-card relative flex max-h-[560px] w-[520px] flex-col overflow-hidden rounded-[20px] border border-white/[0.06] bg-[#171717]/95 text-white backdrop-blur-md"
     onclick={(e) => e.stopPropagation()}
   >
     <header class="flex shrink-0 items-center justify-between border-b border-white/[0.05] px-6 py-4">
@@ -244,8 +247,8 @@
             <input
               id="export-folder"
               type="text"
-              placeholder="No export path selected"
-              class="setting-input flex-1 truncate"
+              placeholder="No path selected"
+              class="setting-input w-[180px] truncate"
               bind:value={exportPath}
               disabled={busy}
             />
@@ -253,77 +256,71 @@
               Browse…
             </button>
           </div>
-          <p class="setting-desc">Choose where the exported images will be saved.</p>
         </div>
 
-        <div class="grid grid-cols-2 gap-4">
-          <div class="setting-group">
-            <label for="format-select" class="setting-label">File Format</label>
-            <select id="format-select" bind:value={format} class="setting-select" disabled={busy}>
-              <option value="jpeg">JPEG (8-bit compressed)</option>
-              <option value="tiff16">TIFF (16-bit uncompressed)</option>
-              <option value="png">PNG (8-bit lossless)</option>
-              <option value="heic">HEIC</option>
-            </select>
-          </div>
-
-          <div class="setting-group">
-            <label for="colorspace-select" class="setting-label">Color Space</label>
-            <select id="colorspace-select" bind:value={target} class="setting-select" disabled={busy}>
-              <option value="srgb">sRGB IEC61966-2.1</option>
-              <option value="adobe-rgb">Adobe RGB 1998</option>
-              <option value="display-p3">Display P3</option>
-              <option value="prophoto">ProPhoto RGB</option>
-            </select>
-          </div>
+        <!-- File Format -->
+        <div class="setting-row">
+          <span class="setting-label">File format</span>
+          <select id="format-select" bind:value={format} class="setting-select" disabled={busy}>
+            <option value="jpeg">JPEG (8-bit compressed)</option>
+            <option value="tiff16">TIFF (16-bit uncompressed)</option>
+            <option value="png">PNG (8-bit lossless)</option>
+            <option value="heic">HEIC</option>
+          </select>
         </div>
 
+        <!-- Color Space -->
+        <div class="setting-row">
+          <span class="setting-label">Color space</span>
+          <select id="colorspace-select" bind:value={target} class="setting-select" disabled={busy}>
+            <option value="srgb">sRGB IEC61966-2.1</option>
+            <option value="adobe-rgb">Adobe RGB 1998</option>
+            <option value="display-p3">Display P3</option>
+            <option value="prophoto">ProPhoto RGB</option>
+          </select>
+        </div>
+
+        <!-- JPEG Quality Slider (only for lossy formats) -->
         {#if lossy}
-          <div class="setting-group border-t border-white/[0.03] pt-4">
-            <div class="flex justify-between">
-              <label for="quality-slider" class="setting-label">JPEG Quality</label>
-              <span class="text-[11px] font-semibold text-accent">{quality}%</span>
+          <div class="setting-row">
+            <span class="setting-label">JPEG quality</span>
+            <div class="flex items-center gap-3 w-[200px]">
+              <input
+                id="quality-slider"
+                type="range"
+                min="50"
+                max="100"
+                bind:value={quality}
+                class="setting-slider flex-1"
+                disabled={busy}
+              />
+              <span class="setting-value w-[38px] text-right">{quality}%</span>
             </div>
-            <input
-              id="quality-slider"
-              type="range"
-              min="50"
-              max="100"
-              bind:value={quality}
-              class="setting-slider"
-              disabled={busy}
-            />
           </div>
         {/if}
 
-        <div class="border-t border-white/[0.03] pt-4">
-          <div class="flex items-center justify-between pb-3">
-            <div class="space-y-0.5">
-              <span class="setting-label">Resize Image Dimensions</span>
-              <p class="setting-desc">Scale the exported image to custom max edge</p>
-            </div>
-            <ToggleSwitch
-              checked={resizeImage}
-              label="Resize Image"
-              onchange={(v) => (resizeImage = v)}
-            />
-          </div>
+        <!-- Resizing options -->
+        <div class="setting-row">
+          <span class="setting-label">Resize image</span>
+          <ToggleSwitch checked={resizeImage} label="Resize Image" onchange={(v) => (resizeImage = v)} />
+        </div>
 
-          {#if resizeImage}
-            <div class="setting-group mt-2">
-              <label for="resize-max" class="setting-label">Max edge (px)</label>
+        {#if resizeImage}
+          <div class="setting-row setting-row--nested">
+            <span class="setting-label setting-label--secondary">Max edge (px)</span>
+            <div class="flex items-center gap-1.5">
               <input
                 id="resize-max"
                 type="number"
                 bind:value={maxDim}
-                class="setting-input"
+                class="setting-input w-[80px] text-center"
                 min="100"
                 max="10000"
                 disabled={busy}
               />
             </div>
-          {/if}
-        </div>
+          </div>
+        {/if}
 
         <div class="setting-group border-t border-white/[0.03] pt-4 flex flex-col gap-3">
           <label for="meta-policy" class="setting-label">Metadata</label>
@@ -347,51 +344,51 @@
             disabled={busy || metadataPolicy === "stripAll"}
           />
         </div>
-
-        {#if busy && progress && progress.phase !== "done"}
-          <div class="h-[4px] overflow-hidden rounded-full bg-white/[0.08]">
-            <div
-              class="h-full bg-accent transition-all duration-200"
-              style="width: {progress.pct}%"
-            ></div>
-          </div>
-        {/if}
-
-        {#if !batchMode && !decodeReady && !busy}
-          <p class="text-[10px] text-red-400/90">
-            Image still decoding — export unlocks when status says ready.
-          </p>
-        {/if}
-        {#if batchMode && folderCount === 0 && !busy}
-          <p class="text-[10px] text-red-400/90">
-            No photos in the current folder.
-          </p>
-        {/if}
-
-        {#if status}
-          <p class="text-[10px] {status.startsWith('Saved') ? 'text-green-400/90' : status.startsWith('Export failed') ? 'text-red-400/90' : 'text-white/45'}">
-            {status}
-          </p>
-        {/if}
       </div>
+
+      {#if busy && progress && progress.phase !== "done"}
+        <div class="progress-track">
+          <div class="progress-fill" style="width: {progress.pct}%"></div>
+        </div>
+      {/if}
+
+      {#if !batchMode && !decodeReady && !busy}
+        <p class="status-line status-line--warn">
+          Image still decoding — export unlocks when status says ready.
+        </p>
+      {/if}
+      {#if batchMode && folderCount === 0 && !busy}
+        <p class="status-line status-line--warn">
+          No photos in the current folder.
+        </p>
+      {/if}
+
+      {#if status}
+        <p
+          class="status-line"
+          class:status-line--ok={status.startsWith("Saved") || status.startsWith("Batch done")}
+          class:status-line--error={status.startsWith("Export failed")}
+        >
+          {status}
+        </p>
+      {/if}
     </div>
 
-    <footer class="flex shrink-0 items-center justify-end gap-3 border-t border-white/[0.05] bg-[#111113]/20 px-6 py-4">
+    <!-- Footer Actions -->
+    <footer class="flex shrink-0 items-center justify-end gap-3 border-t border-white/[0.04] px-8 py-4">
       {#if savedPath}
-        <button
-          type="button"
-          class="action-btn"
-          onclick={() => revealInFinder(savedPath!)}
-        >
+        <button type="button" class="action-btn" onclick={() => revealInFinder(savedPath!)}>
           Reveal in Finder
         </button>
       {/if}
       {#if busy && batchMode}
-        <button class="action-btn" onclick={() => void handleCancelBatch()}>
+        <button class="footer-btn footer-btn--ghost" onclick={() => void handleCancelBatch()}>
           Cancel batch
         </button>
       {:else}
-        <button class="action-btn" onclick={close} disabled={busy}>Cancel</button>
+        <button class="footer-btn footer-btn--ghost" onclick={close} disabled={busy}>
+          Cancel
+        </button>
       {/if}
       <button
         class="footer-btn footer-btn--primary"
@@ -406,111 +403,141 @@
 
 <style>
   .backdrop {
-    background: rgba(0, 0, 0, 0.45);
-    -webkit-backdrop-filter: blur(12px) saturate(120%);
-    backdrop-filter: blur(12px) saturate(120%);
+    background: rgba(0, 0, 0, 0.35);
+    -webkit-backdrop-filter: blur(16px) saturate(120%);
+    backdrop-filter: blur(16px) saturate(120%);
   }
 
   .modal-card {
-    background: rgba(23, 23, 23, 0.95);
+    background: rgba(23, 23, 23, 0.96);
     box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.08),
-      0 4px 6px rgba(0, 0, 0, 0.2),
-      0 12px 20px rgba(0, 0, 0, 0.25),
-      0 20px 40px rgba(0, 0, 0, 0.3),
-      0 40px 80px rgba(0, 0, 0, 0.45);
+      0 0 0 0.5px rgba(255, 255, 255, 0.06),
+      0 8px 24px rgba(0, 0, 0, 0.3),
+      0 24px 48px rgba(0, 0, 0, 0.25);
   }
 
-  .close-btn {
-    appearance: none;
-    -webkit-appearance: none;
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    background: rgba(255, 255, 255, 0.03);
-    padding: 0;
-    margin: 0;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 26px;
-    height: 26px;
-    border-radius: 50%;
-    color: rgba(255, 255, 255, 0.5);
-    transition: background 150ms ease, color 150ms ease, transform 150ms ease;
+  /* ── Content Title ──────────────────────────────────── */
+  .content-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.9);
+    letter-spacing: -0.01em;
+    margin-bottom: 8px;
   }
 
-  .close-btn:hover {
-    background: rgba(255, 255, 255, 0.08);
-    color: #fff;
-  }
-
-  .close-btn:active {
-    transform: scale(0.93);
-  }
-
-  .setting-group {
+  /* ── Settings List ──────────────────────────────────── */
+  .settings-list {
     display: flex;
     flex-direction: column;
-    gap: 6px;
+  }
+
+  .setting-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    transition: background-color 150ms ease;
+  }
+
+  .setting-row:last-child {
+    border-bottom: none;
+  }
+
+  .setting-row--nested {
+    padding: 10px 0 14px 0;
+    background: transparent;
   }
 
   .setting-label {
-    font-size: 11px;
-    font-weight: 600;
+    font-size: 13px;
+    font-weight: 400;
     color: rgba(255, 255, 255, 0.75);
-    letter-spacing: -0.01em;
+    letter-spacing: -0.005em;
   }
 
-  .setting-desc {
-    font-size: 10px;
-    color: rgba(255, 255, 255, 0.35);
-    margin: 0;
+  .setting-label--secondary {
+    color: rgba(255, 255, 255, 0.5);
+    font-size: 12px;
   }
 
+  .setting-value {
+    font-size: 12px;
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.5);
+  }
+
+  .checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+  }
+
+  /* ── Form Controls ──────────────────────────────────── */
   .setting-input {
     appearance: none;
     -webkit-appearance: none;
-    border: 1px solid rgba(255, 255, 255, 0.07);
+    border: 1px solid rgba(255, 255, 255, 0.06);
     background: rgba(255, 255, 255, 0.03);
     border-radius: 8px;
-    padding: 8px 12px;
-    font-size: 11px;
+    padding: 7px 12px;
+    font-size: 12px;
     font-family: inherit;
-    color: rgba(255, 255, 255, 0.85);
+    color: rgba(255, 255, 255, 0.6);
     outline: none;
+    transition: border-color 150ms ease, background-color 150ms ease;
+  }
+
+  .setting-input:focus {
+    border-color: rgba(255, 255, 255, 0.15);
+    background: rgba(255, 255, 255, 0.04);
+  }
+
+  .setting-input:disabled {
+    opacity: 0.45;
+    cursor: default;
   }
 
   .setting-select {
     appearance: none;
     -webkit-appearance: none;
-    border: 1px solid rgba(255, 255, 255, 0.07);
-    background: rgba(255, 255, 255, 0.03)
-      url("data:image/svg+xml,%3Csvg width='8' height='5' viewBox='0 0 8 5' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L4 4L7 1' stroke='rgba%28255,255,255,0.4%29' stroke-width='1.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")
-      no-repeat right 12px center;
+    border: none;
+    background: transparent url("data:image/svg+xml,%3Csvg width='8' height='5' viewBox='0 0 8 5' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L4 4L7 1' stroke='rgba%28255,255,255,0.3%29' stroke-width='1.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 0 center;
     background-size: 8px 5px;
-    border-radius: 8px;
-    padding: 8px 30px 8px 12px;
-    font-size: 11px;
+    padding: 4px 20px 4px 0;
+    font-size: 13px;
     font-family: inherit;
-    color: rgba(255, 255, 255, 0.85);
+    font-weight: 400;
+    color: rgba(255, 255, 255, 0.5);
     outline: none;
     cursor: pointer;
+    transition: color 150ms ease;
+    text-align-last: right;
+  }
+
+  .setting-select:hover {
+    color: rgba(255, 255, 255, 0.7);
+  }
+
+  .setting-select:disabled {
+    opacity: 0.45;
+    cursor: default;
   }
 
   .setting-select option {
     background: #1e1e20;
     color: #fff;
+    text-align: left;
   }
 
   .setting-slider {
     appearance: none;
     -webkit-appearance: none;
-    width: 100%;
-    height: 4px;
-    border-radius: 2px;
+    height: 2px;
+    border-radius: 999px;
     background: rgba(255, 255, 255, 0.08);
     outline: none;
-    margin: 8px 0;
   }
 
   .setting-slider::-webkit-slider-thumb {
@@ -519,38 +546,72 @@
     width: 12px;
     height: 12px;
     border-radius: 50%;
-    background: var(--color-accent, #ffffff);
+    background: #ffffff;
     cursor: pointer;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
     transition: transform 150ms ease;
   }
 
   .setting-slider::-webkit-slider-thumb:hover {
-    transform: scale(1.2);
+    transform: scale(1.15);
   }
 
+  /* ── Progress + Status ────────────────────────────────── */
+  .progress-track {
+    margin-top: 4px;
+    height: 4px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.08);
+  }
+
+  .progress-fill {
+    height: 100%;
+    background: var(--color-accent, #ffffff);
+    transition: width 200ms ease;
+  }
+
+  .status-line {
+    margin: 10px 0 0;
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.45);
+  }
+
+  .status-line--warn {
+    color: rgba(248, 113, 113, 0.9);
+  }
+
+  .status-line--ok {
+    color: rgba(74, 222, 128, 0.9);
+  }
+
+  .status-line--error {
+    color: rgba(248, 113, 113, 0.9);
+  }
+
+  /* ── Action/Footer Buttons ────────────────────────────── */
   .action-btn {
     appearance: none;
     -webkit-appearance: none;
     border: 1px solid rgba(255, 255, 255, 0.08);
     background: rgba(255, 255, 255, 0.04);
     border-radius: 8px;
-    padding: 6px 12px;
-    font-size: 11px;
+    padding: 6px 14px;
+    font-size: 12px;
     font-family: inherit;
     font-weight: 500;
-    color: rgba(255, 255, 255, 0.85);
+    color: rgba(255, 255, 255, 0.7);
     cursor: pointer;
-    transition: background 150ms ease, color 150ms ease, transform 150ms ease;
+    transition: background-color 150ms ease, border-color 150ms ease;
   }
 
   .action-btn:hover:not(:disabled) {
-    background: rgba(255, 255, 255, 0.08);
-    color: #fff;
+    background-color: rgba(255, 255, 255, 0.07);
+    border-color: rgba(255, 255, 255, 0.12);
   }
 
   .action-btn:active:not(:disabled) {
-    transform: scale(0.97);
+    transform: scale(0.98);
   }
 
   .action-btn:disabled {
@@ -568,7 +629,21 @@
     font-family: inherit;
     font-weight: 600;
     cursor: pointer;
-    transition: background 150ms ease, transform 150ms ease;
+    transition: background-color 150ms ease, transform 150ms ease;
+  }
+
+  .footer-btn--ghost {
+    background: transparent;
+    color: rgba(255, 255, 255, 0.5);
+  }
+
+  .footer-btn--ghost:hover:not(:disabled) {
+    color: rgba(255, 255, 255, 0.8);
+  }
+
+  .footer-btn--ghost:disabled {
+    opacity: 0.45;
+    cursor: default;
   }
 
   .footer-btn--primary {
@@ -582,7 +657,7 @@
   }
 
   .footer-btn--primary:active:not(:disabled) {
-    transform: scale(0.97) translateY(0);
+    transform: scale(0.98) translateY(0);
   }
 
   .footer-btn--primary:disabled {

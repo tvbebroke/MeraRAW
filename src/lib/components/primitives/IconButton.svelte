@@ -2,12 +2,14 @@
   let {
     icon,
     label,
+    title,
     iconClass = "size-[20px]",
     wide = false,
     onclick,
   }: {
     icon: string;
     label: string;
+    title?: string;
     iconClass?: string;
     wide?: boolean;
     onclick?: () => void;
@@ -18,7 +20,7 @@
 <button
   {onclick}
   aria-label={label}
-  title={label}
+  title={title ?? label}
   class="icon-btn {wide ? 'icon-btn--wide' : ''}"
 >
   <img src={icon} alt="" class={iconClass} />

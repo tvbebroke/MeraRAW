@@ -1,5 +1,10 @@
 <script lang="ts">
+  import { onMount } from "svelte";
   import GlassPanel from "../primitives/GlassPanel.svelte";
+  import ContextMenu from "../primitives/ContextMenu.svelte";
+  import type { ContextMenuItem } from "../primitives/ContextMenu.svelte";
+  import { isExportOpen } from "../../../stores/ui";
+  import { shortcutLabels } from "../../shortcuts";
   import {
     applyOp,
     reportFrontendStatus,
@@ -478,6 +483,65 @@
     void refresh();
   }
 
+  // Global "Z" shortcut (see lib/shortcuts.ts) — toggle between fit and 1:1.
+  function onToggleZoomShortcut() {
+    if (!imageOpen.get()) return;
+    sendViewCmd(view.scale === null ? "oneToOne" : "fit");
+  }
+
+  // Global "\" shortcut (see lib/shortcuts.ts) — before/after preview toggle
+  // is this app's real equivalent of a "compare" view.
+  function onToggleCompareShortcut() {
+    toggleAfter();
+  }
+
+  onMount(() => {
+    window.addEventListener("meraraw:toggle-zoom", onToggleZoomShortcut);
+    window.addEventListener("meraraw:toggle-compare", onToggleCompareShortcut);
+    return () => {
+      window.removeEventListener("meraraw:toggle-zoom", onToggleZoomShortcut);
+      window.removeEventListener("meraraw:toggle-compare", onToggleCompareShortcut);
+    };
+  });
+
+  // Right-click context menu.
+  let ctxMenu = $state<{ x: number; y: number } | null>(null);
+
+  function handleContextMenu(e: MouseEvent) {
+    if (!imageOpen.get()) return;
+    e.preventDefault();
+    e.stopPropagation();
+    ctxMenu = { x: e.clientX, y: e.clientY };
+  }
+
+  const ctxItems = $derived<ContextMenuItem[]>([
+    {
+      type: "item",
+      label: view.scale === null ? "Zoom to 1:1" : "Zoom to fit",
+      shortcut: shortcutLabels.zoom,
+      onclick: onToggleZoomShortcut,
+    },
+    {
+      type: "item",
+      label: $previewBypass ? "Show after" : "Show before",
+      shortcut: shortcutLabels.compare,
+      onclick: toggleAfter,
+    },
+    { type: "separator" },
+    {
+      type: "item",
+      label: "Export…",
+      shortcut: shortcutLabels.export,
+      onclick: () => isExportOpen.set(true),
+    },
+    {
+      type: "item",
+      label: "Copy to clipboard",
+      disabled: true,
+      onclick: () => {},
+    },
+  ]);
+
   // Reset view when a new image opens.
   $effect(() => {
     const _path = $lastOpenedPath;
@@ -598,6 +662,7 @@
     onpointerup={onPointerUp}
     onpointercancel={onPointerUp}
     ondblclick={onDoubleClick}
+    oncontextmenu={handleContextMenu}
   >
     {#if displaySrc}
       <div class="relative max-h-full max-w-full">
@@ -776,3 +841,12 @@
     </div>
   {/if}
 </GlassPanel>
+
+{#if ctxMenu}
+  <ContextMenu
+    x={ctxMenu.x}
+    y={ctxMenu.y}
+    items={ctxItems}
+    onclose={() => (ctxMenu = null)}
+  />
+{/if}

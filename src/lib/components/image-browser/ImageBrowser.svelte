@@ -1,7 +1,12 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import GlassPanel from "../primitives/GlassPanel.svelte";
+  import ContextMenu from "../primitives/ContextMenu.svelte";
+  import type { ContextMenuItem } from "../primitives/ContextMenu.svelte";
   import { imageBrowserCollapsed } from "../../../stores/editor";
+  import { isExportOpen } from "../../../stores/ui";
+  import { shortcutLabels } from "../../shortcuts";
+  import { push } from "svelte-spa-router";
   import {
     activePhoto,
     openPhoto,
@@ -55,6 +60,65 @@
     window.addEventListener("keydown", handleKeydown);
     return () => window.removeEventListener("keydown", handleKeydown);
   });
+
+  // ── Context Menu ─────────────────────────────────────────────
+  let ctxMenu = $state<{ x: number; y: number } | null>(null);
+  let ctxPhoto = $state<(typeof $photos)[0] | null>(null);
+
+  function handleThumbContextMenu(e: MouseEvent, photo: (typeof $photos)[0]) {
+    e.preventDefault();
+    e.stopPropagation();
+    ctxPhoto = photo;
+    ctxMenu = { x: e.clientX, y: e.clientY };
+  }
+
+  function safePush(path: string) {
+    if (typeof document !== "undefined" && (document as any).startViewTransition) {
+      (document as any).startViewTransition(() => push(path));
+    } else {
+      push(path);
+    }
+  }
+
+  const ctxItems = $derived<ContextMenuItem[]>([
+    {
+      type: "item",
+      label: "Open in editor",
+      shortcut: shortcutLabels.openPhoto,
+      onclick: () => {
+        if (ctxPhoto) { void openPhoto(ctxPhoto); safePush("/edit"); }
+      },
+    },
+    {
+      type: "item",
+      label: "Export…",
+      shortcut: shortcutLabels.export,
+      onclick: () => isExportOpen.set(true),
+    },
+    { type: "separator" },
+    {
+      type: "item",
+      label: "Previous photo",
+      shortcut: shortcutLabels.prevPhoto,
+      onclick: () => {
+        const list = photos.get();
+        const current = activePhoto.get();
+        const idx = current ? list.findIndex((p) => p.path === current.path) : -1;
+        if (idx > 0) void openPhoto(list[idx - 1]);
+      },
+    },
+    {
+      type: "item",
+      label: "Next photo",
+      shortcut: shortcutLabels.nextPhoto,
+      onclick: () => {
+        const list = photos.get();
+        const current = activePhoto.get();
+        const idx = current ? list.findIndex((p) => p.path === current.path) : -1;
+        if (idx >= 0 && idx < list.length - 1) void openPhoto(list[idx + 1]);
+      },
+    },
+  ]);
 </script>
 
 <GlassPanel
@@ -107,6 +171,7 @@
         class="filmstrip-card {$activePhoto?.path === photo.path ? 'filmstrip-card--active' : ''}"
         title={photo.filename}
         onclick={() => openPhoto(photo)}
+        oncontextmenu={(e) => handleThumbContextMenu(e, photo)}
       >
         {#if photo.hasThumb}
           <img
@@ -122,6 +187,15 @@
     {/each}
   </div>
 </GlassPanel>
+
+{#if ctxMenu}
+  <ContextMenu
+    x={ctxMenu.x}
+    y={ctxMenu.y}
+    items={ctxItems}
+    onclose={() => (ctxMenu = null)}
+  />
+{/if}
 
 <style>
   .filmstrip-card {

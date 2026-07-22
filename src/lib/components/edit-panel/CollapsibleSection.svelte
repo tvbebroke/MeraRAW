@@ -18,7 +18,7 @@
   const open = $derived($openSections[id]);
 </script>
 
-<section class="w-full shrink-0 rounded-[22px] bg-[#171717] border border-white/[0.04] shadow-inner transition-all duration-300">
+<section class="w-full shrink-0 rounded-[22px] bg-[#2b2b2b]/60 border border-white/[0.04] shadow-inner transition-all duration-300">
   <button
     class="grid h-[28px] w-full cursor-pointer grid-cols-[26px_1fr_26px] items-center px-[10px] focus:outline-none"
     onclick={() => toggleSection(id)}
@@ -33,7 +33,7 @@
     />
   </button>
   {#if open}
-    <div class="px-[14px] pt-[6px] pb-[14px]" transition:slide={{ duration: 150 }}>
+    <div class="px-[14px] pt-[6px] pb-[14px]" transition:slide={{ duration: 180 }}>
       {@render children?.()}
     </div>
   {/if}

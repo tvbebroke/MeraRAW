@@ -16,6 +16,7 @@
   import AiSettings from "../lib/components/edit-panel/AiSettings.svelte";
   import RetouchSettings from "../lib/components/edit-panel/RetouchSettings.svelte";
   import PresetSettings from "../lib/components/edit-panel/PresetSettings.svelte";
+  import ChatSettings from "../lib/components/edit-panel/ChatSettings.svelte";
   import ImageBrowser from "../lib/components/image-browser/ImageBrowser.svelte";
   import Histogram from "../lib/components/histogram/Histogram.svelte";
   import BottomBar from "../lib/components/shell/BottomBar.svelte";
@@ -375,6 +376,8 @@
                 <RetouchSettings />
               {:else if $activeTool === "presets"}
                 <PresetSettings />
+              {:else if $activeTool === "chat"}
+                <ChatSettings />
               {/if}
             </div>
           {/key}

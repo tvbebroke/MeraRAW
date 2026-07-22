@@ -1,7 +1,11 @@
 <script lang="ts">
   import GlassPanel from "../lib/components/primitives/GlassPanel.svelte";
   import FileBrowser from "../lib/components/file-browser/FileBrowser.svelte";
-  import { leftRailCollapsed } from "../stores/editor";
+  import PhotoDetailsPanel from "../lib/components/library/PhotoDetailsPanel.svelte";
+  import ContextMenu from "../lib/components/primitives/ContextMenu.svelte";
+  import type { ContextMenuItem } from "../lib/components/primitives/ContextMenu.svelte";
+  import { leftRailCollapsed, photoDetailsCollapsed } from "../stores/editor";
+  import { isExportOpen } from "../stores/ui";
   import {
     activePhoto,
     folder,
@@ -14,6 +18,7 @@
   import { push } from "svelte-spa-router";
   import { fade, scale } from "svelte/transition";
   import { cubicOut } from "svelte/easing";
+  import { shortcutLabels } from "../lib/shortcuts";
 
   // Window dimensions for responsive boundaries
   let windowWidth = $state(0);
@@ -55,6 +60,45 @@
   function handleLeftKeyDown(e: KeyboardEvent) {
     if (e.key === "ArrowRight") leftRailWidth = Math.max(180, Math.min(maxLeftRailWidth, leftRailWidth + 10));
     else if (e.key === "ArrowLeft") leftRailWidth = Math.max(180, Math.min(maxLeftRailWidth, leftRailWidth - 10));
+  }
+
+  // Right rail (photo details panel) width
+  let rightRailWidth = $state(260);
+  let isResizingRight = $state(false);
+
+  const maxRightRailWidth = $derived(Math.max(200, Math.min(450, windowWidth * 0.35)));
+
+  $effect(() => {
+    if (rightRailWidth > maxRightRailWidth) rightRailWidth = maxRightRailWidth;
+    else if (rightRailWidth < 200) rightRailWidth = 200;
+  });
+
+  function handleRightResizeStart(e: MouseEvent) {
+    e.preventDefault();
+    isResizingRight = true;
+    const startX = e.clientX;
+    const startWidth = rightRailWidth;
+
+    function handleMouseMove(moveEvent: MouseEvent) {
+      const deltaX = startX - moveEvent.clientX; // drag left increases width
+      rightRailWidth = Math.max(200, Math.min(maxRightRailWidth, startWidth + deltaX));
+    }
+
+    function handleMouseUp() {
+      isResizingRight = false;
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+      document.body.style.cursor = "";
+    }
+
+    document.body.style.cursor = "col-resize";
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseup", handleMouseUp);
+  }
+
+  function handleRightKeyDown(e: KeyboardEvent) {
+    if (e.key === "ArrowLeft") rightRailWidth = Math.max(200, Math.min(maxRightRailWidth, rightRailWidth + 10));
+    else if (e.key === "ArrowRight") rightRailWidth = Math.max(200, Math.min(maxRightRailWidth, rightRailWidth - 10));
   }
 
   // Sort / filter state
@@ -143,14 +187,98 @@
   const selected = $derived(
     filteredPhotos.find((p) => p.path === highlightPath) ?? null,
   );
+
+  // Keyboard navigation across the photo grid
+  let gridEl = $state<HTMLDivElement | null>(null);
+
+  function isEditableTarget(target: EventTarget | null) {
+    if (!(target instanceof HTMLElement)) return false;
+    return (
+      target.isContentEditable ||
+      ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName)
+    );
+  }
+
+  function getColumnCount() {
+    if (!gridEl) return 1;
+    return getComputedStyle(gridEl).gridTemplateColumns.split(" ").length || 1;
+  }
+
+  function handleGridKeydown(e: KeyboardEvent) {
+    if (isEditableTarget(e.target)) return;
+    const list = filteredPhotos;
+    if (!list.length) return;
+
+    if (e.key === "Enter") {
+      const current = list.find((p) => p.path === highlightPath);
+      if (current) void openPhoto(current);
+      return;
+    }
+
+    if (!["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(e.key)) return;
+    e.preventDefault();
+
+    const currentIndex = highlightPath ? list.findIndex((p) => p.path === highlightPath) : -1;
+    const cols = getColumnCount();
+    let nextIndex = currentIndex;
+
+    if (e.key === "ArrowLeft") nextIndex = Math.max(0, currentIndex - 1);
+    else if (e.key === "ArrowRight") nextIndex = Math.min(list.length - 1, currentIndex === -1 ? 0 : currentIndex + 1);
+    else if (e.key === "ArrowUp") nextIndex = Math.max(0, currentIndex - cols);
+    else if (e.key === "ArrowDown") nextIndex = Math.min(list.length - 1, currentIndex === -1 ? 0 : currentIndex + cols);
+
+    if (nextIndex !== currentIndex) selectPhoto(list[nextIndex]);
+  }
+
+  // ── Context Menu ─────────────────────────────────────────
+  let ctxMenu = $state<{ x: number; y: number } | null>(null);
+  let ctxPhoto = $state<GridItem | null>(null);
+
+  function handlePhotoContextMenu(e: MouseEvent, photo: GridItem) {
+    e.preventDefault();
+    e.stopPropagation();
+    selectPhoto(photo);
+    ctxPhoto = photo;
+    ctxMenu = { x: e.clientX, y: e.clientY };
+  }
+
+  const ctxItems = $derived<ContextMenuItem[]>([
+    {
+      type: "item",
+      label: "Open in editor",
+      shortcut: shortcutLabels.openPhoto,
+      onclick: () => { if (ctxPhoto) void openPhoto(ctxPhoto); },
+    },
+    {
+      type: "item",
+      label: "Export…",
+      shortcut: shortcutLabels.export,
+      onclick: () => isExportOpen.set(true),
+    },
+    { type: "separator" },
+    {
+      type: "item",
+      label: "Copy file path",
+      onclick: () => {
+        if (ctxPhoto) navigator.clipboard?.writeText(ctxPhoto.path);
+      },
+    },
+    { type: "separator" },
+    {
+      type: "item",
+      label: "Deselect",
+      shortcut: shortcutLabels.escape,
+      onclick: () => (selectedPath = null),
+    },
+  ]);
 </script>
 
-<svelte:window bind:innerWidth={windowWidth} />
+<svelte:window bind:innerWidth={windowWidth} onkeydown={handleGridKeydown} />
 
 <div
   in:fade={{ duration: 200, delay: 100 }}
   out:fade={{ duration: 150 }}
-  style="grid-template-columns: auto minmax(0, 1fr);"
+  style="grid-template-columns: auto minmax(0, 1fr) auto;"
   class="grid h-full min-h-0 gap-[11px] px-[11px] pb-[11px]"
 >
   <!-- Animated Left Rail Container -->
@@ -279,13 +407,14 @@
           </div>
         {:else}
           <!-- Photo Grid -->
-          <div class="photo-grid">
+          <div class="photo-grid" bind:this={gridEl}>
             {#each filteredPhotos as photo (photo.path)}
               <!-- svelte-ignore a11y_no_static_element_interactions -->
               <button
                 class="photo-card {highlightPath === photo.path ? 'photo-card--active' : ''}"
                 onclick={() => selectPhoto(photo)}
                 ondblclick={() => openPhoto(photo)}
+                oncontextmenu={(e) => handlePhotoContextMenu(e, photo)}
                 title={photo.filename}
               >
                 <div class="photo-thumb-wrap">
@@ -359,8 +488,58 @@
         </svg>
       </button>
     {/if}
+    {#if $photoDetailsCollapsed}
+      <button
+        onclick={() => photoDetailsCollapsed.set(false)}
+        aria-label="Expand Details"
+        class="absolute right-3 top-1/2 -translate-y-1/2 flex size-[26px] items-center justify-center rounded-full border border-white/5 bg-panel-2 backdrop-blur-md text-white/80 hover:bg-white/[0.12] hover:text-white active:scale-95 transition-all cursor-pointer z-50 shadow-md"
+      >
+        <svg width="6" height="10" viewBox="0 0 6 10" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="pointer-events-none rotate-180">
+          <path d="M1.5 1.5L5 5L1.5 8.5" />
+        </svg>
+      </button>
+    {/if}
+  </div>
+
+  <!-- Animated Right Rail Container -->
+  <div
+    style="
+      width: {$photoDetailsCollapsed ? '0px' : `${rightRailWidth}px`};
+      margin-left: {$photoDetailsCollapsed ? '-11px' : '0px'};
+      transition: {isResizingRight ? 'none' : 'width 350ms cubic-bezier(0.16, 1, 0.3, 1), margin-left 350ms cubic-bezier(0.16, 1, 0.3, 1)'};
+    "
+    class="relative min-h-0 {$photoDetailsCollapsed ? 'overflow-hidden pointer-events-none' : 'overflow-visible'}"
+  >
+    <PhotoDetailsPanel class="h-full {isResizingRight ? 'transition-none' : ''}" />
+    <!-- Resize Handle -->
+    {#if !$photoDetailsCollapsed}
+      <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+      <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+      <div
+        role="separator"
+        aria-orientation="vertical"
+        aria-valuenow={rightRailWidth}
+        aria-valuemin={200}
+        aria-valuemax={maxRightRailWidth}
+        tabindex="0"
+        class="group absolute -left-[11px] top-0 bottom-0 w-[11px] cursor-col-resize z-50 flex items-center justify-center focus:outline-none"
+        onmousedown={handleRightResizeStart}
+        onkeydown={handleRightKeyDown}
+      >
+        <div class="w-[2px] h-[40px] rounded-full bg-white/5 group-hover:bg-white/25 group-active:bg-accent transition-all duration-200"></div>
+      </div>
+    {/if}
   </div>
 </div>
+
+{#if ctxMenu}
+  <ContextMenu
+    x={ctxMenu.x}
+    y={ctxMenu.y}
+    items={ctxItems}
+    onclose={() => (ctxMenu = null)}
+  />
+{/if}
 
 <!-- Click-outside to close sort menu -->
 {#if showSortMenu}

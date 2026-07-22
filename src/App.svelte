@@ -6,9 +6,13 @@
   import SettingsModal from "./lib/components/shell/SettingsModal.svelte";
   import ExportModal from "./lib/components/shell/ExportModal.svelte";
   import TelemetryConsent from "./lib/components/shell/TelemetryConsent.svelte";
+  import BugReportModal from "./lib/components/shell/BugReportModal.svelte";
+  import ShortcutsModal from "./lib/components/shell/ShortcutsModal.svelte";
   import {
     isSettingsOpen,
     isExportOpen,
+    isBugReportOpen,
+    isShortcutsOpen,
     classicLook,
     themeTransitionActive,
     themeFlashActive,
@@ -20,6 +24,7 @@
   import { undo, redo } from "./ipc/commands";
   import { reconcile } from "./stores/doc";
   import { refreshFolders } from "./stores/browse";
+  import { handleGlobalShortcut } from "./lib/shortcuts";
 
   onMount(() => {
     // If not running in Tauri (e.g. running in standard browser preview),
@@ -64,9 +69,13 @@
   });
 </script>
 
+<svelte:window onkeydown={handleGlobalShortcut} />
+
+<!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
-  class="relative flex h-full flex-col overflow-hidden rounded-[33px] border border-black/40 bg-window transition-all duration-300"
+  class="relative flex h-full flex-col overflow-hidden bg-window transition-all duration-300"
   class:classic-look={$classicLook}
+  oncontextmenu={(e) => e.preventDefault()}
 >
   <TitleBar />
   <main class="min-h-0 flex-1">
@@ -82,6 +91,14 @@
   {/if}
 
   <TelemetryConsent />
+
+  {#if $isBugReportOpen}
+    <BugReportModal />
+  {/if}
+
+  {#if $isShortcutsOpen}
+    <ShortcutsModal />
+  {/if}
 
   <!-- Shutter flash: CSS opacity transition, not {#if}, so it fades instead of popping -->
   <div

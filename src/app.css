@@ -139,7 +139,7 @@ body {
 .classic-look header {
   background-color: #161618 !important;
   border-bottom: 1px solid #121212 !important;
-  height: 48px !important;
+  height: 44px !important;
 }
 
 /* Library Photo Grid & Cards */
@@ -165,7 +165,7 @@ body {
 }
 
 /* Form inputs & textareas solid Lightroom style (keeping rounded corners) */
-.classic-look input:not(.search-input):not(.search-input-sidebar),
+.classic-look input:not(.search-input):not(.search-input-sidebar):not(.chat-input),
 .classic-look textarea {
   border: 1px solid #333336 !important;
   background-color: #121214 !important;
@@ -173,7 +173,7 @@ body {
   box-shadow: none !important;
 }
 
-.classic-look input:not(.search-input):not(.search-input-sidebar):focus,
+.classic-look input:not(.search-input):not(.search-input-sidebar):not(.chat-input):focus,
 .classic-look textarea:focus {
   border-color: #555558 !important;
 }
@@ -244,5 +244,28 @@ body {
 .animate-gear-ccw {
   animation: spin-ccw 2.5s linear infinite;
   transform-origin: center;
+}
+
+/* Chat Input Area overrides in Classic Mode */
+.classic-look .chat-input-wrapper {
+  background-color: #121214 !important;
+  border: 1px solid #333336 !important;
+}
+
+.classic-look .chat-send-btn {
+  background-color: #252528 !important;
+  color: #e0e0e2 !important;
+  border: 1px solid #333336 !important;
+}
+
+.classic-look .chat-send-btn:hover {
+  background-color: #313135 !important;
+  border-color: #4a4a4d !important;
+}
+
+.classic-look .chat-send-btn:disabled {
+  opacity: 0.3 !important;
+  background-color: #1e1e20 !important;
+  border-color: #2d2d30 !important;
 }
 
