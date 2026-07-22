@@ -14,6 +14,7 @@
 
 <button
   role="switch"
+  data-tauri-drag-region="false"
   aria-checked={checked}
   aria-label={label}
   title={title ?? label}

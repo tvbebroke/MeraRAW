@@ -557,7 +557,7 @@
   .toolbar-btn {
     appearance: none;
     -webkit-appearance: none;
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    border: 1px solid var(--color-border-input, rgba(255, 255, 255, 0.08));
     padding: 0;
     margin: 0;
     cursor: pointer;
@@ -569,7 +569,7 @@
     width: 36px;
     height: 36px;
     border-radius: 9999px;
-    background: #1e1e20;
+    background: var(--color-button-bg, rgba(255, 255, 255, 0.06));
     box-shadow:
       inset 0 1px 0 rgba(255, 255, 255, 0.08),
       inset 0 -1px 0 rgba(0, 0, 0, 0.2),
@@ -578,13 +578,13 @@
   }
 
   .toolbar-btn:hover {
-    background: #2a2a2d;
+    background: var(--color-button-hover, rgba(255, 255, 255, 0.12));
     transform: translateY(-0.5px);
   }
 
   .toolbar-btn:active {
     transform: scale(0.96);
-    background: #1a1a1c;
+    background: rgba(255, 255, 255, 0.15);
   }
 
   /* ── Sort Menu ────────────────────────────────────────── */
@@ -597,7 +597,7 @@
     background: rgba(22, 22, 24, 0.92);
     -webkit-backdrop-filter: blur(20px);
     backdrop-filter: blur(20px);
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    border: 1px solid var(--color-border-input, rgba(255, 255, 255, 0.08));
     border-radius: 12px;
     padding: 5px;
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
@@ -642,8 +642,8 @@
     width: 240px;
     padding: 0 4px 0 16px;
     border-radius: 9999px;
-    border: 1px solid rgba(255, 255, 255, 0.06);
-    background: rgba(33, 33, 35, 0.65);
+    border: 1px solid var(--color-border-input, rgba(255, 255, 255, 0.06));
+    background: var(--color-surface-input, rgba(33, 33, 35, 0.65));
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
     box-shadow:
@@ -655,8 +655,8 @@
   }
 
   .search-wrap:focus-within {
-    background: rgba(47, 47, 49, 0.85);
-    border-color: rgba(255, 255, 255, 0.15);
+    background: rgba(0, 0, 0, 0.4);
+    border-color: var(--color-border-hover, rgba(255, 255, 255, 0.25));
   }
 
   .search-icon-circle {

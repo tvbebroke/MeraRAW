@@ -734,7 +734,7 @@
   {#if !minimal}
     <!-- Bottom Control Bar -->
     <div
-      class="mt-[8px] flex h-[30px] shrink-0 items-center justify-between px-[14px] rounded-[22px] bg-panel-2 border border-white/[0.02] text-[9px] text-white/40 shadow-inner select-none"
+      class="mt-[8px] flex h-[30px] shrink-0 items-center justify-between px-[14px] rounded-[22px] bg-panel-2 border border-white/[0.04] text-[11px] text-white/70 shadow-inner select-none"
     >
       <div class="flex items-center gap-[14px]">
         <button
@@ -742,7 +742,7 @@
           onclick={toggleFullscreen}
           title="Toggle Fullscreen"
           aria-label="Toggle Fullscreen"
-          class="flex items-center justify-center cursor-pointer text-white/40 hover:text-white/95 transition-colors"
+          class="flex items-center justify-center cursor-pointer text-white/70 hover:text-white transition-colors"
         >
           <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.3">
             <path d="M3.5 1H1.5V3" stroke-linecap="round" />
@@ -755,7 +755,7 @@
         <button
           type="button"
           onclick={() => sendViewCmd("oneToOne")}
-          class="text-[9px] cursor-pointer transition-colors {$zoomLabel === '100%' ? 'font-bold text-white/95' : 'text-white/40 hover:text-white/80'}"
+          class="text-[11px] font-light cursor-pointer transition-colors {$zoomLabel === '100%' ? 'text-white font-medium' : 'text-white/70 hover:text-white'}"
         >
           1:1
         </button>
@@ -764,7 +764,7 @@
           type="button"
           onclick={() => sendViewCmd("zoomOut")}
           aria-label="Zoom Out"
-          class="text-[12px] font-medium cursor-pointer text-white/40 hover:text-white/80 transition-colors"
+          class="text-[12px] font-light cursor-pointer text-white/70 hover:text-white transition-colors"
         >
           -
         </button>
@@ -772,16 +772,16 @@
         <button
           type="button"
           onclick={() => sendViewCmd("fit")}
-          class="text-[9px] cursor-pointer transition-colors {$zoomLabel === 'fit' ? 'font-medium text-white/85' : 'text-white/40 hover:text-white/80'}"
+          class="text-[11px] font-light cursor-pointer transition-colors {$zoomLabel === 'fit' ? 'text-white font-medium' : 'text-white/70 hover:text-white'}"
         >
-          fit
+          Fit
         </button>
 
         <button
           type="button"
           onclick={() => sendViewCmd("zoomIn")}
           aria-label="Zoom In"
-          class="text-[10px] font-medium cursor-pointer text-white/40 hover:text-white/80 transition-colors"
+          class="text-[11px] font-light cursor-pointer text-white/70 hover:text-white transition-colors"
         >
           +
         </button>
@@ -792,7 +792,7 @@
           <button
             type="button"
             onclick={() => pickLook(look.value)}
-            class="text-[9px] cursor-pointer transition-colors {$displayLook === look.value ? 'font-bold text-white/95' : 'text-white/40 hover:text-white/80'}"
+            class="text-[11px] font-light cursor-pointer transition-colors {$displayLook === look.value ? 'text-white font-medium' : 'text-white/70 hover:text-white'}"
           >
             {look.label}
           </button>
@@ -801,7 +801,7 @@
         <button
           type="button"
           onclick={toggleAfter}
-          class="flex items-center gap-[5px] text-[9px] cursor-pointer transition-colors {!$previewBypass && !compareSplit ? 'text-white/95 font-medium' : 'text-white/40 hover:text-white/80'}"
+          class="flex items-center gap-[5px] text-[11px] font-light cursor-pointer transition-colors {!$previewBypass && !compareSplit ? 'text-white font-medium' : 'text-white/70 hover:text-white'}"
           title="Toggle full before/after"
         >
           <span>{$previewBypass ? "Before" : "After"}</span>
@@ -811,7 +811,7 @@
           type="button"
           onclick={() => void toggleCompare()}
           disabled={compareBusy}
-          class="flex items-center gap-[5px] text-[9px] cursor-pointer transition-colors {compareSplit ? 'text-white/95 font-medium' : 'text-white/40 hover:text-white/80'}"
+          class="flex items-center gap-[5px] text-[11px] font-light cursor-pointer transition-colors {compareSplit ? 'text-white font-medium' : 'text-white/70 hover:text-white'}"
           title="Split before/after"
           aria-pressed={compareSplit}
         >
@@ -828,7 +828,7 @@
           aria-label="Toggle Zoom Loupe"
           aria-pressed={loupeOn}
           title="Cursor loupe (2.5×)"
-          class="flex items-center justify-center cursor-pointer transition-colors {loupeOn ? 'text-white/95' : 'text-white/40 hover:text-white/80'}"
+          class="flex items-center justify-center cursor-pointer transition-colors {loupeOn ? 'text-white' : 'text-white/70 hover:text-white'}"
         >
           <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5">
             <circle cx="5" cy="5" r="3.5" />
@@ -836,7 +836,7 @@
           </svg>
         </button>
 
-        <span class="text-[9px] text-white/35 tabular-nums">{$zoomLabel}</span>
+        <span class="text-[11px] text-white/50 tabular-nums">{$zoomLabel}</span>
       </div>
     </div>
   {/if}

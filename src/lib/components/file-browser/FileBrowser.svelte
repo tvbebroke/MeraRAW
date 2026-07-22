@@ -112,9 +112,9 @@
 
   <div class="min-h-0 flex-1 overflow-y-auto px-[2px] custom-scrollbar">
     {#if $browseBusy && filteredFolders.length === 0}
-      <p class="px-[8px] py-[6px] text-[9px] text-white/30">Loading…</p>
+      <p class="px-[8px] py-[6px] text-[11px] text-white/40">Loading…</p>
     {:else if filteredFolders.length === 0}
-      <p class="px-[8px] py-[6px] text-[9px] text-white/30">
+      <p class="px-[8px] py-[6px] text-[11px] text-white/40">
         No catalog folders — use + to import
       </p>
     {:else}
@@ -123,15 +123,24 @@
           <li>
             <button
               type="button"
-              class="flex w-full items-center gap-[6px] py-[4px] px-[6px] rounded-[8px] hover:bg-white/[0.03] transition-all cursor-pointer select-none text-[9px] text-left {$folder === item.root ? 'bg-white/[0.08] shadow-sm border border-white/[0.03]' : 'border border-transparent'}"
+              class="flex w-full items-center gap-[6px] py-[4px] px-[6px] rounded-[8px] hover:bg-white/[0.03] transition-all cursor-pointer select-none text-[11px] text-left {$folder === item.root ? 'bg-white/[0.08] shadow-sm border border-white/[0.03]' : 'border border-transparent'}"
               onclick={() => selectFolder(item.root)}
             >
-              <span class="w-[8px] h-[8px]"></span>
-              <span class="text-[10px]">📁</span>
+              <span class="w-[15px] h-[15px] flex items-center justify-center shrink-0">
+                {#if $folder === item.root}
+                  <svg width="14.5" height="14.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="text-white">
+                    <path d="M6 14l1.45-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.55 6A2 2 0 0 1 18.45 20H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h7a2 2 0 0 1 2 2v2"/>
+                  </svg>
+                {:else}
+                  <svg width="14.5" height="14.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="text-white/50">
+                    <path d="M20 20H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2z"/>
+                  </svg>
+                {/if}
+              </span>
               <span class="min-w-0 flex-1 truncate text-white/80 {$folder === item.root ? 'text-white font-medium' : ''}">
                 {item.name}
               </span>
-              <span class="shrink-0 text-[8px] text-white/30">{item.photoCount}</span>
+              <span class="shrink-0 text-[10px] text-white/40">{item.photoCount}</span>
             </button>
           </li>
         {/each}
@@ -150,8 +159,8 @@
     width: 100%;
     padding: 0 3px 0 12px;
     border-radius: 9999px;
-    border: 1px solid rgba(255, 255, 255, 0.06);
-    background: rgba(33, 33, 35, 0.65);
+    border: 1px solid var(--color-border-input, rgba(255, 255, 255, 0.06));
+    background: var(--color-surface-input, rgba(33, 33, 35, 0.65));
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
     box-shadow:
@@ -165,8 +174,8 @@
   }
 
   .search-wrap-sidebar:focus-within {
-    background: rgba(47, 47, 49, 0.85);
-    border-color: rgba(255, 255, 255, 0.15);
+    background: rgba(0, 0, 0, 0.4);
+    border-color: var(--color-border-hover, rgba(255, 255, 255, 0.15));
   }
 
   .search-icon-circle-sidebar {

@@ -79,9 +79,10 @@
     >BETA</span
   >
 
-  <div class="ml-auto flex items-center gap-[7px]">
+  <div class="ml-auto flex items-center gap-[7px]" data-tauri-drag-region="false">
     <button
       type="button"
+      data-tauri-drag-region="false"
       class="rounded-full border border-white/5 bg-white/[0.04] px-3 py-1.5 text-[11px] font-medium text-white/80 transition-all hover:bg-white/[0.12] hover:text-white"
       onclick={() => void openRaw()}
     >
@@ -109,6 +110,7 @@
         aria-label="Edit"
         title="Edit ({shortcutLabels.edit})"
         class="edit-pill-btn"
+        data-tauri-drag-region="false"
       >
         <span class="edit-pill-label">Edit</span>
         <div class="edit-pill-icon-circle">

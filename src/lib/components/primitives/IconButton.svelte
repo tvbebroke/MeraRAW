@@ -19,11 +19,12 @@
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <button
   {onclick}
+  data-tauri-drag-region="false"
   aria-label={label}
   title={title ?? label}
   class="icon-btn {wide ? 'icon-btn--wide' : ''}"
 >
-  <img src={icon} alt="" class={iconClass} />
+  <img src={icon} alt="" class="{iconClass} pointer-events-none" />
 </button>
 
 <style>

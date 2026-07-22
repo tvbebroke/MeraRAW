@@ -39,9 +39,9 @@
     backdrop-filter: blur(30px) saturate(140%);
     
     /* Dark panel fill sitting inside the lighter charcoal window */
-    background: var(--glass-bg, rgba(17, 17, 19, 0.78));
+    background: var(--glass-bg, var(--color-panel, rgba(23, 23, 23, 0.78)));
       
-    border: 1px solid rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--color-border-subtle, rgba(255, 255, 255, 0.05));
     box-shadow:
       inset 0 1px 0 rgba(255, 255, 255, 0.04),
       inset 0 -1px 0 rgba(0, 0, 0, 0.3),

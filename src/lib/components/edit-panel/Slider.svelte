@@ -29,8 +29,10 @@
   let track: HTMLDivElement;
   let isHovered = $state(false);
   let isDragging = $state(false);
+  let localValue = $state(0);
 
-  const frac = $derived((value - min) / (max - min));
+  const displayValue = $derived(isDragging ? localValue : value);
+  const frac = $derived((displayValue - min) / (max - min));
 
   // Determine highlight track geometry
   const zeroFrac = $derived(min < 0 ? -min / (max - min) : 0);
@@ -58,22 +60,40 @@
     if (disabled || !track) return;
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
     isDragging = true;
-    oninput?.(valueFromEvent(e));
+    const val = valueFromEvent(e);
+    localValue = val;
+    if (oninput) oninput(val);
+    else onchange?.(val);
   }
 
   function onpointermove(e: PointerEvent) {
-    if (isDragging && !disabled) oninput?.(valueFromEvent(e));
+    if (isDragging && !disabled) {
+      const val = valueFromEvent(e);
+      localValue = val;
+      if (oninput) oninput(val);
+      else onchange?.(val);
+    }
   }
 
   function onpointerup(e: PointerEvent) {
-    if (isDragging && !disabled) onchange?.(valueFromEvent(e));
+    if (isDragging && !disabled) {
+      const val = valueFromEvent(e);
+      localValue = val;
+      onchange?.(val);
+    }
     isDragging = false;
   }
 
   function onkeydown(e: KeyboardEvent) {
     if (disabled) return;
-    if (e.key === "ArrowLeft") onchange?.(quantize(value - step));
-    if (e.key === "ArrowRight") onchange?.(quantize(value + step));
+    let nextVal = value;
+    if (e.key === "ArrowLeft") nextVal = quantize(value - step);
+    if (e.key === "ArrowRight") nextVal = quantize(value + step);
+    if (nextVal !== value) {
+      localValue = nextVal;
+      if (onchange) onchange(nextVal);
+      else oninput?.(nextVal);
+    }
   }
 
   function fmt(v: number): string {
@@ -88,11 +108,11 @@
   role="slider"
   tabindex={disabled ? -1 : 0}
   aria-label={label}
-  aria-valuenow={value}
+  aria-valuenow={displayValue}
   aria-valuemin={min}
   aria-valuemax={max}
   aria-disabled={disabled}
-  title="{label}: {fmt(value)}"
+  title="{label}: {fmt(displayValue)}"
   class="group relative h-[13px] w-full touch-none outline-none select-none {disabled ? 'opacity-35 cursor-default' : 'cursor-pointer'}"
   {onpointerdown}
   {onpointermove}
@@ -102,7 +122,14 @@
   onpointerenter={() => (isHovered = !disabled)}
   onpointerleave={() => (isHovered = false)}
   {onkeydown}
-  ondblclick={() => !disabled && onchange?.(quantize(resetValue))}
+  ondblclick={() => {
+    if (!disabled) {
+      const reset = quantize(resetValue);
+      localValue = reset;
+      if (onchange) onchange(reset);
+      else oninput?.(reset);
+    }
+  }}
 >
   <!-- Background Track -->
   <div
@@ -132,7 +159,7 @@
       class="absolute bottom-[16px] -translate-x-1/2 px-2 py-0.5 rounded-[4px] bg-[#1a1a1c] border border-white/10 text-[9px] font-mono font-bold text-white shadow-[0_4px_12px_rgba(0,0,0,0.5)] pointer-events-none z-[100]"
       style="left: calc({frac} * (100% - 17px) + 8.5px);"
     >
-      {value > 0 && min < 0 ? "+" : ""}{fmt(value)}
+      {displayValue > 0 && min < 0 ? "+" : ""}{fmt(displayValue)}
     </div>
   {/if}
 </div>

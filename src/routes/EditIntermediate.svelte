@@ -324,13 +324,12 @@
         <div class="w-[2px] h-[40px] rounded-full bg-white/5 group-hover:bg-white/25 group-active:bg-accent transition-all duration-200"></div>
       </div>
     {/if}
-    {#snippet settingsPanel(glassBg: string)}
+    {#snippet settingsPanel()}
       <GlassPanel
         class="flex min-h-0 flex-1 flex-col overflow-hidden {isResizingRight || isResizingHistogram ? 'transition-none' : ''}"
-        style="--glass-bg: {glassBg};"
       >
         <!-- Grid/Cell overlay strategy for zero layout jump settings transitions -->
-        <div class="flex-1 min-h-0 overflow-y-auto p-[7px] grid grid-cols-1 grid-rows-1">
+        <div class="flex-1 min-h-0 overflow-y-auto p-[7px] pb-[16px] custom-scrollbar grid grid-cols-1 grid-rows-1">
           {#key $activeTool}
             <div
               in:fly={{ y: 8, duration: 220, delay: 80, easing: cubicOut }}
@@ -344,9 +343,9 @@
                     <button
                       type="button"
                       onclick={() => void onAutoLevel()}
-                      class="h-[20px] rounded-[10px] bg-white/[0.06] border border-white/[0.04] px-[8px] text-[8px] font-semibold text-white/80 hover:bg-white/[0.12] hover:text-white active:scale-95 transition-all"
+                      class="h-[22px] rounded-[10px] bg-white/[0.06] border border-white/[0.04] px-[8px] text-[11px] font-light text-white/90 hover:bg-white/[0.12] hover:text-white active:scale-95 transition-all cursor-pointer"
                     >Auto</button>
-                    <button class="h-[20px] rounded-[10px] bg-white/[0.06] border border-white/[0.04] px-[8px] text-[8px] font-semibold text-white/80 hover:bg-white/[0.12] hover:text-white active:scale-95 transition-all">B&W</button>
+                    <button class="h-[22px] rounded-[10px] bg-white/[0.06] border border-white/[0.04] px-[8px] text-[11px] font-light text-white/90 hover:bg-white/[0.12] hover:text-white active:scale-95 transition-all cursor-pointer">B&W</button>
                   </div>
                 </div>
                 <ProfileSettings />
@@ -379,6 +378,7 @@
               {:else if $activeTool === "chat"}
                 <ChatSettings />
               {/if}
+              <div class="h-6 shrink-0"></div>
             </div>
           {/key}
         </div>
@@ -392,13 +392,13 @@
       {#if $classicLook}
         <!-- Classic: panel + histogram on the left, tool strip docked right -->
         <div class="flex flex-1 min-w-0 flex-col gap-0 border-r border-[#121212]">
-          {@render settingsPanel("#1e1e20")}
+          {@render settingsPanel()}
           <Histogram onResizeStart={handleHistogramResizeStart} height={histogramHeight} class={isResizingHistogram ? 'transition-none' : ''} />
         </div>
         <EditTypeSelector />
       {:else}
         <EditTypeSelector />
-        {@render settingsPanel("#171717")}
+        {@render settingsPanel()}
         <Histogram onResizeStart={handleHistogramResizeStart} height={histogramHeight} class={isResizingHistogram ? 'transition-none' : ''} />
       {/if}
     </div>
