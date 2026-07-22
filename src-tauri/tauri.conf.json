@@ -23,8 +23,11 @@
         "minWidth": 1024,
         "minHeight": 700,
         "resizable": true,
-        "decorations": false,
+        "decorations": true,
         "transparent": true,
+        "hiddenTitle": true,
+        "titleBarStyle": "Overlay",
+        "trafficLightPosition": { "x": 18, "y": 24 },
         "backgroundColor": "#272727",
         "dragDropEnabled": true
       }

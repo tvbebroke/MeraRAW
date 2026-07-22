@@ -504,10 +504,7 @@ fn main() {
             // Window-state restore can leave the frame oversized / hanging off
             // the right edge (common when moving from a large display to a
             // 13" MacBook). Clamp into the current monitor work area.
-            // Also pin decorations off so a stale `.window-state.json` cannot
-            // resurrect the native title bar beside the custom traffic lights.
             if let Some(win) = app.get_webview_window("main") {
-                let _ = win.set_decorations(false);
                 ensure_main_window_visible(&win);
             }
 
