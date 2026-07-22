@@ -416,21 +416,6 @@
       0 24px 48px rgba(0, 0, 0, 0.25);
   }
 
-  /* ── Content Title ──────────────────────────────────── */
-  .content-title {
-    font-size: 15px;
-    font-weight: 600;
-    color: rgba(255, 255, 255, 0.9);
-    letter-spacing: -0.01em;
-    margin-bottom: 8px;
-  }
-
-  /* ── Settings List ──────────────────────────────────── */
-  .settings-list {
-    display: flex;
-    flex-direction: column;
-  }
-
   .setting-row {
     display: flex;
     align-items: center;
@@ -465,13 +450,6 @@
     font-size: 12px;
     font-weight: 500;
     color: rgba(255, 255, 255, 0.5);
-  }
-
-  .checkbox-label {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    cursor: pointer;
   }
 
   /* ── Form Controls ──────────────────────────────────── */

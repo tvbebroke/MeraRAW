@@ -14,11 +14,14 @@ export type SectionId =
   | "optics"
   | "demosaic"
   | "lut"
+  | "calibration"
   | "cropAspect"
   | "cropTransform"
+  | "cropPerspective"
   | "maskList"
   | "aiSelect"
-  | "presetList";
+  | "presetList"
+  | "retouchRemove";
 export const openSections = map<Record<SectionId, boolean>>({
   profile: true,
   light: true,
@@ -28,11 +31,14 @@ export const openSections = map<Record<SectionId, boolean>>({
   optics: false,
   demosaic: false,
   lut: false,
+  calibration: false,
   cropAspect: true,
   cropTransform: true,
+  cropPerspective: false,
   maskList: true,
   aiSelect: true,
   presetList: true,
+  retouchRemove: true,
 });
 export const toggleSection = (id: SectionId) =>
   openSections.setKey(id, !openSections.get()[id]);
