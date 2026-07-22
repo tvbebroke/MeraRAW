@@ -227,7 +227,7 @@
     grid-template-rows: minmax(0, 1fr) auto 20px;
     transition: {isResizingRight || isResizingBottom || isResizingHistogram ? 'none' : 'grid-template-columns 350ms cubic-bezier(0.16, 1, 0.3, 1)'};
   "
-  class="grid h-full min-h-0 gap-[11px] px-[11px] pb-[9px]"
+  class="relative grid h-full min-h-0 gap-[11px] px-[11px] pb-[9px]"
 >
   <!-- Animated Left Rail Container -->
   <div 
@@ -259,19 +259,22 @@
     {/if}
   </div>
 
+  {#if $leftRailCollapsed}
+    <button
+      in:fade={{ duration: 150, delay: 300 }}
+      out:fade={{ duration: 100 }}
+      onclick={() => leftRailCollapsed.set(false)}
+      aria-label="Expand Sidebar"
+      class="absolute left-1 top-1/2 -translate-y-1/2 flex size-[26px] items-center justify-center rounded-full border border-white/5 bg-panel-2 backdrop-blur-md text-white/80 hover:bg-white/[0.12] hover:text-white active:scale-[0.96] transition-[background-color,color,transform] duration-200 cursor-pointer z-50 shadow-md"
+    >
+      <svg width="6" height="10" viewBox="0 0 6 10" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="pointer-events-none">
+        <path d="M1.5 1.5L5 5L1.5 8.5" />
+      </svg>
+    </button>
+  {/if}
+
   <div class="relative min-h-0 flex flex-col">
     <MainViewport />
-    {#if $leftRailCollapsed}
-      <button
-        onclick={() => leftRailCollapsed.set(false)}
-        aria-label="Expand Sidebar"
-        class="absolute left-1 top-1/2 -translate-y-1/2 flex size-[26px] items-center justify-center rounded-full border border-white/5 bg-panel-2 backdrop-blur-md text-white/80 hover:bg-white/[0.12] hover:text-white active:scale-[0.96] transition-[background-color,color,transform] duration-200 cursor-pointer z-50 shadow-md"
-      >
-        <svg width="6" height="10" viewBox="0 0 6 10" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="pointer-events-none">
-          <path d="M1.5 1.5L5 5L1.5 8.5" />
-        </svg>
-      </button>
-    {/if}
 
     {#if isZen}
       <!-- Agentic edit prompt bar -->
