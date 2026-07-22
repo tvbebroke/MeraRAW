@@ -101,11 +101,11 @@
       </div>
 
       <div class="mt-[12px] flex w-full flex-col gap-[6px]">
-        <ParamRow path="color_grade.shadows_lum" label="Shadow Lum" labelWidth={84} />
-        <ParamRow path="color_grade.midtones_lum" label="Midtones Lum" labelWidth={84} />
-        <ParamRow path="color_grade.highlights_lum" label="Highlights Lum" labelWidth={84} />
-        <ParamRow path="color_grade.shadow_range" label="Shadow Range" labelWidth={84} />
-        <ParamRow path="color_grade.highlight_range" label="Highlight Range" labelWidth={84} />
+        <ParamRow path="color_grade.shadows_lum" label="Shadow Lum" labelWidth={96} />
+        <ParamRow path="color_grade.midtones_lum" label="Midtones Lum" labelWidth={96} />
+        <ParamRow path="color_grade.highlights_lum" label="Highlights Lum" labelWidth={96} />
+        <ParamRow path="color_grade.shadow_range" label="Shadow Range" labelWidth={96} />
+        <ParamRow path="color_grade.highlight_range" label="Highlight Range" labelWidth={96} />
       </div>
     </div>
 
@@ -117,8 +117,8 @@
       <p class="mb-[8px] text-[11px] font-medium text-white">Zone Hue / Sat</p>
       <div class="flex w-full flex-col gap-[6px]">
         {#each wheels as w (w.label)}
-          <ParamRow path={w.hue} label="{w.label} Hue" labelWidth={84} />
-          <ParamRow path={w.sat} label="{w.label} Sat" labelWidth={84} />
+          <ParamRow path={w.hue} label="{w.label} Hue" labelWidth={96} />
+          <ParamRow path={w.sat} label="{w.label} Sat" labelWidth={96} />
         {/each}
       </div>
     </div>
@@ -131,15 +131,15 @@
     >
       <p class="mb-[8px] text-[11px] font-medium text-white">Denoise</p>
       <div class="flex w-full flex-col gap-[6px]">
-        <div class="grid h-[16px] grid-cols-[84px_1fr] items-center gap-x-[8px]">
-          <span class="text-[11px] text-white whitespace-nowrap">Denoise Amt</span>
+        <div class="grid h-[16px] grid-cols-[96px_1fr] items-center gap-x-[8px]">
+          <span class="text-[11px] text-white whitespace-nowrap">Amount</span>
           <Slider label="Denoise Amount" min={0} max={100} value={denoiseAmount} onchange={(v) => (denoiseAmount = v)} />
         </div>
-        <div class="grid h-[16px] grid-cols-[84px_1fr] items-center gap-x-[8px]">
+        <div class="grid h-[16px] grid-cols-[96px_1fr] items-center gap-x-[8px]">
           <span class="text-[11px] text-white whitespace-nowrap">Detail</span>
           <Slider label="Denoise Detail" min={0} max={100} value={denoiseDetail} onchange={(v) => (denoiseDetail = v)} />
         </div>
-        <div class="grid h-[16px] grid-cols-[84px_1fr] items-center gap-x-[8px]">
+        <div class="grid h-[16px] grid-cols-[96px_1fr] items-center gap-x-[8px]">
           <span class="text-[11px] text-white whitespace-nowrap">Contrast</span>
           <Slider label="Denoise Contrast" min={0} max={100} value={denoiseContrast} onchange={(v) => (denoiseContrast = v)} />
         </div>

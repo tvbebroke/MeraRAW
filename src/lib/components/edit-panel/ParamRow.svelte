@@ -9,7 +9,7 @@
   let {
     path,
     label,
-    labelWidth = 72,
+    labelWidth = 76,
     disabled = false,
   }: {
     path: string;
@@ -32,7 +32,7 @@
   >
     <span
       class="truncate text-[11px] font-medium text-white/90"
-      title="double-click slider to reset"
+      title={label ?? spec.ui.label}
     >
       {label ?? spec.ui.label}
     </span>

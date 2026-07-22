@@ -25,7 +25,7 @@
   <div class="flex flex-col gap-[6px]">
     <div class="flex items-center gap-2">
       <div class="min-w-0 flex-1">
-        <ParamRow path="white_balance.temp" label="Temp" labelWidth={48} />
+        <ParamRow path="white_balance.temp" label="Temp" labelWidth={68} />
       </div>
       <button
         type="button"
@@ -39,9 +39,9 @@
         ⌖
       </button>
     </div>
-    <ParamRow path="white_balance.tint" label="Tint" labelWidth={48} />
-    <ParamRow path="color_grade.perceptual_sat" label="Vibrance" labelWidth={48} />
-    <ParamRow path="color_grade.global_chroma" label="Saturation" labelWidth={48} />
+    <ParamRow path="white_balance.tint" label="Tint" labelWidth={68} />
+    <ParamRow path="color_grade.perceptual_sat" label="Vibrance" labelWidth={68} />
+    <ParamRow path="color_grade.global_chroma" label="Saturation" labelWidth={68} />
   </div>
 
   <div
