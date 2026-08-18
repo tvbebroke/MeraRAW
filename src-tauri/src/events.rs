@@ -2,6 +2,9 @@
 
 use tauri::{AppHandle, Emitter};
 
+/// Webview log stream. Emitters land in Phase 2; the name is part of contract C.
+#[allow(dead_code)]
+pub const LOG: &str = "log";
 pub const ENGINE_READY: &str = "engine-ready";
 pub const FILE_OPENED: &str = "file-opened";
 pub const FOLDER_OPENED: &str = "folder-opened";

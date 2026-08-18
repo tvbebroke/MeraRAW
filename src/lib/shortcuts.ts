@@ -1,6 +1,7 @@
 import { push } from "svelte-spa-router";
-import { activeTool, leftRailCollapsed, isZenMode, imageBrowserCollapsed, photos, activePhoto, photoDetailsCollapsed } from "../stores/editor";
+import { leftRailCollapsed, isZenMode, imageBrowserCollapsed, photos, activePhoto, photoDetailsCollapsed, commandPaletteOpen } from "../stores/editor";
 import { isSettingsOpen, isExportOpen, isBugReportOpen, classicLook, isShortcutsOpen } from "../stores/ui";
+import { applyEditFocus, showAiPanel } from "./editor/focus";
 import { openPhoto } from "../stores/browse";
 import { router } from "svelte-spa-router";
 
@@ -65,12 +66,19 @@ function nextPhoto() {
 // those combos. Duplicating a placeholder here would just shadow it with a
 // no-op, so we let those two key combos fall through untouched.
 export function handleGlobalShortcut(e: KeyboardEvent): void {
+  const meta = e.metaKey || e.ctrlKey;
+  const key = e.key.toLowerCase();
+
+  if (meta && key === "k" && !e.shiftKey) {
+    e.preventDefault();
+    commandPaletteOpen.set(!commandPaletteOpen.get());
+    return;
+  }
+
   // Never intercept when the user is typing in an input
   if (isEditableTarget(e.target)) return;
 
-  const meta = e.metaKey || e.ctrlKey;
   const shift = e.shiftKey;
-  const key = e.key.toLowerCase();
 
   // ── Meta combos ───────────────────────────────────────────
   if (meta) {
@@ -115,6 +123,7 @@ export function handleGlobalShortcut(e: KeyboardEvent): void {
     if (isSettingsOpen.get()) { isSettingsOpen.set(false); return; }
     if (isBugReportOpen.get()) { isBugReportOpen.set(false); return; }
     if (isShortcutsOpen.get()) { isShortcutsOpen.set(false); return; }
+    if (commandPaletteOpen.get()) { commandPaletteOpen.set(false); return; }
     return;
   }
 
@@ -183,17 +192,29 @@ export function handleGlobalShortcut(e: KeyboardEvent): void {
     return;
   }
 
-  // 1–6 — Tool switching
-  const toolKeys: Record<string, typeof activeTool extends import("nanostores").WritableAtom<infer T> ? T : never> = {
-    "1": "edit",
-    "2": "crop",
-    "3": "mask",
-    "4": "ai",
-    "5": "presets",
-    "6": "chat",
-  };
-  if (toolKeys[key]) {
-    activeTool.set(toolKeys[key]);
+  // 1–5 — Develop sections · 6 — AI agent
+  if (key === "1") {
+    applyEditFocus("light");
+    return;
+  }
+  if (key === "2") {
+    applyEditFocus("crop");
+    return;
+  }
+  if (key === "3") {
+    applyEditFocus("mask");
+    return;
+  }
+  if (key === "4") {
+    applyEditFocus("retouch");
+    return;
+  }
+  if (key === "5") {
+    applyEditFocus("presets");
+    return;
+  }
+  if (key === "6") {
+    showAiPanel();
     return;
   }
 

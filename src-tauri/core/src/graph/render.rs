@@ -84,14 +84,6 @@ impl RenderGraph {
         self.clip_lo = lo;
     }
 
-    fn original_look(&self) -> bool {
-        self.look == 4
-    }
-
-    pub fn look(&self) -> bool {
-        self.look != 0
-    }
-
     pub fn invalidate_from_module(&mut self, module: &str) {
         if module == "crop" {
             self.last_crop_key = None;
@@ -226,8 +218,9 @@ impl RenderGraph {
         let configs = node_configs(doc, as_shot_cct, out_w, out_h, lut);
 
         // Upload the DCP look tables once per profile (cheap signature check).
-        if view_changed {
-            if let Some(dcp) = dcp_profile.filter(|d| d.has_look()) {
+        // Camera look (1) is the only display mode that consumes them.
+        if let Some(dcp) = dcp_profile.filter(|d| d.has_look()) {
+            if view_changed || DcpProfile::applies_to_display_look(self.look) {
                 self.ensure_dcp_tables(gpu, dcp);
             }
         }
@@ -300,7 +293,9 @@ impl RenderGraph {
         // the CPU apply_look; runs only on a view change, result persists in
         // look_tex. Stays in the same encoder — the extract→look read hazard is
         // handled by the compute-pass boundary.
-        let dcp_active = !self.original_look()
+        // Camera look only. Neutral/Filmic/Original stay scene-referred so
+        // the Adobe default tone curve isn't stacked under AgX or Reinhard.
+        let dcp_active = DcpProfile::applies_to_display_look(self.look)
             && dcp_profile.filter(|d| d.has_look()).is_some()
             && self.dcp_meta.is_some();
         if run_extract && dcp_active {
@@ -690,7 +685,7 @@ impl RenderGraph {
                 width: out_w,
                 height: out_h,
                 overlay: if overlay_mask.is_some() { 0.55 } else { 0.0 },
-                look: self.look,
+                look: DcpProfile::present_look(self.look, dcp_active),
                 clip_hi: u32::from(self.clip_hi),
                 clip_lo: u32::from(self.clip_lo),
                 _p0: millis,
@@ -1107,7 +1102,7 @@ mod tests {
         let tex_view = tex.create_view(&Default::default());
         let seg = HashMap::new();
 
-        let mut render_with = |doc: &EditDoc, out_w: u32, out_h: u32| -> Vec<u8> {
+        let render_with = |doc: &EditDoc, out_w: u32, out_h: u32| -> Vec<u8> {
             let mut graph = RenderGraph::new(&gpu);
             let view = ViewParams {
                 out_w,

@@ -1,7 +1,8 @@
 //! Demo renderer: animate the editor applying a tasteful golden-hour grade
-//! + subject/background masking on a real RAW, frame by frame, so the steps
+//! with subject/background masking on a real RAW, frame by frame, so the steps
 //! can be stitched into a short video. Pure render-side (no UI), exercising
 //! the full P2–P4 pipeline.
+//!
 //! Usage: cargo run -p meratech-core --release --example demo_sequence -- <raw> <out_dir>
 
 use meratech_core::doc::EditDoc;

@@ -1,6 +1,7 @@
 <script lang="ts">
   import CollapsibleSection from "./CollapsibleSection.svelte";
   import ParamRow from "./ParamRow.svelte";
+  import Disclosure from "./Disclosure.svelte";
   import { viewportTool } from "../../../stores/app";
 
   const mixerColors = [
@@ -22,59 +23,87 @@
 </script>
 
 <CollapsibleSection id="color" title="Color">
-  <div class="flex flex-col gap-[6px]">
-    <div class="flex items-center gap-2">
-      <div class="min-w-0 flex-1">
-        <ParamRow path="white_balance.temp" label="Temp" labelWidth={68} />
-      </div>
-      <button
-        type="button"
-        title="White balance eyedropper"
-        aria-label="White balance eyedropper"
-        class="flex size-[22px] shrink-0 items-center justify-center rounded-full border text-[10px] transition-all {$viewportTool === 'wb'
-          ? 'border-white/40 bg-white/15 text-white'
-          : 'border-white/5 bg-white/[0.03] text-white/60 hover:bg-white/10'}"
-        onclick={toggleWb}
-      >
-        ⌖
-      </button>
+  <div class="temp-row">
+    <div class="temp-slider">
+      <ParamRow path="white_balance.temp" label="Temp" />
     </div>
-    <ParamRow path="white_balance.tint" label="Tint" labelWidth={68} />
-    <ParamRow path="color_grade.perceptual_sat" label="Vibrance" labelWidth={68} />
-    <ParamRow path="color_grade.global_chroma" label="Saturation" labelWidth={68} />
-  </div>
-
-  <div
-    class="mt-[12px] rounded-[8px] border border-[rgba(103,103,103,0.05)] bg-[rgba(103,103,103,0.47)] p-[8px] backdrop-blur-[2px] flex flex-col items-center"
-  >
-    <div class="mb-[8px] flex w-full items-center justify-between">
-      <span class="text-[6px] font-medium text-white">Color Mixer</span>
-    </div>
-
-    <div
-      class="mb-[10px] flex h-[18px] w-[169px] items-center justify-between rounded-[22px] bg-[rgba(103,103,103,0.53)] px-[8px] py-[2px]"
+    <button
+      type="button"
+      title="White balance eyedropper"
+      aria-label="White balance eyedropper"
+      class="eyedrop"
+      class:is-active={$viewportTool === "wb"}
+      onclick={toggleWb}
     >
+      ⌖
+    </button>
+  </div>
+  <ParamRow path="white_balance.tint" label="Tint" />
+  <ParamRow path="color_grade.perceptual_sat" label="Vibrance" />
+  <ParamRow path="color_grade.global_chroma" label="Saturation" />
+  <Disclosure label="Color Mixer">
+    <div class="swatches">
       {#each mixerColors as c (c.id)}
         <button
+          type="button"
           aria-label={c.label}
           title={c.label}
-          class="relative size-[9px] rounded-full transition-all duration-150 {activeColor === c.id
-            ? 'scale-125'
-            : 'opacity-80 hover:scale-110 hover:opacity-100'}"
-          style="background: {c.hex};"
+          class="swatch"
+          class:on={activeColor === c.id}
+          style="background: {c.hex}"
           onclick={() => (activeColor = c.id)}
-        >
-          {#if activeColor === c.id}
-            <span class="absolute inset-0 scale-125 rounded-full border border-white/80"></span>
-          {/if}
-        </button>
+        ></button>
       {/each}
     </div>
-
-    <div class="flex w-full flex-col gap-[6px]">
-      <ParamRow path={`hsl.${activeColor}.hue`} label="Hue" labelWidth={72} />
-      <ParamRow path={`hsl.${activeColor}.sat`} label="Sat" labelWidth={72} />
-      <ParamRow path={`hsl.${activeColor}.lum`} label="Lum" labelWidth={72} />
-    </div>
-  </div>
+    <ParamRow path={`hsl.${activeColor}.hue`} label="Hue" />
+    <ParamRow path={`hsl.${activeColor}.sat`} label="Sat" />
+    <ParamRow path={`hsl.${activeColor}.lum`} label="Lum" />
+  </Disclosure>
 </CollapsibleSection>
+
+<style>
+  .temp-row {
+    display: flex;
+    align-items: flex-end;
+    gap: var(--space-2);
+  }
+  .temp-slider { flex: 1; min-width: 0; }
+  .eyedrop {
+    flex: none;
+    width: 28px;
+    height: 28px;
+    margin-bottom: 6px;
+    border-radius: 6px;
+    border: 1px solid var(--color-border);
+    background: var(--color-hover);
+    color: var(--color-subtle);
+    font-size: var(--text-ui);
+    cursor: pointer;
+  }
+  .eyedrop:hover, .eyedrop.is-active {
+    background: var(--color-active);
+    color: var(--color-fg);
+    border-color: var(--color-fg);
+  }
+  .swatches {
+    display: flex;
+    justify-content: space-between;
+    max-width: 180px;
+    margin: var(--space-2) auto;
+    padding: 0 var(--space-1);
+  }
+  .swatch {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    border: 0;
+    padding: 0;
+    cursor: pointer;
+    opacity: 0.8;
+  }
+  .swatch.on {
+    opacity: 1;
+    outline: 1px solid var(--color-fg);
+    outline-offset: 2px;
+  }
+</style>

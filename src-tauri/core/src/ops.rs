@@ -624,7 +624,7 @@ mod tests {
 
     #[test]
     fn curve_monotonic_x_enforced() {
-        let mut d = doc();
+        let d = doc();
         // tone_curve.points isn't registered yet (P3) — use a synthetic check
         // through check_value directly once registered. For now assert the
         // validator logic via a fake spec is covered by P3. Placeholder:

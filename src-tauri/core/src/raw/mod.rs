@@ -33,6 +33,31 @@ pub enum ImageKind {
     Rendered,
 }
 
+impl ImageKind {
+    /// RAW-only stages (demosaic, sensor WB, black-level, DCP camera look)
+    /// are legal only for sensor data.
+    pub fn allows_raw_only_stages(self) -> bool {
+        matches!(self, ImageKind::Raw)
+    }
+}
+
+/// Map the user's display-look selector onto the look present/export actually
+/// run, given the source kind.
+///
+/// Look ids (shared with `present.wgsl`):
+///   0 Neutral Reinhard · 1 Camera punchy · 2 Filmic AgX
+///   3 passthrough (Rec.2020→target + OETF) · 4 Original RAW
+///
+/// Rendered rasters are already display-referred. Neutral / Camera / Original
+/// must be passthrough so a zero-edit JPEG stays faithful. Filmic (2) stays
+/// an explicit creative view.
+pub fn effective_display_look(kind: ImageKind, user_look: u32) -> u32 {
+    match kind {
+        ImageKind::Rendered if user_look != 2 => 3,
+        _ => user_look,
+    }
+}
+
 /// Metadata surfaced to the UI + assistant. serde camelCase for the wire.
 #[derive(Debug, Clone, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -264,6 +289,18 @@ pub trait Decoder: Send + Sync {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn rendered_looks_are_passthrough_except_filmic() {
+        for look in [0u32, 1, 3, 4, 99] {
+            assert_eq!(effective_display_look(ImageKind::Rendered, look), 3);
+        }
+        assert_eq!(effective_display_look(ImageKind::Rendered, 2), 2);
+        assert_eq!(effective_display_look(ImageKind::Raw, 1), 1);
+        assert_eq!(effective_display_look(ImageKind::Raw, 0), 0);
+        assert!(!ImageKind::Rendered.allows_raw_only_stages());
+        assert!(ImageKind::Raw.allows_raw_only_stages());
+    }
 
     #[test]
     fn available_always_includes_in_process_merawler() {

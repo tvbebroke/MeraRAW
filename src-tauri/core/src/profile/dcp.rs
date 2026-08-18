@@ -452,6 +452,24 @@ impl DcpProfile {
         true
     }
 
+    /// DCP HueSatMap + profile tone curve is the Camera display look.
+    /// Neutral / Filmic / Original keep the working master scene-referred.
+    pub fn applies_to_display_look(look: u32) -> bool {
+        look == 1
+    }
+
+    /// After the DCP look has run, present/export with OETF only (look 3).
+    /// The Adobe profile tone curve already supplies the JPEG-like mapping;
+    /// stacking the punchy Camera view-transform (gain 1.6 / sat 1.22) on
+    /// top burns highlights yellow.
+    pub fn present_look(look: u32, dcp_applied: bool) -> u32 {
+        if dcp_applied && look == 1 {
+            3
+        } else {
+            look
+        }
+    }
+
     /// Everything the GPU look pass needs, pulled out of the private fields:
     /// the (valid) HSV delta tables as RGBA, the tone curve baked to a 1D LUT,
     /// the baseline-EV gain, and the two illuminant CCTs for the map blend.
@@ -531,5 +549,17 @@ mod tests {
         let m = dcp.cam_to_rec2020(&[1.0, 1.0, 1.0, 1.0], &cal).unwrap();
         let out = mat_vec(&m, [0.5, 0.5, 0.5]);
         assert!(out.iter().all(|v| v.is_finite() && *v >= 0.0));
+    }
+
+    #[test]
+    fn dcp_look_is_camera_only_and_disables_punchy_present() {
+        assert!(DcpProfile::applies_to_display_look(1));
+        assert!(!DcpProfile::applies_to_display_look(0));
+        assert!(!DcpProfile::applies_to_display_look(2));
+        assert!(!DcpProfile::applies_to_display_look(4));
+        assert_eq!(DcpProfile::present_look(1, true), 3);
+        assert_eq!(DcpProfile::present_look(1, false), 1);
+        assert_eq!(DcpProfile::present_look(0, true), 0);
+        assert_eq!(DcpProfile::present_look(2, true), 2);
     }
 }

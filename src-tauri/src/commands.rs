@@ -355,6 +355,9 @@ pub async fn virtual_copy(engine: State<'_, EngineHandle>) -> Result<String, App
 }
 
 #[tauri::command]
+/// Tauri deserializes invoke args by field name; these camelCase names are the
+/// IPC contract with `src/ipc/commands.ts` and must not be snake_cased.
+#[allow(non_snake_case)]
 pub async fn switch_doc(
     engine: State<'_, EngineHandle>,
     docId: String,
@@ -647,6 +650,9 @@ pub async fn delete_album(
 }
 
 #[tauri::command]
+/// Tauri deserializes invoke args by field name; these camelCase names are the
+/// IPC contract with `src/ipc/commands.ts` and must not be snake_cased.
+#[allow(non_snake_case)]
 pub async fn add_to_album(
     engine: State<'_, EngineHandle>,
     albumId: i64,
@@ -659,6 +665,9 @@ pub async fn add_to_album(
 }
 
 #[tauri::command]
+/// Tauri deserializes invoke args by field name; these camelCase names are the
+/// IPC contract with `src/ipc/commands.ts` and must not be snake_cased.
+#[allow(non_snake_case)]
 pub async fn remove_from_album(
     engine: State<'_, EngineHandle>,
     albumId: i64,
@@ -671,6 +680,9 @@ pub async fn remove_from_album(
 }
 
 #[tauri::command]
+/// Tauri deserializes invoke args by field name; these camelCase names are the
+/// IPC contract with `src/ipc/commands.ts` and must not be snake_cased.
+#[allow(non_snake_case)]
 pub async fn set_camera_profile(
     engine: State<'_, EngineHandle>,
     profileFile: String,
@@ -830,18 +842,19 @@ pub async fn report_frontend_status(status: String) -> Result<(), AppError> {
 #[tauri::command]
 pub async fn reveal_in_finder(path: String) -> Result<(), AppError> {
     let p = crate::paths::validate_existing_path(&path)?;
-    let path = p.to_string_lossy().into_owned();
+    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    let revealed = p.to_string_lossy().into_owned();
     #[cfg(target_os = "macos")]
     {
         std::process::Command::new("open")
-            .args(["-R", &path])
+            .args(["-R", &revealed])
             .spawn()
             .map_err(|e| AppError::Internal(e.to_string()))?;
     }
     #[cfg(target_os = "windows")]
     {
         std::process::Command::new("explorer")
-            .args(["/select,", &path])
+            .args(["/select,", &revealed])
             .spawn()
             .map_err(|e| AppError::Internal(e.to_string()))?;
     }

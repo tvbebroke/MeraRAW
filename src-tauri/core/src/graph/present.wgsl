@@ -35,7 +35,7 @@ fn view_look(c: vec3<f32>, look: u32) -> vec3<f32> {
   var gain = 1.15;     // Neutral: a touch of lift so the base isn't dark
   var contrast = 0.12;
   var sat = 1.0;
-  if (look == 1u) {    // Camera: punchy, JPEG-like
+  if (look == 1u) {    // Camera fallback when no DCP is loaded
     gain = 1.6;
     contrast = 0.34;
     sat = 1.22;
@@ -109,8 +109,8 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
       // AgX already outputs display-encoded sRGB — no second OETF.
       encoded = agx(max(c, vec3<f32>(0.0)));
     } else if (u.look == 3u || u.look == 4u) {
-      // 3 = passthrough for rendered JPEG/PNG; 4 = Original RAW view (demosaic
-      // only — Rec.2020→sRGB + OETF, no profile look or display tonemap).
+      // 3 = raster zero-edit (JPEG/PNG already display-referred).
+      // 4 = Original RAW (demosaic only). Rec.2020→sRGB + OETF, no view look.
       encoded = oetf_srgb(clamp(max(c, vec3<f32>(0.0)), vec3<f32>(0.0), vec3<f32>(1.0)));
     } else {
       let looked = view_look(max(c, vec3<f32>(0.0)), u.look);

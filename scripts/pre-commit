@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# Pre-commit gate (Phase 0). Skip cargo test here — ~30s is too slow for every
+# commit; CI runs the full suite. Failures here are the only work in flight.
+set -euo pipefail
+root="$(git rev-parse --show-toplevel)"
+cd "$root"
+
+echo "[pre-commit] npm run check"
+npm run check
+
+echo "[pre-commit] vitest"
+npx vitest run
+
+echo "[pre-commit] cargo check --workspace"
+(cd src-tauri && cargo check --workspace)

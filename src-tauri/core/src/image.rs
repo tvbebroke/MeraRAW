@@ -160,7 +160,8 @@ mod tests {
         let b = buf2x3().bake_orientation(Orientation::Rotate90);
         assert_eq!((b.width, b.height), (3, 2));
         // old top-left (0,0) → new top-right (nw-1, 0)
-        assert_eq!(b.data[(0 * 3 + 2) * 3], 0.0);
+        let rgb = |x: usize, y: usize| b.data[(y * b.width + x) * 3];
+        assert_eq!(rgb(2, 0), 0.0);
         // old bottom-left (0,2) → new top-left (0,0)
         assert_eq!(b.data[0], 2.0);
     }

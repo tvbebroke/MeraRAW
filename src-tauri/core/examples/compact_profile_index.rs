@@ -2,7 +2,7 @@
 //!
 //!   cargo run -p meratech-core --example compact_profile_index
 
-use meratech_core::profile::{ProfileIndex, ProfileRef};
+use meratech_core::profile::ProfileIndex;
 use std::collections::BTreeMap;
 use std::path::Path;
 

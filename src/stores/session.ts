@@ -4,3 +4,12 @@ export type User = { name: string; email: string } | null;
 
 // ponytail: placeholder until login screen + real auth exist
 export const user = atom<User>(null);
+
+export type LicenseStatus = {
+  licensed: boolean;
+  userId: string | null;
+  reason: string | null;
+} | null;
+
+/** Result of `license_check_local` on boot. Null until the first check returns. */
+export const licenseStatus = atom<LicenseStatus>(null);

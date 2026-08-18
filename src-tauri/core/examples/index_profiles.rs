@@ -5,7 +5,7 @@
 //!     cargo run --example index_profiles -p meratech-core
 
 use meratech_core::profile::dcp::DcpProfile;
-use meratech_core::profile::{profiles_dir, ProfileIndex, ProfileRef};
+use meratech_core::profile::{profiles_dir, ProfileRef};
 use std::collections::BTreeMap;
 use std::path::Path;
 

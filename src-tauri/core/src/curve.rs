@@ -23,7 +23,8 @@ struct MonotonicCubic {
 impl MonotonicCubic {
     fn new(mut pts: Vec<[f32; 2]>) -> Self {
         if pts.first().map(|p| p[0] > 1e-6).unwrap_or(true) {
-            pts.insert(0, [0.0, pts.first().map(|p| p[1]).unwrap_or(0.0).min(0.0).max(0.0)]);
+            // Anchor at x=0 using the first point's y, clamped to the LUT domain.
+            pts.insert(0, [0.0, pts.first().map(|p| p[1]).unwrap_or(0.0).clamp(0.0, 1.0)]);
         }
         if pts.last().map(|p| p[0] < 1.0 - 1e-6).unwrap_or(true) {
             pts.push([1.0, 1.0]);

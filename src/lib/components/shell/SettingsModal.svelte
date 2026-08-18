@@ -1,6 +1,6 @@
 <script lang="ts">
   import { fade, scale } from "svelte/transition";
-  import { isSettingsOpen, classicLook, triggerThemeTransition } from "../../../stores/ui";
+  import { isSettingsOpen, classicLook, themePreference, setThemePreference, triggerThemeTransition, type ThemePreference } from "../../../stores/ui";
   import ToggleSwitch from "../primitives/ToggleSwitch.svelte";
   import { folder, importAndBrowse } from "../../../stores/browse";
   import { pickFolder } from "../../fs";
@@ -16,7 +16,6 @@
   let activeTab = $state<Tab>("general");
 
   // Local settings state
-  let theme = $state("dark");
   let language = $state("en");
   let autoThumbnails = $state(true);
   
@@ -68,11 +67,11 @@
   <!-- Modal Content Card -->
   <div
     transition:scale={{ duration: 250, start: 0.95 }}
-    class="modal-card relative flex h-[520px] w-[720px] overflow-hidden rounded-[20px] border border-white/[0.06] bg-[#171717]/95 text-white backdrop-blur-md"
+    class="modal-card relative flex h-[520px] w-[720px] overflow-hidden text-fg"
     onclick={(e) => e.stopPropagation()}
   >
     <!-- Left Navigation Sidebar -->
-    <aside class="sidebar flex w-[180px] shrink-0 flex-col border-r border-white/[0.05] px-3 py-5">
+    <aside class="sidebar flex w-[180px] shrink-0 flex-col border-r border-border px-3 py-5">
       <nav class="flex flex-1 flex-col gap-[4px]">
         <button
           class="tab-btn {activeTab === 'general' ? 'tab-btn--active' : ''}"
@@ -122,7 +121,7 @@
       </nav>
 
       <!-- App Info at bottom -->
-      <div class="mt-auto px-3 text-[10px] text-white/20">
+      <div class="mt-auto px-3 text-[10px] text-subtle">
         <p>MeraRAW v0.1.0 (Beta)</p>
       </div>
     </aside>
@@ -166,12 +165,21 @@
             <!-- Theme Settings -->
             <div class="setting-row">
               <span class="setting-label">Interface theme</span>
-              <select id="theme-select" bind:value={theme} class="setting-select">
+              <select
+                id="theme-select"
+                value={$themePreference}
+                onchange={(e) => setThemePreference((e.currentTarget as HTMLSelectElement).value as ThemePreference)}
+                class="setting-select"
+              >
                 <option value="dark">Dark mode</option>
                 <option value="light">Light mode</option>
                 <option value="system">Follow system</option>
               </select>
             </div>
+            <p class="setting-desc">
+              Affects panels and menus only. The area around the photo stays dark
+              so exposure and white balance still read true.
+            </p>
 
             <!-- Language Settings -->
             <div class="setting-row">
@@ -196,9 +204,10 @@
               <ToggleSwitch checked={$classicLook} label="Classic Look" onchange={triggerThemeTransition} />
             </div>
 
+
             <!-- Anonymous usage data -->
             {#if telemetryConfigured()}
-              <div class="flex items-center justify-between py-2 border-t border-white/[0.03]">
+              <div class="flex items-center justify-between py-2 border-t border-border">
                 <div class="space-y-0.5">
                   <span class="setting-label">Share Anonymous Usage Data</span>
                   <p class="setting-desc">
@@ -273,7 +282,7 @@
                   bind:value={cacheSize}
                   class="setting-slider flex-1"
                 />
-                <span class="setting-value w-[38px] text-right">{cacheSize} GB</span>
+                <span class="setting-value num w-[38px] text-right">{cacheSize} GB</span>
               </div>
             </div>
           </div>
@@ -303,7 +312,7 @@
                     bind:value={jpegQuality}
                     class="setting-slider flex-1"
                   />
-                  <span class="setting-value w-[38px] text-right">{jpegQuality}%</span>
+                  <span class="setting-value num w-[38px] text-right">{jpegQuality}%</span>
                 </div>
               </div>
             {/if}
@@ -321,7 +330,7 @@
       </div>
 
       <!-- Footer -->
-      <footer class="flex shrink-0 items-center justify-end gap-3 border-t border-white/[0.04] px-8 py-4">
+      <footer class="flex shrink-0 items-center justify-end gap-3 border-t border-border px-8 py-4">
         <button class="footer-btn footer-btn--primary" onclick={close}>
           Apply
         </button>
@@ -337,12 +346,12 @@
     backdrop-filter: blur(16px) saturate(120%);
   }
 
+  /* Solid panel + hairline border + one shadow layer. */
   .modal-card {
-    background: rgba(23, 23, 23, 0.96);
-    box-shadow: 
-      0 0 0 0.5px rgba(255, 255, 255, 0.06),
-      0 8px 24px rgba(0, 0, 0, 0.3),
-      0 24px 48px rgba(0, 0, 0, 0.25);
+    background: var(--color-panel);
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-popover);
   }
 
   /* ── Sidebar ────────────────────────────────────────── */
@@ -367,19 +376,19 @@
     border-radius: 10px;
     font-size: 13px;
     font-weight: 500;
-    color: rgba(255, 255, 255, 0.45);
+    color: var(--color-subtle);
     text-align: left;
     transition: background 150ms ease, color 150ms ease;
   }
 
   .tab-btn:hover {
-    background: rgba(255, 255, 255, 0.04);
-    color: rgba(255, 255, 255, 0.75);
+    background: var(--color-hover);
+    color: var(--color-secondary);
   }
 
   .tab-btn--active {
-    background: rgba(255, 255, 255, 0.08);
-    color: #fff;
+    background: var(--color-active);
+    color: var(--color-fg);
   }
 
   .tab-icon {
@@ -411,20 +420,20 @@
     align-items: center;
     justify-content: center;
     border-radius: 50%;
-    color: rgba(255, 255, 255, 0.35);
+    color: var(--color-subtle);
     transition: background 150ms ease, color 150ms ease;
   }
 
   .close-btn:hover {
-    background: rgba(255, 255, 255, 0.06);
-    color: rgba(255, 255, 255, 0.8);
+    background: var(--color-hover);
+    color: var(--color-fg);
   }
 
   /* ── Content Title ──────────────────────────────────── */
   .content-title {
     font-size: 15px;
     font-weight: 600;
-    color: rgba(255, 255, 255, 0.9);
+    color: var(--color-fg);
     letter-spacing: -0.01em;
     margin-bottom: 8px;
   }
@@ -440,7 +449,7 @@
     align-items: center;
     justify-content: space-between;
     padding: 14px 0;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    border-bottom: 1px solid var(--color-border);
     transition: background-color 150ms ease;
   }
 
@@ -451,34 +460,34 @@
   .setting-label {
     font-size: 13px;
     font-weight: 400;
-    color: rgba(255, 255, 255, 0.75);
+    color: var(--color-secondary);
     letter-spacing: -0.005em;
   }
 
   .setting-value {
     font-size: 12px;
     font-weight: 500;
-    color: rgba(255, 255, 255, 0.5);
+    color: var(--color-subtle);
   }
 
   /* ── Form Controls ──────────────────────────────────── */
   .setting-input {
     appearance: none;
     -webkit-appearance: none;
-    border: 1px solid rgba(255, 255, 255, 0.06);
-    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--color-border);
+    background: var(--color-hover);
     border-radius: 8px;
     padding: 7px 12px;
     font-size: 12px;
     font-family: inherit;
-    color: rgba(255, 255, 255, 0.6);
+    color: var(--color-secondary);
     outline: none;
     transition: border-color 150ms ease, background-color 150ms ease;
   }
 
   .setting-input:focus {
-    border-color: rgba(255, 255, 255, 0.15);
-    background: rgba(255, 255, 255, 0.04);
+    border-color: var(--color-border-strong);
+    background: var(--color-hover);
   }
 
   .setting-select {
@@ -491,7 +500,7 @@
     font-size: 13px;
     font-family: inherit;
     font-weight: 400;
-    color: rgba(255, 255, 255, 0.5);
+    color: var(--color-subtle);
     outline: none;
     cursor: pointer;
     transition: color 150ms ease;
@@ -499,12 +508,12 @@
   }
 
   .setting-select:hover {
-    color: rgba(255, 255, 255, 0.7);
+    color: var(--color-secondary);
   }
 
   .setting-select option {
-    background: #1e1e20;
-    color: #fff;
+    background: var(--color-panel);
+    color: var(--color-fg);
     text-align: left;
   }
 
@@ -513,7 +522,7 @@
     -webkit-appearance: none;
     height: 2px;
     border-radius: 999px;
-    background: rgba(255, 255, 255, 0.08);
+    background: var(--color-active);
     outline: none;
   }
 
@@ -523,7 +532,7 @@
     width: 12px;
     height: 12px;
     border-radius: 50%;
-    background: #ffffff;
+    background: var(--color-fg);
     cursor: pointer;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
     transition: transform 150ms ease;
@@ -537,21 +546,21 @@
   .action-btn {
     appearance: none;
     -webkit-appearance: none;
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--color-border-strong);
+    background: var(--color-hover);
     border-radius: 8px;
     padding: 6px 14px;
     font-size: 12px;
     font-family: inherit;
     font-weight: 500;
-    color: rgba(255, 255, 255, 0.7);
+    color: var(--color-secondary);
     cursor: pointer;
     transition: background-color 150ms ease, border-color 150ms ease;
   }
 
   .action-btn:hover {
-    background-color: rgba(255, 255, 255, 0.07);
-    border-color: rgba(255, 255, 255, 0.12);
+    background-color: var(--color-active);
+    border-color: var(--color-border-strong);
   }
 
   .action-btn:active {
@@ -577,7 +586,7 @@
   }
 
   .footer-btn--primary:hover {
-    background: #e4e4e7;
+    background: var(--color-border-strong);
     transform: translateY(-0.5px);
   }
 

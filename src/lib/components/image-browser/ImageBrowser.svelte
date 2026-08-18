@@ -132,8 +132,8 @@
 </script>
 
 <GlassPanel
-  class="relative z-10 flex h-full min-w-0 {$imageBrowserCollapsed ? 'items-center px-[10px] py-0' : 'p-[10px]'} {cls}"
-  style="--glass-bg: #171717;"
+  variant="quiet"
+  class="relative z-10 flex h-full min-w-0 {$imageBrowserCollapsed ? 'items-center px-[10px] py-0' : 'px-[8px] py-[8px]'} {cls}"
 >
   {#if onResizeStart}
     <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
@@ -144,7 +144,7 @@
       onmousedown={onResizeStart}
     >
       <div
-        class="h-[2px] w-[40px] rounded-full bg-white/5 group-hover:bg-white/25 group-active:bg-accent transition-[background-color] duration-200"
+        class="h-[2px] w-[40px] rounded-full bg-hover group-hover:bg-border-strong group-active:bg-border-strong transition-[background-color] duration-200"
       ></div>
     </div>
   {/if}
@@ -153,7 +153,7 @@
     type="button"
     onclick={() => imageBrowserCollapsed.set(!$imageBrowserCollapsed)}
     aria-label={$imageBrowserCollapsed ? "Expand Filmstrip" : "Collapse Filmstrip"}
-    class="z-20 flex size-[22px] shrink-0 items-center justify-center rounded-full border border-white/5 bg-white/[0.06] text-white/70 hover:bg-white/[0.14] hover:text-white active:scale-[0.96] transition-[background-color,color,transform] duration-200 cursor-pointer {$imageBrowserCollapsed ? '' : 'absolute left-[10px] top-[10px]'}"
+    class="z-20 flex size-[22px] shrink-0 items-center justify-center rounded-full border border-border bg-hover text-secondary hover:bg-active hover:text-fg active:scale-[0.96] transition-[background-color,color,transform] duration-200 cursor-pointer {$imageBrowserCollapsed ? '' : 'absolute left-[10px] top-[10px]'}"
   >
     <svg
       width="8"
@@ -173,7 +173,7 @@
   <div
     bind:this={scrollEl}
     onwheel={handleWheel}
-    class="flex min-w-0 flex-1 items-center gap-[24px] overflow-x-auto pl-[28px] transition-[opacity,transform] duration-200 {$imageBrowserCollapsed ? 'pointer-events-none opacity-0' : 'opacity-100'}"
+    class="flex min-w-0 flex-1 items-center gap-[10px] overflow-x-auto pl-[28px] transition-[opacity,transform] duration-200 {$imageBrowserCollapsed ? 'pointer-events-none opacity-0' : 'opacity-100'}"
   >
     {#each $photos as photo (photo.path)}
       <button
@@ -191,7 +191,7 @@
             class="filmstrip-img"
           />
         {:else}
-          <span class="filmstrip-placeholder text-[11px] text-white/60">RAW</span>
+          <span class="filmstrip-placeholder text-[11px] text-secondary">RAW</span>
         {/if}
       </button>
     {/each}
@@ -213,42 +213,42 @@
     -webkit-appearance: none;
     outline: none;
     position: relative;
-    height: 92%;
+    height: 88%;
     aspect-ratio: 3 / 2;
     flex-shrink: 0;
     cursor: pointer;
     overflow: hidden;
-    border-radius: 12px;
+    border-radius: 6px;
     border: 1px solid transparent;
     background: transparent;
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 14px;
+    padding: 0;
     margin: 0;
+    opacity: 0.72;
     box-shadow: none;
     transition:
-      border-color 150ms ease,
-      background-color 150ms ease,
-      opacity 150ms ease;
+      opacity 150ms ease,
+      transform 150ms ease,
+      box-shadow 150ms ease;
   }
 
   .filmstrip-card:hover {
-    background: rgba(255, 255, 255, 0.05);
-    border-color: rgba(255, 255, 255, 0.06);
-    box-shadow: none;
+    opacity: 1;
+    background: transparent;
+    border-color: transparent;
   }
 
   .filmstrip-card:active {
-    opacity: 0.85;
-    box-shadow: none;
+    opacity: 0.9;
   }
 
   .filmstrip-card--active {
-    border: 1px solid rgba(255, 255, 255, 0.15);
-    border-radius: 12px;
-    background: rgba(255, 255, 255, 0.12);
-    box-shadow: none;
+    opacity: 1;
+    border: 1px solid var(--color-border-strong);
+    transform: scale(1.04);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.28);
   }
 
   .filmstrip-img {
@@ -265,12 +265,12 @@
     width: 100%;
     align-items: center;
     justify-content: center;
-    background: rgba(255, 255, 255, 0.03);
+    background: var(--color-hover);
     border-radius: 0px;
     transition: background-color 200ms ease;
   }
 
   .filmstrip-card:hover .filmstrip-placeholder {
-    background: rgba(255, 255, 255, 0.05);
+    background: var(--color-hover);
   }
 </style>

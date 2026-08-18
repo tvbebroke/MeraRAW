@@ -28,10 +28,12 @@
 </button>
 
 <style>
+  /* Flat square-ish icon button: transparent at rest, hover wash on
+     interaction. No blur, no inset highlights, no drop shadow. */
   .icon-btn {
     appearance: none;
     -webkit-appearance: none;
-    border: 1px solid rgba(255, 255, 255, 0.06);
+    border: 1px solid transparent;
     padding: 0;
     margin: 0;
     font: inherit;
@@ -43,29 +45,23 @@
     justify-content: center;
     flex-shrink: 0;
 
-    width: 36px;
-    height: 36px;
-    border-radius: 9999px;
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
 
-    background: rgba(33, 33, 35, 0.65);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.08),
-      inset 0 -1px 0 rgba(0, 0, 0, 0.2),
-      0 2px 6px rgba(0, 0, 0, 0.25);
-    transition: background 150ms cubic-bezier(0.4, 0, 0.2, 1), border-color 150ms cubic-bezier(0.4, 0, 0.2, 1);
+    background: transparent;
+    transition: background-color 0.15s var(--ease-std), border-color 0.15s var(--ease-std);
   }
 
   .icon-btn--wide {
-    width: 59px;
+    width: 48px;
   }
 
   .icon-btn:hover {
-    background: rgba(47, 47, 49, 0.85);
+    background: var(--color-hover);
   }
 
   .icon-btn:active {
-    background: rgba(65, 65, 68, 0.9);
+    background: var(--color-active);
   }
 </style>

@@ -40,6 +40,8 @@ jobs:
           node-version: 20
 
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
 
       - name: Cache cargo
         uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
@@ -69,6 +71,13 @@ jobs:
       - name: Check Rust
         working-directory: src-tauri
         run: cargo check --workspace
+
+      # Clippy correctness lints are deny-by-default; -D warnings also fails
+      # on style so a new unused import cannot silently land. Color-science
+      # excessive_precision is allowed in core/src/lib.rs on purpose.
+      - name: Clippy
+        working-directory: src-tauri
+        run: cargo clippy --workspace --all-targets -- -D warnings
 
       # Ignored tests need local RAW fixtures / a GPU; they stay opt-in.
       - name: Test Rust

@@ -14,8 +14,11 @@
 use super::profile::{vst_forward, vst_inverse_unbiased, NoiseProfile};
 
 /// Per-channel noise σ in Y0U0V0 after unit-variance RGB stabilization.
+/// Literals are pinned to `graph/noise.wgsl` — do not "simplify" to std consts
+/// (1 ulp of drift breaks GPU↔CPU parity).
 pub const SIGMA_Y0: f32 = 0.577_350_3; // sqrt(3)/3
-pub const SIGMA_U0: f32 = 0.707_106_8; // sqrt(2)/2
+#[allow(clippy::approx_constant)]
+pub const SIGMA_U0: f32 = 0.707_106_8; // 1/√2, matches noise.wgsl
 pub const SIGMA_V0: f32 = 0.612_372_4; // sqrt(6)/4
 
 /// À-trous B3-spline per-level noise attenuation for white input noise —

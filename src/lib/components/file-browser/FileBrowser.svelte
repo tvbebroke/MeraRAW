@@ -39,18 +39,20 @@
 </script>
 
 <GlassPanel
-  class="flex min-h-0 flex-1 flex-col overflow-hidden p-[10px] {cls}"
-  style="--glass-bg: #171717;"
+  variant="quiet"
+  class="flex min-h-0 flex-1 flex-col overflow-hidden {cls}"
 >
-  <div class="flex shrink-0 items-center justify-between px-[6px] pb-[6px] mb-2">
-    <span class="text-[11px] font-semibold text-white/90 tracking-wide">Folders</span>
-    <div class="flex items-center gap-[6px]">
+  <!-- 34px header: title + affordances on one line, no separate toolbar row. -->
+  <div class="panel-header">
+    <span class="panel-title">Library</span>
+    <div class="flex items-center gap-[2px]">
       <button
         type="button"
         onclick={addFolder}
         disabled={$browseBusy}
         aria-label="Add Folder"
-        class="flex size-[26px] items-center justify-center rounded-full border border-white/5 bg-white/[0.04] text-white/80 hover:bg-white/[0.12] hover:text-white active:scale-95 transition-all cursor-pointer disabled:opacity-40"
+        title="Import a folder"
+        class="mr-icon-btn"
       >
         <svg
           width="10"
@@ -69,7 +71,8 @@
         type="button"
         onclick={() => leftRailCollapsed.set(true)}
         aria-label="Collapse Sidebar"
-        class="flex size-[26px] items-center justify-center rounded-full border border-white/5 bg-white/[0.04] text-white/80 hover:bg-white/[0.12] hover:text-white active:scale-95 transition-all cursor-pointer"
+        title="Collapse sidebar"
+        class="mr-icon-btn"
       >
         <svg
           width="6"
@@ -88,129 +91,86 @@
     </div>
   </div>
 
-  <div class="px-[4px] mb-3 shrink-0">
-    <label class="search-wrap-sidebar">
-      <input
-        type="search"
-        placeholder="Search directories..."
-        bind:value={searchQuery}
-        class="search-input-sidebar"
-      />
-      <div class="search-icon-circle-sidebar">
-        <svg width="13" height="13" viewBox="0 0 15 15" fill="none" class="search-icon-sidebar">
-          <circle cx="6.5" cy="6.5" r="4.5" stroke="rgba(255,255,255,0.4)" stroke-width="1.5" />
-          <path
-            d="M10 10L13.5 13.5"
-            stroke="rgba(255,255,255,0.4)"
-            stroke-width="1.5"
-            stroke-linecap="round"
-          />
+  <!-- Search-first: no box of its own, the hairline below is its underline. -->
+  <div class="panel-header">
+    <svg width="13" height="13" viewBox="0 0 15 15" fill="none" class="shrink-0">
+      <circle cx="6.5" cy="6.5" r="4.5" stroke="currentColor" stroke-width="1.5" />
+      <path d="M10 10L13.5 13.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+    </svg>
+    <input class="search-input" type="search" placeholder="Search photos" bind:value={searchQuery} />
+    {#if searchQuery}
+      <button class="mr-icon-btn" onclick={() => (searchQuery = "")} aria-label="Clear search">
+        <svg width="9" height="9" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+          <path d="M1 1l8 8M9 1l-8 8" />
         </svg>
-      </div>
-    </label>
+      </button>
+    {/if}
   </div>
 
-  <div class="min-h-0 flex-1 overflow-y-auto px-[2px] custom-scrollbar">
+  <div class="min-h-0 flex-1 overflow-y-auto p-[6px] custom-scrollbar">
     {#if $browseBusy && filteredFolders.length === 0}
-      <p class="px-[8px] py-[6px] text-[11px] text-white/40">Loading…</p>
+      <p class="empty-state">Loading…</p>
     {:else if filteredFolders.length === 0}
-      <p class="px-[8px] py-[6px] text-[11px] text-white/40">
-        No catalog folders — use + to import
+      <p class="empty-state">
+        {searchQuery ? `No folders matching “${searchQuery}”` : "No photos here. Import a folder to begin."}
       </p>
     {:else}
-      <ul class="flex flex-col gap-[2px]">
+      <p class="eyebrow px-[10px] pt-[8px] pb-[4px]">Folders</p>
+      <ul>
         {#each filteredFolders as item (item.root)}
           <li>
+            <!-- Rail row: fixed icon column, flexible label, mono count.
+                 Active = sunken + weight 500, never an accent bar. -->
             <button
               type="button"
-              class="flex w-full items-center gap-[6px] py-[4px] px-[6px] rounded-[8px] hover:bg-white/[0.03] transition-all cursor-pointer select-none text-[11px] text-left {$folder === item.root ? 'bg-white/[0.08] shadow-sm border border-white/[0.03]' : 'border border-transparent'}"
+              title={item.root}
+              class="rail-item {$folder === item.root ? 'rail-item--active' : ''}"
               onclick={() => selectFolder(item.root)}
             >
-              <span class="w-[15px] h-[15px] flex items-center justify-center shrink-0">
+              <span class="rail-icon">
                 {#if $folder === item.root}
-                  <svg width="14.5" height="14.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="text-white">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M6 14l1.45-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.55 6A2 2 0 0 1 18.45 20H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h7a2 2 0 0 1 2 2v2"/>
                   </svg>
                 {:else}
-                  <svg width="14.5" height="14.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="text-white/50">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M20 20H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2z"/>
                   </svg>
                 {/if}
               </span>
-              <span class="min-w-0 flex-1 truncate text-white/80 {$folder === item.root ? 'text-white font-medium' : ''}">
-                {item.name}
-              </span>
-              <span class="shrink-0 text-[10px] text-white/40">{item.photoCount}</span>
+              <span class="rail-label">{item.name}</span>
+              <span class="rail-count">{item.photoCount}</span>
             </button>
           </li>
         {/each}
       </ul>
     {/if}
   </div>
+  <div class="import-row">
+    <button type="button" class="import-btn" onclick={addFolder} disabled={$browseBusy}>
+      + Import
+    </button>
+  </div>
 </GlassPanel>
 
 <style>
-  .search-wrap-sidebar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 6px;
-    height: 30px;
+  .import-row {
+    flex: none;
+    padding: 8px 10px 12px;
+  }
+  .import-btn {
     width: 100%;
-    padding: 0 3px 0 12px;
-    border-radius: 9999px;
-    border: 1px solid rgba(255, 255, 255, 0.06);
-    background: rgba(33, 33, 35, 0.65);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.05),
-      inset 0 -1px 0 rgba(0, 0, 0, 0.2),
-      0 2px 6px rgba(0, 0, 0, 0.25);
-    transition:
-      background 150ms cubic-bezier(0.4, 0, 0.2, 1),
-      border-color 150ms cubic-bezier(0.4, 0, 0.2, 1);
-    cursor: text;
-  }
-
-  .search-wrap-sidebar:focus-within {
-    background: rgba(47, 47, 49, 0.85);
-    border-color: rgba(255, 255, 255, 0.15);
-  }
-
-  .search-icon-circle-sidebar {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 24px;
-    height: 24px;
-    border-radius: 50%;
-    background: rgba(0, 0, 0, 0.25);
-  }
-
-  .search-icon-sidebar {
-    flex-shrink: 0;
-  }
-
-  .search-input-sidebar {
-    appearance: none;
-    -webkit-appearance: none;
-    border: none;
+    height: 28px;
+    border: 0;
+    border-radius: 7px;
     background: transparent;
-    font: inherit;
-    color: rgba(255, 255, 255, 0.85);
-    font-size: 10px;
-    flex: 1;
-    outline: none;
+    color: var(--color-secondary);
+    font-size: 12px;
+    text-align: left;
+    padding: 0 10px;
+    cursor: pointer;
   }
-
-  .search-input-sidebar::placeholder {
-    color: rgba(255, 255, 255, 0.25);
-  }
-
-  .search-input-sidebar::-webkit-search-cancel-button {
-    display: none;
-  }
+  .import-btn:hover { background: var(--color-hover); color: var(--color-fg); }
 
   .custom-scrollbar::-webkit-scrollbar {
     width: 4px;
@@ -221,11 +181,11 @@
   }
 
   .custom-scrollbar::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.08);
+    background: var(--color-active);
     border-radius: 99px;
   }
 
   .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-    background: rgba(255, 255, 255, 0.15);
+    background: var(--color-active);
   }
 </style>

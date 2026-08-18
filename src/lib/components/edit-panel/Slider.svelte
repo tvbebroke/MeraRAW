@@ -1,6 +1,4 @@
 <script lang="ts">
-  import { fly } from "svelte/transition";
-  import { cubicOut } from "svelte/easing";
   import ContextMenu from "../primitives/ContextMenu.svelte";
   import type { ContextMenuItem } from "../primitives/ContextMenu.svelte";
 
@@ -135,7 +133,7 @@
   aria-valuemax={max}
   aria-disabled={disabled}
   title="{label}: {fmt(displayValue)}"
-  class="group relative h-[13px] w-full touch-none outline-none select-none {disabled ? 'opacity-35 cursor-default' : 'cursor-pointer'}"
+  class="group relative h-[20px] -my-[4px] w-full touch-none outline-none select-none {disabled ? 'opacity-35 cursor-default' : 'cursor-pointer'}"
   {onpointerdown}
   {onpointermove}
   {onpointerup}
@@ -151,35 +149,23 @@
 >
   <!-- Background Track -->
   <div
-    class="absolute inset-x-[2px] top-1/2 h-[3px] -translate-y-1/2 rounded-full bg-[#6f6f6f]/40 group-hover:bg-[#6f6f6f]/55 transition-colors duration-200"
+    class="absolute inset-x-0 top-1/2 h-[2px] -translate-y-1/2 rounded-full bg-white/[0.08] group-hover:bg-white/[0.12] transition-colors duration-150"
   ></div>
 
-  <!-- Highlight Track (fills from center/0 for bipolar sliders, or from left for monopolar) -->
+  <!-- Highlight Track -->
   <div
-    class="absolute top-1/2 h-[3px] -translate-y-1/2 rounded-full bg-white/70 group-hover:bg-white/85 transition-colors duration-200"
-    style="left: calc({leftPercent}% + 2px); width: calc({Math.max(0, widthPercent)}% - 4px);"
+    class="absolute top-1/2 h-[2px] -translate-y-1/2 rounded-full bg-secondary group-hover:bg-fg transition-colors duration-150"
+    style="left: {leftPercent}%; width: {Math.max(0, widthPercent)}%;"
   ></div>
 
-  <!-- Handle (scales up dynamically on hover or dragging) -->
+  <!-- Handle -->
   <div
-    class="absolute top-1/2 h-[8px] w-[17px] rounded-full bg-[#d9d9d9] shadow-md transition-all duration-150 ease-[cubic-bezier(0.25,1,0.5,1)]"
+    class="absolute top-1/2 size-[10px] rounded-full bg-[#ecece8] shadow-[0_0_0_1px_rgba(0,0,0,0.35)] transition-transform duration-150 ease-[cubic-bezier(0.25,1,0.5,1)]"
     style="
-      left: calc({frac} * (100% - 17px));
-      transform: translate(0, -50%) scale({isHovered || isDragging ? 1.25 : 1});
-      background-color: {isHovered || isDragging ? '#ffffff' : '#d9d9d9'};
+      left: calc({frac} * (100% - 10px));
+      transform: translate(0, -50%) scale({isHovered || isDragging ? 1.15 : 1});
     "
   ></div>
-
-  <!-- Floating Tactile Tooltip -->
-  {#if isHovered || isDragging}
-    <div
-      transition:fly={{ y: 4, duration: 150, easing: cubicOut }}
-      class="absolute bottom-[16px] -translate-x-1/2 px-2 py-0.5 rounded-[4px] bg-[#1a1a1c] border border-white/10 text-[9px] font-mono font-bold text-white shadow-[0_4px_12px_rgba(0,0,0,0.5)] pointer-events-none z-[100]"
-      style="left: calc({frac} * (100% - 17px) + 8.5px);"
-    >
-      {displayValue > 0 && min < 0 ? "+" : ""}{fmt(displayValue)}
-    </div>
-  {/if}
 </div>
 
 {#if ctxMenu}

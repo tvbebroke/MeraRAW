@@ -128,18 +128,9 @@ impl Engine {
         if self.graph.is_none() {
             self.graph = Some(RenderGraph::new(gpu));
         }
-        // Rendered images (JPEG/PNG/…) are display-referred — force the
-        // passthrough look (3) so they aren't re-tonemapped by the RAW view.
-        let display_look = match self.current.as_ref() {
-            Some(c) if c.meta.kind == crate::raw::ImageKind::Rendered => {
-                if self.display_look == 4 {
-                    3
-                } else {
-                    self.display_look
-                }
-            }
-            _ => self.display_look,
-        };
+        // Rendered rasters skip Neutral/Camera/Original view-looks (those are
+        // RAW rendering). See `effective_display_look`.
+        let display_look = crate::raw::effective_display_look(cur.meta.kind, self.display_look);
         {
             let g = self.graph.as_mut().unwrap();
             g.set_look(display_look);
@@ -160,10 +151,12 @@ impl Engine {
             cur.doc()
         };
         let as_shot_cct = cur.as_shot_cct();
-        let dcp = if self.display_look == 4 {
-            None
-        } else {
+        let dcp = if cur.meta.kind.allows_raw_only_stages()
+            && crate::profile::DcpProfile::applies_to_display_look(self.display_look)
+        {
             cur.dcp_profile.clone()
+        } else {
+            None
         };
         let lut = if self.display_look == 4 {
             None
@@ -253,7 +246,16 @@ impl Engine {
             .map(|(id, (_, tex))| (id.clone(), tex.create_view(&Default::default())))
             .collect();
         let graph = self.preview_graph.as_mut().unwrap();
+        let display_look = crate::raw::effective_display_look(cur.meta.kind, self.display_look);
+        graph.set_look(display_look);
         graph.invalidate_all();
+        let dcp = if cur.meta.kind.allows_raw_only_stages()
+            && crate::profile::DcpProfile::applies_to_display_look(self.display_look)
+        {
+            cur.dcp_profile.as_deref()
+        } else {
+            None
+        };
         let rgba = graph.render(
             gpu,
             tex_view,
@@ -264,7 +266,7 @@ impl Engine {
             cur.as_shot_cct(),
             &seg_views,
             None,
-            cur.dcp_profile.as_deref(),
+            dcp,
             cur.lut_cube.as_deref(),
         )?;
         let rgb: Vec<u8> = rgba.chunks_exact(4).flat_map(|p| [p[0], p[1], p[2]]).collect();

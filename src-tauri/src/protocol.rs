@@ -12,8 +12,10 @@ const TEST_FRAME_H: u32 = 600;
 
 /// Last JPEG-encoded frame, keyed by version — so the same render isn't
 /// re-encoded on a repeat fetch (startup probe, remount, etc.).
-fn jpeg_cache() -> &'static Mutex<Option<(u64, Vec<u8>)>> {
-    static C: OnceLock<Mutex<Option<(u64, Vec<u8>)>>> = OnceLock::new();
+type JpegCache = Mutex<Option<(u64, Vec<u8>)>>;
+
+fn jpeg_cache() -> &'static JpegCache {
+    static C: OnceLock<JpegCache> = OnceLock::new();
     C.get_or_init(|| Mutex::new(None))
 }
 

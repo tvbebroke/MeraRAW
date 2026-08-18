@@ -4,7 +4,48 @@ This document explains the color tokens, design system, theme architecture, and 
 
 ---
 
-## 🎨 Semantic Color Tokens
+> ## ⚠️ Superseded by the minimal-UI migration (Phases 0–1 landed)
+>
+> The token system was restructured in `src/app.css` to the schema in
+> [`meraraw-minimal-ui-project.md`](./meraraw-minimal-ui-project.md).
+> **The legacy token tables below are kept only as a migration reference.**
+>
+> **Canonical tokens now:**
+>
+> | Group | Tokens |
+> | :--- | :--- |
+> | Surfaces (3 levels) | `--color-bg` `--color-panel` `--color-sunken` |
+> | Interaction washes | `--color-hover` `--color-active` |
+> | Borders (carry elevation) | `--color-border` `--color-border-strong` |
+> | Text (3 levels) | `--color-fg` `--color-secondary` `--color-subtle` |
+> | Semantic status | `--color-accent` `--color-accent-soft` `--color-ok` `--color-destructive` `--color-warn` |
+> | Geometry | `--radius` `--shadow-panel` `--shadow-popover` |
+> | Type | `--font-sans` `--font-mono` |
+>
+> **Two behavioural changes worth knowing:**
+>
+> 1. `--color-accent` changed from `#ffffff` to `#8fadea`. Accent is now
+>    **semantic only** (running / selected). Selection states in presets,
+>    masks, retouch, and export scope are intentionally blue now. Drag
+>    separators were moved to `--color-border-strong` to stay neutral.
+> 2. **The mono rule.** Prose is sans; data is mono. Any number a user
+>    compares, scrubs, or aligns takes the `.num` utility (`--font-mono` +
+>    `tabular-nums`). Use `.eyebrow` for uppercase section labels.
+>
+> Every legacy token name (`--color-window`, `--color-card`,
+> `--color-text-primary`, …) still resolves — they are `var()` aliases onto
+> the canonical set — so pre-migration components keep working.
+> **Do not use them in new code.** They are removed at the end of Phase 3.
+> The old → new map lives in the `@theme` block in `src/app.css`.
+>
+> One caveat this migration exposed: the claim below that "all colors are
+> centralized" is not true of the current code. Components use ~282 raw
+> `white/N` alpha utilities that bypass tokens entirely. Consolidating those
+> is Phase 3 work.
+
+---
+
+## 🎨 Semantic Color Tokens (legacy — see the note above)
 
 All colors in MeraRAW are centralized in [`src/app.css`](file:///Users/avadhootkolee/Documents/Development/Meratech/meraraw-ui-svelte/src/app.css) using Tailwind CSS v4 `@theme` tokens. 
 

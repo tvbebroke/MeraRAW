@@ -2,6 +2,19 @@
 
 All notable changes to MeraRAW are documented here.
 
+## [0.1.7] — 2026-08-18
+
+Edit-panel rebuild: one scrollable accordion instead of a wall of open sections, plus shell polish. Tag: `v0.1.7`.
+
+### Highlights
+
+- **Edit rail** — ten sections (Light → Color → Curve → Detail → Grading → Crop → Mask → Retouch → Camera → Presets). First paint opens Light and Color; histogram dock is open. Numeric controls share one ParamRow layout.
+- **Cuts** — Optics, Effects, and AI Adjust are off the rail. Unwired Masking / split-toning wheels / dead prompt UI are gone. Camera nests Profile, Demosaic, LUT, and Calibration.
+- **Shell** — command palette (⌘K), versions popover, jobs pill, AI agent tab. Collapsed left sidebar shows a chevron on the canvas to reopen it (`L` still toggles).
+- **License check on boot** — the Svelte shell now calls `license_check_local`.
+
+---
+
 ## [0.1.6] — 2026-07-21
 
 Small polish release on top of the 0.1.5 cross-platform shell. Tag: `v0.1.6`.

@@ -1,0 +1,104 @@
+{
+  "schema_version": 1,
+  "doc_id": "doc-full-fixture",
+  "source_ref": {
+    "path": "/fixtures/full.ARW",
+    "content_hash": "abc123",
+    "orientation": 1
+  },
+  "modules": {
+    "color_grade": {
+      "shadows": {
+        "h": 30.0,
+        "s": 0.2,
+        "l": 0.4
+      }
+    },
+    "detail": {
+      "hot_pixels": true
+    },
+    "exposure": {
+      "stops": 0.35
+    },
+    "tone_curve": {
+      "points": [
+        [
+          0.0,
+          0.0
+        ],
+        [
+          1.0,
+          1.0
+        ]
+      ]
+    },
+    "white_balance": {
+      "temp": "as-shot"
+    }
+  },
+  "masks": [
+    {
+      "id": "m-radial",
+      "kind": "radial",
+      "opacity": 80.0,
+      "invert": false,
+      "feather": 12.0,
+      "source": {
+        "center": [
+          0.5,
+          0.5
+        ],
+        "radii": [
+          0.3,
+          0.2
+        ],
+        "rotation": 0,
+        "type": "radial"
+      },
+      "modules": {
+        "exposure": {
+          "stops": 1.25
+        }
+      }
+    }
+  ],
+  "retouch": [
+    {
+      "id": "r-spot",
+      "enabled": true,
+      "feather": 25.0,
+      "source": {
+        "strokes": [
+          {
+            "mode": "add",
+            "points": [
+              [
+                0.4,
+                0.4
+              ],
+              [
+                0.41,
+                0.42
+              ]
+            ],
+            "radius": 0.03
+          }
+        ],
+        "type": "brush"
+      }
+    }
+  ],
+  "meta": {
+    "created_at": "2026-01-01T00:00:00Z",
+    "modified_at": "2026-01-02T00:00:00Z",
+    "rating": 3,
+    "flag": "pick",
+    "label": "red",
+    "profile_file": "Adobe Standard.dcp",
+    "lut_file": "/looks/film.cube",
+    "demosaic": "rcd",
+    "keywords": [
+      "studio"
+    ]
+  }
+}

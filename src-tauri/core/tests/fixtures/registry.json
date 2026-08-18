@@ -1,0 +1,1224 @@
+[
+  {
+    "path": "calibration.blue_hue",
+    "ty": "f32",
+    "min": -100.0,
+    "max": 100.0,
+    "default": 0.0,
+    "ui": {
+      "label": "Blue Hue",
+      "step": 1.0,
+      "scale": "linear",
+      "group": "Calibration"
+    }
+  },
+  {
+    "path": "calibration.blue_sat",
+    "ty": "f32",
+    "min": -100.0,
+    "max": 100.0,
+    "default": 0.0,
+    "ui": {
+      "label": "Blue Sat",
+      "step": 1.0,
+      "scale": "linear",
+      "group": "Calibration"
+    }
+  },
+  {
+    "path": "calibration.green_hue",
+    "ty": "f32",
+    "min": -100.0,
+    "max": 100.0,
+    "default": 0.0,
+    "ui": {
+      "label": "Green Hue",
+      "step": 1.0,
+      "scale": "linear",
+      "group": "Calibration"
+    }
+  },
+  {
+    "path": "calibration.green_sat",
+    "ty": "f32",
+    "min": -100.0,
+    "max": 100.0,
+    "default": 0.0,
+    "ui": {
+      "label": "Green Sat",
+      "step": 1.0,
+      "scale": "linear",
+      "group": "Calibration"
+    }
+  },
+  {
+    "path": "calibration.red_hue",
+    "ty": "f32",
+    "min": -100.0,
+    "max": 100.0,
+    "default": 0.0,
+    "ui": {
+      "label": "Red Hue",
+      "step": 1.0,
+      "scale": "linear",
+      "group": "Calibration"
+    }
+  },
+  {
+    "path": "calibration.red_sat",
+    "ty": "f32",
+    "min": -100.0,
+    "max": 100.0,
+    "default": 0.0,
+    "ui": {
+      "label": "Red Sat",
+      "step": 1.0,
+      "scale": "linear",
+      "group": "Calibration"
+    }
+  },
+  {
+    "path": "calibration.shadow_tint",
+    "ty": "f32",
+    "min": -100.0,
+    "max": 100.0,
+    "default": 0.0,
+    "ui": {
+      "label": "Shadow Tint",
+      "step": 1.0,
+      "scale": "linear",
+      "group": "Calibration"
+    }
+  },
+  {
+    "path": "color_grade.global_chroma",
+    "ty": "f32",
+    "min": -100.0,
+    "max": 100.0,
+    "default": 0.0,
+    "ui": {
+      "label": "Chroma",
+      "step": 1.0,
+      "scale": "linear",
+      "group": "Color Grade"
+    }
+  },
+  {
+    "path": "color_grade.highlight_range",
+    "ty": "f32",
+    "min": 0.0,
+    "max": 1.0,
+    "default": 0.75,
+    "ui": {
+      "label": "Highlight Range",
+      "step": 0.01,
+      "scale": "linear",
+      "group": "Color Grade"
+    }
+  },
+  {
+    "path": "color_grade.highlights_hue",
+    "ty": "f32",
+    "min": 0.0,
+    "max": 360.0,
+    "default": 0.0,
+    "ui": {
+      "label": "High Hue",
+      "step": 1.0,
+      "scale": "linear",
+      "group": "Color Grade"
+    }
+  },
+  {
+    "path": "color_grade.highlights_lum",
+    "ty": "f32",
+    "min": -100.0,
+    "max": 100.0,
+    "default": 0.0,
+    "ui": {
+      "label": "High Lum",
+      "step": 1.0,
+      "scale": "linear",
+      "group": "Color Grade"
+    }
+  },
+  {
+    "path": "color_grade.highlights_sat",
+    "ty": "f32",
+    "min": -100.0,
+    "max": 100.0,
+    "default": 0.0,
+    "ui": {
+      "label": "High Sat",
+      "step": 1.0,
+      "scale": "linear",
+      "group": "Color Grade"
+    }
+  },
+  {
+    "path": "color_grade.midtones_hue",
+    "ty": "f32",
+    "min": 0.0,
+    "max": 360.0,
+    "default": 0.0,
+    "ui": {
+      "label": "Mid Hue",
+      "step": 1.0,
+      "scale": "linear",
+      "group": "Color Grade"
+    }
+  },
+  {
+    "path": "color_grade.midtones_lum",
+    "ty": "f32",
+    "min": -100.0,
+    "max": 100.0,
+    "default": 0.0,
+    "ui": {
+      "label": "Mid Lum",
+      "step": 1.0,
+      "scale": "linear",
+      "group": "Color Grade"
+    }
+  },
+  {
+    "path": "color_grade.midtones_sat",
+    "ty": "f32",
+    "min": -100.0,
+    "max": 100.0,
+    "default": 0.0,
+    "ui": {
+      "label": "Mid Sat",
+      "step": 1.0,
+      "scale": "linear",
+      "group": "Color Grade"
+    }
+  },
+  {
+    "path": "color_grade.model",
+    "ty": "f32",
+    "min": 0.0,
+    "max": 2.0,
+    "default": 0.0,
+    "ui": {
+      "label": "Model",
+      "step": 1.0,
+      "scale": "linear",
+      "group": "Color Grade"
+    }
+  },
+  {
+    "path": "color_grade.perceptual_sat",
+    "ty": "f32",
+    "min": -100.0,
+    "max": 100.0,
+    "default": 0.0,
+    "ui": {
+      "label": "Saturation",
+      "step": 1.0,
+      "scale": "linear",
+      "group": "Color Grade"
+    }
+  },
+  {
+    "path": "color_grade.shadow_range",
+    "ty": "f32",
+    "min": 0.0,
+    "max": 1.0,
+    "default": 0.25,
+    "ui": {
+      "label": "Shadow Range",
+      "step": 0.01,
+      "scale": "linear",
+      "group": "Color Grade"
+    }
+  },
+  {
+    "path": "color_grade.shadows_hue",
+    "ty": "f32",
+    "min": 0.0,
+    "max": 360.0,
+    "default": 0.0,
+    "ui": {
+      "label": "Shadow Hue",
+      "step": 1.0,
+      "scale": "linear",
+      "group": "Color Grade"
+    }
+  },
+  {
+    "path": "color_grade.shadows_lum",
+    "ty": "f32",
+    "min": -100.0,
+    "max": 100.0,
+    "default": 0.0,
+    "ui": {
+      "label": "Shadow Lum",
+      "step": 1.0,
+      "scale": "linear",
+      "group": "Color Grade"
+    }
+  },
+  {
+    "path": "color_grade.shadows_sat",
+    "ty": "f32",
+    "min": -100.0,
+    "max": 100.0,
+    "default": 0.0,
+    "ui": {
+      "label": "Shadow Sat",
+      "step": 1.0,
+      "scale": "linear",
+      "group": "Color Grade"
+    }
+  },
+  {
+    "path": "crop.angle",
+    "ty": "f32",
+    "min": -45.0,
+    "max": 45.0,
+    "default": 0.0,
+    "ui": {
+      "label": "Angle",
+      "step": 0.01,
+      "scale": "linear",
+      "group": "Crop"
+    }
+  },
+  {
+    "path": "crop.aspect_h",
+    "ty": "f32",
+    "min": 0.0,
+    "max": 100.0,
+    "default": 0.0,
+    "ui": {
+      "label": "Aspect H",
+      "step": 1.0,
+      "scale": "linear",
+      "group": "Crop"
+    }
+  },
+  {
+    "path": "crop.aspect_locked",
+    "ty": "f32",
+    "min": 0.0,
+    "max": 1.0,
+    "default": 0.0,
+    "ui": {
+      "label": "Aspect Lock",
+      "step": 1.0,
+      "scale": "linear",
+      "group": "Crop"
+    }
+  },
+  {
+    "path": "crop.aspect_w",
+    "ty": "f32",
+    "min": 0.0,
+    "max": 100.0,
+    "default": 0.0,
+    "ui": {
+      "label": "Aspect W",
+      "step": 1.0,
+      "scale": "linear",
+      "group": "Crop"
+    }
+  },
+  {
+    "path": "crop.bottom",
+    "ty": "f32",
+    "min": 0.0,
+    "max": 1.0,
+    "default": 1.0,
+    "ui": {
+      "label": "Bottom",
+      "step": 0.001,
+      "scale": "linear",
+      "group": "Crop"
+    }
+  },
+  {
+    "path": "crop.constrain_crop",
+    "ty": "f32",
+    "min": 0.0,
+    "max": 1.0,
+    "default": 1.0,
+    "ui": {
+      "label": "Constrain",
+      "step": 1.0,
+      "scale": "linear",
+      "group": "Crop"
+    }
+  },
+  {
+    "path": "crop.flip_h",
+    "ty": "f32",
+    "min": 0.0,
+    "max": 1.0,
+    "default": 0.0,
+    "ui": {
+      "label": "Flip H",
+      "step": 1.0,
+      "scale": "linear",
+      "group": "Crop"
+    }
+  },
+  {
+    "path": "crop.flip_v",
+    "ty": "f32",
+    "min": 0.0,
+    "max": 1.0,
+    "default": 0.0,
+    "ui": {
+      "label": "Flip V",
+      "step": 1.0,
+      "scale": "linear",
+      "group": "Crop"
+    }
+  },
+  {
+    "path": "crop.left",
+    "ty": "f32",
+    "min": 0.0,
+    "max": 1.0,
+    "default": 0.0,
+    "ui": {
+      "label": "Left",
+      "step": 0.001,
+      "scale": "linear",
+      "group": "Crop"
+    }
+  },
+  {
+    "path": "crop.persp_horizontal",
+    "ty": "f32",
+    "min": -100.0,
+    "max": 100.0,
+    "default": 0.0,
+    "ui": {
+      "label": "Horizontal",
+      "step": 1.0,
+      "scale": "linear",
+      "group": "Perspective"
+    }
+  },
+  {
+    "path": "crop.persp_vertical",
+    "ty": "f32",
+    "min": -100.0,
+    "max": 100.0,
+    "default": 0.0,
+    "ui": {
+      "label": "Vertical",
+      "step": 1.0,
+      "scale": "linear",
+      "group": "Perspective"
+    }
+  },
+  {
+    "path": "crop.right",
+    "ty": "f32",
+    "min": 0.0,
+    "max": 1.0,
+    "default": 1.0,
+    "ui": {
+      "label": "Right",
+      "step": 0.001,
+      "scale": "linear",
+      "group": "Crop"
+    }
+  },
+  {
+    "path": "crop.rotate_90",
+    "ty": "f32",
+    "min": 0.0,
+    "max": 3.0,
+    "default": 0.0,
+    "ui": {
+      "label": "Rotate 90",
+      "step": 1.0,
+      "scale": "linear",
+      "group": "Crop"
+    }
+  },
+  {
+    "path": "crop.top",
+    "ty": "f32",
+    "min": 0.0,
+    "max": 1.0,
+    "default": 0.0,
+    "ui": {
+      "label": "Top",
+      "step": 0.001,
+      "scale": "linear",
+      "group": "Crop"
+    }
+  },
+  {
+    "path": "detail.ai_amount",
+    "ty": "f32",
+    "min": 0.0,
+    "max": 100.0,
+    "default": 50.0,
+    "ui": {
+      "label": "AI Amount",
+      "step": 1.0,
+      "scale": "linear",
+      "group": "Noise Reduction"
+    }
+  },
+  {
+    "path": "detail.ai_enabled",
+    "ty": "f32",
+    "min": 0.0,
+    "max": 1.0,
+    "default": 0.0,
+    "ui": {
+      "label": "AI Denoise",
+      "step": 1.0,
+      "scale": "linear",
+      "group": "Noise Reduction"
+    }
+  },
+  {
+    "path": "detail.chroma_auto",
+    "ty": "f32",
+    "min": 0.0,
+    "max": 1.0,
+    "default": 1.0,
+    "ui": {
+      "label": "Color Auto",
+      "step": 1.0,
+      "scale": "linear",
+      "group": "Noise Reduction"
+    }
+  },
+  {
+    "path": "detail.detail_preserve",
+    "ty": "f32",
+    "min": 0.0,
+    "max": 100.0,
+    "default": 50.0,
+    "ui": {
+      "label": "Detail",
+      "step": 1.0,
+      "scale": "linear",
+      "group": "Noise Reduction"
+    }
+  },
+  {
+    "path": "detail.hot_pixels",
+    "ty": "f32",
+    "min": 0.0,
+    "max": 1.0,
+    "default": 1.0,
+    "ui": {
+      "label": "Hot Pixels",
+      "step": 1.0,
+      "scale": "linear",
+      "group": "Noise Reduction"
+    }
+  },
+  {
+    "path": "detail.impulse",
+    "ty": "f32",
+    "min": 0.0,
+    "max": 100.0,
+    "default": 0.0,
+    "ui": {
+      "label": "Impulse",
+      "step": 1.0,
+      "scale": "linear",
+      "group": "Noise Reduction"
+    }
+  },
+  {
+    "path": "detail.nlm_center",
+    "ty": "f32",
+    "min": 0.0,
+    "max": 100.0,
+    "default": 30.0,
+    "ui": {
+      "label": "NLM Center",
+      "step": 1.0,
+      "scale": "linear",
+      "group": "Noise Reduction"
+    }
+  },
+  {
+    "path": "detail.nlm_patch",
+    "ty": "f32",
+    "min": 1.0,
+    "max": 3.0,
+    "default": 1.0,
+    "ui": {
+      "label": "NLM Patch",
+      "step": 1.0,
+      "scale": "linear",
+      "group": "Noise Reduction"
+    }
+  },
+  {
+    "path": "detail.nlm_search",
+    "ty": "f32",
+    "min": 2.0,
+    "max": 10.0,
+    "default": 5.0,
+    "ui": {
+      "label": "NLM Search",
+      "step": 1.0,
+      "scale": "linear",
+      "group": "Noise Reduction"
+    }
+  },
+  {
+    "path": "detail.noise_chroma",
+    "ty": "f32",
+    "min": 0.0,
+    "max": 100.0,
+    "default": 0.0,
+    "ui": {
+      "label": "Color",
+      "step": 1.0,
+      "scale": "linear",
+      "group": "Noise Reduction"
+    }
+  },
+  {
+    "path": "detail.noise_luma",
+    "ty": "f32",
+    "min": 0.0,
+    "max": 100.0,
+    "default": 0.0,
+    "ui": {
+      "label": "Luminance",
+      "step": 1.0,
+      "scale": "linear",
+      "group": "Noise Reduction"
+    }
+  },
+  {
+    "path": "detail.nr_aggressive",
+    "ty": "f32",
+    "min": 0.0,
+    "max": 1.0,
+    "default": 0.0,
+    "ui": {
+      "label": "Aggressive",
+      "step": 1.0,
+      "scale": "linear",
+      "group": "Noise Reduction"
+    }
+  },
+  {
+    "path": "detail.nr_engine",
+    "ty": "f32",
+    "min": 0.0,
+    "max": 2.0,
+    "default": 0.0,
+    "ui": {
+      "label": "Engine",
+      "step": 1.0,
+      "scale": "linear",
+      "group": "Noise Reduction"
+    }
+  },
+  {
+    "path": "detail.nr_strength",
+    "ty": "f32",
+    "min": 0.25,
+    "max": 4.0,
+    "default": 1.0,
+    "ui": {
+      "label": "Strength",
+      "step": 0.05,
+      "scale": "linear",
+      "group": "Noise Reduction"
+    }
+  },
+  {
+    "path": "detail.sharpen_amount",
+    "ty": "f32",
+    "min": 0.0,
+    "max": 150.0,
+    "default": 0.0,
+    "ui": {
+      "label": "Sharpen",
+      "step": 1.0,
+      "scale": "linear",
+      "group": "Detail"
+    }
+  },
+  {
+    "path": "detail.sharpen_detail",
+    "ty": "f32",
+    "min": 0.0,
+    "max": 100.0,
+    "default": 25.0,
+    "ui": {
+      "label": "Sharpen Detail",
+      "step": 1.0,
+      "scale": "linear",
+      "group": "Detail"
+    }
+  },
+  {
+    "path": "detail.sharpen_radius",
+    "ty": "f32",
+    "min": 0.5,
+    "max": 3.0,
+    "default": 1.0,
+    "ui": {
+      "label": "Sharpen Radius",
+      "step": 0.1,
+      "scale": "linear",
+      "group": "Detail"
+    }
+  },
+  {
+    "path": "effects.clarity",
+    "ty": "f32",
+    "min": 0.0,
+    "max": 100.0,
+    "default": 0.0,
+    "ui": {
+      "label": "Clarity",
+      "step": 1.0,
+      "scale": "linear",
+      "group": "Effects"
+    }
+  },
+  {
+    "path": "effects.grain_amount",
+    "ty": "f32",
+    "min": 0.0,
+    "max": 100.0,
+    "default": 0.0,
+    "ui": {
+      "label": "Grain",
+      "step": 1.0,
+      "scale": "linear",
+      "group": "Effects"
+    }
+  },
+  {
+    "path": "effects.grain_size",
+    "ty": "f32",
+    "min": 1.0,
+    "max": 8.0,
+    "default": 2.0,
+    "ui": {
+      "label": "Grain Size",
+      "step": 0.1,
+      "scale": "linear",
+      "group": "Effects"
+    }
+  },
+  {
+    "path": "effects.vignette_amount",
+    "ty": "f32",
+    "min": 0.0,
+    "max": 100.0,
+    "default": 0.0,
+    "ui": {
+      "label": "Vignette",
+      "step": 1.0,
+      "scale": "linear",
+      "group": "Effects"
+    }
+  },
+  {
+    "path": "effects.vignette_midpoint",
+    "ty": "f32",
+    "min": 0.0,
+    "max": 100.0,
+    "default": 50.0,
+    "ui": {
+      "label": "Vignette Mid",
+      "step": 1.0,
+      "scale": "linear",
+      "group": "Effects"
+    }
+  },
+  {
+    "path": "exposure.stops",
+    "ty": "f32",
+    "min": -5.0,
+    "max": 5.0,
+    "default": 0.0,
+    "ui": {
+      "label": "Exposure",
+      "step": 0.01,
+      "scale": "linear",
+      "group": "Light"
+    }
+  },
+  {
+    "path": "hsl.aqua.hue",
+    "ty": "f32",
+    "min": -100.0,
+    "max": 100.0,
+    "default": 0.0,
+    "ui": {
+      "label": "Aqua Hue",
+      "step": 1.0,
+      "scale": "linear",
+      "group": "HSL"
+    }
+  },
+  {
+    "path": "hsl.aqua.lum",
+    "ty": "f32",
+    "min": -100.0,
+    "max": 100.0,
+    "default": 0.0,
+    "ui": {
+      "label": "Aqua Lum",
+      "step": 1.0,
+      "scale": "linear",
+      "group": "HSL"
+    }
+  },
+  {
+    "path": "hsl.aqua.sat",
+    "ty": "f32",
+    "min": -100.0,
+    "max": 100.0,
+    "default": 0.0,
+    "ui": {
+      "label": "Aqua Sat",
+      "step": 1.0,
+      "scale": "linear",
+      "group": "HSL"
+    }
+  },
+  {
+    "path": "hsl.blue.hue",
+    "ty": "f32",
+    "min": -100.0,
+    "max": 100.0,
+    "default": 0.0,
+    "ui": {
+      "label": "Blue Hue",
+      "step": 1.0,
+      "scale": "linear",
+      "group": "HSL"
+    }
+  },
+  {
+    "path": "hsl.blue.lum",
+    "ty": "f32",
+    "min": -100.0,
+    "max": 100.0,
+    "default": 0.0,
+    "ui": {
+      "label": "Blue Lum",
+      "step": 1.0,
+      "scale": "linear",
+      "group": "HSL"
+    }
+  },
+  {
+    "path": "hsl.blue.sat",
+    "ty": "f32",
+    "min": -100.0,
+    "max": 100.0,
+    "default": 0.0,
+    "ui": {
+      "label": "Blue Sat",
+      "step": 1.0,
+      "scale": "linear",
+      "group": "HSL"
+    }
+  },
+  {
+    "path": "hsl.green.hue",
+    "ty": "f32",
+    "min": -100.0,
+    "max": 100.0,
+    "default": 0.0,
+    "ui": {
+      "label": "Green Hue",
+      "step": 1.0,
+      "scale": "linear",
+      "group": "HSL"
+    }
+  },
+  {
+    "path": "hsl.green.lum",
+    "ty": "f32",
+    "min": -100.0,
+    "max": 100.0,
+    "default": 0.0,
+    "ui": {
+      "label": "Green Lum",
+      "step": 1.0,
+      "scale": "linear",
+      "group": "HSL"
+    }
+  },
+  {
+    "path": "hsl.green.sat",
+    "ty": "f32",
+    "min": -100.0,
+    "max": 100.0,
+    "default": 0.0,
+    "ui": {
+      "label": "Green Sat",
+      "step": 1.0,
+      "scale": "linear",
+      "group": "HSL"
+    }
+  },
+  {
+    "path": "hsl.magenta.hue",
+    "ty": "f32",
+    "min": -100.0,
+    "max": 100.0,
+    "default": 0.0,
+    "ui": {
+      "label": "Magenta Hue",
+      "step": 1.0,
+      "scale": "linear",
+      "group": "HSL"
+    }
+  },
+  {
+    "path": "hsl.magenta.lum",
+    "ty": "f32",
+    "min": -100.0,
+    "max": 100.0,
+    "default": 0.0,
+    "ui": {
+      "label": "Magenta Lum",
+      "step": 1.0,
+      "scale": "linear",
+      "group": "HSL"
+    }
+  },
+  {
+    "path": "hsl.magenta.sat",
+    "ty": "f32",
+    "min": -100.0,
+    "max": 100.0,
+    "default": 0.0,
+    "ui": {
+      "label": "Magenta Sat",
+      "step": 1.0,
+      "scale": "linear",
+      "group": "HSL"
+    }
+  },
+  {
+    "path": "hsl.orange.hue",
+    "ty": "f32",
+    "min": -100.0,
+    "max": 100.0,
+    "default": 0.0,
+    "ui": {
+      "label": "Orange Hue",
+      "step": 1.0,
+      "scale": "linear",
+      "group": "HSL"
+    }
+  },
+  {
+    "path": "hsl.orange.lum",
+    "ty": "f32",
+    "min": -100.0,
+    "max": 100.0,
+    "default": 0.0,
+    "ui": {
+      "label": "Orange Lum",
+      "step": 1.0,
+      "scale": "linear",
+      "group": "HSL"
+    }
+  },
+  {
+    "path": "hsl.orange.sat",
+    "ty": "f32",
+    "min": -100.0,
+    "max": 100.0,
+    "default": 0.0,
+    "ui": {
+      "label": "Orange Sat",
+      "step": 1.0,
+      "scale": "linear",
+      "group": "HSL"
+    }
+  },
+  {
+    "path": "hsl.purple.hue",
+    "ty": "f32",
+    "min": -100.0,
+    "max": 100.0,
+    "default": 0.0,
+    "ui": {
+      "label": "Purple Hue",
+      "step": 1.0,
+      "scale": "linear",
+      "group": "HSL"
+    }
+  },
+  {
+    "path": "hsl.purple.lum",
+    "ty": "f32",
+    "min": -100.0,
+    "max": 100.0,
+    "default": 0.0,
+    "ui": {
+      "label": "Purple Lum",
+      "step": 1.0,
+      "scale": "linear",
+      "group": "HSL"
+    }
+  },
+  {
+    "path": "hsl.purple.sat",
+    "ty": "f32",
+    "min": -100.0,
+    "max": 100.0,
+    "default": 0.0,
+    "ui": {
+      "label": "Purple Sat",
+      "step": 1.0,
+      "scale": "linear",
+      "group": "HSL"
+    }
+  },
+  {
+    "path": "hsl.red.hue",
+    "ty": "f32",
+    "min": -100.0,
+    "max": 100.0,
+    "default": 0.0,
+    "ui": {
+      "label": "Red Hue",
+      "step": 1.0,
+      "scale": "linear",
+      "group": "HSL"
+    }
+  },
+  {
+    "path": "hsl.red.lum",
+    "ty": "f32",
+    "min": -100.0,
+    "max": 100.0,
+    "default": 0.0,
+    "ui": {
+      "label": "Red Lum",
+      "step": 1.0,
+      "scale": "linear",
+      "group": "HSL"
+    }
+  },
+  {
+    "path": "hsl.red.sat",
+    "ty": "f32",
+    "min": -100.0,
+    "max": 100.0,
+    "default": 0.0,
+    "ui": {
+      "label": "Red Sat",
+      "step": 1.0,
+      "scale": "linear",
+      "group": "HSL"
+    }
+  },
+  {
+    "path": "hsl.yellow.hue",
+    "ty": "f32",
+    "min": -100.0,
+    "max": 100.0,
+    "default": 0.0,
+    "ui": {
+      "label": "Yellow Hue",
+      "step": 1.0,
+      "scale": "linear",
+      "group": "HSL"
+    }
+  },
+  {
+    "path": "hsl.yellow.lum",
+    "ty": "f32",
+    "min": -100.0,
+    "max": 100.0,
+    "default": 0.0,
+    "ui": {
+      "label": "Yellow Lum",
+      "step": 1.0,
+      "scale": "linear",
+      "group": "HSL"
+    }
+  },
+  {
+    "path": "hsl.yellow.sat",
+    "ty": "f32",
+    "min": -100.0,
+    "max": 100.0,
+    "default": 0.0,
+    "ui": {
+      "label": "Yellow Sat",
+      "step": 1.0,
+      "scale": "linear",
+      "group": "HSL"
+    }
+  },
+  {
+    "path": "lut.opacity",
+    "ty": "f32",
+    "min": 0.0,
+    "max": 100.0,
+    "default": 100.0,
+    "ui": {
+      "label": "LUT Opacity",
+      "step": 1.0,
+      "scale": "linear",
+      "group": "LUT"
+    }
+  },
+  {
+    "path": "tone_curve.contrast",
+    "ty": "f32",
+    "min": -100.0,
+    "max": 100.0,
+    "default": 0.0,
+    "ui": {
+      "label": "Contrast",
+      "step": 1.0,
+      "scale": "linear",
+      "group": "Tone"
+    }
+  },
+  {
+    "path": "tone_curve.darks",
+    "ty": "f32",
+    "min": -100.0,
+    "max": 100.0,
+    "default": 0.0,
+    "ui": {
+      "label": "Darks",
+      "step": 1.0,
+      "scale": "linear",
+      "group": "Tone"
+    }
+  },
+  {
+    "path": "tone_curve.highlights",
+    "ty": "f32",
+    "min": -100.0,
+    "max": 100.0,
+    "default": 0.0,
+    "ui": {
+      "label": "Highlights",
+      "step": 1.0,
+      "scale": "linear",
+      "group": "Tone"
+    }
+  },
+  {
+    "path": "tone_curve.lights",
+    "ty": "f32",
+    "min": -100.0,
+    "max": 100.0,
+    "default": 0.0,
+    "ui": {
+      "label": "Lights",
+      "step": 1.0,
+      "scale": "linear",
+      "group": "Tone"
+    }
+  },
+  {
+    "path": "tone_curve.points",
+    "ty": "curve",
+    "min": 0.0,
+    "max": 1.0,
+    "default": [],
+    "ui": {
+      "label": "Curve RGB",
+      "step": 0.01,
+      "scale": "linear",
+      "group": "Tone"
+    }
+  },
+  {
+    "path": "tone_curve.points_b",
+    "ty": "curve",
+    "min": 0.0,
+    "max": 1.0,
+    "default": [],
+    "ui": {
+      "label": "Curve Blue",
+      "step": 0.01,
+      "scale": "linear",
+      "group": "Tone"
+    }
+  },
+  {
+    "path": "tone_curve.points_g",
+    "ty": "curve",
+    "min": 0.0,
+    "max": 1.0,
+    "default": [],
+    "ui": {
+      "label": "Curve Green",
+      "step": 0.01,
+      "scale": "linear",
+      "group": "Tone"
+    }
+  },
+  {
+    "path": "tone_curve.points_r",
+    "ty": "curve",
+    "min": 0.0,
+    "max": 1.0,
+    "default": [],
+    "ui": {
+      "label": "Curve Red",
+      "step": 0.01,
+      "scale": "linear",
+      "group": "Tone"
+    }
+  },
+  {
+    "path": "tone_curve.shadows",
+    "ty": "f32",
+    "min": -100.0,
+    "max": 100.0,
+    "default": 0.0,
+    "ui": {
+      "label": "Shadows",
+      "step": 1.0,
+      "scale": "linear",
+      "group": "Tone"
+    }
+  },
+  {
+    "path": "white_balance.temp",
+    "ty": "f32",
+    "min": 2000.0,
+    "max": 50000.0,
+    "default": 5200.0,
+    "ui": {
+      "label": "Temp",
+      "step": 10.0,
+      "scale": "linear",
+      "group": "White Balance"
+    }
+  },
+  {
+    "path": "white_balance.tint",
+    "ty": "f32",
+    "min": -150.0,
+    "max": 150.0,
+    "default": 0.0,
+    "ui": {
+      "label": "Tint",
+      "step": 1.0,
+      "scale": "linear",
+      "group": "White Balance"
+    }
+  }
+]

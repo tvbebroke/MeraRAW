@@ -364,3 +364,80 @@ export function failOnPurpose(): Promise<void> {
 export function reportFrontendStatus(status: string): Promise<void> {
   return invoke<void>("report_frontend_status", { status });
 }
+
+export function getPerfStats(): Promise<{
+  decodeMs: number;
+  renderMs: number;
+  [k: string]: unknown;
+}> {
+  return invoke("get_perf_stats");
+}
+
+export function reportProblem(message: string, from?: string | null): Promise<void> {
+  return invoke<void>("report_problem", { message, from: from ?? null });
+}
+
+export function assistantAvailable(): Promise<boolean> {
+  return invoke<boolean>("assistant_available");
+}
+
+export function assistantSend(message: string, mode?: string): Promise<string> {
+  return invoke<string>("assistant_send", { message, mode });
+}
+
+export interface LicenseCheck {
+  licensed: boolean;
+  userId: string | null;
+  reason: string | null;
+}
+
+export function licenseCheckLocal(): Promise<LicenseCheck> {
+  return invoke<LicenseCheck>("license_check_local");
+}
+
+export function licenseClearToken(): Promise<void> {
+  return invoke<void>("license_clear_token");
+}
+
+export function licenseVerifyTokenLocally(token: string): Promise<boolean> {
+  return invoke<boolean>("license_verify_token_locally", { token });
+}
+
+export function licenseSignInAndActivate(
+  email: string,
+  password: string,
+): Promise<string> {
+  return invoke<string>("license_sign_in_and_activate", { email, password });
+}
+
+export function licenseSupporterStatus(): Promise<{
+  licensed: boolean;
+  isEarlySupporter: boolean;
+  userId: string | null;
+  reason: string | null;
+}> {
+  return invoke("license_supporter_status");
+}
+
+export function licenseStartCheckout(
+  email: string,
+  password: string,
+): Promise<string> {
+  return invoke<string>("license_start_checkout", { email, password });
+}
+
+export function openExternalUrl(url: string): Promise<void> {
+  return invoke<void>("open_external_url", { url });
+}
+
+export function selftestEnabled(): Promise<boolean> {
+  return invoke<boolean>("selftest_enabled");
+}
+
+export function liveAssistantEnabled(): Promise<boolean> {
+  return invoke<boolean>("live_assistant_enabled");
+}
+
+export function verifySliderEnabled(): Promise<boolean> {
+  return invoke<boolean>("verify_slider_enabled");
+}

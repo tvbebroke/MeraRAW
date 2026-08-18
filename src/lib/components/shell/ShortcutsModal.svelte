@@ -27,11 +27,12 @@
     {
       title: "Tool Switching",
       items: [
-        { label: "Switch to Edit Panel", key: shortcutLabels.toolEdit },
-        { label: "Switch to Crop Panel", key: shortcutLabels.toolCrop },
-        { label: "Switch to Mask Panel", key: shortcutLabels.toolMask },
-        { label: "Switch to AI Panel", key: shortcutLabels.toolAi },
-        { label: "Switch to Presets Panel", key: shortcutLabels.toolPresets },
+        { label: "Focus Light section", key: shortcutLabels.toolEdit },
+        { label: "Focus Crop section", key: shortcutLabels.toolCrop },
+        { label: "Focus Mask section", key: shortcutLabels.toolMask },
+        { label: "Focus Retouch section", key: shortcutLabels.toolAi },
+        { label: "Focus Presets section", key: shortcutLabels.toolPresets },
+        { label: "Open AI Agent", key: shortcutLabels.toolChat },
       ]
     },
     {
@@ -64,14 +65,14 @@
   <!-- Modal Content Card -->
   <div
     transition:scale={{ duration: 250, start: 0.95 }}
-    class="modal-card relative flex w-[640px] max-h-[90%] flex-col overflow-hidden rounded-[20px] border border-white/[0.06] bg-[#171717]/95 text-white backdrop-blur-md"
+    class="modal-card relative flex w-[640px] max-h-[90%] flex-col overflow-hidden text-fg"
     onclick={(e) => e.stopPropagation()}
   >
     <!-- Modal Header -->
-    <div class="flex shrink-0 items-center justify-between border-b border-white/[0.04] px-8 py-5">
+    <div class="flex shrink-0 items-center justify-between border-b border-border px-8 py-5">
       <h2 class="content-title m-0">Keyboard Shortcuts</h2>
       <button 
-        class="flex size-[26px] items-center justify-center rounded-full border border-white/5 bg-white/[0.04] text-white/80 hover:bg-white/[0.12] hover:text-white active:scale-95 transition-all cursor-pointer"
+        class="flex size-[26px] items-center justify-center rounded-full border border-border bg-hover text-secondary hover:bg-active hover:text-fg active:scale-95 transition-all cursor-pointer"
         onclick={close}
         aria-label="Close dialog"
       >
@@ -99,7 +100,7 @@
     </div>
 
     <!-- Footer Actions -->
-    <footer class="flex shrink-0 items-center justify-end gap-3 border-t border-white/[0.04] px-8 py-4">
+    <footer class="flex shrink-0 items-center justify-end gap-3 border-t border-border px-8 py-4">
       <button class="footer-btn footer-btn--primary" onclick={close}>
         Close
       </button>
@@ -114,18 +115,18 @@
     backdrop-filter: blur(16px) saturate(120%);
   }
 
+  /* Solid panel + hairline border + one shadow layer. */
   .modal-card {
-    background: rgba(23, 23, 23, 0.96);
-    box-shadow: 
-      0 0 0 0.5px rgba(255, 255, 255, 0.06),
-      0 8px 24px rgba(0, 0, 0, 0.3),
-      0 24px 48px rgba(0, 0, 0, 0.25);
+    background: var(--color-panel);
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-popover);
   }
 
   .content-title {
     font-size: 15px;
     font-weight: 600;
-    color: rgba(255, 255, 255, 0.9);
+    color: var(--color-fg);
     letter-spacing: -0.01em;
   }
 
@@ -137,11 +138,11 @@
     background: transparent;
   }
   .custom-scrollbar::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.08);
+    background: var(--color-active);
     border-radius: 99px;
   }
   .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-    background: rgba(255, 255, 255, 0.15);
+    background: var(--color-active);
   }
 
   /* Shortcut Groups */
@@ -156,7 +157,7 @@
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.08em;
-    color: rgba(255, 255, 255, 0.35);
+    color: var(--color-subtle);
     margin: 0;
   }
 
@@ -171,12 +172,12 @@
     align-items: center;
     justify-content: space-between;
     padding: 6px 0;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+    border-bottom: 1px solid var(--color-border);
   }
 
   .shortcut-label {
     font-size: 12px;
-    color: rgba(255, 255, 255, 0.7);
+    color: var(--color-secondary);
   }
 
   .shortcut-kbd {
@@ -189,9 +190,9 @@
     font-family: inherit;
     font-size: 10px;
     font-weight: 600;
-    color: rgba(255, 255, 255, 0.85);
-    background: rgba(255, 255, 255, 0.06);
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: var(--color-fg);
+    background: var(--color-hover);
+    border: 1px solid var(--color-border-strong);
     border-radius: 4px;
     box-shadow: 0 1px 0 rgba(0, 0, 0, 0.2);
   }
@@ -216,7 +217,7 @@
   }
 
   .footer-btn--primary:hover {
-    background: #e4e4e7;
+    background: var(--color-border-strong);
     transform: translateY(-0.5px);
   }
 

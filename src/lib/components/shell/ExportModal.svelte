@@ -200,11 +200,11 @@
   <!-- Modal Content Card -->
   <div
     transition:scale={{ duration: 250, start: 0.95 }}
-    class="modal-card relative flex max-h-[560px] w-[520px] flex-col overflow-hidden rounded-[20px] border border-white/[0.06] bg-[#171717]/95 text-white backdrop-blur-md"
+    class="modal-card relative flex max-h-[560px] w-[520px] flex-col overflow-hidden text-fg"
     onclick={(e) => e.stopPropagation()}
   >
-    <header class="flex shrink-0 items-center justify-between border-b border-white/[0.05] px-6 py-4">
-      <h3 class="text-sm font-semibold text-white/90">Export Photo</h3>
+    <header class="flex shrink-0 items-center justify-between border-b border-border px-6 py-4">
+      <h3 class="text-sm font-semibold text-fg">Export Photo</h3>
       <button class="close-btn" onclick={close} aria-label="Close export dialog">
         <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
           <path d="M1 1L11 11M11 1L1 11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
@@ -294,7 +294,7 @@
                 class="setting-slider flex-1"
                 disabled={busy}
               />
-              <span class="setting-value w-[38px] text-right">{quality}%</span>
+              <span class="setting-value num w-[38px] text-right">{quality}%</span>
             </div>
           </div>
         {/if}
@@ -322,7 +322,7 @@
           </div>
         {/if}
 
-        <div class="setting-group border-t border-white/[0.03] pt-4 flex flex-col gap-3">
+        <div class="setting-group border-t border-border pt-4 flex flex-col gap-3">
           <label for="meta-policy" class="setting-label">Metadata</label>
           <select
             id="meta-policy"
@@ -375,7 +375,7 @@
     </div>
 
     <!-- Footer Actions -->
-    <footer class="flex shrink-0 items-center justify-end gap-3 border-t border-white/[0.04] px-8 py-4">
+    <footer class="flex shrink-0 items-center justify-end gap-3 border-t border-border px-8 py-4">
       {#if savedPath}
         <button type="button" class="action-btn" onclick={() => revealInFinder(savedPath!)}>
           Reveal in Finder
@@ -408,12 +408,12 @@
     backdrop-filter: blur(16px) saturate(120%);
   }
 
+  /* Solid panel + hairline border + one shadow layer. */
   .modal-card {
-    background: rgba(23, 23, 23, 0.96);
-    box-shadow:
-      0 0 0 0.5px rgba(255, 255, 255, 0.06),
-      0 8px 24px rgba(0, 0, 0, 0.3),
-      0 24px 48px rgba(0, 0, 0, 0.25);
+    background: var(--color-panel);
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-popover);
   }
 
   .setting-row {
@@ -421,7 +421,7 @@
     align-items: center;
     justify-content: space-between;
     padding: 14px 0;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    border-bottom: 1px solid var(--color-border);
     transition: background-color 150ms ease;
   }
 
@@ -437,39 +437,39 @@
   .setting-label {
     font-size: 13px;
     font-weight: 400;
-    color: rgba(255, 255, 255, 0.75);
+    color: var(--color-secondary);
     letter-spacing: -0.005em;
   }
 
   .setting-label--secondary {
-    color: rgba(255, 255, 255, 0.5);
+    color: var(--color-subtle);
     font-size: 12px;
   }
 
   .setting-value {
     font-size: 12px;
     font-weight: 500;
-    color: rgba(255, 255, 255, 0.5);
+    color: var(--color-subtle);
   }
 
   /* ── Form Controls ──────────────────────────────────── */
   .setting-input {
     appearance: none;
     -webkit-appearance: none;
-    border: 1px solid rgba(255, 255, 255, 0.06);
-    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--color-border);
+    background: var(--color-hover);
     border-radius: 8px;
     padding: 7px 12px;
     font-size: 12px;
     font-family: inherit;
-    color: rgba(255, 255, 255, 0.6);
+    color: var(--color-secondary);
     outline: none;
     transition: border-color 150ms ease, background-color 150ms ease;
   }
 
   .setting-input:focus {
-    border-color: rgba(255, 255, 255, 0.15);
-    background: rgba(255, 255, 255, 0.04);
+    border-color: var(--color-border-strong);
+    background: var(--color-hover);
   }
 
   .setting-input:disabled {
@@ -487,7 +487,7 @@
     font-size: 13px;
     font-family: inherit;
     font-weight: 400;
-    color: rgba(255, 255, 255, 0.5);
+    color: var(--color-subtle);
     outline: none;
     cursor: pointer;
     transition: color 150ms ease;
@@ -495,7 +495,7 @@
   }
 
   .setting-select:hover {
-    color: rgba(255, 255, 255, 0.7);
+    color: var(--color-secondary);
   }
 
   .setting-select:disabled {
@@ -504,8 +504,8 @@
   }
 
   .setting-select option {
-    background: #1e1e20;
-    color: #fff;
+    background: var(--color-panel);
+    color: var(--color-fg);
     text-align: left;
   }
 
@@ -514,7 +514,7 @@
     -webkit-appearance: none;
     height: 2px;
     border-radius: 999px;
-    background: rgba(255, 255, 255, 0.08);
+    background: var(--color-active);
     outline: none;
   }
 
@@ -524,7 +524,7 @@
     width: 12px;
     height: 12px;
     border-radius: 50%;
-    background: #ffffff;
+    background: var(--color-fg);
     cursor: pointer;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
     transition: transform 150ms ease;
@@ -535,24 +535,25 @@
   }
 
   /* ── Progress + Status ────────────────────────────────── */
+  /* Hairline progress, per the schema. Never a chunky bar. */
   .progress-track {
     margin-top: 4px;
-    height: 4px;
+    height: 2.5px;
     overflow: hidden;
-    border-radius: 999px;
-    background: rgba(255, 255, 255, 0.08);
+    border-radius: 2px;
+    background: var(--color-sunken);
   }
 
   .progress-fill {
     height: 100%;
-    background: var(--color-accent, #ffffff);
+    background: var(--color-accent);
     transition: width 200ms ease;
   }
 
   .status-line {
     margin: 10px 0 0;
     font-size: 11px;
-    color: rgba(255, 255, 255, 0.45);
+    color: var(--color-subtle);
   }
 
   .status-line--warn {
@@ -571,21 +572,21 @@
   .action-btn {
     appearance: none;
     -webkit-appearance: none;
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--color-border-strong);
+    background: var(--color-hover);
     border-radius: 8px;
     padding: 6px 14px;
     font-size: 12px;
     font-family: inherit;
     font-weight: 500;
-    color: rgba(255, 255, 255, 0.7);
+    color: var(--color-secondary);
     cursor: pointer;
     transition: background-color 150ms ease, border-color 150ms ease;
   }
 
   .action-btn:hover:not(:disabled) {
-    background-color: rgba(255, 255, 255, 0.07);
-    border-color: rgba(255, 255, 255, 0.12);
+    background-color: var(--color-active);
+    border-color: var(--color-border-strong);
   }
 
   .action-btn:active:not(:disabled) {
@@ -612,11 +613,11 @@
 
   .footer-btn--ghost {
     background: transparent;
-    color: rgba(255, 255, 255, 0.5);
+    color: var(--color-subtle);
   }
 
   .footer-btn--ghost:hover:not(:disabled) {
-    color: rgba(255, 255, 255, 0.8);
+    color: var(--color-fg);
   }
 
   .footer-btn--ghost:disabled {
@@ -625,12 +626,12 @@
   }
 
   .footer-btn--primary {
-    background: var(--color-accent, #ffffff);
+    background: var(--color-accent);
     color: #000;
   }
 
   .footer-btn--primary:hover:not(:disabled) {
-    background: #e4e4e7;
+    background: var(--color-border-strong);
     transform: translateY(-0.5px);
   }
 

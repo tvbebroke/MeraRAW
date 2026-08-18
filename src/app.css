@@ -49,38 +49,80 @@
 }
 
 @theme {
-  /* ─────────────────────────────────────────────────────────
-     SEMANTIC DESIGN TOKENS (Tailwind v4)
-     Centralized palette tokens mapping to UI roles.
-     Edit these tokens to change colors across the app.
-     ───────────────────────────────────────────────────────── */
+  /* ═════════════════════════════════════════════════════════
+     MERARAW DESIGN TOKENS  ·  Tailwind v4
+     Schema adapted from Pencil (see meraraw-minimal-ui-project.md).
+     Dark-first: a photo editor must not bias exposure/WB judgement.
 
-  /* Surface & Container Colors */
-  --color-window: #272727;
-  --color-panel: #171717;
-  --color-panel-2: #232325;
-  --color-panel-3: #2e2e30;
-  --color-surface-input: rgba(0, 0, 0, 0.25);
-  --color-card: #1e1e20;
-  --color-card-active: #2b2b2e;
+     CANONICAL TOKENS are the source of truth. Legacy token names
+     below are aliases kept so pre-migration components keep
+     compiling; they are removed at the end of Phase 3.
+     ═════════════════════════════════════════════════════════ */
 
-  /* Border & Divider Colors */
-  --color-border-subtle: rgba(255, 255, 255, 0.05);
-  --color-border-input: rgba(255, 255, 255, 0.1);
-  --color-border-hover: rgba(255, 255, 255, 0.25);
+  /* ── Canonical: surfaces ────────────────────────────────── */
+  /* Three levels only. Warm-cast neutrals, never pure grey.    */
+  --color-bg: #121214;
+  --color-canvas: #161618;
+  --color-sidebar: #141416;
+  --color-panel: #1a1a1e;
+  --color-sunken: #222227;
 
-  /* Text & Typography Colors */
-  --color-text-primary: rgba(255, 255, 255, 0.92);
-  --color-text-secondary: rgba(255, 255, 255, 0.65);
-  --color-text-muted: rgba(255, 255, 255, 0.4);
+  /* ── Canonical: interaction washes ──────────────────────── */
+  /* Two global alpha washes. Never per-component hover colors. */
+  --color-hover: rgba(255, 255, 255, 0.055);
+  --color-active: rgba(255, 255, 255, 0.08);
 
-  /* Accent & Interactive Colors */
-  --color-accent: #ffffff;
-  --color-button-bg: rgba(255, 255, 255, 0.06);
-  --color-button-hover: rgba(255, 255, 255, 0.12);
+  /* ── Canonical: borders (these carry all elevation) ─────── */
+  --color-border: rgba(255, 255, 255, 0.07);
+  --color-border-strong: rgba(255, 255, 255, 0.14);
 
-  /* Font Families */
+  /* ── Canonical: text, three levels ──────────────────────── */
+  --color-fg: #eeeeeb;         /* primary; also primary btn fill */
+  --color-secondary: #bcbcc2;  /* secondary labels               */
+  --color-subtle: #808088;     /* metadata, placeholders, counts */
+
+  /* ── Canonical: semantic status (the ONLY chromatic set) ── */
+  /* Desaturated on purpose. Never used decoratively.           */
+  --color-accent: #8fadea;   /* running / selected              */
+  --color-accent-soft: rgba(143, 173, 234, 0.12);
+  --color-ok: #7ab28a;       /* done                            */
+  --color-destructive: #e26f6a; /* failed                       */
+  --color-warn: #dea83e;     /* waiting on user                 */
+
+  /* ── Canonical: geometry & elevation ────────────────────── */
+  --radius: 10px;
+  --shadow-panel: 0 1px 3px rgba(0, 0, 0, 0.35);
+  --shadow-popover: 0 8px 28px rgba(0, 0, 0, 0.42);
+
+  /* ── Canonical: motion ──────────────────────────────────── */
+  --ease-std: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-out: cubic-bezier(0, 0, 0.2, 1);
+
+  /* ── Canonical: type ────────────────────────────────────── */
+  /* Sans keeps the MeraRAW brand voice; mono carries all data. */
   --font-sans: "Neue Haas Grotesk Text", -apple-system, BlinkMacSystemFont, "SF Pro", "Segoe UI", system-ui, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Monaco, monospace;
+
+  /* Four sizes. A control that cannot fit them at 280px is the wrong control. */
+  --text-title: 13px;   /* 500 — accordion section title, nothing else */
+  --text-ui:    12.5px; /* 400 — every label, button, chip, select, prose */
+  --text-num:   12px;   /* mono via .num — every numeric readout */
+  --text-group: 10px;   /* 600 / 0.06em / uppercase — group labels only */
+
+  /* ── Canonical: spacing ─────────────────────────────────── */
+  --space-1: 4px;   /* row padding-y, chevron gap */
+  --space-2: 8px;   /* header padding-y, grid gaps */
+  --space-3: 12px;  /* rail padding-x, group top margin, indent */
+  --space-4: 16px;  /* section body bottom */
+  --space-6: 24px;  /* group-label block */
+
+  /* Legacy aliases (--color-window, --color-card, --color-text-primary, …)
+     were REMOVED in Phase 3. They were declared here as `var()` indirections,
+     which meant they computed against the ROOT token values and did not
+     re-resolve under a theme class applied to a descendant element — so
+     `.light-look` (which sits on the app div, not <html>) left every aliased
+     surface stuck on the dark palette. All call sites now use canonical
+     tokens directly. Do not reintroduce aliases at this level. */
 }
 
 html,
@@ -93,7 +135,11 @@ body {
   margin: 0;
   background: transparent;
   font-family: var(--font-sans);
-  color: var(--color-text-primary);
+  color: var(--color-fg);
+  /* Pro-tool density baseline. Deliberately smaller than web-typical. */
+  font-size: 12.5px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
   overflow: hidden;
   user-select: none;
   -webkit-user-select: none;
@@ -102,6 +148,118 @@ body {
 
 button, input, select, textarea {
   font-family: inherit;
+}
+
+/* ─────────────────────────────────────────────────────────
+   THE MONO RULE
+   Prose is sans. Data is mono. The split is absolute.
+
+   Any number a user compares, scrubs, or aligns gets .num:
+   EV, temperature, tint, ISO, shutter, aperture, focal length,
+   crop dimensions, histogram values, zoom %, counts, progress.
+
+   tabular-nums keeps digits from shifting horizontally as
+   values change in place — essential for live slider readouts.
+   ───────────────────────────────────────────────────────── */
+.num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+
+/* Uppercase section eyebrow — mono, tracked, subdued.
+   Reserved for panel section labels; NOT for menu headers
+   (those stay sentence case + semibold, per the schema). */
+.eyebrow {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-secondary);
+}
+
+/* ── Edit-rail grammar (see docs/edit-panel-review/edit-panel-target.md) ── */
+.group-label {
+  margin: var(--space-3) 0 var(--space-1);
+  font-size: var(--text-group);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-subtle);
+}
+.group-label:first-child { margin-top: 0; }
+
+.disclosure {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  width: 100%;
+  min-height: 32px;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  font-size: var(--text-ui);
+  color: var(--color-subtle);
+  text-align: left;
+}
+.disclosure:hover { color: var(--color-fg); }
+.disclosure > .chev {
+  font-size: 16px;
+  line-height: 1;
+  transition: transform 0.15s var(--ease-std);
+}
+.disclosure > .chev.open { transform: rotate(90deg); }
+.disclosure-body {
+  padding-left: var(--space-3);
+  border-left: 1px solid var(--color-border);
+}
+
+.control-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  min-height: 32px;
+  font-size: var(--text-ui);
+  color: var(--color-fg);
+}
+
+.rail-btn, .rail-chip, .rail-select, .rail-input {
+  height: 28px;
+  border-radius: 6px;
+  border: 1px solid var(--color-border);
+  font-size: var(--text-ui);
+  color: var(--color-fg);
+}
+.rail-btn, .rail-chip { background: var(--color-hover); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; padding: 0 var(--space-2); }
+.rail-btn:hover, .rail-chip:hover { background: var(--color-active); }
+.rail-chip.is-active { background: var(--color-active); color: var(--color-fg); }
+.rail-select, .rail-input {
+  background: var(--color-sunken);
+  padding: 0 var(--space-2);
+  width: 100%;
+  outline: none;
+  appearance: none;
+  -webkit-appearance: none;
+}
+.rail-empty {
+  margin: 0;
+  font-size: var(--text-ui);
+  color: var(--color-subtle);
+}
+
+/* Uppercase section eyebrow — mono, tracked, subdued.
+   Reserved for panel section labels; NOT for menu headers
+   (those stay sentence case + semibold, per the schema). */
+.eyebrow {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-secondary);
 }
 
 /* Super minimal and thin scrollbars for a premium, clean UI */
@@ -115,18 +273,470 @@ button, input, select, textarea {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.12);
+  background: var(--color-border-strong);
   border-radius: 10px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.25);
+  background: var(--color-subtle);
 }
 
 /* Standard cross-browser properties */
 * {
   scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.12) transparent;
+  scrollbar-color: var(--color-border-strong) transparent;
+}
+
+/* ═════════════════════════════════════════════════════════
+   MINIMAL SURFACE MODEL  (Phase 2)
+
+   Elevation is carried by 1px borders, not blur or shadow.
+   `.glass-backdrop` is the shared panel surface used by
+   GlassPanel and the modals; it is FLAT by default and only
+   becomes frosted glass under the opt-in `.glass-look` root
+   class (see "LIQUID GLASS" further down).
+   ═════════════════════════════════════════════════════════ */
+
+.glass-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background: var(--glass-bg, var(--color-panel));
+  border: 1px solid transparent;
+  box-shadow: none;
+}
+
+/* Frosted glass is set in ~15 places — scoped component <style> blocks
+   AND Tailwind `backdrop-blur-*` utilities. One guarded override is far
+   less error-prone than hand-editing every site, and it keeps the old
+   look genuinely recoverable: add `glass-look` to <html> and every
+   original blur returns. Remove this rule to delete glass for good. */
+html:not(.glass-look) *,
+html:not(.glass-look) *::before,
+html:not(.glass-look) *::after {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+
+/* ── Buttons ─────────────────────────────────────────────
+   Primary = --color-fg fill (no brand-color button).
+   `.mr-btn--danger` stays neutral until hover — a destructive
+   control shouldn't shout while it's just sitting there.      */
+.mr-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  white-space: nowrap;
+  padding: 4px 11px;
+  font-size: 11px;
+  border-radius: 6px;
+  border: 1px solid var(--color-border);
+  color: var(--color-secondary);
+  background: transparent;
+  cursor: pointer;
+  transition: background-color 0.15s var(--ease-std), color 0.15s var(--ease-std),
+    border-color 0.15s var(--ease-std);
+}
+.mr-btn:hover:not(:disabled) {
+  background: var(--color-hover);
+  color: var(--color-fg);
+}
+.mr-btn:active:not(:disabled) {
+  background: var(--color-active);
+}
+.mr-btn--primary {
+  background: var(--color-fg);
+  border-color: var(--color-fg);
+  color: var(--color-panel);
+}
+.mr-btn--primary:hover:not(:disabled) {
+  opacity: 0.88;
+  background: var(--color-fg);
+  color: var(--color-panel);
+}
+.mr-btn--danger:hover:not(:disabled) {
+  color: var(--color-destructive);
+  background: color-mix(in srgb, var(--color-destructive) 10%, transparent);
+}
+.mr-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* Square icon button */
+.mr-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 5px;
+  border: none;
+  background: transparent;
+  color: var(--color-secondary);
+  cursor: pointer;
+  transition: background-color 0.15s var(--ease-std), color 0.15s var(--ease-std);
+}
+.mr-icon-btn:hover:not(:disabled) {
+  background: var(--color-hover);
+  color: var(--color-fg);
+}
+.mr-icon-btn:disabled {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+/* ── Panel header ────────────────────────────────────────
+   34px, search-first, borderless. The field has no box of its
+   own — the header's bottom hairline IS its underline. A 34px
+   bar with 11.5px text is about half a typical web app header;
+   the density is the point.                                   */
+.panel-header {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex: none;
+  height: 34px;
+  padding: 0 10px;
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-subtle);
+}
+.panel-header input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--color-fg);
+  font: inherit;
+  font-size: 11.5px;
+}
+.panel-header input::placeholder { color: var(--color-subtle); }
+.panel-title {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-fg);
+}
+
+/* ── Agent panel header ──────────────────────────────────
+   37px — denser than a web app bar, matching Pencil. Status
+   colour lives only on the 7px dot. Title is 12px semibold;
+   status + model are 11px --subtle.                         */
+.agent-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+  height: 37px;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--color-border);
+}
+.agent-header .title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-fg);
+}
+.agent-header .status-label,
+.agent-header .model {
+  font-size: 11px;
+  color: var(--color-subtle);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.agent-header .status-label { flex: 1; }
+.agent-header .model { flex: none; }
+
+/* ── Navigation rail ─────────────────────────────────────
+   Fixed icon column, flexible label, right-aligned mono count.
+   Active = sunken fill + weight 500 + full-contrast text.
+   No accent bar, no coloured fill — this is the Notion pattern. */
+.rail-item {
+  position: relative;
+  display: grid;
+  grid-template-columns: 14px minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 8px;
+  width: 100%;
+  min-height: 32px;
+  padding: 5px 8px 5px 10px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-secondary);
+  font-size: 12px;
+  line-height: 1.3;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 0.15s var(--ease-std), color 0.15s var(--ease-std);
+}
+.rail-item + .rail-item { margin-top: 2px; }
+.rail-item:hover { background: var(--color-hover); color: var(--color-fg); }
+.rail-item--active {
+  background: var(--color-hover);
+  color: var(--color-fg);
+  font-weight: 500;
+}
+.rail-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  color: inherit;
+}
+.rail-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rail-count {
+  flex: none;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 10px;
+  color: var(--color-subtle);
+}
+
+/* ── Segmented pill tabs ─────────────────────────────────
+   `[icon] label [count]`. Active lifts to --panel with a border
+   and the app's one shadow; inactive is fully transparent.      */
+.seg { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.seg-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 9px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-secondary);
+  font-size: 11.5px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background-color 0.15s var(--ease-std), color 0.15s var(--ease-std),
+    border-color 0.15s var(--ease-std);
+}
+.seg-item:hover { background: var(--color-hover); color: var(--color-fg); }
+.seg-item--active {
+  background: var(--color-panel);
+  border-color: var(--color-border);
+  color: var(--color-fg);
+  font-weight: 500;
+  box-shadow: var(--shadow-panel);
+}
+.seg-count {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 10px;
+  color: var(--color-subtle);
+}
+
+/* ── Inline keyboard hints ───────────────────────────────
+   Ambient affordances in the toolbar rather than buried in a
+   shortcuts modal. Mono, subdued, `·`-separated.               */
+.key-hints {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--color-subtle);
+  white-space: nowrap;
+  overflow: hidden;
+}
+.key-hints .sep { opacity: 0.5; }
+
+/* ── Status system ───────────────────────────────────────
+   Colour is semantic here and nowhere else.                  */
+.status-dot {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--color-subtle);
+  transition: background-color 0.25s var(--ease-std);
+}
+.status-dot--running { background: var(--color-accent); }
+.status-dot--ok      { background: var(--color-ok); }
+.status-dot--failed  { background: var(--color-destructive); }
+.status-dot--waiting { background: var(--color-warn); }
+
+/* Hairline progress. Never a chunky bar. */
+.mr-progress {
+  height: 2.5px;
+  border-radius: 2px;
+  background: var(--color-sunken);
+  overflow: hidden;
+}
+.mr-progress > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--color-accent);
+  transition: width 0.4s var(--ease-std);
+}
+
+/* 10px ring spinner */
+.mr-spinner {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 1.5px solid var(--color-border-strong);
+  border-top-color: var(--color-secondary);
+  animation: mr-spin 0.9s linear infinite;
+}
+@keyframes mr-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ── Empty states ────────────────────────────────────────
+   One short sentence. No illustration, no heading, no button. */
+.empty-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 16px;
+  font-size: 11px;
+  color: var(--color-secondary);
+  text-align: center;
+}
+
+/* ── Errors ──────────────────────────────────────────────
+   Inline and quiet — never a modal or a toast.
+   Always selectable: an error you can't copy is half useless. */
+.error-text {
+  color: var(--color-destructive);
+  font-size: 11px;
+  user-select: text;
+  -webkit-user-select: text;
+}
+.error-detail {
+  margin-top: 6px;
+  padding: 7px 8px;
+  border-radius: 6px;
+  background: var(--color-sunken);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  line-height: 1.5;
+  max-height: 160px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+/* Metadata, file paths and EXIF values are data the user copies. */
+.selectable {
+  user-select: text;
+  -webkit-user-select: text;
+  cursor: text;
+}
+
+/* ═════════════════════════════════════════════════════════
+   MOTION  (Phase 4)
+   Nothing travels more than 8px or lasts longer than 400ms.
+   ═════════════════════════════════════════════════════════ */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ═════════════════════════════════════════════════════════
+   LIGHT CHROME  (Phase 5, opt-in via Settings → Appearance)
+
+   Warm-cast neutrals throughout — #fafaf8 not #fafafa. The warmth
+   is most of what separates "minimal" from "clinical".
+
+   IMPORTANT: the image canvas keeps a dark surround even here.
+   A light field around a photograph biases how you read exposure
+   and white balance, so the chrome may go light but the area
+   immediately around the image must not.
+   ═════════════════════════════════════════════════════════ */
+
+.light-look {
+  --color-bg: #fafaf8;
+  --color-canvas: #f3f2ef;
+  --color-sidebar: #f7f6f3;
+  --color-panel: #ffffff;
+  --color-sunken: #f3f2ef;
+  --color-hover: rgba(0, 0, 0, 0.035);
+  --color-active: rgba(0, 0, 0, 0.06);
+  --color-border: rgba(0, 0, 0, 0.08);
+  --color-border-strong: rgba(0, 0, 0, 0.14);
+  --color-fg: #18181b;
+  /* Darkened from the reference palette's #6a6a70 / #9b9ba0. Those give
+     5.37:1 and 2.77:1 on white — the third level fails WCAG AA, and this
+     app renders a lot of 9–11px metadata in it. These values keep three
+     clearly separated levels at 17.7 / 6.8 / 5.0 : 1. */
+  --color-secondary: #5a5a61;
+  --color-subtle: #6f6f78;
+  /* Status colours darkened from the reference light palette. Those values
+     are tuned for dots and fills (the 3:1 non-text bar); here they are also
+     used as text — inline errors, chips, "Done" labels — so they meet 4.5:1
+     on white. Accent lands at 4.62 on white / 4.13 on sunken: going darker
+     starts reading as link-blue and fights the palette's restraint. */
+  --color-accent: #4a76b4;
+  --color-accent-soft: rgba(74, 118, 180, 0.12);
+  --color-destructive: #b8433f;
+  --color-ok: #437253;
+  --color-warn: #8a6b16;
+  --shadow-panel: 0 1px 3px rgba(0, 0, 0, 0.05);
+  --shadow-popover: 0 8px 28px rgba(0, 0, 0, 0.16);
+
+  color: var(--color-fg);
+}
+
+/* Colour-critical surfaces stay dark regardless of chrome theme.
+   The surround is painted explicitly rather than only re-scoping tokens,
+   because the element sets its background from an ancestor's token. */
+.light-look .viewport-surround {
+  background: #17171a;
+}
+
+.light-look .viewport-surround,
+.light-look .photo-thumb-wrap {
+  --color-bg: #17171a;
+  --color-panel: #1e1e22;
+  --color-fg: #eeeeeb;
+  --color-secondary: #bcbcc2;
+  --color-subtle: #808088;
+  --color-border: rgba(255, 255, 255, 0.1);
+  --color-border-strong: rgba(255, 255, 255, 0.18);
+  --color-hover: rgba(255, 255, 255, 0.055);
+  --color-active: rgba(255, 255, 255, 0.08);
+  color: var(--color-fg);
+}
+
+/* ═════════════════════════════════════════════════════════
+   LIQUID GLASS  (opt-in, was the former default)
+
+   Kept so the original identity is recoverable: add the
+   `glass-look` class to the root element to restore frosted
+   panels. Nothing references it by default.
+   ═════════════════════════════════════════════════════════ */
+
+.glass-look .glass-backdrop {
+  -webkit-backdrop-filter: blur(30px) saturate(140%);
+  backdrop-filter: blur(30px) saturate(140%);
+  background: var(--glass-bg, rgba(23, 23, 23, 0.78));
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.3),
+    0 6px 20px rgba(0, 0, 0, 0.12);
 }
 
 /* ─────────────────────────────────────────────────────────
@@ -134,43 +744,42 @@ button, input, select, textarea {
    ───────────────────────────────────────────────────────── */
 
 .classic-look {
-  /* Flat Lightroom Dark Theme Token Overrides */
-  --color-window: #161618 !important;
+  /* Flat Lightroom theme — overrides CANONICAL tokens only.
+     Legacy aliases resolve through var() and follow automatically. */
+  --color-bg: #161618 !important;
   --color-panel: #1e1e20 !important;
-  --color-panel-2: #252528 !important;
-  --color-panel-3: #2d2d30 !important;
-  --color-surface-input: #121214 !important;
-  --color-card: #1e1e20 !important;
-  --color-card-active: #2b2b2e !important;
-  --color-border-subtle: #141416 !important;
-  --color-border-input: #333336 !important;
-  --color-border-hover: #4a4a4d !important;
-  --color-text-primary: #e0e0e2 !important;
-  --color-button-bg: #252528 !important;
-  --color-button-hover: #313135 !important;
-  
+  --color-sunken: #252528 !important;
+  --color-hover: rgba(255, 255, 255, 0.06) !important;
+  --color-active: rgba(255, 255, 255, 0.1) !important;
+  --color-border: #141416 !important;
+  --color-border-strong: #333336 !important;
+  --color-fg: #e0e0e2 !important;
+  --radius: 0px !important;
+
   /* Root window reset */
   border-radius: 0px !important;
   border: none !important;
-  background-color: var(--color-window) !important;
+  background-color: var(--color-bg) !important;
 }
 
-/* Apply sharp corners ONLY to structural panels, app window, and image cards */
+/* Sharp corners on structural panels, app window, and image cards.
+   Radii were normalised to the 4/6/8/10 scale in Phase 2, so these
+   selectors track the container sizes (8px and 10px), not the old
+   22px/33px values. */
 .classic-look,
 .classic-look .glass-backdrop,
+.classic-look .modal-card,
 .classic-look .photo-card,
 .classic-look .photo-thumb-wrap,
-.classic-look .rounded-\[33px\],
-.classic-look .rounded-\[22px\]:not(section),
-.classic-look [class*="rounded-\[33px\]"],
-.classic-look [class*="rounded-\[22px\]"]:not(section) {
+.classic-look [class*="rounded-\[10px\]"]:not(section),
+.classic-look [class*="rounded-\[8px\]"]:not(section) {
   border-radius: 0px !important;
 }
 
 /* Preserve rounded corners for split toning mode selector and buttons */
 .classic-look .split-toning-bar,
 .classic-look .split-toning-bar button {
-  border-radius: 22px !important;
+  border-radius: 6px !important;
 }
 
 /* Glass Panels to Solid Panels */
@@ -178,7 +787,7 @@ button, input, select, textarea {
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
   background: var(--color-panel) !important;
-  border: 1px solid var(--color-border-subtle) !important;
+  border: 1px solid var(--color-border) !important;
   box-shadow: none !important;
 }
 
@@ -221,7 +830,7 @@ button, input, select, textarea {
 
 /* Compact headers and borders in TitleBar */
 .classic-look header {
-  background-color: var(--color-window) !important;
+  background-color: var(--color-bg) !important;
   border-bottom: 1px solid #121212 !important;
   height: 44px !important;
 }
@@ -233,27 +842,27 @@ button, input, select, textarea {
 
 .classic-look .photo-card {
   border: 1px solid #28282b !important;
-  background-color: var(--color-card) !important;
+  background-color: var(--color-sunken) !important;
   box-shadow: none !important;
 }
 
 .classic-look .photo-card--active {
   border-color: #ffffff !important;
   outline: 1px solid #ffffff !important;
-  background-color: var(--color-card-active) !important;
+  background-color: var(--color-active) !important;
 }
 
 .classic-look .photo-meta {
-  border-top: 1px solid var(--color-border-subtle) !important;
-  background-color: var(--color-window) !important;
+  border-top: 1px solid var(--color-border) !important;
+  background-color: var(--color-bg) !important;
 }
 
 /* Form inputs & textareas solid Lightroom style (keeping rounded corners) */
 .classic-look input:not(.search-input):not(.search-input-sidebar):not(.chat-input),
 .classic-look textarea {
-  border: 1px solid var(--color-border-input) !important;
-  background-color: var(--color-surface-input) !important;
-  color: var(--color-text-primary) !important;
+  border: 1px solid var(--color-border-strong) !important;
+  background-color: var(--color-sunken) !important;
+  color: var(--color-fg) !important;
   box-shadow: none !important;
 }
 
@@ -265,23 +874,23 @@ button, input, select, textarea {
 .classic-look button.action-btn,
 .classic-look button.footer-btn,
 .classic-look button.toolbar-btn {
-  background-color: var(--color-button-bg) !important;
-  border: 1px solid var(--color-border-input) !important;
-  color: var(--color-text-primary) !important;
+  background-color: var(--color-hover) !important;
+  border: 1px solid var(--color-border-strong) !important;
+  color: var(--color-fg) !important;
 }
 
 .classic-look button.action-btn:hover,
 .classic-look button.footer-btn:hover,
 .classic-look button.toolbar-btn:hover {
-  background-color: var(--color-button-hover) !important;
-  border-color: var(--color-border-hover) !important;
+  background-color: var(--color-active) !important;
+  border-color: var(--color-border-strong) !important;
 }
 
 /* Search bar styling */
 .classic-look .search-wrap,
 .classic-look .search-wrap-sidebar {
-  border: 1px solid var(--color-border-input) !important;
-  background-color: var(--color-surface-input) !important;
+  border: 1px solid var(--color-border-strong) !important;
+  background-color: var(--color-sunken) !important;
   box-shadow: none !important;
 }
 
@@ -295,7 +904,7 @@ button, input, select, textarea {
 /* Sharp Modals & Inputs */
 .classic-look .modal-card {
   box-shadow: 0 10px 30px rgba(0,0,0,0.5) !important;
-  border: 1px solid var(--color-panel-3) !important;
+  border: 1px solid var(--color-sunken) !important;
 }
 
 /* ─────────────────────────────────────────────────────────
@@ -332,26 +941,72 @@ button, input, select, textarea {
 
 /* Chat Input Area overrides in Classic Mode */
 .classic-look .chat-input-wrapper {
-  background-color: var(--color-surface-input) !important;
-  border: 1px solid var(--color-border-input) !important;
+  background-color: var(--color-sunken) !important;
+  border: 1px solid var(--color-border-strong) !important;
 }
 
 .classic-look .chat-send-btn {
-  background-color: var(--color-button-bg) !important;
-  color: var(--color-text-primary) !important;
-  border: 1px solid var(--color-border-input) !important;
+  background-color: var(--color-hover) !important;
+  color: var(--color-fg) !important;
+  border: 1px solid var(--color-border-strong) !important;
 }
 
 .classic-look .chat-send-btn:hover {
-  background-color: var(--color-button-hover) !important;
-  border-color: var(--color-border-hover) !important;
+  background-color: var(--color-active) !important;
+  border-color: var(--color-border-strong) !important;
 }
 
 .classic-look .chat-send-btn:disabled {
   opacity: 0.3 !important;
   background-color: var(--color-panel) !important;
-  border-color: var(--color-panel-3) !important;
+  border-color: var(--color-sunken) !important;
 }
+
+.viewer-toolbar {
+  position: absolute;
+  left: 50%;
+  bottom: 18px;
+  transform: translateX(-50%);
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  padding: 4px 6px 4px 8px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--color-panel) 92%, transparent);
+  border: 1px solid var(--color-border);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.32);
+  opacity: 1;
+  transition: opacity 0.28s var(--ease-std);
+  pointer-events: auto;
+}
+.viewer-toolbar.is-dim { opacity: 0.18; }
+.viewer-toolbar:hover { opacity: 1; }
+.tb-btn {
+  height: 26px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--color-secondary);
+  font-size: 11.5px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.tb-btn:hover { color: var(--color-fg); background: var(--color-hover); }
+.tb-btn.is-on { color: var(--color-fg); font-weight: 500; }
+.tb-sep {
+  width: 1px;
+  height: 14px;
+  margin: 0 5px;
+  background: var(--color-border);
+}
+.tb-zoom {
+  padding: 0 8px;
+  font-size: 10.5px;
+  color: var(--color-subtle);
+}
+
 
 
 

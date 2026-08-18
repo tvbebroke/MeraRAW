@@ -1,19 +1,16 @@
 <script lang="ts">
   import CollapsibleSection from "./CollapsibleSection.svelte";
   import ParamRow from "./ParamRow.svelte";
-  import ToneCurve from "./ToneCurve.svelte";
+  import Disclosure from "./Disclosure.svelte";
 </script>
 
 <CollapsibleSection id="light" title="Light">
-  <div class="flex flex-col gap-[6px]">
-    <ParamRow path="exposure.stops" label="Exposure" labelWidth={68} />
-    <ParamRow path="tone_curve.contrast" label="Contrast" labelWidth={68} />
-    <ParamRow path="tone_curve.highlights" label="Highlights" labelWidth={68} />
-    <ParamRow path="tone_curve.shadows" label="Shadows" labelWidth={68} />
-    <ParamRow path="tone_curve.lights" label="Whites" labelWidth={68} />
-    <ParamRow path="tone_curve.darks" label="Blacks" labelWidth={68} />
-  </div>
-  <div class="mt-[14px] flex justify-center w-full">
-    <ToneCurve />
-  </div>
+  <ParamRow path="exposure.stops" label="Exposure" />
+  <ParamRow path="tone_curve.contrast" label="Contrast" />
+  <ParamRow path="tone_curve.highlights" label="Highlights" />
+  <ParamRow path="tone_curve.shadows" label="Shadows" />
+  <Disclosure label="Advanced">
+    <ParamRow path="tone_curve.lights" label="Whites" />
+    <ParamRow path="tone_curve.darks" label="Blacks" />
+  </Disclosure>
 </CollapsibleSection>

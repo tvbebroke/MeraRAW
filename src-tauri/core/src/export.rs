@@ -332,7 +332,9 @@ fn agx_srgb_output(linear: &[f32], width: u32, height: u32) -> EncodedImage {
 }
 
 /// Look-aware output: look 0/1 → the Reinhard view transform; look 2 (Filmic
-/// AgX) → AgX for sRGB 8-bit; look 4 (Original) → gamut map + OETF only.
+/// AgX) → AgX for sRGB 8-bit; look 3/4 → gamut map + OETF only (no view look).
+/// Look 3 is the JPEG/raster zero-edit path — must NOT fall through to the
+/// Camera punchy transform (`look >= 1` used to treat 3 as punchy).
 pub fn output_transform_look(
     linear: &[f32],
     width: u32,
@@ -344,7 +346,7 @@ pub fn output_transform_look(
     if look == 2 && target == TargetSpace::Srgb && !want16 {
         return agx_srgb_output(linear, width, height);
     }
-    if look == 4 {
+    if look == 3 || look == 4 {
         return output_transform_passthrough(linear, width, height, target, want16);
     }
     output_transform(linear, width, height, target, want16, look >= 1)
@@ -1121,5 +1123,35 @@ mod tests {
         assert!((xyz[0] - 0.9642).abs() < 0.01, "{xyz:?}");
         assert!((xyz[1] - 1.0).abs() < 0.01);
         assert!((xyz[2] - 0.8252).abs() < 0.01);
+    }
+
+    #[test]
+    fn look3_is_passthrough_matching_original() {
+        let lin = [0.216f32, 0.216, 0.216];
+        let pass = output_transform_look(&lin, 1, 1, TargetSpace::Srgb, false, 3);
+        let orig = output_transform_look(&lin, 1, 1, TargetSpace::Srgb, false, 4);
+        assert_eq!(pass.rgb8, orig.rgb8);
+    }
+
+    #[test]
+    fn dcp_tone_curve_on_linear_jpeg_gray_is_the_burnout() {
+        // Adobe default ProfileToneCurve lifts scene mid-gray (~0.18–0.22) to
+        // ~0.45+. Applying that to an already-rendered JPEG is the burnout.
+        // Passthrough present of the un-curved working buffer stays near 128.
+        let lin = [0.216f32, 0.216, 0.216];
+        let curved = crate::curve::ProfileToneCurve::adobe_default().apply_rgb(lin);
+        let pass = output_transform_look(&lin, 1, 1, TargetSpace::Srgb, false, 3);
+        let burnt = output_transform_look(&curved, 1, 1, TargetSpace::Srgb, false, 3);
+        assert!(
+            (pass.rgb8[0] as i32 - 128).abs() < 8,
+            "passthrough mid-gray should stay ~128, got {}",
+            pass.rgb8[0]
+        );
+        assert!(
+            burnt.rgb8[0] > pass.rgb8[0] + 40,
+            "DCP default curve on a JPEG working buffer lifts mid-gray: pass={} burnt={}",
+            pass.rgb8[0],
+            burnt.rgb8[0]
+        );
     }
 }

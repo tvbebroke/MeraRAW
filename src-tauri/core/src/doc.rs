@@ -347,4 +347,153 @@ mod tests {
         let ts = doc.meta.created_at.unwrap();
         assert!(ts.ends_with('Z') && ts.contains('T') && ts.starts_with("20"), "{ts}");
     }
+
+    /// Pins `#[serde(untagged)]` discrimination order: Bool before F32.
+    /// Reordering ParamValue silently changes wire behavior.
+    #[test]
+    fn param_value_untagged_order_is_bool_then_f32() {
+        assert_eq!(
+            serde_json::from_str::<ParamValue>("true").unwrap(),
+            ParamValue::Bool(true)
+        );
+        assert_eq!(
+            serde_json::from_str::<ParamValue>("false").unwrap(),
+            ParamValue::Bool(false)
+        );
+        assert_eq!(
+            serde_json::from_str::<ParamValue>("1.0").unwrap(),
+            ParamValue::F32(1.0)
+        );
+        assert_eq!(
+            serde_json::from_str::<ParamValue>("0").unwrap(),
+            ParamValue::F32(0.0)
+        );
+        assert_eq!(
+            serde_json::from_str::<ParamValue>("\"rcd\"").unwrap(),
+            ParamValue::Enum("rcd".into())
+        );
+        assert_eq!(
+            serde_json::from_str::<ParamValue>("[]").unwrap(),
+            ParamValue::Curve(vec![])
+        );
+        assert_eq!(
+            serde_json::from_str::<ParamValue>("[[0.0,0.0],[1.0,1.0]]").unwrap(),
+            ParamValue::Curve(vec![[0.0, 0.0], [1.0, 1.0]])
+        );
+        assert_eq!(
+            serde_json::from_str::<ParamValue>(r#"{"h":12.0,"s":0.5,"l":0.4}"#).unwrap(),
+            ParamValue::Color {
+                h: 12.0,
+                s: 0.5,
+                l: 0.4
+            }
+        );
+        // A JSON number must never be eaten by Bool.
+        assert!(matches!(
+            serde_json::from_str::<ParamValue>("1").unwrap(),
+            ParamValue::F32(_)
+        ));
+    }
+
+    #[test]
+    fn full_doc_fixture_round_trips() {
+        let mut doc = EditDoc {
+            schema_version: SCHEMA_VERSION,
+            doc_id: "doc-full-fixture".into(),
+            source_ref: SourceRef {
+                path: "/fixtures/full.ARW".into(),
+                content_hash: Some("abc123".into()),
+                orientation: 1,
+            },
+            modules: Default::default(),
+            masks: vec![Mask {
+                id: "m-radial".into(),
+                kind: "radial".into(),
+                opacity: 80.0,
+                invert: false,
+                feather: 12.0,
+                source: serde_json::json!({
+                    "type": "radial",
+                    "center": [0.5, 0.5],
+                    "radii": [0.3, 0.2],
+                    "rotation": 0
+                }),
+                modules: {
+                    let mut m = ModuleParams::new();
+                    m.entry("exposure".into())
+                        .or_default()
+                        .insert("stops".into(), ParamValue::F32(1.25));
+                    m
+                },
+            }],
+            retouch: vec![crate::retouch::RetouchSpot {
+                id: "r-spot".into(),
+                enabled: true,
+                feather: 25.0,
+                source: serde_json::json!({
+                    "type": "brush",
+                    "strokes": [{"radius": 0.03, "mode": "add", "points": [[0.4, 0.4], [0.41, 0.42]]}]
+                }),
+            }],
+            meta: DocMeta {
+                created_at: Some("2026-01-01T00:00:00Z".into()),
+                modified_at: Some("2026-01-02T00:00:00Z".into()),
+                rating: 3,
+                flag: "pick".into(),
+                label: Some("red".into()),
+                profile_file: Some("Adobe Standard.dcp".into()),
+                lut_file: Some("/looks/film.cube".into()),
+                demosaic: Some("rcd".into()),
+                keywords: vec!["studio".into()],
+            },
+            unknown: Default::default(),
+        };
+        doc.set("exposure", "stops", ParamValue::F32(0.35));
+        doc.set("detail", "hot_pixels", ParamValue::Bool(true));
+        doc.set(
+            "tone_curve",
+            "points",
+            ParamValue::Curve(vec![[0.0, 0.0], [1.0, 1.0]]),
+        );
+        doc.set("white_balance", "temp", ParamValue::Enum("as-shot".into()));
+        doc.set(
+            "color_grade",
+            "shadows",
+            ParamValue::Color {
+                h: 30.0,
+                s: 0.2,
+                l: 0.4,
+            },
+        );
+        // set() touches modified_at — freeze so the committed fixture is stable.
+        doc.meta.created_at = Some("2026-01-01T00:00:00Z".into());
+        doc.meta.modified_at = Some("2026-01-02T00:00:00Z".into());
+
+        let back = EditDoc::from_json(doc.to_json()).unwrap();
+        assert_eq!(back.doc_id, doc.doc_id);
+        assert_eq!(back.schema_version, SCHEMA_VERSION);
+        assert_eq!(back.masks.len(), 1);
+        assert_eq!(back.retouch.len(), 1);
+        assert_eq!(back.get("detail", "hot_pixels"), Some(&ParamValue::Bool(true)));
+        assert!(matches!(
+            back.get("color_grade", "shadows"),
+            Some(ParamValue::Color { .. })
+        ));
+
+        let mut json = serde_json::to_string_pretty(&doc).unwrap();
+        json.push('\n');
+        let path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("tests/fixtures")
+            .join("doc-full.json");
+        let update = std::env::var("UPDATE_FIXTURES").ok().as_deref() == Some("1");
+        if update {
+            std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+            std::fs::write(&path, &json).unwrap();
+        }
+        let committed = std::fs::read_to_string(&path).unwrap_or_default();
+        assert_eq!(
+            committed, json,
+            "doc-full.json is stale. Run: UPDATE_FIXTURES=1 cargo test -p meratech-core --lib"
+        );
+    }
 }

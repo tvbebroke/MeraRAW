@@ -205,7 +205,7 @@ pub(super) fn load_preset(name: &str) -> Result<crate::doc::PartialDoc, CoreErro
     load_preset_file(name).map(|f| f.into_partial())
 }
 
-const MAX_PRESET_BYTES: u64 = 1 * 1024 * 1024;
+const MAX_PRESET_BYTES: u64 = 1024 * 1024;
 
 pub(super) fn load_preset_file(name: &str) -> Result<crate::doc::PresetFile, CoreError> {
     for path in preset_json_paths(name)? {

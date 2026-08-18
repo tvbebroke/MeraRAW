@@ -11,9 +11,9 @@ use std::collections::HashMap;
 
 impl RenderGraph {
     /// Export path (contract F2 output side): run the full chain (modules
-    /// + masks, NO display transform) for one tile and read back LINEAR
+    /// plus masks, no display transform) for one tile and read back LINEAR
     /// Rec.2020 f32. Tiled by the caller (gpu-memory spec §5: export is
-    /// sequential + bounded). Caching is bypassed — every call re-runs.
+    /// sequential and bounded). Caching is bypassed — every call re-runs.
     #[allow(clippy::too_many_arguments)]
     pub fn render_linear_tile(
         &mut self,

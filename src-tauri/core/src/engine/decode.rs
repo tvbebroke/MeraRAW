@@ -297,9 +297,15 @@ impl Engine {
             .filter(|v| v.out_w >= 64 && v.out_h >= 64)
             .map(|v| (v.out_w, v.out_h))
             .unwrap_or((1440, 860));
+        let kind = self
+            .current
+            .as_ref()
+            .map(|c| c.meta.kind)
+            .unwrap_or(crate::raw::ImageKind::Rendered);
+        let look = crate::raw::effective_display_look(kind, self.display_look);
         let frame = cpu_preview_frame(
             &small,
-            self.display_look == 1,
+            look == 1,
             vw.0,
             vw.1,
         );
@@ -320,6 +326,12 @@ impl Engine {
         let out_meta = match self.current.as_mut() {
             None => {
                 let _ = reply.send(Err(CoreError::NoImage));
+                return;
+            }
+            Some(cur) if !cur.meta.kind.allows_raw_only_stages() => {
+                let _ = reply.send(Err(CoreError::InvalidOp(
+                    "camera profiles apply to RAW only".into(),
+                )));
                 return;
             }
             Some(cur) => {
@@ -417,6 +429,16 @@ impl Engine {
         algo: String,
         reply: oneshot::Sender<Result<ImageMeta, CoreError>>,
     ) {
+        if self
+            .current
+            .as_ref()
+            .is_some_and(|c| !c.meta.kind.allows_raw_only_stages())
+        {
+            let _ = reply.send(Err(CoreError::InvalidOp(
+                "demosaic applies to RAW only".into(),
+            )));
+            return;
+        }
         let Some(demosaic) = crate::raw::Demosaic::from_name(&algo) else {
             let _ = reply.send(Err(CoreError::InvalidOp(format!(
                 "unknown demosaic algorithm: {algo}"

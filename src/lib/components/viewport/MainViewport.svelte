@@ -83,6 +83,16 @@
   let loupeOn = $state(false);
   let loupePos = $state<{ x: number; y: number } | null>(null);
   let loupeCanvas = $state<HTMLCanvasElement | null>(null);
+  let chromeVisible = $state(true);
+  let chromeTimer: ReturnType<typeof setTimeout> | undefined;
+
+  function bumpChrome() {
+    chromeVisible = true;
+    if (chromeTimer) clearTimeout(chromeTimer);
+    chromeTimer = setTimeout(() => {
+      chromeVisible = false;
+    }, 1800);
+  }
 
   function appZoom(): number {
     return (
@@ -653,7 +663,10 @@
 
 <GlassPanel
   variant="viewport"
-  class="flex min-h-0 flex-1 flex-col overflow-hidden px-[10px] py-[8px]"
+  class="flex min-h-0 flex-1 flex-col overflow-hidden"
+  onpointermove={bumpChrome}
+  onpointerleave={() => (chromeVisible = false)}
+  onpointerenter={bumpChrome}
 >
   <!-- Main Viewport — frame:// JPEG transport -->
   <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -661,7 +674,7 @@
     bind:this={wrapEl}
     role="img"
     aria-label="Develop preview"
-    class="relative min-h-0 flex-1 flex items-center justify-center overflow-hidden select-none {$cropActive ? 'cursor-default' : 'cursor-grab active:cursor-grabbing'}"
+    class="viewport-surround relative min-h-0 flex-1 flex items-center justify-center overflow-hidden select-none {$cropActive ? 'cursor-default' : 'cursor-grab active:cursor-grabbing'}"
     onwheel={onWheel}
     onpointerdown={onPointerDown}
     onpointermove={onPointerMove}
@@ -676,7 +689,7 @@
           src={displaySrc}
           alt=""
           draggable={false}
-          class="viewport-frame block max-h-full max-w-full object-contain pointer-events-none rounded-[14px]"
+          class="viewport-frame block max-h-full max-w-full object-contain pointer-events-none"
           onerror={() => (error = "frame transport failed")}
         />
         {#if compareSplit && beforeSrc}
@@ -694,24 +707,24 @@
             style="left: {splitRatio * 100}%"
             onpointerdown={onSplitPointerDown}
           >
-            <div class="absolute inset-y-0 left-1/2 w-[2px] -translate-x-1/2 bg-white/85 shadow-[0_0_6px_rgba(0,0,0,0.6)]"></div>
-            <div class="absolute top-1/2 left-1/2 flex size-[18px] -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-white/40 bg-black/50 text-[8px] text-white/90">
+            <div class="absolute inset-y-0 left-1/2 w-[2px] -translate-x-1/2 bg-fg shadow-[0_0_6px_rgba(0,0,0,0.6)]"></div>
+            <div class="absolute top-1/2 left-1/2 flex size-[18px] -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-fg bg-black/50 text-[8px] text-fg">
               ‖
             </div>
           </div>
-          <span class="absolute left-2 top-2 rounded bg-black/50 px-1.5 py-0.5 text-[8px] text-white/70">Before</span>
-          <span class="absolute right-2 top-2 rounded bg-black/50 px-1.5 py-0.5 text-[8px] text-white/70">After</span>
+          <span class="absolute left-2 top-2 rounded bg-black/50 px-1.5 py-0.5 text-[8px] text-secondary">Before</span>
+          <span class="absolute right-2 top-2 rounded bg-black/50 px-1.5 py-0.5 text-[8px] text-secondary">After</span>
         {/if}
       </div>
     {:else if $imageOpen && $decodeState !== "ready"}
-      <div class="flex flex-col items-center justify-center gap-[6px] text-white/30">
-        <span class="rounded-[8px] bg-panel-3 px-[10px] py-[6px] text-[11px]">
+      <div class="flex flex-col items-center justify-center gap-[6px] text-subtle">
+        <span class="rounded-[8px] bg-sunken px-[10px] py-[6px] text-[11px]">
           {$decodeState === "preview" ? "Preview" : "Loading"}
         </span>
         <span class="text-[10px]">Decoding image…</span>
       </div>
     {:else if !$imageOpen}
-      <div class="flex items-center justify-center text-[12px] text-white/25">
+      <div class="flex items-center justify-center text-[12px] text-subtle">
         No photo selected
       </div>
     {/if}
@@ -725,7 +738,7 @@
         bind:this={loupeCanvas}
         width={140}
         height={140}
-        class="pointer-events-none absolute z-20 rounded-full border border-white/40 shadow-lg {loupePos ? '' : 'opacity-0'}"
+        class="pointer-events-none absolute z-20 rounded-full border border-fg shadow-lg {loupePos ? '' : 'opacity-0'}"
         style={loupePos
           ? `left: ${loupePos.x + 16}px; top: ${loupePos.y + 16}px; width: 140px; height: 140px;`
           : "left: 0; top: 0; width: 140px; height: 140px;"}
@@ -738,112 +751,25 @@
   </div>
 
   {#if !minimal}
-    <!-- Bottom Control Bar -->
-    <div
-      class="mt-[8px] flex h-[30px] shrink-0 items-center justify-between px-[14px] rounded-[22px] bg-panel-2 border border-white/[0.04] text-[11px] text-white/70 shadow-inner select-none"
-    >
-      <div class="flex items-center gap-[14px]">
-        <button
-          type="button"
-          onclick={toggleFullscreen}
-          title="Toggle Fullscreen"
-          aria-label="Toggle Fullscreen"
-          class="flex items-center justify-center cursor-pointer text-white/70 hover:text-white transition-colors"
-        >
-          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.3">
-            <path d="M3.5 1H1.5V3" stroke-linecap="round" />
-            <path d="M8.5 1H10.5V3" stroke-linecap="round" />
-            <path d="M3.5 11H1.5V9" stroke-linecap="round" />
-            <path d="M8.5 11H10.5V9" stroke-linecap="round" />
-          </svg>
+    <div class="viewer-toolbar" class:is-dim={!chromeVisible}>
+      <button type="button" onclick={() => sendViewCmd("zoomOut")} aria-label="Zoom Out" class="tb-btn">−</button>
+      <button type="button" onclick={() => sendViewCmd("fit")} class="tb-btn" class:is-on={$zoomLabel === "fit"}>Fit</button>
+      <button type="button" onclick={() => sendViewCmd("zoomIn")} aria-label="Zoom In" class="tb-btn">+</button>
+      <button type="button" onclick={() => sendViewCmd("oneToOne")} class="tb-btn" class:is-on={$zoomLabel === "100%"}>100%</button>
+      <span class="tb-sep"></span>
+      <button type="button" onclick={toggleAfter} class="tb-btn" class:is-on={!$previewBypass && !compareSplit}>
+        {$previewBypass ? "Before" : "After"}
+      </button>
+      <button type="button" onclick={() => void toggleCompare()} disabled={compareBusy} class="tb-btn" class:is-on={compareSplit}>
+        Compare
+      </button>
+      <span class="tb-sep"></span>
+      {#each LOOKS as look}
+        <button type="button" onclick={() => pickLook(look.value)} class="tb-btn" class:is-on={$displayLook === look.value}>
+          {look.label}
         </button>
-
-        <button
-          type="button"
-          onclick={() => sendViewCmd("oneToOne")}
-          class="text-[11px] font-light cursor-pointer transition-colors {$zoomLabel === '100%' ? 'text-white font-medium' : 'text-white/70 hover:text-white'}"
-        >
-          1:1
-        </button>
-
-        <button
-          type="button"
-          onclick={() => sendViewCmd("zoomOut")}
-          aria-label="Zoom Out"
-          class="text-[12px] font-light cursor-pointer text-white/70 hover:text-white transition-colors"
-        >
-          -
-        </button>
-
-        <button
-          type="button"
-          onclick={() => sendViewCmd("fit")}
-          class="text-[11px] font-light cursor-pointer transition-colors {$zoomLabel === 'fit' ? 'text-white font-medium' : 'text-white/70 hover:text-white'}"
-        >
-          Fit
-        </button>
-
-        <button
-          type="button"
-          onclick={() => sendViewCmd("zoomIn")}
-          aria-label="Zoom In"
-          class="text-[11px] font-light cursor-pointer text-white/70 hover:text-white transition-colors"
-        >
-          +
-        </button>
-      </div>
-
-      <div class="flex items-center gap-[14px]">
-        {#each LOOKS as look}
-          <button
-            type="button"
-            onclick={() => pickLook(look.value)}
-            class="text-[11px] font-light cursor-pointer transition-colors {$displayLook === look.value ? 'text-white font-medium' : 'text-white/70 hover:text-white'}"
-          >
-            {look.label}
-          </button>
-        {/each}
-
-        <button
-          type="button"
-          onclick={toggleAfter}
-          class="flex items-center gap-[5px] text-[11px] font-light cursor-pointer transition-colors {!$previewBypass && !compareSplit ? 'text-white font-medium' : 'text-white/70 hover:text-white'}"
-          title="Toggle full before/after"
-        >
-          <span>{$previewBypass ? "Before" : "After"}</span>
-        </button>
-
-        <button
-          type="button"
-          onclick={() => void toggleCompare()}
-          disabled={compareBusy}
-          class="flex items-center gap-[5px] text-[11px] font-light cursor-pointer transition-colors {compareSplit ? 'text-white font-medium' : 'text-white/70 hover:text-white'}"
-          title="Split before/after"
-          aria-pressed={compareSplit}
-        >
-          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.2">
-            <rect x="1.5" y="1.5" width="9" height="9" rx="1" />
-            <line x1="6" y1="1.5" x2="6" y2="10.5" />
-          </svg>
-          <span>Split</span>
-        </button>
-
-        <button
-          type="button"
-          onclick={toggleLoupe}
-          aria-label="Toggle Zoom Loupe"
-          aria-pressed={loupeOn}
-          title="Cursor loupe (2.5×)"
-          class="flex items-center justify-center cursor-pointer transition-colors {loupeOn ? 'text-white' : 'text-white/70 hover:text-white'}"
-        >
-          <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5">
-            <circle cx="5" cy="5" r="3.5" />
-            <line x1="7.5" y1="7.5" x2="10.5" y2="10.5" stroke-linecap="round" />
-          </svg>
-        </button>
-
-        <span class="text-[11px] text-white/50 tabular-nums">{$zoomLabel}</span>
-      </div>
+      {/each}
+      <span class="num tb-zoom">{$zoomLabel}</span>
     </div>
   {/if}
 </GlassPanel>

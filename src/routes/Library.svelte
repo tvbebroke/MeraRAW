@@ -307,27 +307,39 @@
         onmousedown={handleLeftResizeStart}
         onkeydown={handleLeftKeyDown}
       >
-        <div class="w-[2px] h-[40px] rounded-full bg-white/5 group-hover:bg-white/25 group-active:bg-accent transition-all duration-200"></div>
+        <div class="w-[2px] h-[40px] rounded-full bg-hover group-hover:bg-border-strong group-active:bg-border-strong transition-all duration-200"></div>
       </div>
     {/if}
   </div>
 
-  {#if $leftRailCollapsed}
-    <button
-      in:fade={{ duration: 150, delay: 300 }}
-      out:fade={{ duration: 100 }}
-      onclick={() => leftRailCollapsed.set(false)}
-      aria-label="Expand Sidebar"
-      class="absolute left-3 top-1/2 -translate-y-1/2 flex size-[26px] items-center justify-center rounded-full border border-white/5 bg-panel-2 backdrop-blur-md text-white/80 hover:bg-white/[0.12] hover:text-white active:scale-95 transition-all cursor-pointer z-50 shadow-md"
-    >
-      <svg width="6" height="10" viewBox="0 0 6 10" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="pointer-events-none">
-        <path d="M1.5 1.5L5 5L1.5 8.5" />
-      </svg>
-    </button>
-  {/if}
-
   <!-- Main Content Area Wrapper -->
   <div class="relative min-h-0 flex flex-col">
+    {#if $leftRailCollapsed}
+      <button
+        type="button"
+        onclick={() => leftRailCollapsed.set(false)}
+        aria-label="Expand Sidebar"
+        title="Expand sidebar ({shortcutLabels.sidebar})"
+        class="absolute left-2 top-1/2 z-50 flex size-[28px] -translate-y-1/2 items-center justify-center rounded-md border border-border bg-panel text-fg hover:bg-hover cursor-pointer"
+      >
+        <svg width="6" height="10" viewBox="0 0 6 10" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="pointer-events-none">
+          <path d="M1.5 1.5L5 5L1.5 8.5" />
+        </svg>
+      </button>
+    {/if}
+    {#if $photoDetailsCollapsed}
+      <button
+        type="button"
+        onclick={() => photoDetailsCollapsed.set(false)}
+        aria-label="Expand Details"
+        title="Expand details ({shortcutLabels.details})"
+        class="absolute right-2 top-1/2 z-50 flex size-[28px] -translate-y-1/2 items-center justify-center rounded-md border border-border bg-panel text-fg hover:bg-hover cursor-pointer"
+      >
+        <svg width="6" height="10" viewBox="0 0 6 10" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="pointer-events-none rotate-180">
+          <path d="M1.5 1.5L5 5L1.5 8.5" />
+        </svg>
+      </button>
+    {/if}
     <GlassPanel class="flex-1 flex min-h-0 flex-col overflow-hidden">
       <!-- Toolbar -->
       <div class="flex shrink-0 items-center gap-[8px] px-[18px] pt-[18px] pb-[12px]">
@@ -341,7 +353,7 @@
             title="Sort and filter"
           >
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M2 3.5H14L9 9V13.5L7 14.5V9L2 3.5Z" stroke="rgba(255,255,255,0.45)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M2 3.5H14L9 9V13.5L7 14.5V9L2 3.5Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
           </button>
 
@@ -365,7 +377,7 @@
                   {label}
                   {#if sortMode === mode}
                     <svg class="ml-auto" width="10" height="8" viewBox="0 0 10 8" fill="none">
-                      <path d="M1 4L3.5 6.5L9 1" stroke="rgba(255,255,255,0.95)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                      <path d="M1 4L3.5 6.5L9 1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
                     </svg>
                   {/if}
                 </button>
@@ -386,8 +398,8 @@
           />
           <div class="search-icon-circle">
             <svg width="15" height="15" viewBox="0 0 15 15" fill="none" class="search-icon">
-              <circle cx="6.5" cy="6.5" r="4.5" stroke="rgba(255,255,255,0.4)" stroke-width="1.5"/>
-              <path d="M10 10L13.5 13.5" stroke="rgba(255,255,255,0.4)" stroke-width="1.5" stroke-linecap="round"/>
+              <circle cx="6.5" cy="6.5" r="4.5" stroke="currentColor" stroke-width="1.5"/>
+              <path d="M10 10L13.5 13.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
             </svg>
           </div>
         </label>
@@ -400,23 +412,23 @@
           <div class="flex h-full flex-col items-center justify-center gap-3 text-center">
             <div class="empty-icon-wrap">
               <svg width="36" height="36" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <rect x="1.5" y="8.5" width="33" height="24" rx="4.5" stroke="rgba(255,255,255,0.12)" stroke-width="1.5"/>
-                <path d="M1.5 15H34.5" stroke="rgba(255,255,255,0.08)" stroke-width="1.5"/>
-                <path d="M10 3.5H6a4.5 4.5 0 0 0-4.5 4.5V15" stroke="rgba(255,255,255,0.12)" stroke-width="1.5" stroke-linecap="round"/>
-                <path d="M12 3.5H14" stroke="rgba(255,255,255,0.12)" stroke-width="1.5" stroke-linecap="round"/>
-                <circle cx="18" cy="23" r="4" stroke="rgba(255,255,255,0.1)" stroke-width="1.5"/>
-                <path d="M30 20.5L25.5 25" stroke="rgba(255,255,255,0.08)" stroke-width="1.5" stroke-linecap="round"/>
+                <rect x="1.5" y="8.5" width="33" height="24" rx="4.5" stroke="currentColor" stroke-width="1.5"/>
+                <path d="M1.5 15H34.5" stroke="currentColor" stroke-width="1.5"/>
+                <path d="M10 3.5H6a4.5 4.5 0 0 0-4.5 4.5V15" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                <path d="M12 3.5H14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                <circle cx="18" cy="23" r="4" stroke="currentColor" stroke-width="1.5"/>
+                <path d="M30 20.5L25.5 25" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
               </svg>
             </div>
-            <p class="text-[13px] font-medium text-white/40">No folder open</p>
-            <p class="text-[11px] text-white/20">Select a folder from the sidebar to browse your photos</p>
+            <p class="text-[13px] font-medium text-subtle">No folder open</p>
+            <p class="text-[11px] text-subtle">Select a folder from the sidebar to browse your photos</p>
           </div>
         {:else if filteredPhotos.length === 0}
           <!-- Empty state: folder open but no matching photos -->
           <div class="flex h-full flex-col items-center justify-center gap-3 text-center">
-            <p class="text-[13px] font-medium text-white/40">No photos found</p>
+            <p class="text-[13px] font-medium text-subtle">No photos found</p>
             {#if searchQuery}
-              <p class="text-[11px] text-white/20">No results for "{searchQuery}"</p>
+              <p class="empty-state text-[11px] text-subtle">No results for "{searchQuery}"</p>
             {/if}
           </div>
         {:else}
@@ -442,7 +454,7 @@
                     />
                   {:else}
                     <div class="photo-thumb-placeholder">
-                      <span class="text-[10px] font-semibold tracking-widest text-white/20">RAW</span>
+                      <span class="text-[10px] font-semibold tracking-widest text-subtle">RAW</span>
                     </div>
                   {/if}
                 </div>
@@ -518,24 +530,11 @@
         onmousedown={handleRightResizeStart}
         onkeydown={handleRightKeyDown}
       >
-        <div class="w-[2px] h-[40px] rounded-full bg-white/5 group-hover:bg-white/25 group-active:bg-accent transition-all duration-200"></div>
+        <div class="w-[2px] h-[40px] rounded-full bg-hover group-hover:bg-border-strong group-active:bg-border-strong transition-all duration-200"></div>
       </div>
     {/if}
   </div>
 
-  {#if $photoDetailsCollapsed}
-    <button
-      in:fade={{ duration: 150, delay: 300 }}
-      out:fade={{ duration: 100 }}
-      onclick={() => photoDetailsCollapsed.set(false)}
-      aria-label="Expand Details"
-      class="absolute right-3 top-1/2 -translate-y-1/2 flex size-[26px] items-center justify-center rounded-full border border-white/5 bg-panel-2 backdrop-blur-md text-white/80 hover:bg-white/[0.12] hover:text-white active:scale-95 transition-all cursor-pointer z-50 shadow-md"
-    >
-      <svg width="6" height="10" viewBox="0 0 6 10" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="pointer-events-none rotate-180">
-        <path d="M1.5 1.5L5 5L1.5 8.5" />
-      </svg>
-    </button>
-  {/if}
 </div>
 
 {#if ctxMenu}
@@ -563,7 +562,7 @@
   .toolbar-btn {
     appearance: none;
     -webkit-appearance: none;
-    border: 1px solid var(--color-border-input, rgba(255, 255, 255, 0.08));
+    border: 1px solid var(--color-border-strong);
     padding: 0;
     margin: 0;
     cursor: pointer;
@@ -575,7 +574,7 @@
     width: 36px;
     height: 36px;
     border-radius: 9999px;
-    background: var(--color-button-bg, rgba(255, 255, 255, 0.06));
+    background: var(--color-hover);
     box-shadow:
       inset 0 1px 0 rgba(255, 255, 255, 0.08),
       inset 0 -1px 0 rgba(0, 0, 0, 0.2),
@@ -584,13 +583,13 @@
   }
 
   .toolbar-btn:hover {
-    background: var(--color-button-hover, rgba(255, 255, 255, 0.12));
+    background: var(--color-active);
     transform: translateY(-0.5px);
   }
 
   .toolbar-btn:active {
     transform: scale(0.96);
-    background: rgba(255, 255, 255, 0.15);
+    background: var(--color-active);
   }
 
   /* ── Sort Menu ────────────────────────────────────────── */
@@ -600,10 +599,10 @@
     left: 0;
     z-index: 40;
     min-width: 150px;
-    background: rgba(22, 22, 24, 0.92);
+    background: var(--color-panel);
     -webkit-backdrop-filter: blur(20px);
     backdrop-filter: blur(20px);
-    border: 1px solid var(--color-border-input, rgba(255, 255, 255, 0.08));
+    border: 1px solid var(--color-border-strong);
     border-radius: 12px;
     padding: 5px;
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
@@ -615,7 +614,7 @@
     border: none;
     background: transparent;
     font: inherit;
-    color: rgba(255, 255, 255, 0.6);
+    color: var(--color-secondary);
     cursor: pointer;
 
     display: flex;
@@ -629,12 +628,12 @@
   }
 
   .sort-item:hover {
-    background: rgba(255, 255, 255, 0.06);
-    color: rgba(255, 255, 255, 0.9);
+    background: var(--color-hover);
+    color: var(--color-fg);
   }
 
   .sort-item--active {
-    color: rgba(255, 255, 255, 0.9);
+    color: var(--color-fg);
     font-weight: 500;
   }
 
@@ -648,8 +647,8 @@
     width: 240px;
     padding: 0 4px 0 16px;
     border-radius: 9999px;
-    border: 1px solid rgba(255, 255, 255, 0.06);
-    background: rgba(33, 33, 35, 0.65);
+    border: 1px solid var(--color-border);
+    background: var(--color-sunken);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
     box-shadow:
@@ -661,8 +660,8 @@
   }
 
   .search-wrap:focus-within {
-    background: rgba(47, 47, 49, 0.85);
-    border-color: rgba(255, 255, 255, 0.15);
+    background: var(--color-hover);
+    border-color: var(--color-border-strong);
   }
 
   .search-icon-circle {
@@ -685,14 +684,14 @@
     border: none;
     background: transparent;
     font: inherit;
-    color: rgba(255, 255, 255, 0.85);
+    color: var(--color-fg);
     font-size: 12px;
     flex: 1;
     outline: none;
   }
 
   .search-input::placeholder {
-    color: rgba(255, 255, 255, 0.25);
+    color: var(--color-subtle);
   }
 
   /* Remove native search clear button */
@@ -705,8 +704,8 @@
     width: 64px;
     height: 64px;
     border-radius: 18px;
-    background: rgba(255, 255, 255, 0.03);
-    border: 1px solid rgba(255, 255, 255, 0.06);
+    background: var(--color-hover);
+    border: 1px solid var(--color-border);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -722,10 +721,10 @@
   .photo-card {
     appearance: none;
     -webkit-appearance: none;
-    border: 1px solid rgba(255, 255, 255, 0.06);
+    border: 1px solid var(--color-border);
     padding: 0;
     margin: 0;
-    background: rgba(255, 255, 255, 0.03);
+    background: var(--color-hover);
     cursor: pointer;
     overflow: hidden;
     text-align: left;
@@ -733,8 +732,8 @@
   }
 
   .photo-card:hover {
-    border-color: rgba(255, 255, 255, 0.25);
-    background: rgba(255, 255, 255, 0.07);
+    border-color: var(--color-border-strong);
+    background: var(--color-active);
     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
   }
 
@@ -743,16 +742,16 @@
   }
 
   .photo-card--active {
-    border-color: rgba(255, 255, 255, 0.85);
+    border-color: var(--color-fg);
     box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.3), 0 2px 8px rgba(0, 0, 0, 0.2);
-    background: rgba(255, 255, 255, 0.06);
+    background: var(--color-hover);
   }
 
   .photo-thumb-wrap {
     width: 100%;
     aspect-ratio: 3 / 2;
     overflow: hidden;
-    background: rgba(255, 255, 255, 0.02);
+    background: var(--color-hover);
   }
 
   .photo-thumb {
@@ -768,12 +767,12 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    background: rgba(255, 255, 255, 0.025);
+    background: var(--color-hover);
   }
 
   .photo-meta {
     padding: 7px 10px 8px;
-    border-top: 1px solid rgba(255, 255, 255, 0.04);
+    border-top: 1px solid var(--color-border);
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -782,7 +781,7 @@
 
   .photo-name {
     font-size: 10px;
-    color: rgba(255, 255, 255, 0.5);
+    color: var(--color-subtle);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -816,13 +815,13 @@
     align-items: center;
     gap: 12px;
     padding: 10px 18px 14px;
-    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    border-top: 1px solid var(--color-border);
     flex-shrink: 0;
   }
 
   .cull-name {
     font-size: 11px;
-    color: rgba(255, 255, 255, 0.55);
+    color: var(--color-secondary);
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -839,7 +838,7 @@
     appearance: none;
     border: none;
     background: transparent;
-    color: rgba(255, 255, 255, 0.22);
+    color: var(--color-subtle);
     font-size: 14px;
     line-height: 1;
     padding: 2px 3px;
@@ -850,9 +849,9 @@
 
   .flag-btn {
     appearance: none;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    background: rgba(255, 255, 255, 0.04);
-    color: rgba(255, 255, 255, 0.65);
+    border: 1px solid var(--color-border-strong);
+    background: var(--color-hover);
+    color: var(--color-secondary);
     font-size: 10px;
     font-weight: 600;
     padding: 5px 10px;

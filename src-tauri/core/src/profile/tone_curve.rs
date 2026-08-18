@@ -14,7 +14,7 @@ pub fn parse_tone_curve(
     count: u32,
     val: u32,
 ) -> Result<Option<ProfileToneCurve>, CoreError> {
-    if typ != TIFF_FLOAT || count < 4 || count % 2 != 0 {
+    if typ != TIFF_FLOAT || count < 4 || !count.is_multiple_of(2) {
         return Ok(None);
     }
     let pairs = count / 2;
@@ -22,9 +22,7 @@ pub fn parse_tone_curve(
         return Ok(None);
     }
     let off = val as usize;
-    let need = off
-        .checked_add((count as usize).saturating_mul(4))
-        .unwrap_or(usize::MAX);
+    let need = off.saturating_add((count as usize).saturating_mul(4));
     if need > data.len() {
         return Ok(None);
     }

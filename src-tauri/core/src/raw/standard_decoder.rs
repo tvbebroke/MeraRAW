@@ -351,12 +351,24 @@ impl Decoder for StandardDecoder {
             metadata::probe_input_color(path)
         };
         let data = metadata::encoded_rgb_to_working(&src, w, h, color.icc.as_deref())?;
+        let stats = crate::pipeline::RgbStats::from_rgb(&data, 0.995, 0.004);
         let working = RgbF32Buf {
             width: w,
             height: h,
             data,
         };
         let meta = rendered_meta(path, w as u32, h as u32, bit_depth, &color);
+        crate::pipeline::log_import(
+            "decoded-working",
+            meta.kind,
+            &meta.format,
+            meta.bit_depth,
+            color.label.as_str(),
+            true,
+            "",
+            None,
+            &stats,
+        );
         Ok(DecodedImage { working, meta })
     }
 }

@@ -25,7 +25,7 @@ pub fn data_dir() -> PathBuf {
     #[cfg(target_os = "macos")]
     {
         let home = std::env::var("HOME").unwrap_or_else(|_| ".".into());
-        return PathBuf::from(home).join("Library/Application Support/MeraRAW");
+        PathBuf::from(home).join("Library/Application Support/MeraRAW")
     }
     #[cfg(target_os = "windows")]
     {

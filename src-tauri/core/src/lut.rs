@@ -57,7 +57,7 @@ impl CubeLut {
                         .next()
                         .and_then(|s| s.parse().ok())
                         .ok_or_else(|| CoreError::InvalidOp("bad LUT_3D_SIZE".into()))?;
-                    if size < 2 || size > MAX_SIZE {
+                    if !(2..=MAX_SIZE).contains(&size) {
                         return Err(CoreError::InvalidOp(format!(
                             "LUT_3D_SIZE {size} out of range 2..={MAX_SIZE}"
                         )));

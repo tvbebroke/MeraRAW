@@ -224,23 +224,23 @@
     <!-- Crop frame -->
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div
-      class="pointer-events-auto absolute border border-white/90"
+      class="pointer-events-auto absolute border border-fg"
       style="left: {frame.left}px; top: {frame.top}px; width: {frame.width}px; height: {frame.height}px; cursor: move;"
       onpointerdown={onMoveDown}
     >
       <!-- Rule of thirds -->
       <div class="pointer-events-none absolute inset-0">
-        <div class="absolute left-1/3 top-0 bottom-0 w-px bg-white/35"></div>
-        <div class="absolute left-2/3 top-0 bottom-0 w-px bg-white/35"></div>
-        <div class="absolute top-1/3 left-0 right-0 h-px bg-white/35"></div>
-        <div class="absolute top-2/3 left-0 right-0 h-px bg-white/35"></div>
+        <div class="absolute left-1/3 top-0 bottom-0 w-px bg-border-strong"></div>
+        <div class="absolute left-2/3 top-0 bottom-0 w-px bg-border-strong"></div>
+        <div class="absolute top-1/3 left-0 right-0 h-px bg-border-strong"></div>
+        <div class="absolute top-2/3 left-0 right-0 h-px bg-border-strong"></div>
       </div>
 
       {#each handles as h (h.id)}
         <button
           type="button"
           aria-label="Crop handle {h.id}"
-          class="absolute size-[10px] -translate-x-1/2 -translate-y-1/2 rounded-[1px] border border-black/40 bg-white shadow"
+          class="absolute size-[10px] -translate-x-1/2 -translate-y-1/2 rounded-[1px] border border-black/40 bg-fg shadow"
           style="left: {h.left}; top: {h.top}; cursor: {h.cursor};"
           onpointerdown={(e) => onHandleDown(e, h.id)}
         ></button>

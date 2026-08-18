@@ -1,5 +1,4 @@
 <script lang="ts">
-  import CollapsibleSection from "./CollapsibleSection.svelte";
   import ParamRow from "./ParamRow.svelte";
   import { pickLut, setLut } from "../../../ipc/commands";
   import { doc } from "../../../stores/doc";
@@ -8,6 +7,7 @@
     ($doc?.meta as { lut_file?: string } | undefined)?.lut_file ?? null,
   );
   const hasLut = $derived(!!lutFile);
+  const lutName = $derived(lutFile ? lutFile.split("/").pop() : "No LUT loaded");
 
   async function importLut() {
     const path = await pickLut();
@@ -20,29 +20,19 @@
   }
 </script>
 
-<CollapsibleSection id="lut" title="LUT Conversion">
-  <div class="flex flex-col gap-[12px]">
-    <div class="text-[8px] text-white/55 truncate" title={lutFile ?? undefined}>
-      {lutFile ? lutFile.split("/").pop() : "No LUT loaded"}
-    </div>
+<p class="rail-empty" title={lutFile ?? undefined}>{lutName}</p>
+{#if hasLut}
+  <ParamRow path="lut.opacity" label="Intensity" />
+{/if}
+<button type="button" class="rail-btn full" onclick={() => void importLut()}>
+  Import LUT (.cube)…
+</button>
+{#if hasLut}
+  <button type="button" class="rail-btn full" onclick={() => void clearLut()}>
+    Clear LUT
+  </button>
+{/if}
 
-    {#if hasLut}
-      <ParamRow path="lut.opacity" label="Intensity" />
-    {/if}
-
-    <button
-      onclick={() => void importLut()}
-      class="h-[22px] w-full rounded-[6px] border border-white/5 bg-white/[0.03] text-[8px] font-semibold text-white/80 transition-all hover:bg-white/[0.08]"
-    >
-      Import LUT (.cube)…
-    </button>
-    {#if hasLut}
-      <button
-        onclick={() => void clearLut()}
-        class="h-[22px] w-full rounded-[6px] border border-white/5 bg-white/[0.02] text-[8px] font-semibold text-white/60 transition-all hover:bg-white/[0.08]"
-      >
-        Clear LUT
-      </button>
-    {/if}
-  </div>
-</CollapsibleSection>
+<style>
+  .full { width: 100%; margin-top: var(--space-2); }
+</style>

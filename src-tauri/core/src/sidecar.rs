@@ -71,7 +71,7 @@ pub fn load_from_xmp(source: &Path) -> Result<Option<EditDoc>, CoreError> {
     }
 
     use crate::doc::ParamValue;
-    let mut doc = EditDoc::new(&source.to_string_lossy().to_string());
+    let mut doc = EditDoc::new(source.to_string_lossy().as_ref());
     let mut any = false;
 
     let mut map = |module: &str, param: &str, xmp: &str| {

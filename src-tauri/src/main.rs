@@ -27,19 +27,21 @@ struct WinRect {
 const WINDOW_MARGIN: i32 = 8;
 
 /// What to do with the main window once its target monitor is known.
+///
+/// Runaway / missing sizes used to return a `Maximize` variant. That was a
+/// no-op in `ensure_main_window_visible` (the `_ => {}` arm never resized),
+/// so junk geometry survived. Every path now repositions to a concrete
+/// rectangle: the saved size if it is plausible, otherwise the configured
+/// default centered on the work area.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[allow(dead_code)]
 enum FitAction {
-    /// The saved size is usable — keep it, only nudge the origin on screen.
     Reposition(WinRect),
-    /// No size worth restoring — fill the target display instead.
-    Maximize,
 }
 
 /// Decide what to do with a window being restored onto `work`.
 ///
 /// A saved size is only honoured when it could actually have come from the
-/// user. Everything else opens maximized:
+/// user. Everything else opens at the configured default, centered:
 ///
 ///  * No saved state (first run) — nothing to honour.
 ///  * Bigger than the display. Saved on a larger monitor, or a runaway value.
@@ -232,20 +234,17 @@ fn ensure_main_window_visible(win: &tauri::WebviewWindow) {
 
     let (default_size, min_size) = configured_window_sizes(win, monitor.scale_factor());
 
-    match fit_into_work_area(work, cur, min_size, default_size, has_saved_window_state(win)) {
-        FitAction::Reposition(fitted) => {
-            if win.is_maximized().unwrap_or(false) {
-                let _ = win.unmaximize();
-            }
-            let _ = win.set_size(tauri::Size::Physical(tauri::PhysicalSize::new(
-                fitted.w, fitted.h,
-            )));
-            let _ = win.set_position(tauri::Position::Physical(tauri::PhysicalPosition::new(
-                fitted.x, fitted.y,
-            )));
-        }
-        _ => {}
+    let FitAction::Reposition(fitted) =
+        fit_into_work_area(work, cur, min_size, default_size, has_saved_window_state(win));
+    if win.is_maximized().unwrap_or(false) {
+        let _ = win.unmaximize();
     }
+    let _ = win.set_size(tauri::Size::Physical(tauri::PhysicalSize::new(
+        fitted.w, fitted.h,
+    )));
+    let _ = win.set_position(tauri::Position::Physical(tauri::PhysicalPosition::new(
+        fitted.x, fitted.y,
+    )));
 
     let _ = win.set_focus();
 }
@@ -373,8 +372,8 @@ fn main() {
         .manage(engine)
         .register_asynchronous_uri_scheme_protocol("frame", protocol::handle_frame_request)
         .register_asynchronous_uri_scheme_protocol("thumb", protocol::handle_thumb_request)
-        .menu(|app| menu::build_menu(app))
-        .on_menu_event(|app, event| menu::handle_menu_event(app, event))
+        .menu(menu::build_menu)
+        .on_menu_event(menu::handle_menu_event)
         .on_window_event(|window, event| {
             // flush unsaved sidecar edits before the window dies
             if let tauri::WindowEvent::CloseRequested { .. } = event {
@@ -564,46 +563,62 @@ mod window_geometry_tests {
     /// minWidth 1024 / minHeight 700 logical, at 2x and 1x.
     const MIN_2X: (u32, u32) = (2048, 1400);
     const MIN_1X: (u32, u32) = (1024, 700);
+    /// width 1280 / height 800 logical from tauri.conf.json, at 2x and 1x.
+    const DEFAULT_2X: (u32, u32) = (2560, 1600);
+    const DEFAULT_1X: (u32, u32) = (1280, 800);
+
+    fn centered(work: WinRect, (w, h): (u32, u32)) -> WinRect {
+        WinRect {
+            x: work.x + ((work.w as i32 - w as i32) / 2),
+            y: work.y + ((work.h as i32 - h as i32) / 2),
+            w,
+            h,
+        }
+    }
 
     #[test]
-    fn first_run_opens_maximized() {
-        let cur = WinRect { x: 0, y: 0, w: 2560, h: 1600 };
+    fn first_run_opens_at_configured_default() {
+        let cur = WinRect { x: 0, y: 0, w: 8304, h: 2040 };
+        let work = builtin_work_area();
         assert_eq!(
-            fit_into_work_area(builtin_work_area(), cur, MIN_2X, false),
-            FitAction::Maximize,
-            "with no saved state the size is not the user's choice"
+            fit_into_work_area(work, cur, MIN_2X, DEFAULT_2X, false),
+            FitAction::Reposition(centered(work, DEFAULT_2X)),
+            "with no saved state the current size is not the user's choice"
         );
     }
 
     #[test]
-    fn runaway_saved_size_maximizes_instead_of_shrinking_to_junk() {
+    fn runaway_saved_size_resets_to_default_instead_of_shrinking_to_junk() {
         // The first real state found on disk: 8304x2040.
         let cur = WinRect { x: 286, y: 194, w: 8304, h: 2040 };
+        let work = builtin_work_area();
         assert_eq!(
-            fit_into_work_area(builtin_work_area(), cur, MIN_2X, true),
-            FitAction::Maximize
+            fit_into_work_area(work, cur, MIN_2X, DEFAULT_2X, true),
+            FitAction::Reposition(centered(work, DEFAULT_2X))
         );
     }
 
     #[test]
     fn halved_runaway_that_fits_is_still_rejected() {
         // 2076x700 — the runaway after two halvings. It fits the display, so
-        // the fits-check alone accepted it and the app opened squat instead of
-        // maximized. Its height is half the 1400px minimum, which is the tell.
+        // the fits-check alone accepted it and the app opened squat. Its
+        // height is half the 1400px minimum, which is the tell.
         let cur = WinRect { x: 2164, y: 115, w: 2076, h: 700 };
+        let work = builtin_work_area();
         assert_eq!(
-            fit_into_work_area(builtin_work_area(), cur, MIN_2X, true),
-            FitAction::Maximize,
+            fit_into_work_area(work, cur, MIN_2X, DEFAULT_2X, true),
+            FitAction::Reposition(centered(work, DEFAULT_2X)),
             "a size below the app's own minimum cannot have come from the user"
         );
     }
 
     #[test]
-    fn oversize_on_the_1x_external_also_maximizes() {
+    fn oversize_on_the_1x_external_also_resets_to_default() {
         let cur = WinRect { x: 3500, y: 100, w: 3440, h: 2040 };
+        let work = external_work_area();
         assert_eq!(
-            fit_into_work_area(external_work_area(), cur, MIN_1X, true),
-            FitAction::Maximize
+            fit_into_work_area(work, cur, MIN_1X, DEFAULT_1X, true),
+            FitAction::Reposition(centered(work, DEFAULT_1X))
         );
     }
 
@@ -612,17 +627,17 @@ mod window_geometry_tests {
         // The whole point of "remember my size" — this must never be resized.
         let cur = WinRect { x: 100, y: 100, w: 3000, h: 1900 };
         assert_eq!(
-            fit_into_work_area(builtin_work_area(), cur, MIN_2X, true),
+            fit_into_work_area(builtin_work_area(), cur, MIN_2X, DEFAULT_2X, true),
             FitAction::Reposition(WinRect { x: 100, y: 100, w: 3000, h: 1900 })
         );
     }
 
     #[test]
     fn a_size_at_the_minimum_is_left_alone() {
-        // Deliberately small-but-legal windows must not be "helpfully" maximized.
+        // Deliberately small-but-legal windows must not be "helpfully" resized.
         let cur = WinRect { x: 200, y: 200, w: 2048, h: 1400 };
         assert_eq!(
-            fit_into_work_area(builtin_work_area(), cur, MIN_2X, true),
+            fit_into_work_area(builtin_work_area(), cur, MIN_2X, DEFAULT_2X, true),
             FitAction::Reposition(WinRect { x: 200, y: 200, w: 2048, h: 1400 })
         );
     }
@@ -634,7 +649,7 @@ mod window_geometry_tests {
         let work = WinRect { x: 0, y: 0, w: 1200, h: 800 };
         let cur = WinRect { x: 10, y: 10, w: 1100, h: 600 };
         assert_eq!(
-            fit_into_work_area(work, cur, MIN_2X, true),
+            fit_into_work_area(work, cur, MIN_2X, DEFAULT_2X, true),
             FitAction::Reposition(WinRect { x: 10, y: 10, w: 1100, h: 600 })
         );
     }
@@ -643,10 +658,8 @@ mod window_geometry_tests {
     fn offscreen_but_fitting_window_is_pulled_back_without_resizing() {
         // Hanging off the right edge — the original bug this function existed for.
         let cur = WinRect { x: 3300, y: 194, w: 2560, h: 1600 };
-        let got = fit_into_work_area(builtin_work_area(), cur, MIN_2X, true);
-        let FitAction::Reposition(r) = got else {
-            panic!("a fitting size must be repositioned, not maximized: {got:?}");
-        };
+        let FitAction::Reposition(r) =
+            fit_into_work_area(builtin_work_area(), cur, MIN_2X, DEFAULT_2X, true);
         assert_eq!((r.w, r.h), (2560, 1600), "position fix must not resize");
         assert_eq!(r.x, 3456 - 2560 - WINDOW_MARGIN);
         let wa = builtin_work_area();
@@ -656,9 +669,13 @@ mod window_geometry_tests {
     }
 
     #[test]
-    fn tiny_work_area_does_not_underflow() {
+    fn tiny_work_area_clamps_default_to_avail_floor() {
         let work = WinRect { x: 0, y: 0, w: 300, h: 200 };
         let cur = WinRect { x: 0, y: 0, w: 8304, h: 2040 };
-        assert_eq!(fit_into_work_area(work, cur, MIN_2X, true), FitAction::Maximize);
+        // avail floors at 640×480 even on a smaller work area (see fit_into_work_area).
+        let FitAction::Reposition(r) = fit_into_work_area(work, cur, MIN_2X, DEFAULT_2X, true);
+        assert_eq!((r.w, r.h), (640, 480));
+        assert_eq!(r.x, (300i32 - 640) / 2);
+        assert_eq!(r.y, (200i32 - 480) / 2);
     }
 }

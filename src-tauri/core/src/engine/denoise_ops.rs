@@ -131,9 +131,15 @@ impl Engine {
                     .filter(|v| v.out_w >= 64 && v.out_h >= 64)
                     .map(|v| (v.out_w, v.out_h))
                     .unwrap_or((1440, 860));
+                let kind = self
+                    .current
+                    .as_ref()
+                    .map(|c| c.meta.kind)
+                    .unwrap_or(crate::raw::ImageKind::Rendered);
+                let look = crate::raw::effective_display_look(kind, self.display_look);
                 let mut frame = super::decode::cpu_preview_frame(
                     &small,
-                    self.display_look == 1,
+                    look == 1,
                     vw.0,
                     vw.1,
                 );

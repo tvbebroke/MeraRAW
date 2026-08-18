@@ -2,6 +2,7 @@
   import { curveChannel, type CurveChannel } from "../../../stores/editor";
   import { doc, reconcile } from "../../../stores/doc";
   import { setParam } from "../../../ipc/commands";
+  import CollapsibleSection from "./CollapsibleSection.svelte";
 
   const channels: { id: CurveChannel; color: string; stroke: string }[] = [
     { id: "luma", color: "#e8e8e8", stroke: "rgba(255, 255, 255, 0.85)" },
@@ -56,9 +57,9 @@
   const splinePath = $derived.by(() => {
     const pts = activePoints;
     if (pts.length === 0) return "";
-    let path = `M ${pts[0].x * 163} ${(1 - pts[0].y) * 163}`;
+    let path = `M ${pts[0].x * 256} ${(1 - pts[0].y) * 192}`;
     if (pts.length === 2) {
-      path += ` L ${pts[1].x * 163} ${(1 - pts[1].y) * 163}`;
+      path += ` L ${pts[1].x * 256} ${(1 - pts[1].y) * 192}`;
       return path;
     }
     for (let i = 0; i < pts.length - 1; i++) {
@@ -70,7 +71,7 @@
       const cp1y = p1.y + (p2.y - p0.y) / 6;
       const cp2x = p2.x - (p3.x - p1.x) / 6;
       const cp2y = p2.y - (p3.y - p1.y) / 6;
-      path += ` C ${cp1x * 163} ${(1 - cp1y) * 163}, ${cp2x * 163} ${(1 - cp2y) * 163}, ${p2.x * 163} ${(1 - p2.y) * 163}`;
+      path += ` C ${cp1x * 256} ${(1 - cp1y) * 192}, ${cp2x * 256} ${(1 - cp2y) * 192}, ${p2.x * 256} ${(1 - p2.y) * 192}`;
     }
     return path;
   });
@@ -157,25 +158,24 @@
   }
 </script>
 
-<div class="flex w-[163px] flex-col items-center gap-[8px]">
+<CollapsibleSection id="curve" title="Tone Curve">
+<div class="curve">
   <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div
-    class="relative size-[163px] select-none overflow-hidden rounded-[8px] border border-[rgba(103,103,103,0.05)] bg-[rgba(103,103,103,0.47)] touch-none backdrop-blur-[2px]"
-  >
+  <div class="canvas">
     <svg
-      viewBox="0 0 163 163"
-      class="absolute inset-0 size-full cursor-crosshair"
+      viewBox="0 0 256 192"
+      class="svg"
       onpointerdown={handleSvgPointerDown}
       onpointermove={handlePointerMove}
       onpointerup={stopDrag}
       onpointercancel={stopDrag}
     >
-      <line x1="40.75" y1="0" x2="40.75" y2="163" stroke="white" stroke-opacity="0.05" stroke-dasharray="2 2" />
-      <line x1="81.5" y1="0" x2="81.5" y2="163" stroke="white" stroke-opacity="0.05" stroke-dasharray="2 2" />
-      <line x1="122.25" y1="0" x2="122.25" y2="163" stroke="white" stroke-opacity="0.05" stroke-dasharray="2 2" />
-      <line x1="0" y1="40.75" x2="163" y2="40.75" stroke="white" stroke-opacity="0.05" stroke-dasharray="2 2" />
-      <line x1="0" y1="81.5" x2="163" y2="81.5" stroke="white" stroke-opacity="0.05" stroke-dasharray="2 2" />
-      <line x1="0" y1="122.25" x2="163" y2="122.25" stroke="white" stroke-opacity="0.05" stroke-dasharray="2 2" />
+      <line x1="64" y1="0" x2="64" y2="192" stroke="white" stroke-opacity="0.05" stroke-dasharray="2 2" />
+      <line x1="128" y1="0" x2="128" y2="192" stroke="white" stroke-opacity="0.05" stroke-dasharray="2 2" />
+      <line x1="192" y1="0" x2="192" y2="192" stroke="white" stroke-opacity="0.05" stroke-dasharray="2 2" />
+      <line x1="0" y1="48" x2="256" y2="48" stroke="white" stroke-opacity="0.05" stroke-dasharray="2 2" />
+      <line x1="0" y1="96" x2="256" y2="96" stroke="white" stroke-opacity="0.05" stroke-dasharray="2 2" />
+      <line x1="0" y1="144" x2="256" y2="144" stroke="white" stroke-opacity="0.05" stroke-dasharray="2 2" />
       <path
         d={splinePath}
         fill="none"
@@ -186,10 +186,10 @@
       {#each activePoints as p, i}
         <!-- svelte-ignore a11y_no_static_element_interactions -->
         <circle
-          cx={p.x * 163}
-          cy={(1 - p.y) * 163}
+          cx={p.x * 256}
+          cy={(1 - p.y) * 192}
           r={draggedIndex === i ? 5.5 : 4}
-          class="cursor-pointer fill-white stroke-black/60 stroke-[1.5px] transition-all duration-100 hover:fill-[#a8a8a8] active:fill-[#8c8c8c]"
+          class="cursor-pointer fill-fg stroke-black/60 stroke-[1.5px] transition-all duration-100 hover:fill-[#a8a8a8] active:fill-[#8c8c8c]"
           onpointerdown={(e) => startDrag(e, i)}
           ondblclick={(e) => {
             e.stopPropagation();
@@ -205,20 +205,53 @@
     </svg>
   </div>
 
-  <div class="mt-[2px] flex items-center gap-[8px] pl-[2px]">
+  <div class="dots">
     {#each channels as ch (ch.id)}
       <button
         aria-label="{ch.id} channel"
-        class="relative size-[9px] rounded-full transition-all duration-150 {$curveChannel === ch.id
-          ? 'scale-110'
-          : 'opacity-40 hover:opacity-75'}"
+        class="dot"
+        class:on={$curveChannel === ch.id}
         style="background: {ch.color}"
         onclick={() => curveChannel.set(ch.id)}
-      >
-        {#if $curveChannel === ch.id}
-          <span class="absolute inset-0 scale-125 rounded-full border border-white/60"></span>
-        {/if}
-      </button>
+      ></button>
     {/each}
   </div>
 </div>
+</CollapsibleSection>
+
+<style>
+  .curve { display: flex; flex-direction: column; gap: var(--space-2); }
+  .canvas {
+    width: 100%;
+    aspect-ratio: 4 / 3;
+    position: relative;
+    overflow: hidden;
+    border-radius: 8px;
+    border: 1px solid var(--color-border);
+    background: var(--color-active);
+    touch-action: none;
+    user-select: none;
+  }
+  .svg { position: absolute; inset: 0; width: 100%; height: 100%; cursor: crosshair; }
+  .dots {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+    min-height: 28px;
+  }
+  .dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    border: 0;
+    padding: 0;
+    cursor: pointer;
+    opacity: 0.4;
+  }
+  .dot.on {
+    opacity: 1;
+    outline: 1px solid var(--color-fg);
+    outline-offset: 2px;
+  }
+</style>

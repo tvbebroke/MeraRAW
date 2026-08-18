@@ -3,21 +3,23 @@
   import { getCurrentWindow } from "@tauri-apps/api/window";
   import { router, push } from "svelte-spa-router";
   import IconButton from "../primitives/IconButton.svelte";
-  import ToggleSwitch from "../primitives/ToggleSwitch.svelte";
   import settingsIcon from "../../icons/settings.svg";
   import libraryIcon from "../../icons/library.svg";
   import helpIcon from "../../icons/help.svg";
-  import exportIcon from "../../icons/export.svg";
-  import pencilIcon from "../../icons/pencil.svg";
   import logoIcon from "../../icons/logo.png";
-  import { isSettingsOpen, isExportOpen, classicLook, isShortcutsOpen } from "../../../stores/ui";
-  import { isZenMode } from "../../../stores/editor";
+  import { isSettingsOpen, isExportOpen, isShortcutsOpen } from "../../../stores/ui";
+  import JobsPill from "./JobsPill.svelte";
+  import VersionsButton from "./VersionsButton.svelte";
+  import { commandPaletteOpen } from "../../../stores/editor";
   import { pickFile } from "../../fs";
   import { openPath } from "../../engine/boot";
   import { shortcutLabels } from "../../shortcuts";
+  import { lastOpenedPath, imageMeta } from "../../../stores/app";
+  import { folder, folders, activePhoto } from "../../../stores/browse";
+  import { undo, redo } from "../../../ipc/commands";
+  import { reconcile } from "../../../stores/doc";
 
   // Lazy so the page still renders in a plain browser (no Tauri runtime)
-  const win = () => getCurrentWindow();
   const isLibrary = $derived(router.location === "/library");
 
   let isFullscreen = $state(false);
@@ -58,191 +60,137 @@
     const path = await pickFile();
     if (path) void openPath(path);
   }
+
+  function basename(path: string | null | undefined): string {
+    if (!path) return "";
+    const parts = path.replace(/\\/g, "/").split("/").filter(Boolean);
+    return parts.at(-1) ?? path;
+  }
+
+  const folderName = $derived(
+    $folders.find((f) => f.root === $folder)?.name || basename($folder) || "",
+  );
+  const fileName = $derived(
+    $activePhoto?.filename || basename($imageMeta?.path) || basename($lastOpenedPath),
+  );
 </script>
 
 <header
   data-tauri-drag-region
-  class="relative flex h-[44px] shrink-0 items-center pr-4 {isFullscreen ? 'pl-4' : 'pl-[88px]'}"
+  class="relative flex h-[42px] shrink-0 items-center pr-3 {isFullscreen ? 'pl-4' : 'pl-[88px]'} border-b border-border/80"
 >
   <img
     src={logoIcon}
     alt=""
-    class="size-[20px] select-none rounded-[4px]"
+    class="size-[16px] select-none rounded-[3px]"
     draggable="false"
     data-tauri-drag-region
   />
-  <span data-tauri-drag-region class="ml-[7px] text-[14px] text-white"
-    >MeraRAW</span
-  >
-  <span
-    class="ml-[7px] rounded-[8px] border border-[#d0af36] px-[5px] pt-[4px] pb-[3px] text-[8px] leading-none text-[#d0af36]"
-    >BETA</span
-  >
+  <span data-tauri-drag-region class="ml-[8px] text-[13px] font-medium text-fg">MeraRAW</span>
+  {#if folderName || fileName}
+    <span class="crumb-sep" aria-hidden="true">/</span>
+    {#if folderName}
+      <span class="crumb-muted truncate max-w-[10rem]" title={$folder ?? ""}>{folderName}</span>
+    {/if}
+    {#if fileName}
+      <span class="crumb-sep" aria-hidden="true">/</span>
+      <span class="crumb-file truncate max-w-[16rem]" title={fileName}>{fileName}</span>
+    {/if}
+  {/if}
 
-  <div class="ml-auto flex items-center gap-[7px]" data-tauri-drag-region="false">
-    <button
-      type="button"
-      data-tauri-drag-region="false"
-      class="open-btn"
-      onclick={() => void openRaw()}
-    >
-      Open
-    </button>
+  <div class="ml-auto flex items-center gap-[4px]" data-tauri-drag-region="false">
+    <JobsPill />
+    <VersionsButton />
+    <button type="button" class="quiet-btn" onclick={() => void undo().then(reconcile).catch(() => {})} title="Undo ({shortcutLabels.undo})">Undo</button>
+    <button type="button" class="quiet-btn" onclick={() => void redo().then(reconcile).catch(() => {})} title="Redo ({shortcutLabels.redo})">Redo</button>
+    <button type="button" class="quiet-btn" onclick={() => commandPaletteOpen.set(true)} title="Commands (⌘K)">⌘K</button>
+    <button type="button" class="quiet-btn" onclick={() => void openRaw()}>Open</button>
     <IconButton
       icon={settingsIcon}
       label="Settings"
       title="Settings ({shortcutLabels.settings})"
-      iconClass="size-[20px]"
+      iconClass="size-[18px]"
       onclick={() => isSettingsOpen.set(true)}
     />
     <IconButton
       icon={helpIcon}
       label="Help"
       title="Keyboard Shortcuts"
-      iconClass="h-[18px] w-[12px]"
+      iconClass="h-[16px] w-[11px]"
       onclick={() => isShortcutsOpen.set(true)}
     />
 
     {#if isLibrary}
-      <!-- Library page: show Edit button to go back to editor -->
       <button
         onclick={() => safePush("/edit")}
         aria-label="Edit"
         title="Edit ({shortcutLabels.edit})"
-        class="edit-pill-btn"
+        class="quiet-btn"
         data-tauri-drag-region="false"
       >
-        <span class="edit-pill-label">Edit</span>
-        <div class="edit-pill-icon-circle">
-          <img src={pencilIcon} alt="" class="edit-pill-icon" />
-        </div>
+        Edit
       </button>
     {:else}
-      <!-- Edit pages: show Library icon + Zen toggle + Export -->
       <IconButton
         icon={libraryIcon}
         label="Library"
         title="Library ({shortcutLabels.library})"
-        iconClass="h-[17px] w-[21px]"
+        iconClass="h-[15px] w-[19px]"
         onclick={() => safePush("/library")}
       />
-      {#if !$classicLook}
-        <ToggleSwitch
-          checked={$isZenMode}
-          label="Zen / Expert mode"
-          title="Zen / Expert mode ({shortcutLabels.zenMode})"
-          onchange={(zen) => isZenMode.set(zen)}
-        />
-      {/if}
-      <IconButton
-        icon={exportIcon}
-        label="Export"
+      <button
+        type="button"
+        class="export-btn"
         title="Export ({shortcutLabels.export})"
-        iconClass="size-[17px]"
-        wide={true}
         onclick={() => isExportOpen.set(true)}
-      />
+      >
+        Export
+      </button>
     {/if}
   </div>
 </header>
 
 <style>
-  .open-btn {
-    appearance: none;
-    -webkit-appearance: none;
-    border: 1px solid rgba(255, 255, 255, 0.06);
-    margin: 0;
-    font: inherit;
-    color: rgba(255, 255, 255, 0.8);
-    cursor: pointer;
-
-    display: flex;
-    align-items: center;
-    justify-content: center;
-
-    height: 36px;
-    padding: 0 16px;
-    border-radius: 9999px;
+  .crumb-sep {
+    margin: 0 7px;
+    color: var(--color-subtle);
+    opacity: 0.55;
     font-size: 13px;
-    font-weight: 300;
-    letter-spacing: -0.01em;
-    white-space: nowrap;
-
-    background: rgba(33, 33, 35, 0.65);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.08),
-      inset 0 -1px 0 rgba(0, 0, 0, 0.2),
-      0 2px 6px rgba(0, 0, 0, 0.25);
-    transition: background 150ms cubic-bezier(0.4, 0, 0.2, 1), color 150ms cubic-bezier(0.4, 0, 0.2, 1);
   }
-
-  .open-btn:hover {
-    background: rgba(47, 47, 49, 0.85);
-    color: #ffffff;
-  }
-
-  .open-btn:active {
-    background: rgba(65, 65, 68, 0.9);
-  }
-
-  .edit-pill-btn {
-    appearance: none;
-    -webkit-appearance: none;
-    border: 1px solid rgba(255, 255, 255, 0.06);
-    margin: 0;
-    font: inherit;
-    color: rgba(255, 255, 255, 0.85);
-    cursor: pointer;
-
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 10px;
-
-    height: 36px;
-    padding: 0 4px 0 16px;
-    border-radius: 9999px;
-
-    background: rgba(33, 33, 35, 0.65);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.08),
-      inset 0 -1px 0 rgba(0, 0, 0, 0.2),
-      0 2px 6px rgba(0, 0, 0, 0.25);
-    transition: background 150ms cubic-bezier(0.4, 0, 0.2, 1), border-color 150ms cubic-bezier(0.4, 0, 0.2, 1);
-    white-space: nowrap;
-  }
-
-  .edit-pill-btn:hover {
-    background: rgba(47, 47, 49, 0.85);
-  }
-
-  .edit-pill-btn:active {
-    background: rgba(65, 65, 68, 0.9);
-  }
-
-  .edit-pill-label {
+  .crumb-muted {
     font-size: 13px;
+    color: var(--color-subtle);
+  }
+  .crumb-file {
+    font-size: 13px;
+    color: var(--color-fg);
+  }
+  .quiet-btn {
+    height: 26px;
+    padding: 0 8px;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--color-secondary);
+    font: inherit;
+    font-size: 12px;
+    cursor: pointer;
+  }
+  .quiet-btn:hover {
+    background: var(--color-hover);
+    color: var(--color-fg);
+  }
+  .export-btn {
+    height: 26px;
+    padding: 0 11px;
+    border: 1px solid var(--color-border);
+    border-radius: 7px;
+    background: var(--color-fg);
+    color: var(--color-panel);
+    font: inherit;
+    font-size: 12px;
     font-weight: 500;
-    letter-spacing: -0.01em;
+    cursor: pointer;
   }
-
-  .edit-pill-icon-circle {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 28px;
-    height: 28px;
-    border-radius: 50%;
-    background: rgba(255, 255, 255, 0.1);
-  }
-
-  .edit-pill-icon {
-    width: 14px;
-    height: 14px;
-    opacity: 0.9;
-  }
+  .export-btn:hover { opacity: 0.88; }
 </style>

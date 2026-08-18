@@ -8,24 +8,26 @@ Everything downstream of decode runs on the GPU (`wgpu` → Metal) in a
 (values > 1.0) is preserved until the display/export transform.
 
 ```
- RAW file
-   │  rawler: parse · unpack · black/white rescale · CFA pattern · crop rects   [open source]
-   ▼
- normalized Bayer mosaic ──► merawler: demosaic (RCD default, user-selectable)   [ours]
-   │                          non-Bayer (X-Trans/ProRAW) ► rawler fallback
-   ▼  crop to output rect
- camera-native linear RGB
-   │  as-shot WB → DNG dual-illuminant cam→XYZ→Rec.2020 (or DCP) · orientation   [ours]
-   ▼
- WORKING MASTER  (linear Rec.2020 · D65 · scene-referred · headroom kept)
-   │
-   ▼  GPU edit graph (viewport interactive / full-res tiled export)             [ours, WGSL]
- exposure → white_balance → calibration → noise → color_grade → hsl →
- tone_curve → lut → sharpen     (+ per-mask scoped stacks; + DCP look)
-   │
-   ▼  present: Rec2020→sRGB · view transform (Reinhard-ext / AgX Filmic) · OETF
- DISPLAY   ──or──►  EXPORT: target space + OETF · sharpen · encode · ICC + EXIF  [ours]
+ FILE
+  ├── RAW
+  │    rawler unpack → merawler demosaic → as-shot WB → DCP/cam matrix
+  │    → linear Rec.2020 working master (scene-referred)
+  │    → edit graph → present (Neutral / Camera+DCP / Filmic / Original)
+  │
+  └── JPEG / PNG / TIFF / …  (ImageKind::Rendered)
+       decode encoded RGB → embedded ICC or sRGB fallback → EOTF
+       → linear Rec.2020 working master
+       → edit graph (user edits only; no demosaic / DCP / sensor WB)
+       → present look 3 (Rec.2020→sRGB + OETF) unless user picks Filmic
 ```
+
+`ImageKind` is the type-level split. RAW-only stages (`allows_raw_only_stages`)
+cannot run on rasters: DCP autoload, demosaic picker, and the Camera punchy
+view-look are gated on `kind == Raw`. A zero-edit JPEG must stay faithful to
+the decoded source — the default Camera look (gain 1.6 / sat 1.22) is a RAW
+rendering, not a JPEG display transform.
+
+Trace: `MERARAW_PIPELINE_TRACE=1` logs per-stage min/max/mean/clip%.
 
 Two execution paths share one node graph. Interactive runs at viewport
 resolution and caches the chain by a "dirty-from" index (only nodes at/after a

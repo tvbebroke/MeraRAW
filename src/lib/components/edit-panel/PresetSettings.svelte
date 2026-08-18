@@ -9,7 +9,6 @@
   } from "../../../ipc/commands";
   import { reconcile, doc } from "../../../stores/doc";
 
-  /** Develop modules worth bundling into a look preset (skip crop/geometry). */
   const SAVE_MODULES = [
     "exposure",
     "white_balance",
@@ -19,7 +18,6 @@
     "hsl",
     "tone_curve",
     "lut",
-    "effects",
   ];
 
   let presets = $state<PresetCatalogEntry[]>([]);
@@ -44,10 +42,7 @@
     presets.filter((p) => {
       if (!filter) return true;
       const q = filter.toLowerCase();
-      return (
-        p.label.toLowerCase().includes(q) ||
-        p.tags.some((t) => t.toLowerCase().includes(q))
-      );
+      return p.label.toLowerCase().includes(q) || p.tags.some((t) => t.toLowerCase().includes(q));
     }),
   );
 
@@ -81,51 +76,70 @@
   }
 </script>
 
-<CollapsibleSection id="presetList" title="Presets Library">
-  <div class="flex flex-col gap-[8px]">
-    <div class="flex gap-[6px]">
-      <input
-        class="h-[24px] min-w-0 flex-1 rounded-[8px] border border-white/5 bg-white/[0.03] px-2 text-[9px] text-white/80 outline-none"
-        placeholder="Preset name…"
-        bind:value={saveName}
-        onkeydown={(e) => {
-          if (e.key === "Enter") void save();
-        }}
-      />
+<CollapsibleSection id="presets" title="Presets">
+  <div class="save-row">
+    <input
+      class="rail-input"
+      placeholder="Preset name…"
+      bind:value={saveName}
+      onkeydown={(e) => {
+        if (e.key === "Enter") void save();
+      }}
+    />
+    <button type="button" class="rail-btn" onclick={() => void save()}>Save</button>
+  </div>
+  {#if saveStatus}
+    <p class="rail-empty">{saveStatus}</p>
+  {/if}
+
+  <input class="rail-input" placeholder="Filter presets…" bind:value={filter} />
+
+  {#if visible.length === 0}
+    <p class="rail-empty">No presets found.</p>
+  {:else}
+    {#each visible as preset (preset.id)}
       <button
         type="button"
-        class="h-[24px] shrink-0 rounded-[8px] border border-white/5 bg-white/[0.06] px-2 text-[9px] font-medium text-white/80 hover:bg-white/10"
-        onclick={() => void save()}
+        class="item"
+        class:on={selected === preset.id}
+        onclick={() => void apply(preset.id)}
       >
-        Save
+        <span>{preset.label}</span>
+        <span class="tag">{preset.tags[0] ?? ""}</span>
       </button>
-    </div>
-    {#if saveStatus}
-      <p class="px-1 text-[8px] text-white/40">{saveStatus}</p>
-    {/if}
-
-    <input
-      class="h-[24px] rounded-[8px] border border-white/5 bg-white/[0.03] px-2 text-[9px] text-white/80 outline-none"
-      placeholder="Filter presets…"
-      bind:value={filter}
-    />
-    {#if visible.length === 0}
-      <p class="text-[8px] text-white/35">No presets found.</p>
-    {:else}
-      {#each visible as preset (preset.id)}
-        <button
-          onclick={() => void apply(preset.id)}
-          class="flex items-center justify-between rounded-[12px] border p-[10px] text-left transition-all {selected ===
-          preset.id
-            ? 'border-accent bg-accent/10 text-white'
-            : 'border-white/5 bg-white/[0.02] text-white/80 hover:bg-white/5'}"
-        >
-          <span class="text-[10px] font-medium">{preset.label}</span>
-          <span class="text-[8px] text-white/40"
-            >{preset.tags[0] ?? ""}</span
-          >
-        </button>
-      {/each}
-    {/if}
-  </div>
+    {/each}
+  {/if}
 </CollapsibleSection>
+
+<style>
+  .save-row {
+    display: flex;
+    gap: var(--space-2);
+    margin-bottom: var(--space-2);
+  }
+  .save-row .rail-btn { flex: none; padding: 0 var(--space-2); }
+  .rail-input { margin-bottom: var(--space-2); }
+  .item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2);
+    width: 100%;
+    min-height: 28px;
+    padding: 0 var(--space-2);
+    margin-bottom: var(--space-1);
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    background: var(--color-hover);
+    color: var(--color-fg);
+    font-size: var(--text-ui);
+    text-align: left;
+    cursor: pointer;
+  }
+  .item.on {
+    border-color: var(--color-accent);
+    background: var(--color-accent-soft);
+  }
+  .item:hover { background: var(--color-active); }
+  .tag { color: var(--color-subtle); }
+</style>

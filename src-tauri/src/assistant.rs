@@ -319,7 +319,7 @@ async fn execute_tool(
         }
         "undo" => {
             progress("undoing last step".into());
-            (op_result(engine.undo().await.map(|r| r)), None)
+            (op_result(engine.undo().await), None)
         }
         "reset_module" => {
             progress("resetting module".into());

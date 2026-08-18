@@ -61,7 +61,8 @@ impl Engine {
             if self.export_graph.is_none() {
                 self.export_graph = Some(RenderGraph::new(gpu));
             }
-            let display_look = self.display_look;
+            let display_look =
+                crate::raw::effective_display_look(cur.meta.kind, self.display_look);
             // look 4 (Original) renders a fresh doc — no crop, full frame
             let (out_w, out_h) = if display_look == 4 {
                 (w, h)
@@ -70,10 +71,10 @@ impl Engine {
             };
             let tiles_x = out_w.div_ceil(TILE);
             let tiles_y = out_h.div_ceil(TILE);
-            let dcp = if display_look == 4 {
-                None
-            } else {
+            let dcp = if DcpProfile::applies_to_display_look(display_look) {
                 cur.dcp_profile.clone()
+            } else {
+                None
             };
             let lut = if display_look == 4 {
                 None
@@ -131,7 +132,8 @@ impl Engine {
         let cct = job.cct;
         let dcp = job.dcp.clone();
         let lut = job.lut.clone();
-        let original = job.look == 4;
+        let look = job.look;
+        let original = look == 4;
 
         let tile_result: Result<Vec<f32>, CoreError> = (|| {
             let gpu = self.gpu.as_ref().ok_or(CoreError::Gpu("no gpu".into()))?;
@@ -180,10 +182,12 @@ impl Engine {
                 &seg_views,
                 lut.as_deref(),
             )?;
-            if let Some(dcp) = dcp.as_ref() {
-                for px in tile.chunks_mut(3) {
-                    let out = dcp.apply_look([px[0], px[1], px[2]], cct);
-                    px.copy_from_slice(&out);
+            if DcpProfile::applies_to_display_look(look) {
+                if let Some(dcp) = dcp.as_ref() {
+                    for px in tile.chunks_mut(3) {
+                        let out = dcp.apply_look([px[0], px[1], px[2]], cct);
+                        px.copy_from_slice(&out);
+                    }
                 }
             }
             Ok(tile)
@@ -237,7 +241,7 @@ impl Engine {
         }
 
         let mut job = self.export_job.take().unwrap();
-        let look = job.look;
+        let look = DcpProfile::present_look(job.look, job.dcp.is_some());
         tracing::info!(
             w = job.w,
             h = job.h,
@@ -640,10 +644,12 @@ impl Engine {
                 &seg_views,
                 lut.as_deref(),
             )?;
-            if let Some(dcp) = dcp.as_ref() {
-                for px in tile.chunks_mut(3) {
-                    let out = dcp.apply_look([px[0], px[1], px[2]], cct);
-                    px.copy_from_slice(&out);
+            if DcpProfile::applies_to_display_look(look) {
+                if let Some(dcp) = dcp.as_ref() {
+                    for px in tile.chunks_mut(3) {
+                        let out = dcp.apply_look([px[0], px[1], px[2]], cct);
+                        px.copy_from_slice(&out);
+                    }
                 }
             }
             Ok(tile)
@@ -712,6 +718,10 @@ impl Engine {
             )
         };
         self.emit_batch_progress(index, &path, "encode", 0, 1);
+        let enc_look = {
+            let effective = crate::raw::effective_display_look(meta.kind, look);
+            DcpProfile::present_look(effective, dcp.is_some())
+        };
         let tx_chan = self.self_tx.clone();
         std::thread::Builder::new()
             .name("batch-encode".into())
@@ -729,7 +739,7 @@ impl Engine {
                         h,
                         settings.target,
                         want16,
-                        look,
+                        enc_look,
                     );
                     if !want16 {
                         crate::export::output_sharpen8(&mut enc.rgb8, w, h, settings.sharpen);

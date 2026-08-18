@@ -134,47 +134,34 @@
 </div>
 
 <style>
+  /* Flat popover: hairline border + one shadow layer, no blur.
+     Radius follows --radius so .classic-look squares it off for free. */
   .ctx-menu {
     position: fixed;
     z-index: 210;
     min-width: 190px;
     max-width: 300px;
-    background: rgba(23, 23, 23, 0.88);
-    -webkit-backdrop-filter: blur(30px) saturate(140%);
-    backdrop-filter: blur(30px) saturate(140%);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 14px;
+    background: var(--color-panel);
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius);
     padding: 5px;
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.04),
-      0 16px 36px -8px rgba(0, 0, 0, 0.65),
-      0 0 0 1px rgba(255, 255, 255, 0.05);
+    box-shadow: var(--shadow-popover);
     transform-origin: top left;
-  }
-
-  /* Support Classic Look theme */
-  :global(.classic-look) .ctx-menu {
-    border-radius: 6px !important;
-    border: 1px solid var(--color-border-input) !important;
-    background: var(--color-panel, #1e1e20) !important;
-    backdrop-filter: none !important;
-    -webkit-backdrop-filter: none !important;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5) !important;
   }
 
   .ctx-sep {
     height: 1px;
     margin: 4px 6px;
-    background: rgba(255, 255, 255, 0.08);
+    background: var(--color-border);
   }
 
+  /* Menu section headers are sentence case + semibold.
+     Uppercase-tracked caps are reserved for panel eyebrows. */
   .ctx-header {
     padding: 6px 10px 4px 10px;
-    font-size: 11px;
+    font-size: 11.5px;
     font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: rgba(255, 255, 255, 0.45);
+    color: var(--color-fg);
   }
 
   .ctx-search-wrap {
@@ -188,24 +175,29 @@
   .ctx-search-icon {
     position: absolute;
     left: 10px;
-    color: rgba(255, 255, 255, 0.4);
+    color: var(--color-subtle);
     pointer-events: none;
   }
 
   .ctx-search-input {
     width: 100%;
     padding: 6px 10px 6px 28px;
-    background: rgba(0, 0, 0, 0.25);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 8px;
-    color: #ffffff;
+    background: var(--color-sunken);
+    border: 1px solid var(--color-border);
+    border-radius: 7px;
+    color: var(--color-fg);
     font-size: 12px;
     outline: none;
+    transition: border-color 0.15s var(--ease-std);
   }
 
+  /* Focus = border colour change only. No ring, no glow. */
   .ctx-search-input:focus {
-    border-color: rgba(255, 255, 255, 0.25);
-    background: rgba(0, 0, 0, 0.4);
+    border-color: var(--color-accent);
+  }
+
+  .ctx-search-input::placeholder {
+    color: var(--color-subtle);
   }
 
   .ctx-item {
@@ -214,7 +206,7 @@
     border: none;
     background: transparent;
     font: inherit;
-    color: #ffffff;
+    color: var(--color-fg);
     cursor: pointer;
 
     display: flex;
@@ -222,13 +214,12 @@
     justify-content: space-between;
     gap: 16px;
     width: 100%;
-    padding: 7px 10px;
-    border-radius: 8px;
-    font-size: 13px;
+    padding: 6px 10px;
+    border-radius: 6px;
+    font-size: 12.5px;
     font-weight: 450;
     text-align: left;
-    letter-spacing: -0.01em;
-    transition: background 120ms ease, color 120ms ease;
+    transition: background-color 0.12s var(--ease-std), color 0.12s var(--ease-std);
   }
 
   .ctx-item-left {
@@ -245,7 +236,7 @@
     justify-content: center;
     width: 15px;
     height: 15px;
-    color: rgba(255, 255, 255, 0.7);
+    color: var(--color-secondary);
     flex-shrink: 0;
   }
 
@@ -254,69 +245,60 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    color: #ffffff;
+    color: inherit;
   }
 
   .ctx-item:hover:not(:disabled) {
-    background: rgba(255, 255, 255, 0.09);
-    color: #ffffff;
+    background: var(--color-hover);
+    color: var(--color-fg);
   }
 
   .ctx-item:hover:not(:disabled) .ctx-item-icon {
-    color: #ffffff;
+    color: var(--color-fg);
   }
 
   .ctx-item:active:not(:disabled) {
-    background: rgba(255, 255, 255, 0.15);
+    background: var(--color-active);
   }
 
   .ctx-item--disabled {
-    color: rgba(255, 255, 255, 0.3);
+    color: var(--color-subtle);
     cursor: default;
+    opacity: 0.6;
   }
 
-  .ctx-item--disabled .ctx-item-label {
-    color: rgba(255, 255, 255, 0.3);
-  }
-
+  /* Neutral at rest — destructive intent only shows on hover. */
   .ctx-item--danger {
-    color: #ff5555;
+    color: var(--color-secondary);
   }
 
   .ctx-item--danger:hover:not(:disabled) {
-    background: rgba(255, 85, 85, 0.15);
-    color: #ff6666;
+    background: color-mix(in srgb, var(--color-destructive) 12%, transparent);
+    color: var(--color-destructive);
   }
 
+  /* Shortcut hint: bare mono text, right-aligned. No key-cap chrome —
+     the box was competing with the label for attention. */
   .ctx-item-shortcut {
     flex-shrink: 0;
-    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-    font-size: 10px;
-    font-weight: 500;
-    color: rgba(255, 255, 255, 0.5);
-    background: rgba(255, 255, 255, 0.08);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 5px;
-    padding: 1.5px 6px;
-    letter-spacing: 0.02em;
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    color: var(--color-subtle);
     line-height: 1.2;
-    transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
+    transition: color 0.12s var(--ease-std);
   }
 
   .ctx-item:hover:not(:disabled) .ctx-item-shortcut {
-    color: rgba(255, 255, 255, 0.85);
-    background: rgba(255, 255, 255, 0.14);
-    border-color: rgba(255, 255, 255, 0.15);
+    color: var(--color-secondary);
   }
 
   .ctx-item-arrow {
     flex-shrink: 0;
-    color: rgba(255, 255, 255, 0.4);
-    transition: color 120ms ease, transform 120ms ease;
+    color: var(--color-subtle);
+    transition: color 0.12s var(--ease-std);
   }
 
   .ctx-item:hover:not(:disabled) .ctx-item-arrow {
-    color: rgba(255, 255, 255, 0.9);
-    transform: translateX(1px);
+    color: var(--color-fg);
   }
 </style>

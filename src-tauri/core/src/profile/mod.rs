@@ -146,7 +146,12 @@ fn title_case_word(s: &str) -> String {
 }
 
 /// Profiles available for this raw's camera metadata.
+/// Rendered rasters never list DCPs — EXIF camera tags on a JPEG are metadata,
+/// not a license to apply a sensor matrix.
 pub fn resolve_profiles(meta: &ImageMeta, index: &ProfileIndex) -> Vec<ProfileRef> {
+    if !meta.kind.allows_raw_only_stages() {
+        return Vec::new();
+    }
     index
         .profiles_for(&meta.camera_make, &meta.camera_model)
         .map(|v| v.to_vec())
@@ -243,11 +248,16 @@ pub fn find_profile<'a>(profiles: &'a [ProfileRef], name_or_file: &str) -> Optio
 }
 
 /// Pick a profile from sidecar override, explicit name, or the default autoload.
+/// Rendered rasters (JPEG/PNG/…) never receive a DCP — EXIF camera tags on a
+/// JPEG must not trigger sensor-matrix / profile-tone-curve application.
 pub fn choose_profile(
     meta: &ImageMeta,
     index: &ProfileIndex,
     override_file: Option<&str>,
 ) -> Option<ProfileRef> {
+    if !meta.kind.allows_raw_only_stages() {
+        return None;
+    }
     let profiles = resolve_profiles(meta, index);
     if profiles.is_empty() {
         return None;
@@ -328,6 +338,43 @@ mod tests {
             "expected ILCE-7M4 profiles in index"
         );
         assert!(default_profile(&profiles).is_some());
+    }
+
+    #[test]
+    fn jpeg_exif_camera_does_not_autoload_dcp() {
+        let index = ProfileIndex::embedded();
+        let mut meta = ImageMeta {
+            path: "/x.jpg".into(),
+            kind: crate::raw::ImageKind::Rendered,
+            format: "JPEG".into(),
+            bit_depth: 8,
+            camera_make: "SONY".into(),
+            camera_model: "ILCE-7M4".into(),
+            lens: None,
+            iso: None,
+            shutter: None,
+            aperture: None,
+            focal_mm: None,
+            captured_at: None,
+            width: 100,
+            height: 100,
+            orientation: "Normal".into(),
+            as_shot_wb: [1.0, 1.0, 1.0],
+            estimated_cct: Some(5500.0),
+            camera_profile: None,
+            available_profiles: Vec::new(),
+            available_profile_files: Vec::new(),
+            demosaic: String::new(),
+            available_demosaic: Vec::new(),
+            gps_lat: None,
+            gps_lon: None,
+            input_color_space: Some("sRGB".into()),
+        };
+        assert!(resolve_profiles(&meta, &index).is_empty());
+        assert!(choose_profile(&meta, &index, None).is_none());
+        meta.kind = crate::raw::ImageKind::Raw;
+        // RAW of the same camera still resolves (when the index has it).
+        let _ = resolve_profiles(&meta, &index);
     }
 
     #[test]

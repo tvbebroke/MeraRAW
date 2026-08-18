@@ -1,13 +1,15 @@
 <script lang="ts">
   import { fade, scale } from "svelte/transition";
+  import { reportProblem } from "../../../ipc/commands";
   import { isBugReportOpen } from "../../../stores/ui";
   import ToggleSwitch from "../primitives/ToggleSwitch.svelte";
 
-  // Local placeholder state — no submission pipeline yet
   let title = $state("");
   let description = $state("");
   let severity = $state("minor");
   let attachDiagnostics = $state(true);
+  let submitting = $state(false);
+  let submitError = $state<string | null>(null);
 
   function close() {
     isBugReportOpen.set(false);
@@ -15,6 +17,32 @@
 
   function handleKeyDown(e: KeyboardEvent) {
     if (e.key === "Escape") close();
+  }
+
+  async function submit() {
+    const parts = [
+      title.trim() && `Title: ${title.trim()}`,
+      `Severity: ${severity}`,
+      description.trim(),
+    ].filter(Boolean);
+    if (attachDiagnostics) {
+      parts.push(`UA: ${navigator.userAgent}`);
+    }
+    const message = parts.join("\n\n");
+    if (!title.trim() && !description.trim()) {
+      submitError = "Add a title or description.";
+      return;
+    }
+    submitting = true;
+    submitError = null;
+    try {
+      await reportProblem(message);
+      close();
+    } catch (e) {
+      submitError = e instanceof Error ? e.message : String(e);
+    } finally {
+      submitting = false;
+    }
   }
 </script>
 
@@ -29,7 +57,7 @@
 >
   <div
     transition:scale={{ duration: 250, start: 0.95 }}
-    class="modal-card relative flex w-[420px] flex-col overflow-hidden rounded-[20px] border border-white/[0.06] bg-[#171717]/95 text-white backdrop-blur-md"
+    class="modal-card relative flex w-[420px] flex-col overflow-hidden text-fg"
     onclick={(e) => e.stopPropagation()}
   >
     <div class="flex-1 overflow-y-auto px-8 pt-7 pb-6">
@@ -74,10 +102,18 @@
       </div>
     </div>
 
-    <!-- ponytail: no submission pipeline yet, this is a UI placeholder -->
-    <footer class="flex shrink-0 items-center justify-end gap-3 border-t border-white/[0.04] px-8 py-4">
+    <footer class="flex shrink-0 items-center justify-end gap-3 border-t border-border px-8 py-4">
+      {#if submitError}
+        <span class="mr-auto text-[11px] text-red-400">{submitError}</span>
+      {/if}
       <button class="footer-btn footer-btn--ghost" onclick={close}>Cancel</button>
-      <button class="footer-btn footer-btn--primary" onclick={close}>Submit report</button>
+      <button
+        class="footer-btn footer-btn--primary"
+        disabled={submitting}
+        onclick={() => void submit()}
+      >
+        {submitting ? "Opening…" : "Submit report"}
+      </button>
     </footer>
   </div>
 </div>
@@ -89,19 +125,19 @@
     backdrop-filter: blur(16px) saturate(120%);
   }
 
+  /* Solid panel + hairline border + one shadow layer. */
   .modal-card {
-    background: rgba(23, 23, 23, 0.96);
-    box-shadow: 
-      0 0 0 0.5px rgba(255, 255, 255, 0.06),
-      0 8px 24px rgba(0, 0, 0, 0.3),
-      0 24px 48px rgba(0, 0, 0, 0.25);
+    background: var(--color-panel);
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-popover);
   }
 
   /* ── Content Title ──────────────────────────────────── */
   .content-title {
     font-size: 15px;
     font-weight: 600;
-    color: rgba(255, 255, 255, 0.9);
+    color: var(--color-fg);
     letter-spacing: -0.01em;
     margin-bottom: 8px;
   }
@@ -117,7 +153,7 @@
     align-items: center;
     justify-content: space-between;
     padding: 14px 0;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    border-bottom: 1px solid var(--color-border);
     transition: background-color 150ms ease;
   }
 
@@ -134,7 +170,7 @@
   .setting-label {
     font-size: 13px;
     font-weight: 400;
-    color: rgba(255, 255, 255, 0.75);
+    color: var(--color-secondary);
     letter-spacing: -0.005em;
   }
 
@@ -142,20 +178,20 @@
   .setting-input {
     appearance: none;
     -webkit-appearance: none;
-    border: 1px solid rgba(255, 255, 255, 0.06);
-    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--color-border);
+    background: var(--color-hover);
     border-radius: 8px;
     padding: 7px 12px;
     font-size: 12px;
     font-family: inherit;
-    color: rgba(255, 255, 255, 0.6);
+    color: var(--color-secondary);
     outline: none;
     transition: border-color 150ms ease, background-color 150ms ease;
   }
 
   .setting-input:focus {
-    border-color: rgba(255, 255, 255, 0.15);
-    background: rgba(255, 255, 255, 0.04);
+    border-color: var(--color-border-strong);
+    background: var(--color-hover);
   }
 
   .setting-select {
@@ -168,7 +204,7 @@
     font-size: 13px;
     font-family: inherit;
     font-weight: 400;
-    color: rgba(255, 255, 255, 0.5);
+    color: var(--color-subtle);
     outline: none;
     cursor: pointer;
     transition: color 150ms ease;
@@ -176,12 +212,12 @@
   }
 
   .setting-select:hover {
-    color: rgba(255, 255, 255, 0.7);
+    color: var(--color-secondary);
   }
 
   .setting-select option {
-    background: #1e1e20;
-    color: #fff;
+    background: var(--color-panel);
+    color: var(--color-fg);
     text-align: left;
   }
 
@@ -201,11 +237,11 @@
 
   .footer-btn--ghost {
     background: transparent;
-    color: rgba(255, 255, 255, 0.5);
+    color: var(--color-subtle);
   }
 
   .footer-btn--ghost:hover {
-    color: rgba(255, 255, 255, 0.8);
+    color: var(--color-fg);
   }
 
   .footer-btn--primary {
@@ -214,7 +250,7 @@
   }
 
   .footer-btn--primary:hover {
-    background: #e4e4e7;
+    background: var(--color-border-strong);
     transform: translateY(-0.5px);
   }
 

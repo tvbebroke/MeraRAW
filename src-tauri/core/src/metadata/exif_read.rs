@@ -36,8 +36,7 @@ pub fn enrich_from_file(path: &Path, meta: &mut ImageMeta) {
     }
     if meta.iso.is_none() {
         meta.iso = uint_field(&exif, Tag::PhotographicSensitivity)
-            .or_else(|| uint_field(&exif, Tag::ISOSpeed))
-            .map(|v| v as u32);
+            .or_else(|| uint_field(&exif, Tag::ISOSpeed));
     }
     if meta.aperture.is_none() {
         meta.aperture = rational_f32(&exif, Tag::FNumber);

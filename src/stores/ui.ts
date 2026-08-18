@@ -26,6 +26,71 @@ function persistClassicLook(val: boolean): void {
 
 export const classicLook = atom<boolean>(readStoredClassicLook());
 
+const THEME_PREFERENCE_KEY = "theme-preference";
+
+export type ThemePreference = "dark" | "light" | "system";
+
+function readStoredThemePreference(): ThemePreference {
+  try {
+    const v = localStorage.getItem(THEME_PREFERENCE_KEY);
+    if (v === "dark" || v === "light" || v === "system") return v;
+  } catch {
+    /* ignore */
+  }
+  return "dark";
+}
+
+function systemPrefersLight(): boolean {
+  try {
+    return window.matchMedia("(prefers-color-scheme: light)").matches;
+  } catch {
+    return false;
+  }
+}
+
+/** What the user picked. Dark is the default — see `lightMode` for why. */
+export const themePreference = atom<ThemePreference>(readStoredThemePreference());
+
+/**
+ * Resolved light/dark, after folding in the OS setting.
+ *
+ * Dark by default and deliberately so: a light surround biases how you read
+ * exposure and white balance, which is why serious raw editors ship dark.
+ * Even in light mode the image canvas keeps its dark surround (see
+ * `.light-look` in app.css) so colour judgement stays trustworthy.
+ */
+export const lightMode = atom<boolean>(
+  readStoredThemePreference() === "light" ||
+    (readStoredThemePreference() === "system" && systemPrefersLight()),
+);
+
+function resolveLightMode(pref: ThemePreference): boolean {
+  return pref === "light" || (pref === "system" && systemPrefersLight());
+}
+
+export const setThemePreference = (pref: ThemePreference) => {
+  themePreference.set(pref);
+  lightMode.set(resolveLightMode(pref));
+  try {
+    localStorage.setItem(THEME_PREFERENCE_KEY, pref);
+  } catch {
+    /* ignore */
+  }
+};
+
+// Follow the OS in real time, but only while "system" is selected.
+try {
+  window
+    .matchMedia("(prefers-color-scheme: light)")
+    .addEventListener("change", () => {
+      if (themePreference.get() === "system") {
+        lightMode.set(systemPrefersLight());
+      }
+    });
+} catch {
+  /* matchMedia unavailable — stay on the stored preference */
+}
+
 export const themeTransitionActive = atom<boolean>(false);
 export const themeFlashActive = atom<boolean>(false);
 export const themeTransitionTarget = atom<"classic" | "standard">("classic");

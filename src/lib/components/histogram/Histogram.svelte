@@ -16,10 +16,12 @@
     onResizeStart,
     height,
     class: cls = "",
+    embedded = false,
   }: {
     onResizeStart?: (e: MouseEvent) => void;
     height?: number;
     class?: string;
+    embedded?: boolean;
   } = $props();
 
   let canvasEl = $state<HTMLCanvasElement | null>(null);
@@ -141,8 +143,8 @@
   ];
 </script>
 
-<div class="relative shrink-0 {cls}" style="height: {height}px">
-  {#if onResizeStart}
+<div class="relative {embedded ? 'h-full min-h-0' : 'shrink-0'} {cls}" style={embedded ? undefined : `height: ${height}px`}>
+  {#if onResizeStart && !embedded}
     <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
     <div
       role="separator"
@@ -151,21 +153,19 @@
       onmousedown={onResizeStart}
     >
       <div
-        class="h-[2px] w-[40px] rounded-full bg-white/5 group-hover:bg-white/25 group-active:bg-accent transition-all duration-200"
+        class="h-[2px] w-[40px] rounded-full bg-hover group-hover:bg-border-strong group-active:bg-border-strong transition-all duration-200"
       ></div>
     </div>
   {/if}
 
-  <GlassPanel class="relative flex h-full flex-col overflow-hidden">
-    <div class="flex min-h-0 flex-1 flex-col px-[12px] py-[10px]">
-      <div class="mb-[8px] flex items-center justify-between gap-1 shrink-0">
+  {#if embedded}
+    <div class="relative flex h-full min-h-0 flex-col">
+      <div class="mb-[6px] flex items-center justify-between gap-1 shrink-0">
         <div class="flex gap-[2px]">
           {#each modes as m}
             <button
               type="button"
-              class="rounded px-[5px] py-[1px] text-[8px] {$histMode === m.id
-                ? 'bg-white/12 text-white/90'
-                : 'text-white/35 hover:text-white/60'}"
+              class="rail-chip {$histMode === m.id ? 'is-active' : ''}"
               onclick={() => setHistMode(m.id)}
             >{m.label}</button>
           {/each}
@@ -174,9 +174,40 @@
           {#each scales as sc}
             <button
               type="button"
-              class="rounded px-[5px] py-[1px] text-[8px] {$histScale === sc.id
-                ? 'bg-white/12 text-white/90'
-                : 'text-white/35 hover:text-white/60'}"
+              class="rail-chip {$histScale === sc.id ? 'is-active' : ''}"
+              onclick={() => setHistScale(sc.id)}
+              title="Y scale"
+            >{sc.label}</button>
+          {/each}
+        </div>
+      </div>
+      <div bind:clientWidth={canvasBoxW} bind:clientHeight={canvasBoxH} class="relative min-h-0 flex-1">
+        <canvas
+          bind:this={canvasEl}
+          width={canvasBoxW}
+          height={canvasBoxH}
+          class="absolute inset-0 h-full w-full rounded-[4px] bg-black/30"
+        ></canvas>
+      </div>
+    </div>
+  {:else}
+  <GlassPanel class="relative flex h-full flex-col overflow-hidden">
+    <div class="flex min-h-0 flex-1 flex-col px-[12px] py-[10px]">
+      <div class="mb-[8px] flex items-center justify-between gap-1 shrink-0">
+        <div class="flex gap-[2px]">
+          {#each modes as m}
+            <button
+              type="button"
+              class="rail-chip {$histMode === m.id ? 'is-active' : ''}"
+              onclick={() => setHistMode(m.id)}
+            >{m.label}</button>
+          {/each}
+        </div>
+        <div class="flex gap-[2px]">
+          {#each scales as sc}
+            <button
+              type="button"
+              class="rail-chip {$histScale === sc.id ? 'is-active' : ''}"
               onclick={() => setHistScale(sc.id)}
               title="Y scale"
             >{sc.label}</button>
@@ -189,14 +220,14 @@
           bind:this={canvasEl}
           width={canvasBoxW}
           height={canvasBoxH}
-          class="absolute inset-0 h-full w-full rounded-[4px] border border-white/[0.06] bg-black/40"
+          class="absolute inset-0 h-full w-full rounded-[4px] border border-border bg-black/40"
         ></canvas>
       </div>
       {#if stats}
-        <div class="mt-[8px] flex shrink-0 items-center justify-between gap-2 text-[8px] text-white/35">
+        <div class="num mt-[8px] flex shrink-0 items-center justify-between gap-2 text-[8px] text-subtle">
           <button
             type="button"
-            class="truncate {clipLo ? 'text-sky-300 animate-pulse' : 'hover:text-white/60'}"
+            class="truncate {clipLo ? 'text-sky-300 animate-pulse' : 'hover:text-secondary'}"
             title="Toggle shadow clipping overlay"
             onclick={() => {
               clipLo = !clipLo;
@@ -205,10 +236,10 @@
           >
             ▼ {stats.clipLowPct.toFixed(1)}%
           </button>
-          <span class="text-white/20">{stats.bins} bins</span>
+          <span class="text-subtle">{stats.bins} bins</span>
           <button
             type="button"
-            class="truncate {clipHi ? 'text-red-300 animate-pulse' : 'hover:text-white/60'}"
+            class="truncate {clipHi ? 'text-red-300 animate-pulse' : 'hover:text-secondary'}"
             title="Toggle highlight clipping overlay"
             onclick={() => {
               clipHi = !clipHi;
@@ -219,8 +250,9 @@
           </button>
         </div>
       {:else}
-        <span class="mt-[8px] shrink-0 text-center text-[9px] text-white/20">Histogram</span>
+        <span class="mt-[8px] shrink-0 text-center text-[9px] text-subtle">Histogram</span>
       {/if}
     </div>
   </GlassPanel>
+  {/if}
 </div>

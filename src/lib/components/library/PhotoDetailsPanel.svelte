@@ -45,27 +45,29 @@
     const photo = $activePhoto;
     if (!photo) return [];
     const d = detail;
+    // `mono: true` = a value the user scans or compares → the mono rule.
+    // Camera/Lens are prose names, so they stay in the sans face.
     return [
-      { label: "Dimensions", value: `${photo.width} × ${photo.height}` },
-      { label: "Date Captured", value: formatDate(photo.capturedAt) },
-      { label: "Camera", value: d?.cameraMake && d?.cameraModel ? `${d.cameraMake} ${d.cameraModel}` : photo.cameraModel ?? "—" },
-      { label: "Lens", value: d?.lens ?? "—" },
-      { label: "Focal Length", value: d?.focalMm != null ? `${d.focalMm}mm` : "—" },
-      { label: "Aperture", value: d?.aperture != null ? `f/${d.aperture}` : "—" },
-      { label: "Shutter Speed", value: d?.shutter ?? "—" },
-      { label: "ISO", value: d?.iso != null ? String(d.iso) : "—" },
+      { label: "Dimensions", value: `${photo.width} × ${photo.height}`, mono: true },
+      { label: "Date Captured", value: formatDate(photo.capturedAt), mono: true },
+      { label: "Camera", value: d?.cameraMake && d?.cameraModel ? `${d.cameraMake} ${d.cameraModel}` : photo.cameraModel ?? "—", mono: false },
+      { label: "Lens", value: d?.lens ?? "—", mono: false },
+      { label: "Focal Length", value: d?.focalMm != null ? `${d.focalMm}mm` : "—", mono: true },
+      { label: "Aperture", value: d?.aperture != null ? `f/${d.aperture}` : "—", mono: true },
+      { label: "Shutter Speed", value: d?.shutter ?? "—", mono: true },
+      { label: "ISO", value: d?.iso != null ? String(d.iso) : "—", mono: true },
     ];
   });
 </script>
 
-<GlassPanel class="flex h-full min-h-0 w-full flex-col overflow-hidden p-[10px] {cls}" style="--glass-bg: #171717;">
+<GlassPanel class="flex h-full min-h-0 w-full flex-col overflow-hidden p-[10px] {cls}">
   <!-- Header with title and collapse control, matching FileBrowser -->
   <div class="mb-2 flex shrink-0 items-center justify-between px-[6px] pb-[6px]">
-    <span class="text-[11px] font-semibold tracking-wide text-white/90">Details</span>
+    <span class="text-[11px] font-semibold tracking-wide text-fg">Details</span>
     <button
       onclick={() => photoDetailsCollapsed.set(true)}
       aria-label="Collapse Details"
-      class="flex size-[26px] cursor-pointer items-center justify-center rounded-full border border-white/5 bg-white/[0.04] text-white/80 transition-all hover:bg-white/[0.12] hover:text-white active:scale-95"
+      class="flex size-[26px] cursor-pointer items-center justify-center rounded-full border border-border bg-hover text-secondary transition-all hover:bg-active hover:text-fg active:scale-95"
     >
       <svg width="6" height="10" viewBox="0 0 6 10" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="pointer-events-none">
         <path d="M1.5 1.5L5 5L1.5 8.5" />
@@ -75,25 +77,24 @@
 
   <div class="min-h-0 flex-1 overflow-y-auto px-[4px]">
     <!-- Preview -->
-    <div class="flex aspect-[3/2] shrink-0 items-center justify-center overflow-hidden border border-white/[0.04] bg-black/20 will-change-[width]">
+    <div class="flex aspect-[3/2] shrink-0 items-center justify-center overflow-hidden border border-border bg-black/20 will-change-[width]">
       {#if $activePhoto?.hasThumb}
         <img src={thumbUrl($activePhoto.id, "p")} alt={$activePhoto.filename} class="h-full w-full object-contain" />
       {:else if $activePhoto}
-        <span class="text-[10px] font-semibold tracking-widest text-white/20">RAW</span>
+        <span class="text-[10px] font-semibold tracking-widest text-subtle">RAW</span>
       {:else}
-        <span class="text-[10px] text-white/20">No photo selected</span>
+        <span class="text-[10px] text-subtle">No photo selected</span>
       {/if}
     </div>
 
     <!-- Metadata -->
-    <section class="mt-[11px] w-full shrink-0 rounded-[22px] border border-white/[0.04] bg-[#2b2b2b]/60 shadow-inner">
+    <section class="mt-[11px] w-full shrink-0 rounded-[10px] border border-border bg-sunken shadow-inner">
       <button
-        class="grid h-[28px] w-full cursor-pointer grid-cols-[26px_1fr_26px] items-center px-[10px] focus:outline-none"
+        class="flex h-[28px] w-full cursor-pointer items-center justify-between gap-2 px-[10px] focus:outline-none"
         onclick={() => (metadataOpen = !metadataOpen)}
         aria-expanded={metadataOpen}
       >
-        <span></span>
-        <span class="text-center text-[10px] font-medium text-white/90">Metadata</span>
+        <span class="eyebrow truncate">Metadata</span>
         <img
           src={metadataOpen ? chevronOpen : chevron}
           alt=""
@@ -103,17 +104,19 @@
       {#if metadataOpen}
         <div class="px-[14px] pb-[14px] pt-[6px]" transition:slide={{ duration: 180 }}>
           {#if $activePhoto}
-            <p class="mb-[10px] truncate text-[11px] font-medium text-white/90">{$activePhoto.filename}</p>
+            <p class="selectable mb-[10px] truncate text-[11px] font-medium text-fg">{$activePhoto.filename}</p>
             <div class="flex flex-col gap-[8px]">
               {#each rows as row}
                 <div class="flex items-baseline justify-between gap-[8px]">
-                  <span class="text-[9px] text-white/35">{row.label}</span>
-                  <span class="truncate text-[9px] text-white/70">{row.value}</span>
+                  <span class="text-[9px] text-subtle">{row.label}</span>
+                  <!-- EXIF is data people copy out, so values stay selectable
+                       even though the rest of the chrome is not. -->
+                  <span class="selectable truncate text-[9px] text-secondary {row.mono ? 'num' : ''}">{row.value}</span>
                 </div>
               {/each}
             </div>
           {:else}
-            <p class="text-[10px] text-white/25">Select a photo to view its details.</p>
+            <p class="empty-state">Select a photo to view its details.</p>
           {/if}
         </div>
       {/if}

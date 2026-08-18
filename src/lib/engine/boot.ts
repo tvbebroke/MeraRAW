@@ -4,6 +4,7 @@ import { push } from "svelte-spa-router";
 import {
   autoopenPath,
   getDoc,
+  licenseCheckLocal,
   openImage,
   pingEngine,
   reportFrontendStatus,
@@ -38,6 +39,7 @@ import {
 } from "../../stores/app";
 import { clearDoc, reconcile, setDoc } from "../../stores/doc";
 import { isExportOpen, isSettingsOpen } from "../../stores/ui";
+import { licenseStatus } from "../../stores/session";
 import { loadRegistry } from "./params";
 
 declare global {
@@ -72,6 +74,15 @@ export async function openPath(path: string): Promise<void> {
 
 export function initEngineBridge(): () => void {
   void loadRegistry();
+  void licenseCheckLocal()
+    .then((s) => licenseStatus.set(s))
+    .catch((e) => {
+      licenseStatus.set({
+        licensed: false,
+        userId: null,
+        reason: isAppError(e) ? `${e.kind}: ${e.message}` : String(e),
+      });
+    });
 
   const unlistens = [
     onEngineReady((p) => {

@@ -53,6 +53,18 @@ pub const MODULE_ORDER: &[&str] = &[
     "effects",       // 9: grain / vignette / clarity
 ];
 
+/// HSL mixer bands (schema §3.6). Must stay in lockstep with ColorSettings.svelte.
+pub const HSL_BANDS: &[(&str, &str)] = &[
+    ("red", "Red"),
+    ("orange", "Orange"), // skin band — first-class (spec 3.11)
+    ("yellow", "Yellow"),
+    ("green", "Green"),
+    ("aqua", "Aqua"),
+    ("blue", "Blue"),
+    ("purple", "Purple"),
+    ("magenta", "Magenta"),
+];
+
 fn f32_spec(
     path: &'static str,
     min: f32,
@@ -195,18 +207,8 @@ fn build_registry() -> BTreeMap<&'static str, ParamSpec> {
         });
     }
     // ---- slot 6: hsl — 8 bands × hue/sat/lum (schema §3.6) ----
-    const BANDS: &[(&str, &str)] = &[
-        ("red", "Red"),
-        ("orange", "Orange"), // skin band — first-class (spec 3.11)
-        ("yellow", "Yellow"),
-        ("green", "Green"),
-        ("aqua", "Aqua"),
-        ("blue", "Blue"),
-        ("purple", "Purple"),
-        ("magenta", "Magenta"),
-    ];
     // static paths need 'static strs — build with leaked strings once
-    for (band, label) in BANDS {
+    for (band, label) in HSL_BANDS {
         for (param, plabel) in [("hue", "Hue"), ("sat", "Sat"), ("lum", "Lum")] {
             let path: &'static str =
                 Box::leak(format!("hsl.{band}.{param}").into_boxed_str());
@@ -348,5 +350,39 @@ mod tests {
     fn module_order_contains_reference_modules() {
         assert_eq!(MODULE_ORDER[0], "exposure");
         assert_eq!(MODULE_ORDER[1], "white_balance");
+    }
+
+    #[test]
+    fn hsl_bands_are_the_eight_mixer_colors() {
+        let ids: Vec<&str> = HSL_BANDS.iter().map(|(id, _)| *id).collect();
+        assert_eq!(
+            ids,
+            ["red", "orange", "yellow", "green", "aqua", "blue", "purple", "magenta"]
+        );
+    }
+
+    #[test]
+    fn registry_fixture_is_current() {
+        let mut dump: Vec<&ParamSpec> = all_specs();
+        dump.sort_by_key(|s| s.path);
+        let mut json = serde_json::to_string_pretty(&dump).unwrap();
+        json.push('\n');
+        assert_committed_fixture("registry.json", &json);
+    }
+
+    fn assert_committed_fixture(name: &str, actual: &str) {
+        let path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("tests/fixtures")
+            .join(name);
+        let update = std::env::var("UPDATE_FIXTURES").ok().as_deref() == Some("1");
+        if update {
+            std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+            std::fs::write(&path, actual).unwrap();
+        }
+        let committed = std::fs::read_to_string(&path).unwrap_or_default();
+        assert_eq!(
+            committed, actual,
+            "{name} is stale. Run: UPDATE_FIXTURES=1 cargo test -p meratech-core --lib"
+        );
     }
 }
