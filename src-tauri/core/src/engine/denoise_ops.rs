@@ -15,6 +15,11 @@ impl Engine {
     pub(super) fn denoise_ai_start(&mut self) -> Result<u64, CoreError> {
         let (hash, settings, path, profile_path, demosaic) = {
             let cur = self.current.as_ref().ok_or(CoreError::NoImage)?;
+            if cur.meta.kind == crate::raw::ImageKind::Video {
+                return Err(CoreError::InvalidOp(
+                    "AI denoise is stills-only — video is out of v1".into(),
+                ));
+            }
             let small = cur
                 .small_cpu
                 .as_ref()
@@ -137,12 +142,7 @@ impl Engine {
                     .map(|c| c.meta.kind)
                     .unwrap_or(crate::raw::ImageKind::Rendered);
                 let look = crate::raw::effective_display_look(kind, self.display_look);
-                let mut frame = super::decode::cpu_preview_frame(
-                    &small,
-                    look == 1,
-                    vw.0,
-                    vw.1,
-                );
+                let mut frame = super::decode::cpu_preview_frame(&small, look == 1, vw.0, vw.1);
                 let version = self.next_version();
                 frame.version = version;
                 self.latest_frame = Some(frame);
@@ -155,10 +155,7 @@ impl Engine {
     /// AI Denoise unchecked: restore the plain decode as the working master.
     /// Mirrors `set_demosaic` (re-decode with the current settings; same
     /// generation so DecodeDone isn't discarded as stale).
-    pub(super) fn denoise_ai_reset(
-        &mut self,
-        reply: oneshot::Sender<Result<(), CoreError>>,
-    ) {
+    pub(super) fn denoise_ai_reset(&mut self, reply: oneshot::Sender<Result<(), CoreError>>) {
         self.ai_denoise.cancel_active();
         self.pending_denoise = None;
         let (path, profile_path, demosaic) = {

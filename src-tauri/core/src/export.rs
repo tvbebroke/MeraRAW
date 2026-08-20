@@ -64,6 +64,26 @@ pub struct ExportSettings {
     /// optional copyright/artist string written to EXIF + TIFF.
     #[serde(default)]
     pub copyright: Option<String>,
+    /// When true and the source is video, export every frame in the in/out range
+    /// (no dropped frames), then mux H.264 if FFmpeg is on PATH.
+    #[serde(default)]
+    pub video_clip: bool,
+    /// Override the output file stem (used for per-frame video stills).
+    #[serde(default)]
+    pub output_stem: Option<String>,
+    /// Inclusive in-point for `video_clip` (defaults to the clip's current in mark).
+    #[serde(default)]
+    pub video_in: Option<u32>,
+    /// Inclusive out-point for `video_clip`.
+    #[serde(default)]
+    pub video_out: Option<u32>,
+    /// Copy source audio into the muxed H.264 clip when possible (falls back to silent).
+    #[serde(default = "default_true")]
+    pub video_audio: bool,
+}
+
+fn default_true() -> bool {
+    true
 }
 
 impl Default for ExportSettings {
@@ -78,6 +98,11 @@ impl Default for ExportSettings {
             metadata_policy: MetadataPolicy::Preserve,
             strip_metadata: false,
             copyright: None,
+            video_clip: false,
+            output_stem: None,
+            video_in: None,
+            video_out: None,
+            video_audio: true,
         }
     }
 }
@@ -219,8 +244,16 @@ pub fn output_transform(
 ) -> EncodedImage {
     let m = target_from_rec2020(target);
     let px = (width * height) as usize;
-    let mut rgb8 = if want16 { Vec::new() } else { Vec::with_capacity(px * 3) };
-    let mut rgb16 = if want16 { Vec::with_capacity(px * 3) } else { Vec::new() };
+    let mut rgb8 = if want16 {
+        Vec::new()
+    } else {
+        Vec::with_capacity(px * 3)
+    };
+    let mut rgb16 = if want16 {
+        Vec::with_capacity(px * 3)
+    } else {
+        Vec::new()
+    };
     for i in 0..px {
         let lin = [linear[i * 3], linear[i * 3 + 1], linear[i * 3 + 2]];
         let looked = view_look(lin, camera_look);
@@ -252,8 +285,16 @@ pub fn output_transform_passthrough(
 ) -> EncodedImage {
     let m = target_from_rec2020(target);
     let px = (width * height) as usize;
-    let mut rgb8 = if want16 { Vec::new() } else { Vec::with_capacity(px * 3) };
-    let mut rgb16 = if want16 { Vec::with_capacity(px * 3) } else { Vec::new() };
+    let mut rgb8 = if want16 {
+        Vec::new()
+    } else {
+        Vec::with_capacity(px * 3)
+    };
+    let mut rgb16 = if want16 {
+        Vec::with_capacity(px * 3)
+    } else {
+        Vec::new()
+    };
     for i in 0..px {
         let lin = [linear[i * 3], linear[i * 3 + 1], linear[i * 3 + 2]];
         let target_lin = gamut_compress(mat_vec(&m, lin));
@@ -293,8 +334,7 @@ fn agx_rs(srgb_lin: [f32; 3]) -> [f32; 3] {
     let contrast = |x: f32| {
         let x2 = x * x;
         let x4 = x2 * x2;
-        15.5 * x4 * x2 - 40.14 * x4 * x + 31.96 * x4 - 6.868 * x2 * x + 0.4298 * x2
-            + 0.1191 * x
+        15.5 * x4 * x2 - 40.14 * x4 * x + 31.96 * x4 - 6.868 * x2 * x + 0.4298 * x2 + 0.1191 * x
             - 0.00232
     };
     let v = mat_vec(&INSET, srgb_lin);
@@ -304,7 +344,11 @@ fn agx_rs(srgb_lin: [f32; 3]) -> [f32; 3] {
         log[k] = contrast(x.clamp(0.0, 1.0));
     }
     let out = mat_vec(&OUTSET, log);
-    [out[0].clamp(0.0, 1.0), out[1].clamp(0.0, 1.0), out[2].clamp(0.0, 1.0)]
+    [
+        out[0].clamp(0.0, 1.0),
+        out[1].clamp(0.0, 1.0),
+        out[2].clamp(0.0, 1.0),
+    ]
 }
 
 /// AgX → sRGB 8-bit (display-encoded; bypasses the normal matrix/gamut/OETF).
@@ -372,13 +416,16 @@ pub fn output_sharpen8(rgb: &mut [u8], width: u32, height: u32, amount: f32) {
     let (w, h) = (width as usize, height as usize);
     let luma: Vec<f32> = (0..w * h)
         .map(|i| {
-            0.2126 * rgb[i * 3] as f32 + 0.7152 * rgb[i * 3 + 1] as f32 + 0.0722 * rgb[i * 3 + 2] as f32
+            0.2126 * rgb[i * 3] as f32
+                + 0.7152 * rgb[i * 3 + 1] as f32
+                + 0.0722 * rgb[i * 3 + 2] as f32
         })
         .collect();
     for y in 1..h - 1 {
         for x in 1..w - 1 {
             let i = y * w + x;
-            let blur = (luma[i - 1] + luma[i + 1] + luma[i - w] + luma[i + w] + luma[i] * 4.0) / 8.0;
+            let blur =
+                (luma[i - 1] + luma[i + 1] + luma[i - w] + luma[i + w] + luma[i] * 4.0) / 8.0;
             let high = luma[i] - blur;
             let gain = 1.0 + k * high / luma[i].max(8.0);
             for c in 0..3 {
@@ -529,7 +576,8 @@ fn build_exif(meta: &ImageMeta, settings: &ExportSettings) -> Vec<u8> {
         exif.push((0x829A, ExifVal::Rational(n, d))); // ExposureTime
     }
     if let Some(a) = meta.aperture.filter(|a| *a > 0.0) {
-        exif.push((0x829D, ExifVal::Rational((a * 1000.0).round() as u32, 1000))); // FNumber
+        exif.push((0x829D, ExifVal::Rational((a * 1000.0).round() as u32, 1000)));
+        // FNumber
     }
     if let Some(iso) = meta.iso {
         exif.push((0x8827, ExifVal::Short(iso.min(65535) as u16))); // ISOSpeedRatings
@@ -538,7 +586,8 @@ fn build_exif(meta: &ImageMeta, settings: &ExportSettings) -> Vec<u8> {
         exif.push((0x9003, ExifVal::Ascii(dt))); // DateTimeOriginal
     }
     if let Some(f) = meta.focal_mm.filter(|f| *f > 0.0) {
-        exif.push((0x920A, ExifVal::Rational((f * 100.0).round() as u32, 100))); // FocalLength
+        exif.push((0x920A, ExifVal::Rational((f * 100.0).round() as u32, 100)));
+        // FocalLength
     }
     if let Some(l) = meta.lens.as_deref().filter(|l| !l.is_empty()) {
         exif.push((0xA434, ExifVal::Ascii(l.to_string()))); // LensModel
@@ -687,7 +736,11 @@ fn splice_jpeg_metadata(jpeg: Vec<u8>, icc: Option<&[u8]>, exif: Option<&[u8]>) 
 }
 
 /// PNG encode with embedded ICC (iCCP) + EXIF (eXIf) via the png crate.
-fn encode_png(enc: &EncodedImage, icc: Option<&[u8]>, exif: Option<&[u8]>) -> Result<Vec<u8>, CoreError> {
+fn encode_png(
+    enc: &EncodedImage,
+    icc: Option<&[u8]>,
+    exif: Option<&[u8]>,
+) -> Result<Vec<u8>, CoreError> {
     use std::borrow::Cow;
     let mut info = png::Info::with_size(enc.width, enc.height);
     info.color_type = png::ColorType::Rgb;
@@ -767,6 +820,11 @@ pub fn encode_and_write(
         .file_stem()
         .map(|s| s.to_string_lossy().into_owned())
         .unwrap_or_else(|| "export".into());
+    let stem = settings
+        .output_stem
+        .clone()
+        .filter(|s| !s.is_empty())
+        .unwrap_or(stem);
     let dir = if settings.dest_dir.is_empty() {
         Path::new(source_path)
             .parent()
@@ -790,9 +848,12 @@ pub fn encode_and_write(
             let img = image::RgbImage::from_raw(enc.width, enc.height, enc.rgb8.clone())
                 .ok_or_else(|| CoreError::Io("buffer".into()))?;
             let mut bytes = Vec::new();
-            image::codecs::jpeg::JpegEncoder::new_with_quality(&mut bytes, settings.quality.clamp(1, 100))
-                .encode_image(&img)
-                .map_err(|e| CoreError::Io(format!("encode: {e}")))?;
+            image::codecs::jpeg::JpegEncoder::new_with_quality(
+                &mut bytes,
+                settings.quality.clamp(1, 100),
+            )
+            .encode_image(&img)
+            .map_err(|e| CoreError::Io(format!("encode: {e}")))?;
             let bytes = splice_jpeg_metadata(bytes, icc.as_deref(), exif.as_deref());
             std::fs::write(&p, bytes)?;
             p
@@ -831,7 +892,11 @@ pub fn encode_and_write(
             std::fs::write(&tmp, &png)?;
             let out = std::process::Command::new("/usr/bin/sips")
                 .args(["-s", "format", "heic"])
-                .args(["-s", "formatOptions", &settings.quality.clamp(1, 100).to_string()])
+                .args([
+                    "-s",
+                    "formatOptions",
+                    &settings.quality.clamp(1, 100).to_string(),
+                ])
                 .arg(&tmp)
                 .arg("--out")
                 .arg(&p)
@@ -883,6 +948,7 @@ mod tests {
             gps_lat: Some(37.7749),
             gps_lon: Some(-122.4194),
             input_color_space: None,
+            video: None,
         }
     }
 
@@ -975,8 +1041,14 @@ mod tests {
         assert_eq!(&out[..2], &[0xFF, 0xD8], "SOI intact");
         assert_eq!(&out[2..4], &[0xFF, 0xE1], "APP1 EXIF follows SOI");
         let icc_needle = b"ICC_PROFILE\0";
-        let icc_chunks = out.windows(icc_needle.len()).filter(|w| *w == icc_needle).count();
-        assert!(icc_chunks >= 2, "expected multi-chunk ICC, got {icc_chunks}");
+        let icc_chunks = out
+            .windows(icc_needle.len())
+            .filter(|w| *w == icc_needle)
+            .count();
+        assert!(
+            icc_chunks >= 2,
+            "expected multi-chunk ICC, got {icc_chunks}"
+        );
         let decoded = image::load_from_memory(&out).expect("jpeg decodes");
         assert_eq!(decoded.width(), 8);
     }
@@ -1095,6 +1167,11 @@ mod tests {
                     metadata_policy: MetadataPolicy::Preserve,
                     strip_metadata: false,
                     copyright: Some("© Test Photographer".into()),
+                    video_clip: false,
+                    output_stem: None,
+                    video_in: None,
+                    video_out: None,
+                    video_audio: true,
                 };
                 let src = format!("/x/smoke_{fname}_{tname}.ARW");
                 match encode_and_write(&enc, &settings, &src, &meta) {

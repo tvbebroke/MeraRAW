@@ -15,11 +15,7 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 
 fn main() {
-    let path = PathBuf::from(
-        std::env::args()
-            .nth(1)
-            .expect("usage: mask_check <raw>"),
-    );
+    let path = PathBuf::from(std::env::args().nth(1).expect("usage: mask_check <raw>"));
     let dec = RawlerDecoder::default();
     let img = dec.decode(&path).expect("decode");
     let payload = DecodedPayload::from_decoded(img);
@@ -28,11 +24,18 @@ fn main() {
     let t0 = std::time::Instant::now();
     let input = payload.small_cpu.downscale_to(768);
     let mask = TractSegmenter.subject(&input).expect("segment");
-    println!("segmentation: {} ms ({}x{})", t0.elapsed().as_millis(), mask.width, mask.height);
-    let coverage =
-        mask.data.iter().filter(|v| **v > 0.5).count() as f32 / mask.data.len() as f32;
+    println!(
+        "segmentation: {} ms ({}x{})",
+        t0.elapsed().as_millis(),
+        mask.width,
+        mask.height
+    );
+    let coverage = mask.data.iter().filter(|v| **v > 0.5).count() as f32 / mask.data.len() as f32;
     println!("mask coverage >0.5: {:.1}%", coverage * 100.0);
-    assert!(coverage > 0.02 && coverage < 0.9, "implausible subject mask");
+    assert!(
+        coverage > 0.02 && coverage < 0.9,
+        "implausible subject mask"
+    );
 
     // mask PNG
     let mask_png: Vec<u8> = mask.data.iter().map(|v| (v * 255.0) as u8).collect();
@@ -86,10 +89,7 @@ fn main() {
     let small_view = small_tex.create_view(&Default::default());
     let mut seg = HashMap::new();
     seg.insert(subj.clone(), small_view);
-    seg.insert(
-        bg.clone(),
-        small_tex.create_view(&Default::default()),
-    );
+    seg.insert(bg.clone(), small_tex.create_view(&Default::default()));
 
     let scale = 1100.0 / payload.width.max(payload.height) as f32;
     let view = ViewParams {
@@ -121,8 +121,17 @@ fn main() {
         t1.elapsed().as_millis(),
         graph.last_passes_run
     );
-    let rgb: Vec<u8> = frame.chunks_exact(4).flat_map(|p| [p[0], p[1], p[2]]).collect();
-    image::save_buffer("/tmp/mask_render.png", &rgb, view.out_w, view.out_h, image::ColorType::Rgb8)
-        .unwrap();
+    let rgb: Vec<u8> = frame
+        .chunks_exact(4)
+        .flat_map(|p| [p[0], p[1], p[2]])
+        .collect();
+    image::save_buffer(
+        "/tmp/mask_render.png",
+        &rgb,
+        view.out_w,
+        view.out_h,
+        image::ColorType::Rgb8,
+    )
+    .unwrap();
     println!("wrote /tmp/mask_subject.png + /tmp/mask_render.png");
 }

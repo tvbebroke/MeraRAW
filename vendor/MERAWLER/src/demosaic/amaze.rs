@@ -24,9 +24,9 @@
 //!
 //! Scope note: the reference's SIMD paths are ignored; the scalar path is ported.
 
-use crate::image::{CfaImage, RgbImage};
 use super::bilinear::Bilinear;
 use super::Demosaic;
+use crate::image::{CfaImage, RgbImage};
 
 pub struct Amaze;
 
@@ -130,8 +130,16 @@ impl Demosaic for Amaze {
                 let cc1 = (right - left) as usize;
                 let rrmin = if top < 0 { 16 } else { 0 };
                 let ccmin = if left < 0 { 16 } else { 0 };
-                let rrmax = if bottom > hi { (hi - top) as usize } else { rr1 };
-                let ccmax = if right > wi { (wi - left) as usize } else { cc1 };
+                let rrmax = if bottom > hi {
+                    (hi - top) as usize
+                } else {
+                    rr1
+                };
+                let ccmax = if right > wi {
+                    (wi - left) as usize
+                } else {
+                    cc1
+                };
 
                 // --- tile load with mirrored halo (phase-preserving, offsets even) ---
                 let mut cfa = vec![0.0f32; fsz];
@@ -280,10 +288,26 @@ impl Demosaic for Amaze {
                         let glha = cfa[indx - 1] + 0.5 * (cfai - cfa[indx - 2]);
                         let grha = cfa[indx + 1] + 0.5 * (cfai - cfa[indx + 2]);
 
-                        let mut guar = if (1.0 - cru).abs() < ARTHRESH { cfai * cru } else { guha };
-                        let mut gdar = if (1.0 - crd).abs() < ARTHRESH { cfai * crd } else { gdha };
-                        let mut glar = if (1.0 - crl).abs() < ARTHRESH { cfai * crl } else { glha };
-                        let mut grar = if (1.0 - crr).abs() < ARTHRESH { cfai * crr } else { grha };
+                        let mut guar = if (1.0 - cru).abs() < ARTHRESH {
+                            cfai * cru
+                        } else {
+                            guha
+                        };
+                        let mut gdar = if (1.0 - crd).abs() < ARTHRESH {
+                            cfai * crd
+                        } else {
+                            gdha
+                        };
+                        let mut glar = if (1.0 - crl).abs() < ARTHRESH {
+                            cfai * crl
+                        } else {
+                            glha
+                        };
+                        let mut grar = if (1.0 - crr).abs() < ARTHRESH {
+                            cfai * crr
+                        } else {
+                            grha
+                        };
 
                         let hwt = dirwts1[indx - 1] / (dirwts1[indx - 1] + dirwts1[indx + 1]);
                         let vwt = dirwts0[indx - v1] / (dirwts0[indx + v1] + dirwts0[indx - v1]);
@@ -323,12 +347,14 @@ impl Demosaic for Amaze {
                 for rr in 4..rr1 - 4 {
                     for cc in 4..cc1 - 4 {
                         let indx = rr * TS + cc;
-                        let hcdvar = 3.0 * (sqr(hcd[indx - 2]) + sqr(hcd[indx]) + sqr(hcd[indx + 2]))
+                        let hcdvar = 3.0
+                            * (sqr(hcd[indx - 2]) + sqr(hcd[indx]) + sqr(hcd[indx + 2]))
                             - sqr(hcd[indx - 2] + hcd[indx] + hcd[indx + 2]);
                         let hcdaltvar = 3.0
                             * (sqr(hcdalt[indx - 2]) + sqr(hcdalt[indx]) + sqr(hcdalt[indx + 2]))
                             - sqr(hcdalt[indx - 2] + hcdalt[indx] + hcdalt[indx + 2]);
-                        let vcdvar = 3.0 * (sqr(vcd[indx - v2]) + sqr(vcd[indx]) + sqr(vcd[indx + v2]))
+                        let vcdvar = 3.0
+                            * (sqr(vcd[indx - v2]) + sqr(vcd[indx]) + sqr(vcd[indx + v2]))
                             - sqr(vcd[indx - v2] + vcd[indx] + vcd[indx + v2]);
                         let vcdaltvar = 3.0
                             * (sqr(vcdalt[indx - v2]) + sqr(vcdalt[indx]) + sqr(vcdalt[indx + v2]))
@@ -594,8 +620,8 @@ impl Demosaic for Amaze {
                                             sumcfa += cfat;
                                             sumh += cfa[indx1 - 1] + cfa[indx1 + 1];
                                             sumv += cfa[indx1 - v1] + cfa[indx1 + v1];
-                                            sumsqh +=
-                                                sqr(cfat - cfa[indx1 - 1]) + sqr(cfat - cfa[indx1 + 1]);
+                                            sumsqh += sqr(cfat - cfa[indx1 - 1])
+                                                + sqr(cfat - cfa[indx1 + 1]);
                                             sumsqv += sqr(cfat - cfa[indx1 - v1])
                                                 + sqr(cfat - cfa[indx1 + v1]);
                                             areawt += 1.0;
@@ -634,10 +660,11 @@ impl Demosaic for Amaze {
                         rgbgreen[indx] = cfa[indx] + dgrb0[indx >> 1];
                         if nyquist2[indx >> 1] != 0 {
                             dgrb2h[indx >> 1] =
-                                sqr(rgbgreen[indx] - 0.5 * (rgbgreen[indx - 1] + rgbgreen[indx + 1]));
-                            dgrb2v[indx >> 1] = sqr(
-                                rgbgreen[indx] - 0.5 * (rgbgreen[indx - v1] + rgbgreen[indx + v1]),
-                            );
+                                sqr(rgbgreen[indx]
+                                    - 0.5 * (rgbgreen[indx - 1] + rgbgreen[indx + 1]));
+                            dgrb2v[indx >> 1] =
+                                sqr(rgbgreen[indx]
+                                    - 0.5 * (rgbgreen[indx - v1] + rgbgreen[indx + v1]));
                         } else {
                             dgrb2h[indx >> 1] = 0.0;
                             dgrb2v[indx >> 1] = 0.0;
@@ -717,14 +744,16 @@ impl Demosaic for Amaze {
                             delp[indx >> 1] = (cfa[p1a] - cfa[p1b]).abs();
                             delm[indx >> 1] = (cfa[m1a] - cfa[m1b]).abs();
                             let t = cfa[indx + 1];
-                            dgrbsq1p[indx >> 1] =
-                                sqr(t - cfa[indx + 1 - (v1 - 1)]) + sqr(t - cfa[indx + 1 + (v1 - 1)]);
-                            dgrbsq1m[indx >> 1] =
-                                sqr(t - cfa[indx + 1 - (v1 + 1)]) + sqr(t - cfa[indx + 1 + (v1 + 1)]);
+                            dgrbsq1p[indx >> 1] = sqr(t - cfa[indx + 1 - (v1 - 1)])
+                                + sqr(t - cfa[indx + 1 + (v1 - 1)]);
+                            dgrbsq1m[indx >> 1] = sqr(t - cfa[indx + 1 - (v1 + 1)])
+                                + sqr(t - cfa[indx + 1 + (v1 + 1)]);
                         } else {
                             let t = cfa[indx];
-                            dgrbsq1p[indx >> 1] = sqr(t - cfa[indx + 1 - v1]) + sqr(t - cfa[indx + v1 - 1]);
-                            dgrbsq1m[indx >> 1] = sqr(t - cfa[indx - v1 - 1]) + sqr(t - cfa[indx + v1 + 1]);
+                            dgrbsq1p[indx >> 1] =
+                                sqr(t - cfa[indx + 1 - v1]) + sqr(t - cfa[indx + v1 - 1]);
+                            dgrbsq1m[indx >> 1] =
+                                sqr(t - cfa[indx - v1 - 1]) + sqr(t - cfa[indx + v1 + 1]);
                             delp[indx >> 1] =
                                 (cfa[indx + 1 + 1 - v1] - cfa[indx + 1 + v1 - 1]).abs();
                             delm[indx >> 1] =
@@ -861,8 +890,10 @@ impl Demosaic for Amaze {
                         if (0.5 - pmwt[indx1]).abs() < (0.5 - pmwtalt).abs() {
                             pmwt[indx1] = pmwtalt;
                         }
-                        rbint[indx1] =
-                            0.5 * (cfa[indx] + rbm[indx1] * (1.0 - pmwt[indx1]) + rbp[indx1] * pmwt[indx1]);
+                        rbint[indx1] = 0.5
+                            * (cfa[indx]
+                                + rbm[indx1] * (1.0 - pmwt[indx1])
+                                + rbp[indx1] * pmwt[indx1]);
                         cc += 2;
                     }
                 }
@@ -907,12 +938,10 @@ impl Demosaic for Amaze {
                             cfa[indx + 1] + 0.5 * (rbi - rbint[indx1 + 1])
                         };
 
-                        let mut gintv =
-                            (dirwts0[indx - v1] * gd + dirwts0[indx + v1] * gu)
-                                / (dirwts0[indx + v1] + dirwts0[indx - v1]);
-                        let mut ginth =
-                            (dirwts1[indx - 1] * gr + dirwts1[indx + 1] * gl)
-                                / (dirwts1[indx - 1] + dirwts1[indx + 1]);
+                        let mut gintv = (dirwts0[indx - v1] * gd + dirwts0[indx + v1] * gu)
+                            / (dirwts0[indx + v1] + dirwts0[indx - v1]);
+                        let mut ginth = (dirwts1[indx - 1] * gr + dirwts1[indx + 1] * gl)
+                            / (dirwts1[indx - 1] + dirwts1[indx + 1]);
 
                         if gintv < rbi {
                             if 2.0 * gintv < rbi {
@@ -997,19 +1026,23 @@ impl Demosaic for Amaze {
                                 + (d[m1 >> 1] - d[m3o >> 1]).abs());
 
                         d[indx >> 1] = (wtnw
-                            * (1.325 * d[m1 >> 1] - 0.175 * d[m3 >> 1]
+                            * (1.325 * d[m1 >> 1]
+                                - 0.175 * d[m3 >> 1]
                                 - 0.075 * d[(m1 - 2) >> 1]
                                 - 0.075 * d[(m1 - v2) >> 1])
                             + wtne
-                                * (1.325 * d[p1 >> 1] - 0.175 * d[p3 >> 1]
+                                * (1.325 * d[p1 >> 1]
+                                    - 0.175 * d[p3 >> 1]
                                     - 0.075 * d[(p1 + 2) >> 1]
                                     - 0.075 * d[(p1 + v2) >> 1])
                             + wtsw
-                                * (1.325 * d[p1o >> 1] - 0.175 * d[p3o >> 1]
+                                * (1.325 * d[p1o >> 1]
+                                    - 0.175 * d[p3o >> 1]
                                     - 0.075 * d[(p1o - 2) >> 1]
                                     - 0.075 * d[(p1o - v2) >> 1])
                             + wtse
-                                * (1.325 * d[m1o >> 1] - 0.175 * d[m3o >> 1]
+                                * (1.325 * d[m1o >> 1]
+                                    - 0.175 * d[m3o >> 1]
                                     - 0.075 * d[(m1o + 2) >> 1]
                                     - 0.075 * d[(m1o + v2) >> 1]))
                             / (wtnw + wtne + wtsw + wtse);
@@ -1074,8 +1107,8 @@ impl Demosaic for Amaze {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::image::CfaPattern;
     use crate::demosaic::tests_common::{max_interior_error, mosaic_from_fn};
+    use crate::image::CfaPattern;
 
     #[test]
     fn constant_field_reconstructs() {

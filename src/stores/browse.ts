@@ -12,10 +12,20 @@ import { onCatalogChanged, onImportDone } from "../ipc/events";
 import type { FolderItem, GridItem, MetaPatch } from "../ipc/types";
 import { customSchemeUrl } from "../lib/engine/customScheme";
 import { currentFolder, lastOpenedPath } from "./app";
+import { workspace } from "./workspace";
+import { isVideoPath } from "../lib/media";
 
 export const folders = atom<FolderItem[]>([]);
 export const photos = atom<GridItem[]>([]);
 export const browseBusy = atom(false);
+
+/** Catalog rows for the active workspace. Photo never lists clips; video never lists stills. */
+export const libraryItems = computed([photos, workspace], (items, ws) =>
+  items.filter((i) => {
+    const vid = isVideoPath(i.path) || isVideoPath(i.filename);
+    return ws === "video" ? vid : !vid;
+  }),
+);
 
 /** Alias used by shell chrome that still says "folder". */
 export const folder = currentFolder;
@@ -24,9 +34,9 @@ export function thumbUrl(id: number, tier: "t" | "p" = "t"): string {
   return customSchemeUrl("thumb", `${id}?tier=${tier}`);
 }
 
-/** Grid item matching the currently open image (if visible in the strip). */
+/** Grid item matching the currently open image (if visible in this workspace). */
 export const activePhoto = computed(
-  [photos, lastOpenedPath],
+  [libraryItems, lastOpenedPath],
   (items, path) => items.find((i) => i.path === path) ?? null,
 );
 

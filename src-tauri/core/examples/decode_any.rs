@@ -36,5 +36,8 @@ fn main() {
         mn, mx,
     );
     assert!(mn >= 0.0, "negative values leaked into working buffer");
-    assert!(n == img.working.width * img.working.height * 3, "buffer size mismatch");
+    assert!(
+        n == img.working.width * img.working.height * 3,
+        "buffer size mismatch"
+    );
 }

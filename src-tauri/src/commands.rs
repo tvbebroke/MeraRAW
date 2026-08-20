@@ -71,7 +71,7 @@ pub async fn ping_engine(
     Ok(engine.ping().await?)
 }
 
-pub const IMAGE_EXTENSIONS: &[&str] = &[
+pub const PHOTO_EXTENSIONS: &[&str] = &[
     // RAW (rawler)
     "arw", "nef", "nrw", "cr2", "cr3", "crw", "dng", "raf", "orf", "rw2", "pef", "srw", "erf",
     "kdc", "dcs", "dcr", "iiq", "3fr", "mef", "mos",
@@ -79,12 +79,33 @@ pub const IMAGE_EXTENSIONS: &[&str] = &[
     "jpg", "jpeg", "png", "tif", "tiff", "webp", "bmp", "gif", "jxl", "heic", "heif", "hif", "psd",
 ];
 
+pub const VIDEO_EXTENSIONS: &[&str] = &["mp4", "mov", "m4v", "mkv", "webm"];
+
+pub const IMAGE_EXTENSIONS: &[&str] = &[
+    // PHOTO_EXTENSIONS + VIDEO_EXTENSIONS — keep in sync with the two lists above.
+    "arw", "nef", "nrw", "cr2", "cr3", "crw", "dng", "raf", "orf", "rw2", "pef", "srw", "erf",
+    "kdc", "dcs", "dcr", "iiq", "3fr", "mef", "mos", "jpg", "jpeg", "png", "tif", "tiff", "webp",
+    "bmp", "gif", "jxl", "heic", "heif", "hif", "psd", "mp4", "mov", "m4v", "mkv", "webm",
+];
+
 #[tauri::command]
-pub async fn pick_file(app: AppHandle) -> Result<Option<String>, AppError> {
+pub async fn pick_file(app: AppHandle, kind: Option<String>) -> Result<Option<String>, AppError> {
+    let kind = kind.unwrap_or_default();
     let picked = tauri::async_runtime::spawn_blocking(move || {
-        file_dialog(&app)
-            .add_filter("Images", IMAGE_EXTENSIONS)
-            .blocking_pick_file()
+        let dlg = file_dialog(&app);
+        let dlg = match kind.as_str() {
+            "video" => dlg
+                .set_title("Open video")
+                .add_filter("Video", VIDEO_EXTENSIONS),
+            "photo" => dlg
+                .set_title("Open photo")
+                .add_filter("Photos", PHOTO_EXTENSIONS),
+            _ => dlg
+                .add_filter("All media", IMAGE_EXTENSIONS)
+                .add_filter("Photos", PHOTO_EXTENSIONS)
+                .add_filter("Video", VIDEO_EXTENSIONS),
+        };
+        dlg.blocking_pick_file()
     })
     .await
     .map_err(|e| AppError::Internal(format!("file dialog join: {e}")))?;
@@ -137,9 +158,7 @@ pub async fn pick_folder(app: AppHandle) -> Result<Option<String>, AppError> {
 pub async fn read_file_meta(path: String) -> Result<FileMeta, AppError> {
     let p = crate::paths::validate_user_path(&path)?;
     let path = p.to_string_lossy().into_owned();
-    let ext = p
-        .extension()
-        .map(|e| e.to_string_lossy().to_lowercase());
+    let ext = p.extension().map(|e| e.to_string_lossy().to_lowercase());
     match tokio::fs::metadata(&p).await {
         Ok(md) => Ok(FileMeta {
             path,
@@ -238,7 +257,8 @@ pub async fn list_dir(path: String) -> Result<Vec<DirEntry>, AppError> {
             size: md.len(),
         });
     }
-    entries.sort_by(|a, b| (b.is_dir, a.name.to_lowercase()).cmp(&(a.is_dir, b.name.to_lowercase())));
+    entries
+        .sort_by(|a, b| (b.is_dir, a.name.to_lowercase()).cmp(&(a.is_dir, b.name.to_lowercase())));
     Ok(entries)
 }
 
@@ -251,10 +271,7 @@ pub async fn open_image(
     // Fail fast with a clear macOS TCC / iCloud message — RawSource reports
     // the same failure as a cryptic "Operation not permitted (os error 1)".
     crate::paths::ensure_readable(&path)?;
-    engine
-        .open_image(path)
-        .await?
-        .map_err(AppError::from)
+    engine.open_image(path).await?.map_err(AppError::from)
 }
 
 #[tauri::command]
@@ -329,10 +346,7 @@ pub fn get_registry() -> Vec<meratech_core::registry::ParamSpec> {
 }
 
 #[tauri::command]
-pub async fn snapshot(
-    engine: State<'_, EngineHandle>,
-    name: String,
-) -> Result<(), AppError> {
+pub async fn snapshot(engine: State<'_, EngineHandle>, name: String) -> Result<(), AppError> {
     engine.snapshot(name).await?.map_err(AppError::from)
 }
 
@@ -380,7 +394,9 @@ pub async fn autoopen_path() -> Result<Option<String>, AppError> {
     if !dig_surface_enabled() {
         return Ok(None);
     }
-    Ok(std::env::var("MERATECH_OPEN").ok().filter(|s| !s.is_empty()))
+    Ok(std::env::var("MERATECH_OPEN")
+        .ok()
+        .filter(|s| !s.is_empty()))
 }
 
 #[tauri::command]
@@ -553,10 +569,7 @@ pub async fn denoise_ai_start(engine: State<'_, EngineHandle>) -> Result<u64, Ap
 }
 
 #[tauri::command]
-pub async fn denoise_ai_cancel(
-    engine: State<'_, EngineHandle>,
-    job: u64,
-) -> Result<(), AppError> {
+pub async fn denoise_ai_cancel(engine: State<'_, EngineHandle>, job: u64) -> Result<(), AppError> {
     Ok(engine.denoise_ai_cancel(job).await?)
 }
 
@@ -568,15 +581,9 @@ pub async fn denoise_ai_reset(engine: State<'_, EngineHandle>) -> Result<(), App
 // ---- Phase 5: catalog ----
 
 #[tauri::command]
-pub async fn import_folder(
-    engine: State<'_, EngineHandle>,
-    path: String,
-) -> Result<u64, AppError> {
+pub async fn import_folder(engine: State<'_, EngineHandle>, path: String) -> Result<u64, AppError> {
     let path = crate::paths::validate_existing_path(&path)?;
-    engine
-        .import_folder(path)
-        .await?
-        .map_err(AppError::from)
+    engine.import_folder(path).await?.map_err(AppError::from)
 }
 
 #[tauri::command]
@@ -598,9 +605,7 @@ pub async fn import_selected(
     paths: Vec<String>,
 ) -> Result<u64, AppError> {
     let root = crate::paths::validate_existing_path(&root)?;
-    let root_canon = root
-        .canonicalize()
-        .unwrap_or_else(|_| root.clone());
+    let root_canon = root.canonicalize().unwrap_or_else(|_| root.clone());
     let mut validated = Vec::with_capacity(paths.len());
     for p in paths {
         let path = crate::paths::validate_existing_path(&p)?;
@@ -634,18 +639,12 @@ pub async fn list_albums(
 }
 
 #[tauri::command]
-pub async fn create_album(
-    engine: State<'_, EngineHandle>,
-    name: String,
-) -> Result<i64, AppError> {
+pub async fn create_album(engine: State<'_, EngineHandle>, name: String) -> Result<i64, AppError> {
     engine.create_album(name).await?.map_err(AppError::from)
 }
 
 #[tauri::command]
-pub async fn delete_album(
-    engine: State<'_, EngineHandle>,
-    id: i64,
-) -> Result<(), AppError> {
+pub async fn delete_album(engine: State<'_, EngineHandle>, id: i64) -> Result<(), AppError> {
     engine.delete_album(id).await?.map_err(AppError::from)
 }
 
@@ -700,12 +699,53 @@ pub async fn set_lut(
     path: Option<String>,
 ) -> Result<(), AppError> {
     let path = match path {
-        Some(p) if !p.trim().is_empty() => {
-            Some(crate::paths::validate_existing_path(&p)?.to_string_lossy().into_owned())
-        }
+        Some(p) if p.starts_with("bundled:") || p.starts_with("user:") => Some(p),
+        Some(p) if !p.trim().is_empty() => Some(
+            crate::paths::validate_existing_path(&p)?
+                .to_string_lossy()
+                .into_owned(),
+        ),
         _ => None,
     };
     engine.set_lut(path).await?.map_err(AppError::from)
+}
+
+#[tauri::command]
+pub async fn list_looks(
+    engine: State<'_, EngineHandle>,
+) -> Result<Vec<meratech_core::look::LookInfo>, AppError> {
+    Ok(engine.list_looks().await?)
+}
+
+#[tauri::command]
+pub fn user_looks_dir() -> Result<String, AppError> {
+    let dir = meratech_core::look::looks_dir();
+    std::fs::create_dir_all(&dir)
+        .map_err(|_| AppError::Io("could not create looks folder".into()))?;
+    Ok(dir.to_string_lossy().into_owned())
+}
+
+#[tauri::command]
+pub async fn delete_user_look(engine: State<'_, EngineHandle>, id: String) -> Result<(), AppError> {
+    meratech_core::look::delete_user_look(&id).map_err(AppError::from)?;
+    if let Ok(Some(doc)) = engine.get_doc().await {
+        let lut = doc
+            .get("meta")
+            .and_then(|m| m.get("lut_file"))
+            .and_then(|v| v.as_str());
+        if lut == Some(id.as_str()) {
+            engine.set_lut(None).await?.map_err(AppError::from)?;
+        }
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn seek_video(
+    engine: State<'_, EngineHandle>,
+    frame: u32,
+) -> Result<meratech_core::raw::ImageMeta, AppError> {
+    engine.seek_video(frame).await?.map_err(AppError::from)
 }
 
 /// Change the demosaic algorithm for the current image and re-decode.
@@ -767,19 +807,13 @@ pub async fn set_mask_overlay(
 
 /// Before/after: render the un-edited base while `on`.
 #[tauri::command]
-pub async fn set_preview_bypass(
-    engine: State<'_, EngineHandle>,
-    on: bool,
-) -> Result<(), AppError> {
+pub async fn set_preview_bypass(engine: State<'_, EngineHandle>, on: bool) -> Result<(), AppError> {
     Ok(engine.set_preview_bypass(on).await?)
 }
 
 /// Display look: 0 = Neutral, 1 = Camera, 2 = Filmic (AgX).
 #[tauri::command]
-pub async fn set_display_look(
-    engine: State<'_, EngineHandle>,
-    look: u32,
-) -> Result<(), AppError> {
+pub async fn set_display_look(engine: State<'_, EngineHandle>, look: u32) -> Result<(), AppError> {
     Ok(engine.set_display_look(look).await?)
 }
 

@@ -22,6 +22,8 @@ export const EVENTS = {
   exportRequested: "export-requested",
   importRequested: "import-requested",
   settingsRequested: "settings-requested",
+  photoWorkspace: "photo-workspace",
+  videoWorkspace: "video-workspace",
   assistantProgress: "assistant-progress",
   denoiseProgress: "denoise-progress",
   denoiseDone: "denoise-done",
@@ -169,6 +171,14 @@ export function onExportRequested(cb: () => void): Promise<UnlistenFn> {
 
 export function onSettingsRequested(cb: () => void): Promise<UnlistenFn> {
   return listen<null>(EVENTS.settingsRequested, () => cb());
+}
+
+export function onPhotoWorkspace(cb: () => void): Promise<UnlistenFn> {
+  return listen<null>(EVENTS.photoWorkspace, () => cb());
+}
+
+export function onVideoWorkspace(cb: () => void): Promise<UnlistenFn> {
+  return listen<null>(EVENTS.videoWorkspace, () => cb());
 }
 
 export function onAssistantProgress(

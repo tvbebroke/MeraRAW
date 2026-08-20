@@ -140,7 +140,7 @@ mod tests {
         assert_eq!(p.color_at(1, 0), 1); // G
         assert_eq!(p.color_at(0, 1), 1); // G
         assert_eq!(p.color_at(1, 1), 2); // B
-        // pattern is periodic
+                                         // pattern is periodic
         assert_eq!(p.color_at(2, 2), 0);
         assert_eq!(p.color_at(3, 3), 2);
     }

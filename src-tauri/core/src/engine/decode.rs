@@ -40,10 +40,7 @@ impl Engine {
         meta.available_profiles = available
             .iter()
             .map(|p| {
-                crate::profile::profile_display_name(
-                    &p.file,
-                    camera_key.as_deref().unwrap_or(""),
-                )
+                crate::profile::profile_display_name(&p.file, camera_key.as_deref().unwrap_or(""))
             })
             .collect();
         meta.available_profile_files = available.iter().map(|p| p.file.clone()).collect();
@@ -67,11 +64,8 @@ impl Engine {
                 .insert("denoise_iso".into(), serde_json::json!(iso));
         }
 
-        let chosen = crate::profile::choose_profile(
-            &meta,
-            &index,
-            doc.meta.profile_file.as_deref(),
-        );
+        let chosen =
+            crate::profile::choose_profile(&meta, &index, doc.meta.profile_file.as_deref());
         let profile_path = chosen.as_ref().map(|p| {
             meta.camera_profile = Some(crate::profile::profile_display_name(
                 &p.file,
@@ -90,15 +84,16 @@ impl Engine {
         // Restore a previously-applied look LUT from the sidecar path, if any.
         // Re-check path safety here (defense in depth vs. older sidecars).
         doc.meta.lut_file = crate::path_safety::sanitize_lut_path(doc.meta.lut_file.take());
-        let lut_cube = doc.meta.lut_file.as_ref().and_then(|p| {
-            match crate::lut::CubeLut::load_cube(std::path::Path::new(p)) {
-                Ok(c) => Some(std::sync::Arc::new(c)),
-                Err(e) => {
-                    tracing::warn!(error = %e, path = %p, "load look LUT on open");
-                    None
+        let lut_cube =
+            doc.meta.lut_file.as_ref().and_then(|p| {
+                match crate::lut::CubeLut::load_cube(std::path::Path::new(p)) {
+                    Ok(c) => Some(std::sync::Arc::new(c)),
+                    Err(e) => {
+                        tracing::warn!(error = %e, path = %p, "load look LUT on open");
+                        None
+                    }
                 }
-            }
-        });
+            });
 
         // Demosaic algorithm from the doc (None = engine default). Surfaced on
         // meta so the UI picker shows the effective algorithm. Reset to an
@@ -303,12 +298,7 @@ impl Engine {
             .map(|c| c.meta.kind)
             .unwrap_or(crate::raw::ImageKind::Rendered);
         let look = crate::raw::effective_display_look(kind, self.display_look);
-        let frame = cpu_preview_frame(
-            &small,
-            look == 1,
-            vw.0,
-            vw.1,
-        );
+        let frame = cpu_preview_frame(&small, look == 1, vw.0, vw.1);
         let version = self.next_version();
         let mut frame = frame;
         frame.version = version;
@@ -390,15 +380,69 @@ impl Engine {
         };
         match path {
             Some(p) => {
-                let Some(safe) = crate::path_safety::sanitize_user_path(&p) else {
+                let p = if p.starts_with("bundled:") || p.starts_with("user:") {
+                    p
+                } else {
+                    match crate::look::install_user_look(std::path::Path::new(&p)) {
+                        Ok(key) => key,
+                        Err(e) => {
+                            let _ = reply.send(Err(e));
+                            return;
+                        }
+                    }
+                };
+                let Some(safe_s) = crate::path_safety::sanitize_lut_path(Some(p)) else {
                     let _ = reply.send(Err(CoreError::InvalidOp("path not allowed".into())));
                     return;
                 };
-                let safe_s = safe.to_string_lossy().into_owned();
-                match crate::lut::CubeLut::load_cube(&safe) {
+                match crate::lut::CubeLut::load_cube(std::path::Path::new(&safe_s)) {
                     Ok(cube) => {
+                        if let Some(id) = safe_s.strip_prefix("bundled:") {
+                            cur.doc_mut().set(
+                                "lut",
+                                "input_primaries",
+                                crate::doc::ParamValue::F32(1.0),
+                            );
+                            cur.doc_mut().set(
+                                "lut",
+                                "output_primaries",
+                                crate::doc::ParamValue::F32(1.0),
+                            );
+                            cur.doc_mut()
+                                .set("lut", "shaper", crate::doc::ParamValue::F32(1.0));
+                            cur.doc_mut().set(
+                                "lut",
+                                "kind",
+                                crate::doc::ParamValue::F32(
+                                    crate::look::look_info(id)
+                                        .map(|l| l.kind as f32)
+                                        .unwrap_or(0.0),
+                                ),
+                            );
+                            cur.doc_mut()
+                                .set("lut", "enabled", crate::doc::ParamValue::F32(1.0));
+                            if let Some((g, sz)) = crate::look::grain_for(id) {
+                                cur.doc_mut().set(
+                                    "effects",
+                                    "grain_amount",
+                                    crate::doc::ParamValue::F32(g),
+                                );
+                                cur.doc_mut().set(
+                                    "effects",
+                                    "grain_size",
+                                    crate::doc::ParamValue::F32(sz),
+                                );
+                            }
+                        }
                         cur.lut_cube = Some(std::sync::Arc::new(cube));
-                        cur.doc_mut().meta.lut_file = Some(safe_s);
+                        cur.doc_mut().meta.lut_file = Some(safe_s.clone());
+                        cur.doc_mut().meta.look_id = if safe_s.starts_with("bundled:") {
+                            safe_s.strip_prefix("bundled:").map(|s| s.to_string())
+                        } else if safe_s.starts_with("user:") {
+                            Some(safe_s.clone())
+                        } else {
+                            None
+                        };
                         cur.doc_dirty = true;
                     }
                     Err(e) => {
@@ -410,6 +454,7 @@ impl Engine {
             None => {
                 cur.lut_cube = None;
                 cur.doc_mut().meta.lut_file = None;
+                cur.doc_mut().meta.look_id = None;
                 cur.doc_dirty = true;
             }
         }
@@ -419,6 +464,61 @@ impl Engine {
         self.schedule_render();
         self.schedule_settle();
         let _ = reply.send(Ok(()));
+    }
+
+    pub(super) fn seek_video(
+        &mut self,
+        frame: u32,
+        reply: oneshot::Sender<Result<ImageMeta, CoreError>>,
+    ) {
+        let Some(cur) = self.current.as_ref() else {
+            let _ = reply.send(Err(CoreError::NoImage));
+            return;
+        };
+        if cur.meta.kind != crate::raw::ImageKind::Video {
+            let _ = reply.send(Err(CoreError::InvalidOp("not a video clip".into())));
+            return;
+        }
+        let path = cur.path.clone();
+        let max = cur
+            .meta
+            .video
+            .as_ref()
+            .map(|v| v.frame_count.saturating_sub(1))
+            .unwrap_or(0);
+        let frame = frame.min(max);
+        let t = crate::registry::effective_f32(cur.doc(), "input", "transfer").round() as u32;
+        let p = crate::registry::effective_f32(cur.doc(), "input", "primaries").round() as u32;
+        let (override_t, override_p) = crate::video::overrides_from_input_params(t, p);
+        let working = match (|| {
+            let pr = crate::video::probe(&path)?;
+            let land = crate::video::land_from_tags(&pr, override_t, override_p);
+            crate::video::decode_frame(&path, frame, land)
+        })() {
+            Ok(w) => w,
+            Err(e) => {
+                let _ = reply.send(Err(e));
+                return;
+            }
+        };
+        let payload = crate::raw::DecodedImage {
+            working,
+            meta: cur.meta.clone(),
+        };
+        let mut boxed = DecodedPayload::from_decoded(payload);
+        boxed.meta.video.as_mut().map(|v| v.frame = frame);
+        if let Some(cur) = self.current.as_mut() {
+            cur.doc_mut()
+                .unknown
+                .insert("video_frame".into(), serde_json::json!(frame));
+            if let Some(v) = cur.meta.video.as_mut() {
+                v.frame = frame;
+            }
+            boxed.meta = cur.meta.clone();
+        }
+        let meta = boxed.meta.clone();
+        self.finish_decode(boxed);
+        let _ = reply.send(Ok(meta));
     }
 
     /// Change the demosaic algorithm for the current image and re-decode it.

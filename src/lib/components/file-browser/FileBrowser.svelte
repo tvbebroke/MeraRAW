@@ -11,7 +11,10 @@
     refreshFolders,
   } from "../../../stores/browse";
 
+  import { workspace } from "../../../stores/workspace";
+
   let { class: cls = "" }: { class?: string } = $props();
+  const isVideo = $derived($workspace === "video");
 
   let searchQuery = $state("");
 
@@ -97,7 +100,7 @@
       <circle cx="6.5" cy="6.5" r="4.5" stroke="currentColor" stroke-width="1.5" />
       <path d="M10 10L13.5 13.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
     </svg>
-    <input class="search-input" type="search" placeholder="Search photos" bind:value={searchQuery} />
+    <input class="search-input" type="search" placeholder={isVideo ? "Search folders" : "Search photos"} bind:value={searchQuery} />
     {#if searchQuery}
       <button class="mr-icon-btn" onclick={() => (searchQuery = "")} aria-label="Clear search">
         <svg width="9" height="9" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
@@ -112,7 +115,7 @@
       <p class="empty-state">Loading…</p>
     {:else if filteredFolders.length === 0}
       <p class="empty-state">
-        {searchQuery ? `No folders matching “${searchQuery}”` : "No photos here. Import a folder to begin."}
+        {searchQuery ? `No folders matching “${searchQuery}”` : isVideo ? "No clips here. Import a folder to begin." : "No photos here. Import a folder to begin."}
       </p>
     {:else}
       <p class="eyebrow px-[10px] pt-[8px] pb-[4px]">Folders</p>
@@ -148,7 +151,7 @@
   </div>
   <div class="import-row">
     <button type="button" class="import-btn" onclick={addFolder} disabled={$browseBusy}>
-      + Import
+      + Import {$workspace === "video" ? "clips" : "photos"}
     </button>
   </div>
 </GlassPanel>

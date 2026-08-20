@@ -11,6 +11,7 @@
     type HistMode,
     type HistScale,
   } from "../../../stores/app";
+  import { workspace } from "../../../stores/workspace";
 
   let {
     onResizeStart,
@@ -88,6 +89,29 @@
     };
   });
 
+  function persistMode(mode: HistMode) {
+    setHistMode(mode);
+    try {
+      localStorage.setItem(`hist-mode-${workspace.get()}`, mode);
+    } catch {
+      /* ignore */
+    }
+  }
+
+  $effect(() => {
+    const ws = $workspace;
+    let next: HistMode = ws === "video" ? "parade" : "rgb";
+    try {
+      const v = localStorage.getItem(`hist-mode-${ws}`);
+      if (v === "luma" || v === "parade" || v === "rgb" || v === "wave" || v === "scope") {
+        next = v;
+      }
+    } catch {
+      /* ignore */
+    }
+    if (histMode.get() !== next) setHistMode(next);
+  });
+
   $effect(() => {
     const canvas = canvasEl;
     const s = stats;
@@ -102,22 +126,100 @@
     const H = canvas.height;
     ctx.clearRect(0, 0, W, H);
 
-    if (mode === "luma") {
+    if (mode === "wave") {
+      const ww = s.waveformW ?? 0;
+      const wh = s.waveformH ?? 0;
+      const wf = s.waveform ?? [];
+      ctx.fillStyle = "#0b0b0c";
+      ctx.fillRect(0, 0, W, H);
+      if (ww > 0 && wh > 0 && wf.length >= ww * wh) {
+        let max = 1;
+        for (const n of wf) max = Math.max(max, n);
+        const cw = W / ww;
+        const ch = H / wh;
+        for (let y = 0; y < wh; y++) {
+          for (let x = 0; x < ww; x++) {
+            const v = wf[y * ww + x] / max;
+            if (v <= 0) continue;
+            const a = Math.min(1, 0.15 + v * 0.85);
+            ctx.fillStyle = `rgba(210, 230, 210, ${a})`;
+            ctx.fillRect(x * cw, y * ch, Math.ceil(cw), Math.ceil(ch));
+          }
+        }
+      }
+    } else if (mode === "scope") {
+      const vs = s.vectorscopeSize ?? 0;
+      const bins = s.vectorscope ?? [];
+      ctx.fillStyle = "#0b0b0c";
+      ctx.fillRect(0, 0, W, H);
+      const side = Math.min(W, H);
+      const ox = (W - side) / 2;
+      const oy = (H - side) / 2;
+      if (vs > 0 && bins.length >= vs * vs) {
+        let max = 1;
+        for (const n of bins) max = Math.max(max, n);
+        const cw = side / vs;
+        for (let y = 0; y < vs; y++) {
+          for (let x = 0; x < vs; x++) {
+            const v = bins[y * vs + x] / max;
+            if (v <= 0) continue;
+            const a = Math.min(1, 0.12 + v * 0.88);
+            ctx.fillStyle = `rgba(180, 220, 160, ${a})`;
+            ctx.fillRect(ox + x * cw, oy + y * cw, Math.ceil(cw), Math.ceil(cw));
+          }
+        }
+      }
+      ctx.strokeStyle = "rgba(255,255,255,0.18)";
+      ctx.beginPath();
+      ctx.arc(ox + side / 2, oy + side / 2, side * 0.42, 0, Math.PI * 2);
+      ctx.stroke();
+    } else if (mode === "luma") {
       const max = Math.max(1, ...s.luma);
       drawChannel(ctx, s.luma, "rgba(230,230,230,0.75)", 0, W, H, max, scale);
     } else if (mode === "parade") {
-      const third = W / 3;
-      const max = Math.max(1, ...s.r, ...s.g, ...s.b);
-      drawChannel(ctx, s.r, "rgba(255,90,90,0.7)", 0, third, H, max, scale);
-      drawChannel(ctx, s.g, "rgba(110,230,110,0.7)", third, third, H, max, scale);
-      drawChannel(ctx, s.b, "rgba(110,140,255,0.7)", third * 2, third, H, max, scale);
-      ctx.strokeStyle = "rgba(255,255,255,0.12)";
-      ctx.beginPath();
-      ctx.moveTo(third, 0);
-      ctx.lineTo(third, H);
-      ctx.moveTo(third * 2, 0);
-      ctx.lineTo(third * 2, H);
-      ctx.stroke();
+      const ww = s.waveformW ?? 0;
+      const wh = s.waveformH ?? 0;
+      const packed = s.parade ?? [];
+      const plane = ww * wh;
+      ctx.fillStyle = "#0b0b0c";
+      ctx.fillRect(0, 0, W, H);
+      if (ww > 0 && wh > 0 && packed.length >= plane * 3) {
+        let max = 1;
+        for (const n of packed) max = Math.max(max, n);
+        const third = W / 3;
+        const colors = [
+          "255,90,90",
+          "110,230,110",
+          "110,140,255",
+        ];
+        for (let p = 0; p < 3; p++) {
+          const cw = third / ww;
+          const ch = H / wh;
+          const x0 = p * third;
+          for (let y = 0; y < wh; y++) {
+            for (let x = 0; x < ww; x++) {
+              const v = packed[p * plane + y * ww + x] / max;
+              if (v <= 0) continue;
+              const a = Math.min(1, 0.12 + v * 0.88);
+              ctx.fillStyle = `rgba(${colors[p]}, ${a})`;
+              ctx.fillRect(x0 + x * cw, y * ch, Math.ceil(cw), Math.ceil(ch));
+            }
+          }
+        }
+        ctx.strokeStyle = "rgba(255,255,255,0.12)";
+        ctx.beginPath();
+        ctx.moveTo(third, 0);
+        ctx.lineTo(third, H);
+        ctx.moveTo(third * 2, 0);
+        ctx.lineTo(third * 2, H);
+        ctx.stroke();
+      } else {
+        const third = W / 3;
+        const max = Math.max(1, ...s.r, ...s.g, ...s.b);
+        drawChannel(ctx, s.r, "rgba(255,90,90,0.7)", 0, third, H, max, scale);
+        drawChannel(ctx, s.g, "rgba(110,230,110,0.7)", third, third, H, max, scale);
+        drawChannel(ctx, s.b, "rgba(110,140,255,0.7)", third * 2, third, H, max, scale);
+      }
     } else {
       const channels: [number[], string][] = [
         [s.r, "rgba(255,90,90,0.55)"],
@@ -135,6 +237,8 @@
     { id: "rgb", label: "RGB" },
     { id: "luma", label: "Luma" },
     { id: "parade", label: "Parade" },
+    { id: "wave", label: "Wave" },
+    { id: "scope", label: "Scope" },
   ];
   const scales: { id: HistScale; label: string }[] = [
     { id: "sqrt", label: "√" },
@@ -166,7 +270,7 @@
             <button
               type="button"
               class="rail-chip {$histMode === m.id ? 'is-active' : ''}"
-              onclick={() => setHistMode(m.id)}
+              onclick={() => persistMode(m.id)}
             >{m.label}</button>
           {/each}
         </div>
@@ -199,7 +303,7 @@
             <button
               type="button"
               class="rail-chip {$histMode === m.id ? 'is-active' : ''}"
-              onclick={() => setHistMode(m.id)}
+              onclick={() => persistMode(m.id)}
             >{m.label}</button>
           {/each}
         </div>

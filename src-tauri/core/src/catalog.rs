@@ -175,9 +175,7 @@ fn folder_root_variants(root: &str) -> Vec<String> {
     let simple = crate::path_safety::simplify_path_str(root);
     let mut out = vec![simple.clone()];
     // Legacy rows stored before verbatim-prefix stripping.
-    if !simple.starts_with(r"\\?\")
-        && simple.len() >= 2
-        && simple.as_bytes().get(1) == Some(&b':')
+    if !simple.starts_with(r"\\?\") && simple.len() >= 2 && simple.as_bytes().get(1) == Some(&b':')
     {
         out.push(format!(r"\\?\{simple}"));
     }
@@ -222,9 +220,12 @@ impl Catalog {
     pub fn open_at(dir: PathBuf) -> Result<Self, CoreError> {
         std::fs::create_dir_all(dir.join("previews"))?;
         let conn = Connection::open(dir.join("catalog.db")).map_err(db_err)?;
-        conn.pragma_update(None, "journal_mode", "WAL").map_err(db_err)?;
-        conn.pragma_update(None, "synchronous", "NORMAL").map_err(db_err)?;
-        conn.pragma_update(None, "foreign_keys", "ON").map_err(db_err)?;
+        conn.pragma_update(None, "journal_mode", "WAL")
+            .map_err(db_err)?;
+        conn.pragma_update(None, "synchronous", "NORMAL")
+            .map_err(db_err)?;
+        conn.pragma_update(None, "foreign_keys", "ON")
+            .map_err(db_err)?;
         let cat = Self { conn, dir };
         cat.init_schema()?;
         Ok(cat)
@@ -370,11 +371,9 @@ impl Catalog {
             let sql = format!("SELECT COUNT(*) FROM assets WHERE {clause}");
             let photo_count: i64 = self
                 .conn
-                .query_row(
-                    &sql,
-                    rusqlite::params_from_iter(params.iter()),
-                    |r| r.get(0),
-                )
+                .query_row(&sql, rusqlite::params_from_iter(params.iter()), |r| {
+                    r.get(0)
+                })
                 .unwrap_or(0);
             let accessible = Path::new(&root_trim).exists();
             let name = Path::new(&root_trim)
@@ -474,7 +473,9 @@ impl Catalog {
             .map_err(db_err)?;
         let id: i64 = self
             .conn
-            .query_row("SELECT id FROM assets WHERE path = ?1", [path], |r| r.get(0))
+            .query_row("SELECT id FROM assets WHERE path = ?1", [path], |r| {
+                r.get(0)
+            })
             .map_err(db_err)?;
         if let Some(sm) = sidecar_meta {
             for kw in &sm.keywords {
@@ -609,25 +610,28 @@ impl Catalog {
 
         let mut stmt = self.conn.prepare(&sql).map_err(db_err)?;
         let rows = stmt
-            .query_map(rusqlite::params_from_iter(params.iter().map(|p| p.as_ref())), |r| {
-                let path: String = r.get(1)?;
-                Ok(GridItem {
-                    id: r.get(0)?,
-                    path: path.clone(),
-                    filename: r.get(2)?,
-                    width: r.get::<_, Option<u32>>(3)?.unwrap_or(0),
-                    height: r.get::<_, Option<u32>>(4)?.unwrap_or(0),
-                    rating: r.get::<_, i64>(5)? as u8,
-                    flag: r.get(6)?,
-                    label: r.get(7)?,
-                    has_edits: r.get::<_, i64>(8)? != 0,
-                    captured_at: r.get(9)?,
-                    camera_model: r.get(10)?,
-                    blur_score: r.get(11)?,
-                    has_thumb: r.get::<_, i64>(12)? != 0,
-                    accessible: Path::new(&path).exists(),
-                })
-            })
+            .query_map(
+                rusqlite::params_from_iter(params.iter().map(|p| p.as_ref())),
+                |r| {
+                    let path: String = r.get(1)?;
+                    Ok(GridItem {
+                        id: r.get(0)?,
+                        path: path.clone(),
+                        filename: r.get(2)?,
+                        width: r.get::<_, Option<u32>>(3)?.unwrap_or(0),
+                        height: r.get::<_, Option<u32>>(4)?.unwrap_or(0),
+                        rating: r.get::<_, i64>(5)? as u8,
+                        flag: r.get(6)?,
+                        label: r.get(7)?,
+                        has_edits: r.get::<_, i64>(8)? != 0,
+                        captured_at: r.get(9)?,
+                        camera_model: r.get(10)?,
+                        blur_score: r.get(11)?,
+                        has_thumb: r.get::<_, i64>(12)? != 0,
+                        accessible: Path::new(&path).exists(),
+                    })
+                },
+            )
             .map_err(db_err)?;
         Ok(rows.filter_map(|r| r.ok()).collect())
     }
@@ -907,7 +911,7 @@ pub struct ImportedFile {
     pub preview_jpeg: Option<Vec<u8>>,
 }
 
-/// Scan a folder for importable images (RAW + rendered; recursive).
+/// Scan a folder for importable images (RAW + rendered + video; recursive).
 pub fn scan_folder(root: &Path) -> Vec<PathBuf> {
     let mut out = Vec::new();
     let root = crate::path_safety::simplify_path(root.to_path_buf());
@@ -929,7 +933,7 @@ pub fn scan_folder(root: &Path) -> Vec<PathBuf> {
                 if !name.map(|n| n.starts_with('.')).unwrap_or(true) {
                     stack.push(p);
                 }
-            } else if raw_dec.probe(&p) || std_dec.probe(&p) {
+            } else if raw_dec.probe(&p) || std_dec.probe(&p) || crate::video::is_video_path(&p) {
                 out.push(p);
             }
         }
@@ -965,7 +969,10 @@ pub fn import_one(path: &Path) -> Result<ImportedFile, CoreError> {
 
     let meta = dec.metadata(&path)?;
     let doc = sidecar::load_sidecar(&path).ok().flatten();
-    let has_edits = doc.as_ref().map(|d| !d.modules.is_empty() || !d.masks.is_empty()).unwrap_or(false);
+    let has_edits = doc
+        .as_ref()
+        .map(|d| !d.modules.is_empty() || !d.masks.is_empty())
+        .unwrap_or(false);
     let sidecar_meta = doc.map(|d| d.meta);
 
     // previews from the embedded JPEG (fast path)
@@ -1089,6 +1096,7 @@ mod tests {
             gps_lat: None,
             gps_lon: None,
             input_color_space: None,
+            video: None,
         }
     }
 
@@ -1099,14 +1107,50 @@ mod tests {
     }
 
     #[test]
+    fn scan_folder_picks_up_clips_without_dropping_stills() {
+        let dir = std::env::temp_dir().join(format!(
+            "meratech-scan-media-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::remove_dir_all(&dir).ok();
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join("still.jpg"), b"not-a-jpeg").unwrap();
+        std::fs::write(dir.join("clip.MOV"), b"not-a-movie").unwrap();
+        std::fs::write(dir.join("notes.txt"), b"skip").unwrap();
+        let names: Vec<String> = scan_folder(&dir)
+            .into_iter()
+            .filter_map(|p| p.file_name().map(|n| n.to_string_lossy().into_owned()))
+            .collect();
+        std::fs::remove_dir_all(&dir).ok();
+        assert!(names.iter().any(|n| n == "still.jpg"), "{names:?}");
+        assert!(names.iter().any(|n| n == "clip.MOV"), "{names:?}");
+        assert!(!names.iter().any(|n| n.eq_ignore_ascii_case("notes.txt")));
+    }
+
+    #[test]
     fn grid_folder_filter_matches_windows_backslash_paths() {
         let (mut cat, dir) = tmp_cat("win-paths");
         let root = r"C:\Users\test\photos";
         let p = format!(r"{root}\IMG_0001.ARW");
         let nested_folder = format!(r"{root}\trip");
         let nested = format!(r"{nested_folder}\IMG_0002.ARW");
-        cat.upsert_asset(&p, root, "h", 100, 0, &meta_stub(&p), None, false, None, None)
-            .unwrap();
+        cat.upsert_asset(
+            &p,
+            root,
+            "h",
+            100,
+            0,
+            &meta_stub(&p),
+            None,
+            false,
+            None,
+            None,
+        )
+        .unwrap();
         cat.upsert_asset(
             &nested,
             &nested_folder,
@@ -1202,32 +1246,69 @@ mod tests {
         let (mut cat, dir) = tmp_cat("grid");
         for i in 0..5 {
             let p = format!("/photos/a/IMG_{i:04}.ARW");
-            cat.upsert_asset(&p, "/photos/a", "h", 100, i, &meta_stub(&p), None, false, None, Some(if i == 0 { 10.0 } else { 200.0 }))
-                .unwrap();
+            cat.upsert_asset(
+                &p,
+                "/photos/a",
+                "h",
+                100,
+                i,
+                &meta_stub(&p),
+                None,
+                false,
+                None,
+                Some(if i == 0 { 10.0 } else { 200.0 }),
+            )
+            .unwrap();
         }
         assert_eq!(cat.count(), 5);
         // re-upsert same path → no dupes (keep its blur signal)
-        cat.upsert_asset("/photos/a/IMG_0000.ARW", "/photos/a", "h", 100, 0, &meta_stub("x"), None, false, None, Some(10.0))
-            .unwrap();
+        cat.upsert_asset(
+            "/photos/a/IMG_0000.ARW",
+            "/photos/a",
+            "h",
+            100,
+            0,
+            &meta_stub("x"),
+            None,
+            false,
+            None,
+            Some(10.0),
+        )
+        .unwrap();
         assert_eq!(cat.count(), 5);
 
         let all = cat.grid(&GridQuery::default()).unwrap();
         assert_eq!(all.len(), 5);
 
-        cat.set_meta(&[all[0].id], &MetaPatch { rating: Some(4), ..Default::default() })
-            .unwrap();
+        cat.set_meta(
+            &[all[0].id],
+            &MetaPatch {
+                rating: Some(4),
+                ..Default::default()
+            },
+        )
+        .unwrap();
         let rated = cat
-            .grid(&GridQuery { rating_min: Some(3), ..Default::default() })
+            .grid(&GridQuery {
+                rating_min: Some(3),
+                ..Default::default()
+            })
             .unwrap();
         assert_eq!(rated.len(), 1);
 
         let blurry = cat
-            .grid(&GridQuery { blurry_only: true, ..Default::default() })
+            .grid(&GridQuery {
+                blurry_only: true,
+                ..Default::default()
+            })
             .unwrap();
         assert_eq!(blurry.len(), 1, "one asset has blur_score 10");
 
         let text = cat
-            .grid(&GridQuery { text: Some("IMG_0003".into()), ..Default::default() })
+            .grid(&GridQuery {
+                text: Some("IMG_0003".into()),
+                ..Default::default()
+            })
             .unwrap();
         assert_eq!(text.len(), 1);
 
@@ -1269,8 +1350,16 @@ mod tests {
                 preview_jpeg: None,
             };
             cat.upsert_asset(
-                &f.path, &f.folder, &f.partial_hash, f.size, f.modified_ms, &f.meta,
-                f.sidecar_meta.as_ref(), f.has_edits, None, None,
+                &f.path,
+                &f.folder,
+                &f.partial_hash,
+                f.size,
+                f.modified_ms,
+                &f.meta,
+                f.sidecar_meta.as_ref(),
+                f.has_edits,
+                None,
+                None,
             )
             .unwrap();
             cat.remember_folder(&f.folder).unwrap();

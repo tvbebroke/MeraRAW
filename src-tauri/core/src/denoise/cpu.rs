@@ -240,7 +240,11 @@ pub fn atrous_denoise(yuv: &[f32], w: usize, h: usize, p: &ChainParams) -> Vec<f
             let c = i % 3;
             let d = smooth[i] - next[i];
             let s = if c == 0 {
-                if j < p.luma_levels { p.luma_s[j] } else { 0.0 }
+                if j < p.luma_levels {
+                    p.luma_s[j]
+                } else {
+                    0.0
+                }
             } else if j < p.chroma_levels {
                 p.chroma_s[j]
             } else {
@@ -298,8 +302,7 @@ pub fn nlm_luma(yuv: &[f32], w: usize, h: usize, p: &ChainParams) -> Vec<f32> {
             }
             let center = yuv[(y as usize * w + x as usize) * 3];
             let wc = p.nlm_center * wsum.max(1e-6);
-            out[(y as usize * w + x as usize) * 3] =
-                (acc + wc * center) / (wsum + wc).max(1e-6);
+            out[(y as usize * w + x as usize) * 3] = (acc + wc * center) / (wsum + wc).max(1e-6);
         }
     }
     out
@@ -396,13 +399,7 @@ pub fn denoise_rgb(rgb: &[f32], w: usize, h: usize, p: &ChainParams) -> Vec<f32>
 /// Suppress defective sites on a Bayer mosaic in place: compare each pixel
 /// against the median of its 4 same-CFA-color neighbors (±2); replace when
 /// it sticks out beyond t·max(local spread, ε·white). Returns replaced count.
-pub fn hot_pixel_suppress(
-    mosaic: &mut [f32],
-    w: usize,
-    h: usize,
-    t: f32,
-    white: f32,
-) -> usize {
+pub fn hot_pixel_suppress(mosaic: &mut [f32], w: usize, h: usize, t: f32, white: f32) -> usize {
     let eps_floor = 0.002 * white;
     let mut fixed = 0usize;
     let orig = mosaic.to_vec();
@@ -413,12 +410,7 @@ pub fn hot_pixel_suppress(
     };
     for y in 0..h as i32 {
         for x in 0..w as i32 {
-            let n = [
-                get(x - 2, y),
-                get(x + 2, y),
-                get(x, y - 2),
-                get(x, y + 2),
-            ];
+            let n = [get(x - 2, y), get(x + 2, y), get(x, y - 2), get(x, y + 2)];
             let mut s = n;
             s.sort_by(f32::total_cmp);
             let med = (s[1] + s[2]) * 0.5;
@@ -440,19 +432,7 @@ mod tests {
 
     fn test_params(profile: &NoiseProfile, lum: f32, chrom: f32) -> ChainParams {
         ChainParams::from_sliders(
-            profile,
-            1.0,
-            lum,
-            chrom,
-            50.0,
-            0.0,
-            &[1.0; 6],
-            &[1.0; 6],
-            false,
-            1,
-            5,
-            30.0,
-            false,
+            profile, 1.0, lum, chrom, 50.0, 0.0, &[1.0; 6], &[1.0; 6], false, 1, 5, 30.0, false,
             1.0,
         )
     }
@@ -478,7 +458,11 @@ mod tests {
     fn y0u0v0_rotation_is_exact_inverse() {
         let mut rng = Rng::new(3);
         for _ in 0..1000 {
-            let (r, g, b) = (rng.next_f32() * 2.0, rng.next_f32() * 2.0, rng.next_f32() * 2.0);
+            let (r, g, b) = (
+                rng.next_f32() * 2.0,
+                rng.next_f32() * 2.0,
+                rng.next_f32() * 2.0,
+            );
             let (y, u, v) = rgb_to_y0u0v0(r, g, b);
             let (r2, g2, b2) = y0u0v0_to_rgb(y, u, v);
             assert!((r - r2).abs() < 1e-5 && (g - g2).abs() < 1e-5 && (b - b2).abs() < 1e-5);
@@ -605,8 +589,7 @@ mod tests {
         let (w, h) = (128, 128);
         // flat gray mosaic with mild noise
         let mut rng = Rng::new(41);
-        let mut mosaic: Vec<f32> =
-            (0..w * h).map(|_| 0.3 + 0.005 * rng.next_gauss()).collect();
+        let mut mosaic: Vec<f32> = (0..w * h).map(|_| 0.3 + 0.005 * rng.next_gauss()).collect();
         // inject 200 hot + 50 dead pixels
         let mut hot = std::collections::HashSet::new();
         for _ in 0..200 {

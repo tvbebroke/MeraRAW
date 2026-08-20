@@ -100,7 +100,11 @@ fn main() {
             }
             let m = metrics(truth, &result, 20);
             save_rgb(&result, &out.join(format!("{tname}_{}.png", algo.name())));
-            save_error(truth, &result, &out.join(format!("{tname}_{}_err.png", algo.name())));
+            save_error(
+                truth,
+                &result,
+                &out.join(format!("{tname}_{}_err.png", algo.name())),
+            );
             println!(
                 "{:<9} {:>8.2} {:>8.2} {:>8.2} {:>8.2} {:>10.2} {:>9.1}",
                 algo.name(),
@@ -130,7 +134,11 @@ fn main() {
     std::fs::File::create(&csv_path)
         .and_then(|mut f| f.write_all(csv.as_bytes()))
         .expect("write csv");
-    println!("\nwrote {} and per-algorithm PNGs to {}", csv_path.display(), out.display());
+    println!(
+        "\nwrote {} and per-algorithm PNGs to {}",
+        csv_path.display(),
+        out.display()
+    );
 }
 
 /// Average CPSNR over every PNG in `dir` (full-color ground-truth images such as
@@ -144,7 +152,11 @@ fn run_dir(dir: &std::path::Path, algos: &[Algorithm], border: usize) {
         .collect();
     paths.sort();
     assert!(!paths.is_empty(), "no PNGs in {}", dir.display());
-    println!("Averaging over {} images in {}\n", paths.len(), dir.display());
+    println!(
+        "Averaging over {} images in {}\n",
+        paths.len(),
+        dir.display()
+    );
 
     let n = algos.len();
     let mut sum_psnr = vec![0.0f64; n];
@@ -352,10 +364,17 @@ fn load_truth(path: &std::path::Path) -> RgbImage {
     let (w, h) = (img.width() as usize, img.height() as usize);
     let mut data = vec![[0.0f32; 3]; w * h];
     for (x, y, px) in img.enumerate_pixels() {
-        data[y as usize * w + x as usize] =
-            [px[0] as f32 / 255.0, px[1] as f32 / 255.0, px[2] as f32 / 255.0];
+        data[y as usize * w + x as usize] = [
+            px[0] as f32 / 255.0,
+            px[1] as f32 / 255.0,
+            px[2] as f32 / 255.0,
+        ];
     }
-    RgbImage { width: w, height: h, data }
+    RgbImage {
+        width: w,
+        height: h,
+        data,
+    }
 }
 
 fn to_u8(v: f32) -> u8 {

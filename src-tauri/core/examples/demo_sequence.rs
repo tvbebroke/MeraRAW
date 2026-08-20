@@ -25,7 +25,9 @@ fn smoothstep(a: f32, b: f32, t: f32) -> f32 {
 fn main() {
     let mut args = std::env::args().skip(1);
     let path = PathBuf::from(args.next().expect("usage: demo_sequence <raw> <out_dir>"));
-    let out_dir = args.next().unwrap_or_else(|| "/tmp/meratech-demo-frames".into());
+    let out_dir = args
+        .next()
+        .unwrap_or_else(|| "/tmp/meratech-demo-frames".into());
     std::fs::create_dir_all(&out_dir).unwrap();
 
     let dec = RawlerDecoder::default();
@@ -121,7 +123,14 @@ fn main() {
             (format!("mask.{bg}.color_grade.perceptual_sat"), -18.0 * m),
         ] {
             if v.abs() > 1e-3 {
-                apply_op(&mut doc, &Op::SetParam { path: p, value: json!(v) }).unwrap();
+                apply_op(
+                    &mut doc,
+                    &Op::SetParam {
+                        path: p,
+                        value: json!(v),
+                    },
+                )
+                .unwrap();
             }
         }
 
@@ -133,9 +142,15 @@ fn main() {
         let frame = graph
             .render(&gpu, &tv, w, h, &view, &doc, cct, &seg, None, None, None)
             .expect("render");
-        let rgb: Vec<u8> = frame.chunks_exact(4).flat_map(|p| [p[0], p[1], p[2]]).collect();
+        let rgb: Vec<u8> = frame
+            .chunks_exact(4)
+            .flat_map(|p| [p[0], p[1], p[2]])
+            .collect();
         let p = format!("{out_dir}/frame_{i:03}.png");
         image::save_buffer(&p, &rgb, view.out_w, view.out_h, image::ColorType::Rgb8).unwrap();
     }
-    println!("wrote {N} frames to {out_dir} ({}x{})", view.out_w, view.out_h);
+    println!(
+        "wrote {N} frames to {out_dir} ({}x{})",
+        view.out_w, view.out_h
+    );
 }

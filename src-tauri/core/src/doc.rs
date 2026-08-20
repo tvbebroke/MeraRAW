@@ -20,7 +20,11 @@ pub enum ParamValue {
     /// Curve: ordered control points, x strictly increasing, x/y ∈ [0,1].
     Curve(Vec<[f32; 2]>),
     /// Color as {h,s,l} (hue 0..360, s/l normalized).
-    Color { h: f32, s: f32, l: f32 },
+    Color {
+        h: f32,
+        s: f32,
+        l: f32,
+    },
 }
 
 impl ParamValue {
@@ -83,6 +87,9 @@ pub struct DocMeta {
     /// engine. None = no LUT. Persisted in the sidecar so a look survives reload.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub lut_file: Option<String>,
+    /// Bundled look id when the active cube is generated (`bundled:<id>`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub look_id: Option<String>,
     /// Demosaic algorithm name (e.g. "rcd", "amaze", "rawler"). None = engine
     /// default. Changing it re-decodes the RAW; persisted in the sidecar.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -345,7 +352,10 @@ mod tests {
     fn timestamps_look_iso() {
         let doc = EditDoc::new("/x.ARW");
         let ts = doc.meta.created_at.unwrap();
-        assert!(ts.ends_with('Z') && ts.contains('T') && ts.starts_with("20"), "{ts}");
+        assert!(
+            ts.ends_with('Z') && ts.contains('T') && ts.starts_with("20"),
+            "{ts}"
+        );
     }
 
     /// Pins `#[serde(untagged)]` discrimination order: Bool before F32.
@@ -443,6 +453,7 @@ mod tests {
                 label: Some("red".into()),
                 profile_file: Some("Adobe Standard.dcp".into()),
                 lut_file: Some("/looks/film.cube".into()),
+                look_id: None,
                 demosaic: Some("rcd".into()),
                 keywords: vec!["studio".into()],
             },
@@ -474,7 +485,10 @@ mod tests {
         assert_eq!(back.schema_version, SCHEMA_VERSION);
         assert_eq!(back.masks.len(), 1);
         assert_eq!(back.retouch.len(), 1);
-        assert_eq!(back.get("detail", "hot_pixels"), Some(&ParamValue::Bool(true)));
+        assert_eq!(
+            back.get("detail", "hot_pixels"),
+            Some(&ParamValue::Bool(true))
+        );
         assert!(matches!(
             back.get("color_grade", "shadows"),
             Some(ParamValue::Color { .. })

@@ -49,6 +49,16 @@ impl Engine {
         }
         self.flush_sidecar_now();
 
+        if settings.video_clip
+            && self
+                .current
+                .as_ref()
+                .is_some_and(|c| c.meta.kind == crate::raw::ImageKind::Video)
+        {
+            self.export_video_clip(settings, reply);
+            return;
+        }
+
         let setup: Result<ExportJob, CoreError> = (|| {
             self.ensure_segmentations();
             let cur = self.current.as_ref().ok_or(CoreError::NoImage)?;
@@ -62,7 +72,7 @@ impl Engine {
                 self.export_graph = Some(RenderGraph::new(gpu));
             }
             let display_look =
-                crate::raw::effective_display_look(cur.meta.kind, self.display_look);
+                crate::lut::present_look_for(cur.meta.kind, self.display_look, cur.doc());
             // look 4 (Original) renders a fresh doc — no crop, full frame
             let (out_w, out_h) = if display_look == 4 {
                 (w, h)
@@ -119,6 +129,246 @@ impl Engine {
                 let _ = self.self_tx.try_send(EngineMsg::ExportStep);
             }
         }
+    }
+
+    fn render_working_linear(&mut self) -> Result<(Vec<f32>, u32, u32), CoreError> {
+        let gpu = self.gpu.as_ref().ok_or(CoreError::Gpu("no gpu".into()))?;
+        let (display_look, job_w, job_h) = {
+            let cur = self.current.as_ref().ok_or(CoreError::NoImage)?;
+            let (_, _, src_w, src_h) = cur
+                .working
+                .as_ref()
+                .ok_or(CoreError::Engine("decode not finished".into()))?;
+            let display_look =
+                crate::lut::present_look_for(cur.meta.kind, self.display_look, cur.doc());
+            let (job_w, job_h) = if display_look == 4 {
+                (*src_w, *src_h)
+            } else {
+                export_dims(cur.doc(), *src_w, *src_h)
+            };
+            (display_look, job_w, job_h)
+        };
+        if self.export_graph.is_none() {
+            self.export_graph = Some(RenderGraph::new(gpu));
+        }
+        let gpu = self.gpu.as_ref().ok_or(CoreError::Gpu("no gpu".into()))?;
+        let cur = self.current.as_ref().ok_or(CoreError::NoImage)?;
+        let (_, tex_view, src_w, src_h) = cur
+            .working
+            .as_ref()
+            .ok_or(CoreError::Engine("decode not finished".into()))?;
+        let lut = if display_look == 4 {
+            None
+        } else {
+            cur.lut_cube.clone()
+        };
+        let dcp = if DcpProfile::applies_to_display_look(display_look) {
+            cur.dcp_profile.clone()
+        } else {
+            None
+        };
+        let cct = cur.as_shot_cct();
+        let original = display_look == 4;
+        let seg_views: std::collections::HashMap<String, wgpu::TextureView> = cur
+            .masks_gpu
+            .iter()
+            .map(|(id, (_, tex))| (id.clone(), tex.create_view(&Default::default())))
+            .collect();
+        let graph = self
+            .export_graph
+            .as_mut()
+            .ok_or(CoreError::Engine("export graph".into()))?;
+        graph.set_look(display_look);
+        graph.invalidate_all();
+
+        let mut full = vec![0.0f32; (job_w as usize) * (job_h as usize) * 3];
+        let mut ty = 0u32;
+        while ty < job_h {
+            let mut tx = 0u32;
+            while tx < job_w {
+                let tw = TILE.min(job_w - tx);
+                let th = TILE.min(job_h - ty);
+                let view = ViewParams {
+                    out_w: tw,
+                    out_h: th,
+                    scale: Some(1.0),
+                    center_x: (tx as f32 + tw as f32 / 2.0) / job_w as f32,
+                    center_y: (ty as f32 + th as f32 / 2.0) / job_h as f32,
+                    crop_preview: false,
+                };
+                let base_doc;
+                let render_doc = if original {
+                    base_doc = EditDoc::new(&cur.path.to_string_lossy());
+                    &base_doc
+                } else {
+                    cur.doc()
+                };
+                let mut tile = graph.render_linear_tile(
+                    gpu,
+                    tex_view,
+                    *src_w,
+                    *src_h,
+                    &view,
+                    render_doc,
+                    cct,
+                    &seg_views,
+                    lut.as_deref(),
+                )?;
+                if DcpProfile::applies_to_display_look(display_look) {
+                    if let Some(dcp) = dcp.as_ref() {
+                        for px in tile.chunks_mut(3) {
+                            let out = dcp.apply_look([px[0], px[1], px[2]], cct);
+                            px.copy_from_slice(&out);
+                        }
+                    }
+                }
+                for row in 0..th as usize {
+                    let src = row * tw as usize * 3;
+                    let dst = ((ty as usize + row) * job_w as usize + tx as usize) * 3;
+                    full[dst..dst + tw as usize * 3]
+                        .copy_from_slice(&tile[src..src + tw as usize * 3]);
+                }
+                tx += TILE;
+            }
+            ty += TILE;
+        }
+        Ok((full, job_w, job_h))
+    }
+
+    fn export_video_clip(
+        &mut self,
+        settings: crate::export::ExportSettings,
+        reply: oneshot::Sender<Result<String, CoreError>>,
+    ) {
+        let result = (|| -> Result<String, CoreError> {
+            let cur = self.current.as_ref().ok_or(CoreError::NoImage)?;
+            let path = cur.path.clone();
+            let meta = cur.meta.clone();
+            let video = meta
+                .video
+                .clone()
+                .ok_or_else(|| CoreError::InvalidOp("not a video clip".into()))?;
+            let restore_frame = video.frame;
+            let max = video.frame_count.saturating_sub(1);
+            let mut in_f = settings.video_in.unwrap_or(video.in_frame).min(max);
+            let mut out_f = settings.video_out.unwrap_or(video.out_frame).min(max);
+            if in_f > out_f {
+                std::mem::swap(&mut in_f, &mut out_f);
+            }
+            let fps = video.fps.max(1.0);
+            let t = crate::registry::effective_f32(cur.doc(), "input", "transfer").round() as u32;
+            let p = crate::registry::effective_f32(cur.doc(), "input", "primaries").round() as u32;
+            let (override_t, override_p) = crate::video::overrides_from_input_params(t, p);
+            let pr = crate::video::probe(&path)?;
+            let land = crate::video::land_from_tags(&pr, override_t, override_p);
+            let look = crate::lut::present_look_for(cur.meta.kind, self.display_look, cur.doc());
+            let gpu = self.gpu.as_ref().ok_or(CoreError::Gpu("no gpu".into()))?;
+            if self.export_graph.is_none() {
+                self.export_graph = Some(RenderGraph::new(gpu));
+            }
+            if let Some(g) = self.export_graph.as_mut() {
+                g.set_look(look);
+            }
+
+            let dest = if settings.dest_dir.is_empty() {
+                path.parent()
+                    .unwrap_or_else(|| Path::new("."))
+                    .join("exports")
+            } else {
+                std::path::PathBuf::from(&settings.dest_dir)
+            };
+            std::fs::create_dir_all(&dest)?;
+            let clip_stem = path
+                .file_stem()
+                .map(|s| s.to_string_lossy().into_owned())
+                .unwrap_or_else(|| "clip".into());
+            let total = out_f.saturating_sub(in_f) + 1;
+            let mut last_still = dest.join(format!("{clip_stem}_{in_f:06}.jpg"));
+
+            for (i, frame) in (in_f..=out_f).enumerate() {
+                self.emit(EngineEvent::ExportProgress {
+                    phase: "render".into(),
+                    done: i as u32,
+                    total,
+                });
+                let buf = crate::video::decode_frame(&path, frame, land)?;
+                if let Some(cur) = self.current.as_mut() {
+                    cur.doc_mut()
+                        .unknown
+                        .insert("video_frame".into(), serde_json::json!(frame));
+                    if let Some(v) = cur.meta.video.as_mut() {
+                        v.frame = frame;
+                    }
+                }
+                self.upload_working_rgb(buf);
+                let (full, w, h) = self.render_working_linear()?;
+                let (lin, w, h) = match settings.max_dim {
+                    Some(d) => crate::export::resize_linear(full, w, h, d),
+                    None => (full, w, h),
+                };
+                let mut enc =
+                    crate::export::output_transform_look(&lin, w, h, settings.target, false, look);
+                crate::export::output_sharpen8(&mut enc.rgb8, w, h, settings.sharpen);
+                let mut frame_settings = settings.clone();
+                frame_settings.format = crate::export::ExportFormat::Jpeg;
+                frame_settings.output_stem = Some(format!("{clip_stem}_{frame:06}"));
+                last_still = crate::export::encode_and_write(
+                    &enc,
+                    &frame_settings,
+                    &path.to_string_lossy(),
+                    &meta,
+                )?;
+            }
+
+            self.emit(EngineEvent::ExportProgress {
+                phase: "encode".into(),
+                done: 0,
+                total: 1,
+            });
+            let mp4 = dest.join(format!("{clip_stem}.mp4"));
+            let pattern = dest.join(format!("{clip_stem}_%06d.jpg"));
+            let audio = if settings.video_audio && crate::video::has_audio_stream(&path) {
+                Some(crate::video::AudioPass {
+                    source: path.clone(),
+                    start_s: in_f as f32 / fps,
+                    duration_s: total as f32 / fps,
+                })
+            } else {
+                None
+            };
+            let out_path =
+                match crate::video::mux_jpeg_sequence(&pattern, in_f, fps, &mp4, audio.as_ref()) {
+                    Ok(p) => p,
+                    Err(e) => {
+                        tracing::warn!(error = %e, "clip mux failed; jpeg sequence kept");
+                        last_still
+                    }
+                };
+
+            if restore_frame != out_f {
+                if let Ok(buf) = crate::video::decode_frame(&path, restore_frame, land) {
+                    if let Some(cur) = self.current.as_mut() {
+                        cur.doc_mut()
+                            .unknown
+                            .insert("video_frame".into(), serde_json::json!(restore_frame));
+                        if let Some(v) = cur.meta.video.as_mut() {
+                            v.frame = restore_frame;
+                        }
+                    }
+                    self.upload_working_rgb(buf);
+                    self.schedule_render();
+                }
+            } else {
+                self.schedule_render();
+            }
+            self.emit(EngineEvent::ExportProgress {
+                phase: "encode".into(),
+                done: 1,
+                total: 1,
+            });
+            Ok(out_path.to_string_lossy().into_owned())
+        })();
+        let _ = reply.send(result);
     }
 
     pub(super) fn export_step(&mut self) {
@@ -434,7 +684,9 @@ impl Engine {
     /// decode in flight and one prepared image stashed.
     fn spawn_batch_prepare(&mut self) {
         let job = {
-            let Some(batch) = self.export_batch.as_mut() else { return };
+            let Some(batch) = self.export_batch.as_mut() else {
+                return;
+            };
             if batch.preparing.is_some()
                 || batch.prepared.is_some()
                 || batch.next_prepare >= batch.paths.len()
@@ -469,7 +721,9 @@ impl Engine {
         result: Result<Box<BatchPrepared>, CoreError>,
     ) {
         {
-            let Some(batch) = self.export_batch.as_mut() else { return };
+            let Some(batch) = self.export_batch.as_mut() else {
+                return;
+            };
             if batch.id != batch_id {
                 return;
             }
@@ -493,7 +747,9 @@ impl Engine {
     /// keep the decode pipeline full, finish when all slots are accounted for.
     fn batch_advance(&mut self) {
         let start = {
-            let Some(batch) = self.export_batch.as_mut() else { return };
+            let Some(batch) = self.export_batch.as_mut() else {
+                return;
+            };
             if batch.cur.is_none() {
                 batch.prepared.take()
             } else {
@@ -505,7 +761,9 @@ impl Engine {
         }
         self.spawn_batch_prepare();
         let all_done = {
-            let Some(batch) = self.export_batch.as_ref() else { return };
+            let Some(batch) = self.export_batch.as_ref() else {
+                return;
+            };
             batch.finished == batch.paths.len()
         };
         if all_done {
@@ -516,7 +774,10 @@ impl Engine {
     fn batch_begin_render(&mut self, index: usize, p: Box<BatchPrepared>) {
         let (look, path) = {
             let batch = self.export_batch.as_ref().expect("batch state");
-            (batch.look, batch.paths[index].to_string_lossy().into_owned())
+            (
+                batch.look,
+                batch.paths[index].to_string_lossy().into_owned(),
+            )
         };
         let Some(gpu) = &self.gpu else {
             if let Some(batch) = self.export_batch.as_mut() {
@@ -537,12 +798,8 @@ impl Engine {
         let masks_gpu: Vec<(String, wgpu::Texture)> = masks
             .into_iter()
             .map(|(id, _hash, m)| {
-                let t = crate::graph::upload_small_mask(
-                    gpu,
-                    &m.data,
-                    m.width as u32,
-                    m.height as u32,
-                );
+                let t =
+                    crate::graph::upload_small_mask(gpu, &m.data, m.width as u32, m.height as u32);
                 (id, t)
             })
             .collect();
@@ -590,8 +847,12 @@ impl Engine {
     }
 
     pub(super) fn export_batch_step(&mut self) {
-        let Some(batch) = self.export_batch.as_ref() else { return };
-        let Some(img) = batch.cur.as_ref() else { return };
+        let Some(batch) = self.export_batch.as_ref() else {
+            return;
+        };
+        let Some(img) = batch.cur.as_ref() else {
+            return;
+        };
         if img.encoding {
             return;
         }
@@ -768,7 +1029,9 @@ impl Engine {
         result: Result<String, CoreError>,
     ) {
         let path = {
-            let Some(batch) = self.export_batch.as_mut() else { return };
+            let Some(batch) = self.export_batch.as_mut() else {
+                return;
+            };
             if batch.id != batch_id {
                 return;
             }
@@ -786,7 +1049,9 @@ impl Engine {
     }
 
     fn batch_finish(&mut self, cancelled: bool) {
-        let Some(batch) = self.export_batch.take() else { return };
+        let Some(batch) = self.export_batch.take() else {
+            return;
+        };
         tracing::info!(
             ok = batch.ok.len(),
             failed = batch.failed.len(),
@@ -828,7 +1093,9 @@ fn prepare_batch_image(path: &Path, skip_edits: bool) -> Result<BatchPrepared, C
     };
     let index = crate::profile::ProfileIndex::embedded();
     let chosen = crate::profile::choose_profile(&meta, &index, doc.meta.profile_file.as_deref());
-    let profile_path = chosen.as_ref().map(|p| crate::profile::profile_path(&p.file));
+    let profile_path = chosen
+        .as_ref()
+        .map(|p| crate::profile::profile_path(&p.file));
     let dcp = if skip_edits {
         None
     } else {

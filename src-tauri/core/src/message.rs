@@ -64,6 +64,21 @@ pub struct FrameStats {
     pub luma: Vec<u32>,
     pub clip_high_pct: f32,
     pub clip_low_pct: f32,
+    /// Compact luma waveform: `waveform_w` columns × `waveform_h` luma rows.
+    #[serde(default)]
+    pub waveform: Vec<u32>,
+    #[serde(default)]
+    pub waveform_w: u32,
+    #[serde(default)]
+    pub waveform_h: u32,
+    /// Rec.709-style vectorscope: `vectorscope_size²` bins, U×V from display RGB.
+    #[serde(default)]
+    pub vectorscope: Vec<u32>,
+    #[serde(default)]
+    pub vectorscope_size: u32,
+    /// RGB parade waveform, 3 planes packed R then G then B, each `waveform_w * waveform_h`.
+    #[serde(default)]
+    pub parade: Vec<u32>,
 }
 
 #[derive(Debug, Clone, Copy, Serialize)]
@@ -79,16 +94,33 @@ pub struct FrameInfo {
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase", tag = "type")]
 pub enum EngineEvent {
-    PreviewReady { version: u64 },
-    ImageReady { version: u64 },
-    FrameReady { version: u64 },
-    DecodeError { message: String },
+    PreviewReady {
+        version: u64,
+    },
+    ImageReady {
+        version: u64,
+    },
+    FrameReady {
+        version: u64,
+    },
+    DecodeError {
+        message: String,
+    },
     /// Canonical doc changed (op/undo/redo/restore) — frontend reconciles.
-    DocUpdated { delta: serde_json::Value },
+    DocUpdated {
+        delta: serde_json::Value,
+    },
     /// A segmentation mask finished inference and is now rendering.
-    MaskReady { id: String },
-    ImportProgress { done: u64, total: u64 },
-    ImportDone { total: u64 },
+    MaskReady {
+        id: String,
+    },
+    ImportProgress {
+        done: u64,
+        total: u64,
+    },
+    ImportDone {
+        total: u64,
+    },
     /// Catalog rows changed (ratings/flags/imports) — grids should refresh.
     CatalogChanged,
     /// Tiled export progress (phase: "render" | "encode", done/total tiles or 1/1).
@@ -114,7 +146,9 @@ pub enum EngineEvent {
         cancelled: bool,
     },
     /// Engine thread recovered from a panic; UI should prompt restart.
-    EngineCrashed { message: String },
+    EngineCrashed {
+        message: String,
+    },
     /// AI denoise job progress (tiles).
     DenoiseProgress {
         job: u64,
@@ -122,11 +156,18 @@ pub enum EngineEvent {
         tile: u32,
         tiles: u32,
     },
-    DenoiseDone { job: u64 },
-    DenoiseError { job: u64, message: String },
+    DenoiseDone {
+        job: u64,
+    },
+    DenoiseError {
+        job: u64,
+        message: String,
+    },
     /// Object-removal / heal rebuild finished.
     RetouchDone,
-    RetouchError { message: String },
+    RetouchError {
+        message: String,
+    },
 }
 
 pub enum EngineMsg {
@@ -288,6 +329,13 @@ pub enum EngineMsg {
     SetLut {
         path: Option<String>,
         reply: oneshot::Sender<Result<(), CoreError>>,
+    },
+    ListLooks {
+        reply: oneshot::Sender<Vec<crate::look::LookInfo>>,
+    },
+    SeekVideo {
+        frame: u32,
+        reply: oneshot::Sender<Result<ImageMeta, CoreError>>,
     },
     /// Change the demosaic algorithm for the current image and re-decode it.
     SetDemosaic {

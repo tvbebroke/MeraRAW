@@ -41,14 +41,20 @@ fn main() -> ExitCode {
         }
     };
     let truth = merawler::demosaic(&cfa, merawler::Algorithm::Rcd).expect("rcd");
-    eprintln!("      truth: {}x{} (sensor orientation)", truth.width, truth.height);
+    eprintln!(
+        "      truth: {}x{} (sensor orientation)",
+        truth.width, truth.height
+    );
 
     // --- candidate: zerawler native decode (levels forced to rawler's so the
     // normalization matches the ground truth exactly)
     eprintln!("[2/4] zerawler native {} decode…", algo.name());
     let engine = Engine::detect();
     let opts = rawler_levels(raw);
-    eprintln!("      forcing levels: black={:?} white={:?}", opts.black, opts.white);
+    eprintln!(
+        "      forcing levels: black={:?} white={:?}",
+        opts.black, opts.white
+    );
     let dec = match engine.decode_opts(raw, algo, Mode::Native, opts) {
         Ok(d) => d,
         Err(e) => {
@@ -114,7 +120,10 @@ fn main() -> ExitCode {
 
     println!("\n=== RT NATIVE VALIDATION ===");
     println!("rotation: {rot}   offset: ({dx},{dy})   alignment ncc: {ncc:.5}");
-    println!("best transfer curve: {trc}   relative residual: {:.3}%", fit.residual * 100.0);
+    println!(
+        "best transfer curve: {trc}   relative residual: {:.3}%",
+        fit.residual * 100.0
+    );
     println!("affine matrix (rows map RT [r,g,b,1] -> merawler channel):");
     for r in 0..3 {
         println!(
@@ -136,7 +145,11 @@ fn main() -> ExitCode {
     let off_ratio = max_off / mean_diag;
     println!(
         "diag: [{:.4} {:.4} {:.4}]  spread {:.2}%  max off-diag/diag {:.2}%",
-        diag[0], diag[1], diag[2], diag_spread * 100.0, off_ratio * 100.0
+        diag[0],
+        diag[1],
+        diag[2],
+        diag_spread * 100.0,
+        off_ratio * 100.0
     );
 
     // Interpretation guide (ground truth = camera-native unity-WB linear):
@@ -185,9 +198,13 @@ fn rawler_levels(raw: &Path) -> zerawler::DecodeOpts {
     use rawler::decoders::RawDecodeParams;
     use rawler::rawsource::RawSource;
     let mut opts = zerawler::DecodeOpts::default();
-    let Ok(source) = RawSource::new(raw) else { return opts };
+    let Ok(source) = RawSource::new(raw) else {
+        return opts;
+    };
     let loader = rawler::RawLoader::new();
-    let Ok(decoder) = loader.get_decoder(&source) else { return opts };
+    let Ok(decoder) = loader.get_decoder(&source) else {
+        return opts;
+    };
     let Ok(img) = decoder.raw_image(&source, &RawDecodeParams::default(), true) else {
         return opts;
     };
@@ -215,7 +232,11 @@ fn rot90cw(src: &RgbImage) -> RgbImage {
             data[y * wd + x] = src.data[(hs - 1 - x) * ws + y];
         }
     }
-    RgbImage { width: wd, height: hd, data }
+    RgbImage {
+        width: wd,
+        height: hd,
+        data,
+    }
 }
 
 fn rot90ccw(src: &RgbImage) -> RgbImage {
@@ -227,7 +248,11 @@ fn rot90ccw(src: &RgbImage) -> RgbImage {
             data[y * wd + x] = src.data[x * ws + (ws - 1 - y)];
         }
     }
-    RgbImage { width: wd, height: hd, data }
+    RgbImage {
+        width: wd,
+        height: hd,
+        data,
+    }
 }
 
 /// Best (dx,dy) placing `z`'s origin inside `truth`, by NCC on green over a
@@ -299,8 +324,8 @@ fn collect_samples(
         for zx in (margin..z.width - margin).step_by(stride) {
             let (tx, ty) = (zx + dx, zy + dy);
             let g = |x: usize, y: usize| truth.data[y * truth.width + x][1];
-            let grad = (g(tx + 1, ty) - g(tx - 1, ty)).abs()
-                + (g(tx, ty + 1) - g(tx, ty - 1)).abs();
+            let grad =
+                (g(tx + 1, ty) - g(tx - 1, ty)).abs() + (g(tx, ty + 1) - g(tx, ty - 1)).abs();
             if grad > 0.02 {
                 continue;
             }
@@ -357,7 +382,9 @@ fn solve4(a: [[f64; 4]; 4], b: [f64; 4]) -> [f64; 4] {
         m[r][4] = b[r];
     }
     for col in 0..4 {
-        let piv = (col..4).max_by(|&i, &j| m[i][col].abs().partial_cmp(&m[j][col].abs()).unwrap()).unwrap();
+        let piv = (col..4)
+            .max_by(|&i, &j| m[i][col].abs().partial_cmp(&m[j][col].abs()).unwrap())
+            .unwrap();
         m.swap(col, piv);
         let p = m[col][col];
         if p.abs() < 1e-12 {
@@ -374,7 +401,11 @@ fn solve4(a: [[f64; 4]; 4], b: [f64; 4]) -> [f64; 4] {
     }
     let mut out = [0.0f64; 4];
     for r in 0..4 {
-        out[r] = if m[r][r].abs() > 1e-12 { m[r][4] / m[r][r] } else { 0.0 };
+        out[r] = if m[r][r].abs() > 1e-12 {
+            m[r][4] / m[r][r]
+        } else {
+            0.0
+        };
     }
     out
 }

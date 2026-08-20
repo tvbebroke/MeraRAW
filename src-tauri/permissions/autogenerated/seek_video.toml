@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-seek-video"
+description = "Enables the seek_video command without any pre-configured scope."
+commands.allow = ["seek_video"]
+
+[[permission]]
+identifier = "deny-seek-video"
+description = "Denies the seek_video command without any pre-configured scope."
+commands.deny = ["seek_video"]

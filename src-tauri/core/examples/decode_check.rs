@@ -30,7 +30,9 @@ fn view_transform(c: [f32; 3]) -> [f32; 3] {
 fn main() {
     let mut args = std::env::args().skip(1);
     let path = PathBuf::from(args.next().expect("usage: decode_check <raw> [out.png]"));
-    let out = args.next().unwrap_or_else(|| "/tmp/decode_check.png".into());
+    let out = args
+        .next()
+        .unwrap_or_else(|| "/tmp/decode_check.png".into());
 
     let dec = RawlerDecoder::default();
     assert!(dec.probe(&path), "probe rejected {}", path.display());
@@ -42,9 +44,18 @@ fn main() {
     let m = &img.meta;
     println!("camera:   {} {}", m.camera_make, m.camera_model);
     println!("lens:     {:?}", m.lens);
-    println!("iso/shutter/f: {:?} {:?} {:?}", m.iso, m.shutter, m.aperture);
-    println!("dims:     {}x{} (orientation {})", m.width, m.height, m.orientation);
-    println!("as-shot wb: {:?}  est CCT: {:?}", m.as_shot_wb, m.estimated_cct);
+    println!(
+        "iso/shutter/f: {:?} {:?} {:?}",
+        m.iso, m.shutter, m.aperture
+    );
+    println!(
+        "dims:     {}x{} (orientation {})",
+        m.width, m.height, m.orientation
+    );
+    println!(
+        "as-shot wb: {:?}  est CCT: {:?}",
+        m.as_shot_wb, m.estimated_cct
+    );
     println!("decode:   {decode_ms} ms");
 
     let buf = &img.working;
@@ -69,7 +80,10 @@ fn main() {
     println!("pixels >1.0 (headroom): {:.3}%", 100.0 * over1 as f32 / n);
 
     // sanity tripwires
-    assert!(mean.iter().all(|v| *v > 0.0005 && *v < 4.0), "implausible mean {mean:?}");
+    assert!(
+        mean.iter().all(|v| *v > 0.0005 && *v < 4.0),
+        "implausible mean {mean:?}"
+    );
     assert!(minv.iter().all(|v| *v >= 0.0), "negatives leaked");
     let gray_ratio_rg = mean[0] / mean[1];
     let gray_ratio_bg = mean[2] / mean[1];

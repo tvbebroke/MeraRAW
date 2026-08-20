@@ -14,6 +14,8 @@ pub fn decoder_for(path: &Path) -> Box<dyn Decoder> {
     let raw = RawlerDecoder::default();
     if raw.probe(path) {
         Box::new(raw)
+    } else if crate::video::is_video_path(path) {
+        Box::new(crate::video::VideoDecoder)
     } else {
         Box::new(StandardDecoder)
     }
@@ -31,6 +33,7 @@ use std::path::Path;
 pub enum ImageKind {
     Raw,
     Rendered,
+    Video,
 }
 
 impl ImageKind {
@@ -54,6 +57,8 @@ impl ImageKind {
 pub fn effective_display_look(kind: ImageKind, user_look: u32) -> u32 {
     match kind {
         ImageKind::Rendered if user_look != 2 => 3,
+        // Rec.709 video is display-referred like a JPEG; Filmic (2) stays creative.
+        ImageKind::Video if user_look != 2 => 3,
         _ => user_look,
     }
 }
@@ -109,6 +114,21 @@ pub struct ImageMeta {
     /// Input color space label for rendered files (e.g. "Display P3", "sRGB").
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub input_color_space: Option<String>,
+    /// Present only for `ImageKind::Video`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub video: Option<VideoMeta>,
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct VideoMeta {
+    pub fps: f32,
+    pub frame_count: u32,
+    pub duration_s: f32,
+    pub frame: u32,
+    pub in_frame: u32,
+    pub out_frame: u32,
+    pub input_transform: String,
 }
 
 /// Which demosaic algorithm runs at decode time. `Rawler` = rawler's built-in
@@ -298,7 +318,10 @@ mod tests {
         assert_eq!(effective_display_look(ImageKind::Rendered, 2), 2);
         assert_eq!(effective_display_look(ImageKind::Raw, 1), 1);
         assert_eq!(effective_display_look(ImageKind::Raw, 0), 0);
+        assert_eq!(effective_display_look(ImageKind::Video, 0), 3);
+        assert_eq!(effective_display_look(ImageKind::Video, 2), 2);
         assert!(!ImageKind::Rendered.allows_raw_only_stages());
+        assert!(!ImageKind::Video.allows_raw_only_stages());
         assert!(ImageKind::Raw.allows_raw_only_stages());
     }
 

@@ -21,7 +21,9 @@ use std::path::PathBuf;
 fn main() {
     let mut args = std::env::args().skip(1);
     let path = PathBuf::from(args.next().expect("usage: export_check <raw> [out_dir]"));
-    let out_dir = args.next().unwrap_or_else(|| "/tmp/meratech-exports".into());
+    let out_dir = args
+        .next()
+        .unwrap_or_else(|| "/tmp/meratech-exports".into());
 
     let dec = RawlerDecoder::default();
     let img = dec.decode(&path).expect("decode");
@@ -49,7 +51,14 @@ fn main() {
         ("color_grade.highlights_sat", json!(14)),
         ("color_grade.perceptual_sat", json!(12)),
     ] {
-        apply_op(&mut doc, &Op::SetParam { path: p.into(), value: v }).unwrap();
+        apply_op(
+            &mut doc,
+            &Op::SetParam {
+                path: p.into(),
+                value: v,
+            },
+        )
+        .unwrap();
     }
 
     // tiled full-res linear render
@@ -80,7 +89,12 @@ fn main() {
             }
         }
     }
-    println!("tiled linear render {}x{} in {} ms", w, h, t0.elapsed().as_millis());
+    println!(
+        "tiled linear render {}x{} in {} ms",
+        w,
+        h,
+        t0.elapsed().as_millis()
+    );
 
     for (target, name) in [
         (TargetSpace::Srgb, "srgb"),
@@ -97,6 +111,11 @@ fn main() {
             metadata_policy: Default::default(),
             strip_metadata: false,
             copyright: None,
+            video_clip: false,
+            output_stem: None,
+            video_in: None,
+            video_out: None,
+            video_audio: true,
         };
         let (lin, rw, rh) = resize_linear(full.clone(), w, h, 2048);
         let mut enc = output_transform(&lin, rw, rh, target, false, false);

@@ -173,7 +173,12 @@ impl AiJobManager {
 
         if let Some(path) = self.cache.lookup(&key)? {
             let id = JobId(NEXT_JOB.fetch_add(1, Ordering::Relaxed));
-            *lock_mutex(&self.state)? = Some((id, JobState::Done { path: Some(path.clone()) }));
+            *lock_mutex(&self.state)? = Some((
+                id,
+                JobState::Done {
+                    path: Some(path.clone()),
+                },
+            ));
             return Ok(Enqueued::Cached(id, path));
         }
 
@@ -393,20 +398,7 @@ fn run_stand_in(
     let mut out = rgb.to_vec();
     let profile = super::profile::NoiseProfile::from_iso(6400);
     let params = super::cpu::ChainParams::from_sliders(
-        &profile,
-        1.0,
-        70.0,
-        60.0,
-        50.0,
-        0.0,
-        &[1.0; 6],
-        &[1.0; 6],
-        false,
-        1,
-        5,
-        30.0,
-        false,
-        1.0,
+        &profile, 1.0, 70.0, 60.0, 50.0, 0.0, &[1.0; 6], &[1.0; 6], false, 1, 5, 30.0, false, 1.0,
     );
     for (i, tile) in tiles.iter().enumerate() {
         if cancel.load(Ordering::SeqCst) {
@@ -781,11 +773,18 @@ mod tests {
         root.push(format!("meraraw-onnx-test-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&root);
         std::fs::create_dir_all(&root).unwrap();
-        std::fs::write(root.join("nind-utnet-v2.onnx"), fixtures::identity_onnx_bytes()).unwrap();
+        std::fs::write(
+            root.join("nind-utnet-v2.onnx"),
+            fixtures::identity_onnx_bytes(),
+        )
+        .unwrap();
 
         let registry = ModelRegistry::with_dir(root.clone());
         let ready = &registry.list()[0];
-        assert!(ready.ready && !ready.stand_in, "fixture model should be ready");
+        assert!(
+            ready.ready && !ready.stand_in,
+            "fixture model should be ready"
+        );
 
         let (tx, rx) = mpsc::channel::<JobNotify>();
         let mut mgr = AiJobManager {

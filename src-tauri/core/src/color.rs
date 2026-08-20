@@ -34,6 +34,46 @@ pub const XYZ_TO_SRGB: Mat3 = [
     [0.0556301, -0.2039770, 1.0569715],
 ];
 
+/// Display P3 (linear) → XYZ (D65). CSS Color 4 / Apple P3.
+pub const DISPLAY_P3_TO_XYZ: Mat3 = [
+    [0.4865709, 0.2656677, 0.1982173],
+    [0.2289746, 0.6917385, 0.0792869],
+    [0.0000000, 0.0451134, 1.0439444],
+];
+
+/// Build an RGB→XYZ matrix from chromaticities (ITU-R BT.709 style).
+/// `r,g,b,w` are (x, y) pairs. White is typically D65 (0.3127, 0.3290).
+pub fn rgb_to_xyz_from_xy(r: (f32, f32), g: (f32, f32), b: (f32, f32), w: (f32, f32)) -> Mat3 {
+    let xy_to_xyz = |x: f32, y: f32| -> [f32; 3] {
+        if y.abs() < 1e-8 {
+            return [0.0, 0.0, 0.0];
+        }
+        [x / y, 1.0, (1.0 - x - y) / y]
+    };
+    let mut xr = xy_to_xyz(r.0, r.1);
+    let mut xg = xy_to_xyz(g.0, g.1);
+    let mut xb = xy_to_xyz(b.0, b.1);
+    let wxyz = xy_to_xyz(w.0, w.1);
+    // X = [Xr Xg Xb]; S = X^{-1} W
+    let x = [
+        [xr[0], xg[0], xb[0]],
+        [xr[1], xg[1], xb[1]],
+        [xr[2], xg[2], xb[2]],
+    ];
+    let inv = mat_inverse(&x).expect("primaries XY invertible");
+    let s = mat_vec(&inv, wxyz);
+    for i in 0..3 {
+        xr[i] *= s[0];
+        xg[i] *= s[1];
+        xb[i] *= s[2];
+    }
+    [
+        [xr[0], xg[0], xb[0]],
+        [xr[1], xg[1], xb[1]],
+        [xr[2], xg[2], xb[2]],
+    ]
+}
+
 pub fn mat_mul(a: &Mat3, b: &Mat3) -> Mat3 {
     let mut out = [[0.0f32; 3]; 3];
     for i in 0..3 {
@@ -120,7 +160,11 @@ fn cbrt_signed(v: f32) -> f32 {
 pub fn rec2020_to_oklab(rgb: [f32; 3]) -> [f32; 3] {
     let m = oklab_mats();
     let lms = mat_vec(&m.rec2020_to_lms, rgb);
-    let lms_p = [cbrt_signed(lms[0]), cbrt_signed(lms[1]), cbrt_signed(lms[2])];
+    let lms_p = [
+        cbrt_signed(lms[0]),
+        cbrt_signed(lms[1]),
+        cbrt_signed(lms[2]),
+    ];
     mat_vec(&m.m2, lms_p)
 }
 
@@ -306,11 +350,7 @@ impl CameraCalibration {
             .iter()
             .filter(|(_, m)| m.len() >= 9)
             .map(|(ill, m)| {
-                let mat = [
-                    [m[0], m[1], m[2]],
-                    [m[3], m[4], m[5]],
-                    [m[6], m[7], m[8]],
-                ];
+                let mat = [[m[0], m[1], m[2]], [m[3], m[4], m[5]], [m[6], m[7], m[8]]];
                 (illuminant_cct(ill), mat)
             })
             .collect();
@@ -441,7 +481,11 @@ mod tests {
         for i in 0..3 {
             for j in 0..3 {
                 let want = if i == j { 1.0 } else { 0.0 };
-                assert!(approx(prod[i][j], want, 1e-4), "prod[{i}][{j}]={}", prod[i][j]);
+                assert!(
+                    approx(prod[i][j], want, 1e-4),
+                    "prod[{i}][{j}]={}",
+                    prod[i][j]
+                );
             }
         }
     }
@@ -483,13 +527,15 @@ mod tests {
 
     #[test]
     fn oklab_round_trips() {
-        for rgb in [[0.18, 0.18, 0.18], [0.6, 0.2, 0.1], [0.05, 0.4, 0.7], [1.5, 1.2, 0.9]] {
+        for rgb in [
+            [0.18, 0.18, 0.18],
+            [0.6, 0.2, 0.1],
+            [0.05, 0.4, 0.7],
+            [1.5, 1.2, 0.9],
+        ] {
             let back = oklab_to_rec2020(rec2020_to_oklab(rgb));
             for c in 0..3 {
-                assert!(
-                    (back[c] - rgb[c]).abs() < 2e-3,
-                    "{rgb:?} → {back:?}"
-                );
+                assert!((back[c] - rgb[c]).abs() < 2e-3, "{rgb:?} → {back:?}");
             }
         }
     }
@@ -545,7 +591,10 @@ mod tests {
         let (temp, tint) = solve_wb_for_neutral(cast, 5200.0);
         let fixed = mat_vec(&wb_matrix_rec2020(temp, tint, 5200.0), cast);
         let g = fixed[1];
-        assert!((fixed[0] / g - 1.0).abs() < 0.01, "{fixed:?} temp={temp} tint={tint}");
+        assert!(
+            (fixed[0] / g - 1.0).abs() < 0.01,
+            "{fixed:?} temp={temp} tint={tint}"
+        );
         assert!((fixed[2] / g - 1.0).abs() < 0.01, "{fixed:?}");
     }
 
@@ -565,6 +614,9 @@ mod tests {
         let cal = CameraCalibration::from_rawler(&cm);
         let m = cal.cam_to_rec2020(&[2.0, 1.0, 1.5, f32::NAN]).unwrap();
         let out = mat_vec(&m, [1.0, 1.0, 1.0]);
-        assert!(approx(out[0], out[1], 1e-3) && approx(out[1], out[2], 1e-3), "{out:?}");
+        assert!(
+            approx(out[0], out[1], 1e-3) && approx(out[1], out[2], 1e-3),
+            "{out:?}"
+        );
     }
 }

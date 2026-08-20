@@ -42,8 +42,8 @@ async fn denoise_events_flow_end_to_end() {
     use std::path::PathBuf;
     use std::time::Duration;
 
-    let raw = PathBuf::from(std::env::var("HOME").unwrap())
-        .join("Desktop/test-claude-raw/DSC07078.ARW");
+    let raw =
+        PathBuf::from(std::env::var("HOME").unwrap()).join("Desktop/test-claude-raw/DSC07078.ARW");
     if !raw.is_file() {
         eprintln!("fixture raw missing — skipping");
         return;

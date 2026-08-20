@@ -314,12 +314,7 @@ pub(super) fn make_mask_tex(gpu: &GpuContext, w: u32, h: u32, label: &str) -> wg
 
 /// Upload a small CPU segmentation mask as an R16Float texture
 /// (filterable — sampled by mask_sample.wgsl).
-pub fn upload_small_mask(
-    gpu: &GpuContext,
-    data: &[f32],
-    w: u32,
-    h: u32,
-) -> wgpu::Texture {
+pub fn upload_small_mask(gpu: &GpuContext, data: &[f32], w: u32, h: u32) -> wgpu::Texture {
     let tex = make_tex(
         gpu,
         w,
@@ -550,8 +545,14 @@ impl RenderGraph {
             mask_sample,
             blend,
             sampler,
-            extract_uniforms: mk_uniform(std::mem::size_of::<ExtractUniforms>() as u64, "extract-u"),
-            present_uniforms: mk_uniform(std::mem::size_of::<PresentUniforms>() as u64, "present-u"),
+            extract_uniforms: mk_uniform(
+                std::mem::size_of::<ExtractUniforms>() as u64,
+                "extract-u",
+            ),
+            present_uniforms: mk_uniform(
+                std::mem::size_of::<PresentUniforms>() as u64,
+                "present-u",
+            ),
             node_uniforms,
             lut_buffer,
             lut3d_buffer,

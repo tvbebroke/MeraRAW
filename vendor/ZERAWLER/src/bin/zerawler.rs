@@ -53,7 +53,11 @@ fn main() -> ExitCode {
                    --native       linear camera-native output contract\n  \
                -o, --out <file>   output image (.png or .tif; default <input>_<algo>.png)\n"
         );
-        return if args.is_empty() { ExitCode::FAILURE } else { ExitCode::SUCCESS };
+        return if args.is_empty() {
+            ExitCode::FAILURE
+        } else {
+            ExitCode::SUCCESS
+        };
     }
 
     let mut input: Option<PathBuf> = None;

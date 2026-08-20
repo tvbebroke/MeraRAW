@@ -1,9 +1,11 @@
-import { push } from "svelte-spa-router";
-import { leftRailCollapsed, isZenMode, imageBrowserCollapsed, photos, activePhoto, photoDetailsCollapsed, commandPaletteOpen } from "../stores/editor";
+import { push, router } from "svelte-spa-router";
+import { leftRailCollapsed, isZenMode, imageBrowserCollapsed, photoDetailsCollapsed, commandPaletteOpen } from "../stores/editor";
 import { isSettingsOpen, isExportOpen, isBugReportOpen, classicLook, isShortcutsOpen } from "../stores/ui";
 import { applyEditFocus, showAiPanel } from "./editor/focus";
-import { openPhoto } from "../stores/browse";
-import { router } from "svelte-spa-router";
+import { activePhoto, libraryItems, openPhoto } from "../stores/browse";
+import { imageMeta } from "../stores/app";
+import { editorRoute, isEditorRoute, isLibraryRoute, libraryRoute, workspace } from "../stores/workspace";
+import { copyGrade, pasteGrade } from "./grade";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -40,8 +42,12 @@ function isOnRoute(path: string): boolean {
   return router.location === path;
 }
 
+function isEditVideo(): boolean {
+  return isEditorRoute() && imageMeta.get()?.kind === "video";
+}
+
 function prevPhoto() {
-  const list = photos.get();
+  const list = libraryItems.get();
   if (!list.length) return;
   const current = activePhoto.get();
   const idx = current ? list.findIndex((p) => p.path === current.path) : -1;
@@ -50,7 +56,7 @@ function prevPhoto() {
 }
 
 function nextPhoto() {
-  const list = photos.get();
+  const list = libraryItems.get();
   if (!list.length) return;
   const current = activePhoto.get();
   const idx = current ? list.findIndex((p) => p.path === current.path) : -1;
@@ -104,11 +110,23 @@ export function handleGlobalShortcut(e: KeyboardEvent): void {
 
     // ⌘F — Focus search bar (Library)
     if (key === "f" && !shift) {
-      if (isOnRoute("/library")) {
+      if (isLibraryRoute()) {
         e.preventDefault();
         const searchInput = document.querySelector<HTMLInputElement>(".search-input");
         searchInput?.focus();
       }
+      return;
+    }
+
+    // ⌘⇧C / ⌘⇧V — Copy / Paste Grade (not system clipboard)
+    if (shift && key === "c") {
+      e.preventDefault();
+      void copyGrade();
+      return;
+    }
+    if (shift && key === "v") {
+      e.preventDefault();
+      void pasteGrade();
       return;
     }
 
@@ -131,13 +149,13 @@ export function handleGlobalShortcut(e: KeyboardEvent): void {
 
   // G — Library
   if (key === "g") {
-    safePush("/library");
+    safePush(libraryRoute());
     return;
   }
 
-  // D — Edit
+  // D — Edit / Grade
   if (key === "d") {
-    safePush("/edit");
+    safePush(editorRoute());
     return;
   }
 
@@ -157,11 +175,44 @@ export function handleGlobalShortcut(e: KeyboardEvent): void {
     return;
   }
 
-  // I — Toggle details panel (Library)
+  // I — mark In on video; details panel on Library
   if (key === "i") {
-    if (isOnRoute("/library")) {
+    if (isEditVideo()) {
+      window.dispatchEvent(new CustomEvent("meraraw:mark-in"));
+      return;
+    }
+    if (isLibraryRoute()) {
       photoDetailsCollapsed.set(!photoDetailsCollapsed.get());
     }
+    return;
+  }
+
+  if (key === "o" && isEditVideo()) {
+    window.dispatchEvent(new CustomEvent("meraraw:mark-out"));
+    return;
+  }
+
+  if (key === " " && isEditVideo()) {
+    e.preventDefault();
+    window.dispatchEvent(new CustomEvent("meraraw:video-play"));
+    return;
+  }
+
+  if (key === "j" && isEditVideo()) {
+    window.dispatchEvent(new CustomEvent("meraraw:video-reverse"));
+    return;
+  }
+  if (key === "k" && isEditVideo()) {
+    window.dispatchEvent(new CustomEvent("meraraw:video-pause"));
+    return;
+  }
+
+  if (key === "[" ) {
+    window.dispatchEvent(new CustomEvent("meraraw:look-prev"));
+    return;
+  }
+  if (key === "]") {
+    window.dispatchEvent(new CustomEvent("meraraw:look-next"));
     return;
   }
 
@@ -198,14 +249,17 @@ export function handleGlobalShortcut(e: KeyboardEvent): void {
     return;
   }
   if (key === "2") {
+    if (workspace.get() === "video") return;
     applyEditFocus("crop");
     return;
   }
   if (key === "3") {
+    if (workspace.get() === "video") return;
     applyEditFocus("mask");
     return;
   }
   if (key === "4") {
+    if (workspace.get() === "video") return;
     applyEditFocus("retouch");
     return;
   }
@@ -218,21 +272,30 @@ export function handleGlobalShortcut(e: KeyboardEvent): void {
     return;
   }
 
-  // ArrowLeft / ArrowRight — navigate photos (already handled in ImageBrowser
-  // but we add it here too for when the filmstrip doesn't have focus)
+  // ArrowLeft / ArrowRight — frame-step on video, otherwise navigate photos
   if (key === "arrowleft") {
+    if (isEditVideo()) {
+      e.preventDefault();
+      window.dispatchEvent(new CustomEvent("meraraw:video-step", { detail: -1 }));
+      return;
+    }
     prevPhoto();
     return;
   }
   if (key === "arrowright") {
+    if (isEditVideo()) {
+      e.preventDefault();
+      window.dispatchEvent(new CustomEvent("meraraw:video-step", { detail: 1 }));
+      return;
+    }
     nextPhoto();
     return;
   }
 
   // Enter — Open selected photo in editor (Library)
   if (key === "enter") {
-    if (isOnRoute("/library") && activePhoto.get()) {
-      safePush("/edit");
+    if (isLibraryRoute() && activePhoto.get()) {
+      safePush(editorRoute());
     }
     return;
   }
@@ -259,6 +322,13 @@ export const shortcutLabels = {
   zenMode: "T",
   zoom: "Z",
   compare: "\\",
+  lookPrev: "[",
+  lookNext: "]",
+  videoPlay: "Space",
+  markIn: "I",
+  markOut: "O",
+  copyGrade: `${MOD}⇧C`,
+  pasteGrade: `${MOD}⇧V`,
   toolEdit: "1",
   toolCrop: "2",
   toolMask: "3",

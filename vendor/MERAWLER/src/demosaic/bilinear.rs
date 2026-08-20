@@ -6,8 +6,8 @@
 //! Out-of-bounds neighbors are skipped rather than clamped, so a clamped
 //! coordinate can never contribute the wrong CFA color.
 
-use crate::image::{CfaImage, RgbImage};
 use super::Demosaic;
+use crate::image::{CfaImage, RgbImage};
 
 pub struct Bilinear;
 
@@ -75,8 +75,8 @@ fn avg_color_neighbors(cfa: &CfaImage, x: usize, y: usize, color: u8) -> f32 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::demosaic::tests_common::{max_interior_error, mosaic_from_fn};
     use crate::image::CfaPattern;
-    use crate::demosaic::tests_common::{mosaic_from_fn, max_interior_error};
 
     #[test]
     fn constant_field_reconstructs_exactly() {

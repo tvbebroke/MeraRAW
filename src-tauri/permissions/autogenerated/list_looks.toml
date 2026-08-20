@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-list-looks"
+description = "Enables the list_looks command without any pre-configured scope."
+commands.allow = ["list_looks"]
+
+[[permission]]
+identifier = "deny-list-looks"
+description = "Denies the list_looks command without any pre-configured scope."
+commands.deny = ["list_looks"]

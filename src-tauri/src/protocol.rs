@@ -55,10 +55,7 @@ fn request_origin(request: &http::Request<Vec<u8>>) -> &'static str {
     allowed_origin(hdr)
 }
 
-fn cors_headers(
-    builder: http::response::Builder,
-    origin: &'static str,
-) -> http::response::Builder {
+fn cors_headers(builder: http::response::Builder, origin: &'static str) -> http::response::Builder {
     builder
         .header("Access-Control-Allow-Origin", origin)
         .header("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS")
@@ -81,11 +78,7 @@ pub fn handle_thumb_request<R: Runtime>(
     let uri = request.uri().clone();
     let origin = request_origin(&request);
     tauri::async_runtime::spawn(async move {
-        let id: i64 = uri
-            .path()
-            .trim_start_matches('/')
-            .parse()
-            .unwrap_or(-1);
+        let id: i64 = uri.path().trim_start_matches('/').parse().unwrap_or(-1);
         let tier = uri
             .query()
             .and_then(|q| q.split('&').find_map(|kv| kv.strip_prefix("tier=")))

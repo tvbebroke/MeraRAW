@@ -12,5 +12,8 @@
   <Disclosure label="Advanced">
     <ParamRow path="tone_curve.lights" label="Whites" />
     <ParamRow path="tone_curve.darks" label="Blacks" />
+    <ParamRow path="effects.clarity" label="Clarity" />
+    <ParamRow path="effects.vignette_amount" label="Vignette" />
+    <ParamRow path="effects.vignette_midpoint" label="Vignette mid" />
   </Disclosure>
 </CollapsibleSection>

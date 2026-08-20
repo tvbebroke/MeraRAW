@@ -37,7 +37,7 @@ export interface BrowseRoot {
 export interface ImageMeta {
   path: string;
   /** "raw" = sensor data; "rendered" = already-processed (JPEG/PNG/…). */
-  kind: "raw" | "rendered";
+  kind: "raw" | "rendered" | "video";
   /** Uppercase format tag, e.g. "ARW", "JPEG", "PNG". */
   format: string;
   /** Source bit depth per channel (8/16); 0 = unknown (RAW). */
@@ -68,6 +68,15 @@ export interface ImageMeta {
   gpsLon?: number | null;
   /** Rendered-file input color space label (e.g. "Display P3", "sRGB"). */
   inputColorSpace?: string | null;
+  video?: {
+    fps: number;
+    frameCount: number;
+    durationS: number;
+    frame: number;
+    inFrame: number;
+    outFrame: number;
+    inputTransform: string;
+  } | null;
 }
 
 export interface ViewParams {
@@ -253,6 +262,13 @@ export interface FrameStats {
   luma: number[];
   clipHighPct: number;
   clipLowPct: number;
+  waveform?: number[];
+  waveformW?: number;
+  waveformH?: number;
+  vectorscope?: number[];
+  vectorscopeSize?: number;
+  /** RGB parade waveform: 3 planes packed R then G then B. */
+  parade?: number[];
 }
 
 export type MetadataPolicy = "preserve" | "stripGps" | "stripAll";
@@ -269,6 +285,12 @@ export interface ExportSettings {
   stripMetadata?: boolean;
   copyright?: string | null;
   watermarkText?: string | null;
+  videoClip?: boolean;
+  outputStem?: string | null;
+  videoIn?: number | null;
+  videoOut?: number | null;
+  /** Copy source audio into the muxed clip when possible. Default true. */
+  videoAudio?: boolean;
 }
 
 export interface ExportProgress {

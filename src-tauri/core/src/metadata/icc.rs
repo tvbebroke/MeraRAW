@@ -112,8 +112,8 @@ fn rec2020_linear_profile() -> Result<Profile, CoreError> {
 }
 
 fn lcms_to_rec2020(src: &[f32], n: usize, icc: &[u8]) -> Result<Vec<f32>, CoreError> {
-    let src_prof = Profile::new_icc(icc)
-        .map_err(|e| CoreError::Decode(format!("ICC parse: {e:?}")))?;
+    let src_prof =
+        Profile::new_icc(icc).map_err(|e| CoreError::Decode(format!("ICC parse: {e:?}")))?;
     let dst_prof = rec2020_linear_profile()?;
     let transform = Transform::new(
         &src_prof,
@@ -235,8 +235,8 @@ fn extract_tiff_icc(path: &Path) -> Result<Option<Vec<u8>>, CoreError> {
     use tiff::decoder::Decoder;
     use tiff::tags::Tag;
     let f = File::open(path).map_err(|e| CoreError::Decode(e.to_string()))?;
-    let mut dec = Decoder::new(BufReader::new(f))
-        .map_err(|e| CoreError::Decode(format!("tiff: {e}")))?;
+    let mut dec =
+        Decoder::new(BufReader::new(f)).map_err(|e| CoreError::Decode(format!("tiff: {e}")))?;
     match dec.get_tag_u8_vec(Tag::IccProfile) {
         Ok(v) if !v.is_empty() => Ok(Some(v)),
         _ => Ok(None),
@@ -263,9 +263,7 @@ mod tests {
     #[test]
     fn srgb_icc_round_trip_close_to_matrix() {
         let srgb = Profile::new_srgb();
-        let bytes = srgb
-            .icc()
-            .expect("srgb profile serializes");
+        let bytes = srgb.icc().expect("srgb profile serializes");
         let src = vec![0.8f32, 0.2, 0.1];
         let via_icc = encoded_rgb_to_working(&src, 1, 1, Some(&bytes)).unwrap();
         let via_mat = encoded_rgb_to_working(&src, 1, 1, None).unwrap();

@@ -24,11 +24,13 @@ export const SECTION_PREFIXES: Record<SectionId, string[]> = {
     "color_grade.highlights_",
     "color_grade.shadow_range",
     "color_grade.highlight_range",
+    "lut.",
+    "effects.grain_",
   ],
   crop: ["crop."],
   mask: [],
   retouch: [],
-  camera: ["calibration.", "lut."],
+  camera: ["calibration.", "input."],
   presets: [],
 };
 
@@ -60,7 +62,7 @@ export function sectionIsModified(
   if (id === "mask") return (d?.masks?.length ?? 0) > 0;
   if (id === "retouch") return (d?.retouch?.length ?? 0) > 0;
   if (id === "curve" && curveModified(d)) return true;
-  if (id === "camera" && (d?.meta as { lut_file?: string } | undefined)?.lut_file) return true;
+  if (id === "grading" && (d?.meta as { lut_file?: string } | undefined)?.lut_file) return true;
   for (const spec of specsFor(id, specs)) {
     if (spec.path.startsWith("tone_curve.points")) continue;
     const v = effectiveValue(d, spec, meta, maskId);
@@ -99,6 +101,10 @@ export async function resetSection(
       reconcile(await setParam(path, []));
     }
     return;
+  }
+  if (id === "grading") {
+    const { setLut } = await import("../../ipc/commands");
+    await setLut(null).catch(() => {});
   }
   for (const spec of specsFor(id, specs)) {
     if (spec.path.startsWith("tone_curve.points")) continue;

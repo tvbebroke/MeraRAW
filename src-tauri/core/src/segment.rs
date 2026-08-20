@@ -42,10 +42,7 @@ fn model() -> Result<&'static TractModel, CoreError> {
                 .and_then(|m| {
                     m.with_input_fact(
                         0,
-                        InferenceFact::dt_shape(
-                            f32::datum_type(),
-                            tvec!(1, 3, NET_SIZE, NET_SIZE),
-                        ),
+                        InferenceFact::dt_shape(f32::datum_type(), tvec!(1, 3, NET_SIZE, NET_SIZE)),
                     )
                 })
                 .and_then(|m| m.into_optimized())
@@ -79,8 +76,7 @@ impl Segmenter for TractSegmenter {
                 }
             }
         }
-        let tensor =
-            Tensor::from_shape(&[1, 3, NET_SIZE, NET_SIZE], &input).map_err(tr_err)?;
+        let tensor = Tensor::from_shape(&[1, 3, NET_SIZE, NET_SIZE], &input).map_err(tr_err)?;
         let result = plan.run(tvec!(tensor.into())).map_err(tr_err)?;
         let view = result[0].view();
         let raw: Vec<f32> = view.as_slice::<f32>().map_err(tr_err)?.to_vec();

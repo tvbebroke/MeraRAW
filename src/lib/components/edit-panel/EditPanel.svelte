@@ -16,6 +16,13 @@
   import PresetSettings from "./PresetSettings.svelte";
   import Histogram from "../histogram/Histogram.svelte";
   import AgentPanel from "../shell/AgentPanel.svelte";
+  import { workspace } from "../../../stores/workspace";
+
+  const isVideo = $derived($workspace === "video");
+
+  $effect(() => {
+    if (isVideo && $rightPanelMode === "ai") rightPanelMode.set("edit");
+  });
 </script>
 
 <div class="edit-rail">
@@ -28,18 +35,20 @@
       class:is-active={$rightPanelMode === "edit"}
       onclick={() => rightPanelMode.set("edit")}
     >
-      Edit
+      {isVideo ? "Grade" : "Edit"}
     </button>
-    <button
-      type="button"
-      role="tab"
-      aria-selected={$rightPanelMode === "ai"}
-      class="edit-tab"
-      class:is-active={$rightPanelMode === "ai"}
-      onclick={() => showAiPanel()}
-    >
-      AI
-    </button>
+    {#if !isVideo}
+      <button
+        type="button"
+        role="tab"
+        aria-selected={$rightPanelMode === "ai"}
+        class="edit-tab"
+        class:is-active={$rightPanelMode === "ai"}
+        onclick={() => showAiPanel()}
+      >
+        AI
+      </button>
+    {/if}
   </div>
 
   {#if $rightPanelMode === "ai"}
@@ -49,19 +58,29 @@
   {:else}
     <div class="edit-body">
       {#if !$imageOpen}
-        <p class="rail-empty empty">Open a photo to start editing.</p>
+        <p class="rail-empty empty">
+          {isVideo ? "Open a clip to start grading." : "Open a photo to start editing."}
+        </p>
       {:else}
         <div class="acc-list custom-scrollbar">
-          <LightSettings />
-          <ColorSettings />
-          <ToneCurve />
-          <DetailSettings />
-          <GradingSettings />
-          <CropSettings />
-          <MaskSettings />
-          <RetouchSettings />
-          <CameraSettings />
-          <PresetSettings />
+          {#if isVideo}
+            <LightSettings />
+            <ColorSettings />
+            <GradingSettings />
+            <CameraSettings mode="video" />
+            <PresetSettings />
+          {:else}
+            <LightSettings />
+            <ColorSettings />
+            <ToneCurve />
+            <DetailSettings />
+            <GradingSettings />
+            <CropSettings />
+            <MaskSettings />
+            <RetouchSettings />
+            <CameraSettings mode="photo" />
+            <PresetSettings />
+          {/if}
         </div>
       {/if}
     </div>

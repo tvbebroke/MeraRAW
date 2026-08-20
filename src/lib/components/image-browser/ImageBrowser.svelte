@@ -6,13 +6,16 @@
   import { imageBrowserCollapsed } from "../../../stores/editor";
   import { isExportOpen } from "../../../stores/ui";
   import { shortcutLabels } from "../../shortcuts";
-  import { push } from "svelte-spa-router";
+  import { push, router } from "svelte-spa-router";
   import {
     activePhoto,
+    libraryItems,
     openPhoto,
-    photos,
     thumbUrl,
   } from "../../../stores/browse";
+  import { imageMeta } from "../../../stores/app";
+  import { editorRoute, isEditorRoute, workspace } from "../../../stores/workspace";
+  import { isVideoPath } from "../../media";
 
   let {
     onResizeStart,
@@ -43,7 +46,8 @@
   function handleKeydown(e: KeyboardEvent) {
     if (isEditableTarget(e.target)) return;
     if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
-    const list = photos.get();
+    if (isEditorRoute(router.location) && imageMeta.get()?.kind === "video") return;
+    const list = libraryItems.get();
     if (!list.length) return;
     const current = activePhoto.get();
     const currentIndex = current ? list.findIndex((p) => p.path === current.path) : -1;
@@ -73,9 +77,9 @@
 
   // ── Context Menu ─────────────────────────────────────────────
   let ctxMenu = $state<{ x: number; y: number } | null>(null);
-  let ctxPhoto = $state<(typeof $photos)[0] | null>(null);
+  let ctxPhoto = $state<(typeof $libraryItems)[0] | null>(null);
 
-  function handleThumbContextMenu(e: MouseEvent, photo: (typeof $photos)[0]) {
+  function handleThumbContextMenu(e: MouseEvent, photo: (typeof $libraryItems)[0]) {
     e.preventDefault();
     e.stopPropagation();
     ctxPhoto = photo;
@@ -93,10 +97,10 @@
   const ctxItems = $derived<ContextMenuItem[]>([
     {
       type: "item",
-      label: "Open in editor",
+      label: $workspace === "video" ? "Open in video editor" : "Open in editor",
       shortcut: shortcutLabels.openPhoto,
       onclick: () => {
-        if (ctxPhoto) { void openPhoto(ctxPhoto); safePush("/edit"); }
+        if (ctxPhoto) { void openPhoto(ctxPhoto); safePush(editorRoute()); }
       },
     },
     {
@@ -108,10 +112,10 @@
     { type: "separator" },
     {
       type: "item",
-      label: "Previous photo",
+      label: $workspace === "video" ? "Previous clip" : "Previous photo",
       shortcut: shortcutLabels.prevPhoto,
       onclick: () => {
-        const list = photos.get();
+        const list = libraryItems.get();
         const current = activePhoto.get();
         const idx = current ? list.findIndex((p) => p.path === current.path) : -1;
         if (idx > 0) void openPhoto(list[idx - 1]);
@@ -119,10 +123,10 @@
     },
     {
       type: "item",
-      label: "Next photo",
+      label: $workspace === "video" ? "Next clip" : "Next photo",
       shortcut: shortcutLabels.nextPhoto,
       onclick: () => {
-        const list = photos.get();
+        const list = libraryItems.get();
         const current = activePhoto.get();
         const idx = current ? list.findIndex((p) => p.path === current.path) : -1;
         if (idx >= 0 && idx < list.length - 1) void openPhoto(list[idx + 1]);
@@ -175,7 +179,7 @@
     onwheel={handleWheel}
     class="flex min-w-0 flex-1 items-center gap-[10px] overflow-x-auto pl-[28px] transition-[opacity,transform] duration-200 {$imageBrowserCollapsed ? 'pointer-events-none opacity-0' : 'opacity-100'}"
   >
-    {#each $photos as photo (photo.path)}
+    {#each $libraryItems as photo (photo.path)}
       <button
         type="button"
         class="filmstrip-card {$activePhoto?.path === photo.path ? 'filmstrip-card--active' : ''}"
@@ -191,10 +195,15 @@
             class="filmstrip-img"
           />
         {:else}
-          <span class="filmstrip-placeholder text-[11px] text-secondary">RAW</span>
+          <span class="filmstrip-placeholder text-[11px] text-secondary">{isVideoPath(photo.filename) ? "CLIP" : "RAW"}</span>
         {/if}
       </button>
     {/each}
+    {#if $libraryItems.length === 0 && !$imageBrowserCollapsed}
+      <p class="empty-state px-2 text-[11px] text-subtle">
+        {$workspace === "video" ? "No clips in this folder." : "No photos in this folder."}
+      </p>
+    {/if}
   </div>
 </GlassPanel>
 

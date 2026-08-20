@@ -8,6 +8,7 @@ use tauri::{AppHandle, Manager};
 
 const LICENSE_PUBLIC_KEY_PEM: &str = include_str!("../license-public.pem");
 const TOKEN_FILE: &str = "license.jwt";
+const EMAIL_FILE: &str = "license.email";
 /// Must match the issuer written by verify-license (Supabase Edge Function).
 const LICENSE_ISS: &str = "https://meratech.co";
 /// Audience bound to this desktop app.
@@ -39,6 +40,7 @@ pub struct SupporterStatusResult {
 pub struct LicenseCheckResult {
     pub licensed: bool,
     pub user_id: Option<String>,
+    pub email: Option<String>,
     pub reason: Option<String>,
 }
 
@@ -48,6 +50,67 @@ fn token_path(app: &AppHandle) -> Result<PathBuf, AppError> {
         .app_data_dir()
         .map_err(|e| AppError::Internal(format!("app data dir: {e}")))?;
     Ok(dir.join(TOKEN_FILE))
+}
+
+fn email_path(app: &AppHandle) -> Result<PathBuf, AppError> {
+    let dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| AppError::Internal(format!("app data dir: {e}")))?;
+    Ok(dir.join(EMAIL_FILE))
+}
+
+fn read_saved_email(app: &AppHandle) -> Option<String> {
+    let path = email_path(app).ok()?;
+    let raw = std::fs::read_to_string(path).ok()?;
+    let email = raw.trim().to_lowercase();
+    if email.is_empty() || !email.contains('@') {
+        None
+    } else {
+        Some(email)
+    }
+}
+
+fn save_email(app: &AppHandle, email: &str) -> Result<(), AppError> {
+    let path = email_path(app)?;
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)
+            .map_err(|e| AppError::Internal(format!("create app data dir: {e}")))?;
+    }
+    std::fs::write(&path, email.trim().to_lowercase())
+        .map_err(|e| AppError::Internal(format!("write license email: {e}")))?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let _ = std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600));
+    }
+    Ok(())
+}
+
+pub(crate) fn normalize_email(raw: &str) -> Result<String, AppError> {
+    let email = raw.trim().to_lowercase();
+    let (user, host) = email
+        .split_once('@')
+        .ok_or_else(|| AppError::Internal("Enter a valid email address.".into()))?;
+    if user.is_empty()
+        || host.is_empty()
+        || !host.contains('.')
+        || email.chars().any(char::is_whitespace)
+        || email.len() > 254
+    {
+        return Err(AppError::Internal("Enter a valid email address.".into()));
+    }
+    Ok(email)
+}
+
+pub(crate) fn parse_otp(raw: &str) -> Result<String, AppError> {
+    let digits: String = raw.chars().filter(|c| c.is_ascii_digit()).collect();
+    if digits.len() != 6 {
+        return Err(AppError::Internal(
+            "Enter the 6-digit code from your email.".into(),
+        ));
+    }
+    Ok(digits)
 }
 
 fn verify_token(token: &str) -> Result<LicenseClaims, AppError> {
@@ -86,7 +149,10 @@ fn license_skip_enabled() -> bool {
 
 #[cfg(debug_assertions)]
 fn license_relax_iss_aud_enabled() -> bool {
-    std::env::var("MERARAW_LICENSE_RELAX_ISS_AUD").ok().as_deref() == Some("1")
+    std::env::var("MERARAW_LICENSE_RELAX_ISS_AUD")
+        .ok()
+        .as_deref()
+        == Some("1")
 }
 
 #[cfg(not(debug_assertions))]
@@ -100,6 +166,7 @@ pub fn license_check_local(app: AppHandle) -> LicenseCheckResult {
         return LicenseCheckResult {
             licensed: true,
             user_id: Some("beta-skip".into()),
+            email: None,
             reason: None,
         };
     }
@@ -111,6 +178,7 @@ pub fn license_check_local(app: AppHandle) -> LicenseCheckResult {
             return LicenseCheckResult {
                 licensed: false,
                 user_id: None,
+                email: read_saved_email(&app),
                 reason: Some("license unavailable".into()),
             };
         }
@@ -122,6 +190,7 @@ pub fn license_check_local(app: AppHandle) -> LicenseCheckResult {
             return LicenseCheckResult {
                 licensed: false,
                 user_id: None,
+                email: read_saved_email(&app),
                 reason: Some("no saved license".into()),
             };
         }
@@ -131,6 +200,7 @@ pub fn license_check_local(app: AppHandle) -> LicenseCheckResult {
         Ok(claims) => LicenseCheckResult {
             licensed: true,
             user_id: Some(claims.sub),
+            email: read_saved_email(&app),
             reason: None,
         },
         Err(e) => {
@@ -138,6 +208,7 @@ pub fn license_check_local(app: AppHandle) -> LicenseCheckResult {
             LicenseCheckResult {
                 licensed: false,
                 user_id: None,
+                email: read_saved_email(&app),
                 reason: Some("invalid license".into()),
             }
         }
@@ -170,6 +241,11 @@ pub fn license_clear_token(app: AppHandle) -> Result<(), AppError> {
         std::fs::remove_file(&path)
             .map_err(|e| AppError::Internal(format!("remove license token: {e}")))?;
     }
+    if let Ok(email_file) = email_path(&app) {
+        if email_file.exists() {
+            let _ = std::fs::remove_file(&email_file);
+        }
+    }
     Ok(())
 }
 
@@ -190,7 +266,9 @@ fn supabase_url() -> Result<String, AppError> {
     let parsed = url::Url::parse(&raw)
         .map_err(|_| AppError::Internal("Invalid VITE_SUPABASE_URL.".into()))?;
     if parsed.scheme() != "https" {
-        return Err(AppError::Internal("VITE_SUPABASE_URL must be https.".into()));
+        return Err(AppError::Internal(
+            "VITE_SUPABASE_URL must be https.".into(),
+        ));
     }
     let host = parsed
         .host_str()
@@ -210,13 +288,10 @@ fn supabase_anon_key() -> String {
 
 async fn http_text(resp: reqwest::Response) -> Result<String, AppError> {
     let status = resp.status();
-    let body = resp
-        .text()
-        .await
-        .map_err(|e| {
-            tracing::warn!(error = %e, "license http read failed");
-            AppError::Internal("Could not read server response.".into())
-        })?;
+    let body = resp.text().await.map_err(|e| {
+        tracing::warn!(error = %e, "license http read failed");
+        AppError::Internal("Could not read server response.".into())
+    })?;
     if status.is_success() {
         Ok(body)
     } else {
@@ -230,6 +305,14 @@ async fn http_text(resp: reqwest::Response) -> Result<String, AppError> {
             "Server missing LICENSE_SIGNING_PRIVATE_KEY in Supabase secrets."
         } else if status.as_u16() == 404 {
             "Server endpoint not found. Deploy the required Supabase Edge Function."
+        } else if status.as_u16() == 429 {
+            "Wait a moment before requesting another code."
+        } else if body.to_lowercase().contains("expired") || body.contains("otp_expired") {
+            "That code expired. Request a new one."
+        } else if body.to_lowercase().contains("invalid")
+            && (body.to_lowercase().contains("token") || body.to_lowercase().contains("otp"))
+        {
+            "That code didn't match. Check the email and try again."
         } else if status.as_u16() == 401 || status.as_u16() == 403 {
             "Authentication failed."
         } else {
@@ -239,6 +322,128 @@ async fn http_text(resp: reqwest::Response) -> Result<String, AppError> {
     }
 }
 
+async fn activate_with_access_token(
+    app: &AppHandle,
+    access_token: &str,
+    email: Option<&str>,
+) -> Result<String, AppError> {
+    let base = supabase_url()?;
+    let anon = supabase_anon_key();
+    let client = reqwest::Client::new();
+    let auth_header = format!("Bearer {access_token}");
+
+    let _ = client
+        .post(format!("{base}/functions/v1/grant-beta-license"))
+        .header("apikey", &anon)
+        .header("Authorization", &auth_header)
+        .send()
+        .await;
+
+    let verify_resp = client
+        .post(format!("{base}/functions/v1/verify-license"))
+        .header("apikey", &anon)
+        .header("Authorization", &auth_header)
+        .send()
+        .await
+        .map_err(|e| {
+            AppError::Internal(format!(
+                "Activation request failed ({e}). Deploy verify-license in Supabase."
+            ))
+        })?;
+
+    let verify_body = http_text(verify_resp).await?;
+    let verify: serde_json::Value = serde_json::from_str(&verify_body)
+        .map_err(|e| AppError::Internal(format!("Activation response: {e}")))?;
+    let token = verify["token"]
+        .as_str()
+        .ok_or_else(|| AppError::Internal("Activation did not return a license token.".into()))?;
+
+    save_token(app, token)?;
+    if let Some(email) = email {
+        let _ = save_email(app, email);
+    }
+    Ok(verify["user_id"].as_str().unwrap_or("").to_string())
+}
+
+/// Email OTP via Supabase Auth. Delivery is the project's Auth SMTP (Resend).
+#[tauri::command]
+pub async fn license_request_otp(email: String) -> Result<(), AppError> {
+    let email = normalize_email(&email)?;
+    let base = supabase_url()?;
+    let anon = supabase_anon_key();
+    let client = reqwest::Client::new();
+
+    let resp = client
+        .post(format!("{base}/auth/v1/otp"))
+        .header("apikey", &anon)
+        .header("Content-Type", "application/json")
+        .json(&serde_json::json!({
+            "email": email,
+            "create_user": true,
+        }))
+        .send()
+        .await
+        .map_err(|e| {
+            AppError::Internal(format!(
+                "Could not reach the sign-in service ({e}). Check your internet connection."
+            ))
+        })?;
+
+    http_text(resp).await.map(|_| ())
+}
+
+/// Confirm the 6-digit email code, grant beta, persist the offline license JWT.
+#[tauri::command]
+pub async fn license_verify_otp(
+    app: AppHandle,
+    email: String,
+    code: String,
+) -> Result<LicenseCheckResult, AppError> {
+    let email = normalize_email(&email)?;
+    let code = parse_otp(&code)?;
+    let base = supabase_url()?;
+    let anon = supabase_anon_key();
+    let client = reqwest::Client::new();
+
+    let resp = client
+        .post(format!("{base}/auth/v1/verify"))
+        .header("apikey", &anon)
+        .header("Content-Type", "application/json")
+        .json(&serde_json::json!({
+            "type": "email",
+            "email": email,
+            "token": code,
+        }))
+        .send()
+        .await
+        .map_err(|e| {
+            AppError::Internal(format!(
+                "Could not reach the sign-in service ({e}). Check your internet connection."
+            ))
+        })?;
+
+    let body = http_text(resp).await?;
+    let auth: serde_json::Value = serde_json::from_str(&body)
+        .map_err(|e| AppError::Internal(format!("Sign-in response: {e}")))?;
+    let access_token = auth["access_token"]
+        .as_str()
+        .ok_or_else(|| AppError::Internal("Sign-in did not return a session.".into()))?;
+    let user_id = auth["user"]["id"].as_str().unwrap_or("").to_string();
+
+    let _ = activate_with_access_token(&app, access_token, Some(&email)).await?;
+
+    Ok(LicenseCheckResult {
+        licensed: true,
+        user_id: if user_id.is_empty() {
+            None
+        } else {
+            Some(user_id)
+        },
+        email: Some(email),
+        reason: None,
+    })
+}
+
 /// Sign in + grant beta + verify license over native HTTPS (avoids WKWebView "Load failed").
 #[tauri::command]
 pub async fn license_sign_in_and_activate(
@@ -246,8 +451,8 @@ pub async fn license_sign_in_and_activate(
     email: String,
     password: String,
 ) -> Result<String, AppError> {
-    let email = email.trim();
-    if email.is_empty() || password.is_empty() {
+    let email = normalize_email(&email)?;
+    if password.is_empty() {
         return Err(AppError::Internal("Enter email and password.".into()));
     }
 
@@ -285,42 +490,9 @@ pub async fn license_sign_in_and_activate(
     let access_token = auth["access_token"]
         .as_str()
         .ok_or_else(|| AppError::Internal("Sign-in did not return a session.".into()))?;
-    let user_id = auth["user"]["id"]
-        .as_str()
-        .unwrap_or("")
-        .to_string();
+    let user_id = auth["user"]["id"].as_str().unwrap_or("").to_string();
 
-    let auth_header = format!("Bearer {access_token}");
-
-    // Best-effort beta row (same as website).
-    let _ = client
-        .post(format!("{base}/functions/v1/grant-beta-license"))
-        .header("apikey", &anon)
-        .header("Authorization", &auth_header)
-        .send()
-        .await;
-
-    let verify_resp = client
-        .post(format!("{base}/functions/v1/verify-license"))
-        .header("apikey", &anon)
-        .header("Authorization", &auth_header)
-        .send()
-        .await
-        .map_err(|e| {
-            AppError::Internal(format!(
-                "Activation request failed ({e}). Deploy verify-license in Supabase."
-            ))
-        })?;
-
-    let verify_body = http_text(verify_resp).await?;
-
-    let verify: serde_json::Value = serde_json::from_str(&verify_body)
-        .map_err(|e| AppError::Internal(format!("Activation response: {e}")))?;
-    let token = verify["token"]
-        .as_str()
-        .ok_or_else(|| AppError::Internal("Activation did not return a license token.".into()))?;
-
-    save_token(&app, token)?;
+    let _ = activate_with_access_token(&app, access_token, Some(&email)).await?;
     Ok(user_id)
 }
 
@@ -430,4 +602,28 @@ pub async fn license_start_checkout(email: String, password: String) -> Result<S
 #[tauri::command]
 pub fn open_external_url(url: String) -> Result<(), AppError> {
     crate::open_url::open_https_url(&url)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{normalize_email, parse_otp};
+
+    #[test]
+    fn email_normalizes_and_rejects() {
+        assert_eq!(
+            normalize_email("  Kai@Meratech.CO ").unwrap(),
+            "kai@meratech.co"
+        );
+        assert!(normalize_email("not-an-email").is_err());
+        assert!(normalize_email("a@b").is_err());
+        assert!(normalize_email("a @b.com").is_err());
+    }
+
+    #[test]
+    fn otp_accepts_six_digits_and_strips_noise() {
+        assert_eq!(parse_otp("123456").unwrap(), "123456");
+        assert_eq!(parse_otp("123 456").unwrap(), "123456");
+        assert!(parse_otp("12345").is_err());
+        assert!(parse_otp("abcdef").is_err());
+    }
 }

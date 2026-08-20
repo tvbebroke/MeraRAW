@@ -252,7 +252,9 @@ impl Engine {
         dc_known.push(PathBuf::from("/usr/bin/dcraw_emu"));
         #[cfg(windows)]
         {
-            rt_known.push(PathBuf::from(r"C:\Program Files\RawTherapee\rawtherapee-cli.exe"));
+            rt_known.push(PathBuf::from(
+                r"C:\Program Files\RawTherapee\rawtherapee-cli.exe",
+            ));
             rt_known.push(PathBuf::from(
                 r"C:\Program Files\RawTherapee\rawtherapee-cli",
             ));

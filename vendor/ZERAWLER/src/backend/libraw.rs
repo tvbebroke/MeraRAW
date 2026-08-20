@@ -48,7 +48,19 @@ pub fn decode(
     match mode {
         Mode::Native => {
             cmd.args([
-                "-q", quality(algo), "-o", "0", "-r", "1", "1", "1", "1", "-c", "0", "-4", "-T",
+                "-q",
+                quality(algo),
+                "-o",
+                "0",
+                "-r",
+                "1",
+                "1",
+                "1",
+                "1",
+                "-c",
+                "0",
+                "-4",
+                "-T",
             ]);
             // Forcing the host pipeline's own levels makes dcraw's
             // normalization match it exactly (kills the residual uniform

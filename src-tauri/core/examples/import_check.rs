@@ -21,7 +21,10 @@ fn main() {
     }
 
     match catalog::import_one(&files[0]) {
-        Ok(f) => eprintln!("import_one ok: {} ({}x{})", f.path, f.meta.width, f.meta.height),
+        Ok(f) => eprintln!(
+            "import_one ok: {} ({}x{})",
+            f.path, f.meta.width, f.meta.height
+        ),
         Err(e) => {
             eprintln!("import_one failed: {e}");
             std::process::exit(3);

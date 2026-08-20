@@ -33,6 +33,48 @@ impl Engine {
             }
         }
         let n = n.max(1) as f32;
+        const WW: u32 = 128;
+        const WH: u32 = 64;
+        let mut waveform = vec![0u32; (WW * WH) as usize];
+        let mut parade = vec![0u32; (WW * WH * 3) as usize];
+        const VS: u32 = 64;
+        let mut vectorscope = vec![0u32; (VS * VS) as usize];
+        if let Some(frame) = self.latest_frame.as_ref() {
+            for y in 0..frame.height {
+                for x in 0..frame.width {
+                    let i = ((y * frame.width + x) * 4) as usize;
+                    let px = &frame.rgba[i..];
+                    if px[0] == 22 && px[1] == 22 && px[2] == 24 {
+                        continue;
+                    }
+                    let rf = px[0] as f32;
+                    let gf = px[1] as f32;
+                    let bf = px[2] as f32;
+                    let l = 0.2126 * rf + 0.7152 * gf + 0.0722 * bf;
+                    let col = (x as f32 / frame.width.max(1) as f32 * WW as f32) as u32;
+                    let col = col.min(WW - 1);
+                    let row_of = |v: f32| {
+                        WH.saturating_sub(1)
+                            - ((v / 255.0) * (WH - 1) as f32).clamp(0.0, (WH - 1) as f32) as u32
+                    };
+                    let idx = (row_of(l) * WW + col) as usize;
+                    waveform[idx] = waveform[idx].saturating_add(1);
+                    for (plane, v) in [rf, gf, bf].into_iter().enumerate() {
+                        let pidx = (plane as u32 * WW * WH + row_of(v) * WW + col) as usize;
+                        parade[pidx] = parade[pidx].saturating_add(1);
+                    }
+                    // Rec.709 luma-subtracted chroma, origin at center.
+                    let cb = (bf - l) / 255.0; // ~[-1,1]
+                    let cr = (rf - l) / 255.0;
+                    let vx =
+                        ((cr * 0.5 + 0.5) * (VS - 1) as f32).clamp(0.0, (VS - 1) as f32) as u32;
+                    let vy = ((1.0 - (cb * 0.5 + 0.5)) * (VS - 1) as f32)
+                        .clamp(0.0, (VS - 1) as f32) as u32;
+                    let vsi = (vy * VS + vx) as usize;
+                    vectorscope[vsi] = vectorscope[vsi].saturating_add(1);
+                }
+            }
+        }
         Some(crate::message::FrameStats {
             bins: BINS,
             r,
@@ -41,6 +83,12 @@ impl Engine {
             luma,
             clip_high_pct: 100.0 * hi as f32 / n,
             clip_low_pct: 100.0 * lo as f32 / n,
+            waveform,
+            waveform_w: WW,
+            waveform_h: WH,
+            vectorscope,
+            vectorscope_size: VS,
+            parade,
         })
     }
     pub(super) fn wb_from_point(&mut self, x: f32, y: f32) -> Result<DocDelta, CoreError> {
@@ -130,7 +178,8 @@ impl Engine {
         }
         // Rendered rasters skip Neutral/Camera/Original view-looks (those are
         // RAW rendering). See `effective_display_look`.
-        let display_look = crate::raw::effective_display_look(cur.meta.kind, self.display_look);
+        let display_look =
+            crate::lut::present_look_for(cur.meta.kind, self.display_look, cur.doc());
         {
             let g = self.graph.as_mut().unwrap();
             g.set_look(display_look);
@@ -246,7 +295,8 @@ impl Engine {
             .map(|(id, (_, tex))| (id.clone(), tex.create_view(&Default::default())))
             .collect();
         let graph = self.preview_graph.as_mut().unwrap();
-        let display_look = crate::raw::effective_display_look(cur.meta.kind, self.display_look);
+        let display_look =
+            crate::lut::present_look_for(cur.meta.kind, self.display_look, cur.doc());
         graph.set_look(display_look);
         graph.invalidate_all();
         let dcp = if cur.meta.kind.allows_raw_only_stages()
@@ -269,7 +319,10 @@ impl Engine {
             dcp,
             cur.lut_cube.as_deref(),
         )?;
-        let rgb: Vec<u8> = rgba.chunks_exact(4).flat_map(|p| [p[0], p[1], p[2]]).collect();
+        let rgb: Vec<u8> = rgba
+            .chunks_exact(4)
+            .flat_map(|p| [p[0], p[1], p[2]])
+            .collect();
         let img = image::RgbImage::from_raw(view.out_w, view.out_h, rgb)
             .ok_or_else(|| CoreError::Engine("preview buffer".into()))?;
         let mut out = Vec::new();
@@ -278,7 +331,11 @@ impl Engine {
             .map_err(|e| CoreError::Engine(e.to_string()))?;
         Ok(out)
     }
-    pub(super) fn sample_color(&self, x: f32, y: f32) -> Result<crate::message::SampledColor, CoreError> {
+    pub(super) fn sample_color(
+        &self,
+        x: f32,
+        y: f32,
+    ) -> Result<crate::message::SampledColor, CoreError> {
         let cur = self.current.as_ref().ok_or(CoreError::NoImage)?;
         let small = cur.small_cpu.as_ref().ok_or(CoreError::NoImage)?;
         let (w, h) = (small.width, small.height);
@@ -287,10 +344,7 @@ impl Engine {
         let i = (cy * w + cx) * 3;
         let lin = [small.data[i], small.data[i + 1], small.data[i + 2]];
         // friendly display value (same math as the present shader)
-        let m = crate::color::mat_mul(
-            &crate::color::XYZ_TO_SRGB,
-            &crate::color::REC2020_TO_XYZ,
-        );
+        let m = crate::color::mat_mul(&crate::color::XYZ_TO_SRGB, &crate::color::REC2020_TO_XYZ);
         let srgb_lin = crate::color::mat_vec(&m, lin);
         let l = 0.2126 * srgb_lin[0].max(0.0)
             + 0.7152 * srgb_lin[1].max(0.0)

@@ -59,7 +59,14 @@ fn stderr_tail(stderr: &[u8]) -> String {
         return String::new();
     }
     let s = String::from_utf8_lossy(stderr);
-    let tail: String = s.chars().rev().take(400).collect::<String>().chars().rev().collect();
+    let tail: String = s
+        .chars()
+        .rev()
+        .take(400)
+        .collect::<String>()
+        .chars()
+        .rev()
+        .collect();
     format!("; stderr tail: {tail}")
 }
 
@@ -82,7 +89,13 @@ mod tests {
         cmd.arg("30");
         let started = Instant::now();
         let err = run_with_timeout(&mut cmd, Duration::from_millis(300)).unwrap_err();
-        assert!(started.elapsed() < Duration::from_secs(5), "kill was not prompt");
-        assert!(err.to_string().contains("timed out"), "unexpected error: {err}");
+        assert!(
+            started.elapsed() < Duration::from_secs(5),
+            "kill was not prompt"
+        );
+        assert!(
+            err.to_string().contains("timed out"),
+            "unexpected error: {err}"
+        );
     }
 }

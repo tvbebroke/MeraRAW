@@ -6,7 +6,9 @@
   import { push } from "svelte-spa-router";
   import { undo, redo } from "../../../ipc/commands";
   import { reconcile } from "../../../stores/doc";
+  import { copyGrade, pasteGrade } from "../../grade";
   import { shortcutLabels } from "../../shortcuts";
+  import { editorRoute, libraryRoute, setWorkspace, workspace } from "../../../stores/workspace";
 
   interface Cmd {
     id: string;
@@ -14,29 +16,35 @@
     label: string;
     hint?: string;
     keywords?: string;
+    photoOnly?: boolean;
     run: () => void;
   }
 
   const commands: Cmd[] = [
     { id: "light", group: "Edit", label: "Adjust Light", hint: "1", keywords: "exposure contrast highlights shadows", run: () => applyEditFocus("light") },
     { id: "color", group: "Edit", label: "Adjust Color", keywords: "temp tint vibrance saturation mixer", run: () => applyEditFocus("color") },
-    { id: "curve", group: "Edit", label: "Tone Curve", keywords: "rgb curve", run: () => applyEditFocus("curve") },
-    { id: "detail", group: "Edit", label: "Adjust Detail", keywords: "sharp sharpen denoise noise", run: () => applyEditFocus("detail") },
-    { id: "grading", group: "Edit", label: "Color Grading", keywords: "split toning shadows midtones highlights", run: () => applyEditFocus("grading") },
-    { id: "crop", group: "Edit", label: "Crop Image", hint: "2", run: () => applyEditFocus("crop") },
-    { id: "mask", group: "Edit", label: "Mask", hint: "3", run: () => applyEditFocus("mask") },
-    { id: "retouch", group: "Edit", label: "Retouch", hint: "4", keywords: "heal spot object removal", run: () => applyEditFocus("retouch") },
-    { id: "camera", group: "Edit", label: "Camera", keywords: "profile demosaic lut calibration", run: () => applyEditFocus("camera") },
+    { id: "curve", group: "Edit", label: "Tone Curve", keywords: "rgb curve", photoOnly: true, run: () => applyEditFocus("curve") },
+    { id: "detail", group: "Edit", label: "Adjust Detail", keywords: "sharp sharpen denoise noise", photoOnly: true, run: () => applyEditFocus("detail") },
+    { id: "grading", group: "Edit", label: "Color Grading", keywords: "split toning shadows midtones highlights looks", run: () => applyEditFocus("grading") },
+    { id: "crop", group: "Edit", label: "Crop Image", hint: "2", photoOnly: true, run: () => applyEditFocus("crop") },
+    { id: "mask", group: "Edit", label: "Mask", hint: "3", photoOnly: true, run: () => applyEditFocus("mask") },
+    { id: "retouch", group: "Edit", label: "Retouch", hint: "4", keywords: "heal spot object removal", photoOnly: true, run: () => applyEditFocus("retouch") },
+    { id: "camera", group: "Edit", label: "Camera", keywords: "profile demosaic lut calibration log", run: () => applyEditFocus("camera") },
     { id: "presets", group: "Edit", label: "Presets", hint: "5", run: () => applyEditFocus("presets") },
     { id: "ai", group: "Edit", label: "Open AI Agent", hint: "6", run: () => showAiPanel() },
     { id: "compare", group: "View", label: "Compare Before / After", hint: shortcutLabels.compare, run: () => window.dispatchEvent(new CustomEvent("meraraw:toggle-compare")) },
     { id: "filmstrip", group: "View", label: "Toggle Filmstrip", hint: shortcutLabels.filmstrip, run: () => imageBrowserCollapsed.set(!imageBrowserCollapsed.get()) },
     { id: "sidebar", group: "View", label: "Toggle Sidebar", hint: shortcutLabels.sidebar, run: () => leftRailCollapsed.set(!leftRailCollapsed.get()) },
     { id: "zen", group: "View", label: "Toggle Zen Mode", hint: shortcutLabels.zenMode, run: () => isZenMode.set(!isZenMode.get()) },
-    { id: "library", group: "View", label: "Go to Library", hint: shortcutLabels.library, run: () => push("/library") },
+    { id: "library", group: "View", label: "Go to Library", hint: shortcutLabels.library, run: () => push(libraryRoute()) },
+    { id: "grade", group: "View", label: "Go to Editor", hint: shortcutLabels.edit, run: () => push(editorRoute()) },
+    { id: "ws-photo", group: "View", label: "Switch to Photo Editor", keywords: "stills raw meraraw original", run: () => setWorkspace("photo") },
+    { id: "ws-video", group: "View", label: "Switch to Video Editor", keywords: "grade clip lut colorist", run: () => setWorkspace("video") },
     { id: "export", group: "File", label: "Export", hint: shortcutLabels.export, run: () => isExportOpen.set(true) },
     { id: "settings", group: "File", label: "Settings", hint: shortcutLabels.settings, run: () => isSettingsOpen.set(true) },
     { id: "shortcuts", group: "File", label: "Keyboard Shortcuts", run: () => isShortcutsOpen.set(true) },
+    { id: "copy-grade", group: "Edit", label: "Copy Grade", hint: shortcutLabels.copyGrade, keywords: "look lut cdl", run: () => void copyGrade() },
+    { id: "paste-grade", group: "Edit", label: "Paste Grade", hint: shortcutLabels.pasteGrade, keywords: "look lut cdl", run: () => void pasteGrade() },
     { id: "undo", group: "Edit", label: "Undo", hint: shortcutLabels.undo, run: () => void undo().then(reconcile).catch(() => {}) },
     { id: "redo", group: "Edit", label: "Redo", hint: shortcutLabels.redo, run: () => void redo().then(reconcile).catch(() => {}) },
   ];
@@ -46,11 +54,13 @@
   let inputEl = $state<HTMLInputElement | null>(null);
 
   const filtered = $derived.by(() => {
+    const video = $workspace === "video";
     const q = query.trim().toLowerCase();
-    if (!q) return commands;
-    return commands.filter((c) =>
-      `${c.group} ${c.label} ${c.keywords ?? ""}`.toLowerCase().includes(q),
-    );
+    return commands.filter((c) => {
+      if (c.photoOnly && video) return false;
+      if (!q) return true;
+      return `${c.group} ${c.label} ${c.keywords ?? ""}`.toLowerCase().includes(q);
+    });
   });
 
   $effect(() => {

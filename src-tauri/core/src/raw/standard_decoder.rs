@@ -27,7 +27,8 @@ fn is_psd(path: &Path) -> bool {
 fn decode_psd_srgb(path: &Path) -> Result<(Vec<f32>, usize, usize), CoreError> {
     use psd::{ColorMode, Psd};
     let bytes = std::fs::read(path).map_err(|e| CoreError::Decode(format!("psd read: {e}")))?;
-    let doc = Psd::from_bytes(&bytes).map_err(|e| CoreError::Decode(format!("psd parse: {e:?}")))?;
+    let doc =
+        Psd::from_bytes(&bytes).map_err(|e| CoreError::Decode(format!("psd parse: {e:?}")))?;
     if doc.color_mode() != ColorMode::Rgb {
         return Err(CoreError::Decode(format!(
             "PSD color mode {:?} not supported yet — only RGB",
@@ -53,7 +54,8 @@ fn decode_psd_srgb(path: &Path) -> Result<(Vec<f32>, usize, usize), CoreError> {
 fn psd_dimensions(path: &Path) -> Result<(u32, u32), CoreError> {
     use std::io::Read;
     let mut buf = [0u8; 26];
-    let mut f = std::fs::File::open(path).map_err(|e| CoreError::Decode(format!("psd open: {e}")))?;
+    let mut f =
+        std::fs::File::open(path).map_err(|e| CoreError::Decode(format!("psd open: {e}")))?;
     f.read_exact(&mut buf)
         .map_err(|e| CoreError::Decode(format!("psd header: {e}")))?;
     if &buf[0..4] != b"8BPS" {
@@ -119,8 +121,8 @@ fn decode_heic_srgb(path: &Path) -> Result<(Vec<f32>, usize, usize), CoreError> 
             )));
         }
         let result = (|| {
-            let dynimg = image::open(&tmp)
-                .map_err(|e| CoreError::Decode(format!("heic->png read: {e}")))?;
+            let dynimg =
+                image::open(&tmp).map_err(|e| CoreError::Decode(format!("heic->png read: {e}")))?;
             let rgb = dynimg.to_rgb32f();
             let (w, h) = (rgb.width() as usize, rgb.height() as usize);
             Ok((rgb.into_raw(), w, h))
@@ -203,7 +205,9 @@ fn heic_dimensions(path: &Path) -> Result<(u32, u32), CoreError> {
             }
         }
         if w == 0 || h == 0 {
-            return Err(CoreError::Decode("sips: could not read HEIC dimensions".into()));
+            return Err(CoreError::Decode(
+                "sips: could not read HEIC dimensions".into(),
+            ));
         }
         Ok((w, h))
     }
@@ -224,7 +228,13 @@ fn format_tag(path: &Path) -> String {
     }
 }
 
-fn rendered_meta(path: &Path, w: u32, h: u32, bit_depth: u8, color: &metadata::InputColorInfo) -> ImageMeta {
+fn rendered_meta(
+    path: &Path,
+    w: u32,
+    h: u32,
+    bit_depth: u8,
+    color: &metadata::InputColorInfo,
+) -> ImageMeta {
     let mut meta = ImageMeta {
         path: path.to_string_lossy().into_owned(),
         kind: ImageKind::Rendered,
@@ -251,6 +261,7 @@ fn rendered_meta(path: &Path, w: u32, h: u32, bit_depth: u8, color: &metadata::I
         gps_lat: None,
         gps_lon: None,
         input_color_space: Some(color.label.clone()),
+        video: None,
     };
     metadata::enrich_from_file(path, &mut meta);
     meta
@@ -393,9 +404,19 @@ mod tests {
         assert_eq!(out.meta.bit_depth, 8);
         assert_eq!((out.working.width, out.working.height), (4, 2));
         assert_eq!(out.working.data.len(), 4 * 2 * 3);
-        let (r, g, b) = (out.working.data[0], out.working.data[1], out.working.data[2]);
-        assert!((r - 0.216).abs() < 0.02, "sRGB 128 → linear ~0.216, got {r}");
-        assert!((r - g).abs() < 0.01 && (g - b).abs() < 0.01, "gray stays neutral");
+        let (r, g, b) = (
+            out.working.data[0],
+            out.working.data[1],
+            out.working.data[2],
+        );
+        assert!(
+            (r - 0.216).abs() < 0.02,
+            "sRGB 128 → linear ~0.216, got {r}"
+        );
+        assert!(
+            (r - g).abs() < 0.01 && (g - b).abs() < 0.01,
+            "gray stays neutral"
+        );
         let _ = std::fs::remove_file(&path);
     }
 
@@ -414,7 +435,8 @@ mod tests {
             ("gif", "GIF"),
         ] {
             let path = dir.join(format!("meraraw-fmt-{ext}.{ext}"));
-            base.save(&path).unwrap_or_else(|e| panic!("save {ext}: {e}"));
+            base.save(&path)
+                .unwrap_or_else(|e| panic!("save {ext}: {e}"));
             let dec = crate::raw::decoder_for(&path);
             assert!(dec.probe(&path), "probe {ext}");
             let out = dec
@@ -422,9 +444,15 @@ mod tests {
                 .unwrap_or_else(|e| panic!("decode {ext}: {e:?}"));
             assert_eq!(out.meta.kind, ImageKind::Rendered, "{ext} kind");
             assert_eq!(out.meta.format, fmt, "{ext} format");
-            assert_eq!((out.working.width, out.working.height), (8, 6), "{ext} dims");
+            assert_eq!(
+                (out.working.width, out.working.height),
+                (8, 6),
+                "{ext} dims"
+            );
             assert_eq!(out.working.data.len(), 8 * 6 * 3, "{ext} buf len");
-            let m = dec.metadata(&path).unwrap_or_else(|e| panic!("meta {ext}: {e:?}"));
+            let m = dec
+                .metadata(&path)
+                .unwrap_or_else(|e| panic!("meta {ext}: {e:?}"));
             assert_eq!((m.width, m.height), (8, 6), "{ext} meta dims");
             let _ = std::fs::remove_file(&path);
         }

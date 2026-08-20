@@ -95,7 +95,11 @@ fn is_denied(path: &Path) -> bool {
 
     #[cfg(windows)]
     {
-        let deny = ["\\windows\\system32", "\\windows\\syswow64", "\\$recycle.bin"];
+        let deny = [
+            "\\windows\\system32",
+            "\\windows\\syswow64",
+            "\\$recycle.bin",
+        ];
         if deny.iter().any(|d| lower.contains(d)) {
             return true;
         }

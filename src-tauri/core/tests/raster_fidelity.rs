@@ -174,8 +174,7 @@ fn dcp_curve_on_decoded_jpeg_is_the_burnout_passthrough_is_not() {
         .data
         .chunks_exact(3)
         .flat_map(|px| {
-            meratech_core::curve::ProfileToneCurve::adobe_default()
-                .apply_rgb([px[0], px[1], px[2]])
+            meratech_core::curve::ProfileToneCurve::adobe_default().apply_rgb([px[0], px[1], px[2]])
         })
         .collect();
     let burnt = output_transform_look(

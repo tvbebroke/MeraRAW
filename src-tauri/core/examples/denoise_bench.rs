@@ -37,19 +37,7 @@ fn main() {
         let profile = NoiseProfile::from_iso(iso);
         let noisy = add_poisson_gaussian(&clean, &profile, 42 + iso as u64);
         let p = ChainParams::from_sliders(
-            &profile,
-            1.0,
-            55.0,
-            55.0,
-            50.0,
-            0.0,
-            &[1.0; 6],
-            &[1.0; 6],
-            false,
-            1,
-            5,
-            30.0,
-            false,
+            &profile, 1.0, 55.0, 55.0, 50.0, 0.0, &[1.0; 6], &[1.0; 6], false, 1, 5, 30.0, false,
             1.0,
         );
         let t0 = Instant::now();

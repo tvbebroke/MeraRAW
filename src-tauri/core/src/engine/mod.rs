@@ -109,15 +109,23 @@ impl EngineHandle {
     }
 
     pub async fn apply_op(&self, op: Op) -> Result<Result<DocDelta, CoreError>, EngineError> {
-        self.request(|reply| EngineMsg::ApplyOp { op, live: false, reply })
-            .await
+        self.request(|reply| EngineMsg::ApplyOp {
+            op,
+            live: false,
+            reply,
+        })
+        .await
     }
 
     /// Live (interactive drag) variant — coalesced into one undo entry per
     /// gesture; the committing `apply_op` closes the gesture.
     pub async fn apply_op_live(&self, op: Op) -> Result<Result<DocDelta, CoreError>, EngineError> {
-        self.request(|reply| EngineMsg::ApplyOp { op, live: true, reply })
-            .await
+        self.request(|reply| EngineMsg::ApplyOp {
+            op,
+            live: true,
+            reply,
+        })
+        .await
     }
 
     pub async fn undo(&self) -> Result<Result<DocDelta, CoreError>, EngineError> {
@@ -179,9 +187,7 @@ impl EngineHandle {
             .await
     }
 
-    pub async fn get_stats(
-        &self,
-    ) -> Result<Option<crate::message::FrameStats>, EngineError> {
+    pub async fn get_stats(&self) -> Result<Option<crate::message::FrameStats>, EngineError> {
         self.request(|reply| EngineMsg::GetStats { reply }).await
     }
 
@@ -255,16 +261,14 @@ impl EngineHandle {
         self.request(|reply| EngineMsg::ListAlbums { reply }).await
     }
 
-    pub async fn create_album(
-        &self,
-        name: String,
-    ) -> Result<Result<i64, CoreError>, EngineError> {
+    pub async fn create_album(&self, name: String) -> Result<Result<i64, CoreError>, EngineError> {
         self.request(|reply| EngineMsg::CreateAlbum { name, reply })
             .await
     }
 
     pub async fn delete_album(&self, id: i64) -> Result<Result<(), CoreError>, EngineError> {
-        self.request(|reply| EngineMsg::DeleteAlbum { id, reply }).await
+        self.request(|reply| EngineMsg::DeleteAlbum { id, reply })
+            .await
     }
 
     pub async fn add_to_album(
@@ -309,7 +313,20 @@ impl EngineHandle {
         &self,
         path: Option<String>,
     ) -> Result<Result<(), CoreError>, EngineError> {
-        self.request(|reply| EngineMsg::SetLut { path, reply }).await
+        self.request(|reply| EngineMsg::SetLut { path, reply })
+            .await
+    }
+
+    pub async fn list_looks(&self) -> Result<Vec<crate::look::LookInfo>, EngineError> {
+        self.request(|reply| EngineMsg::ListLooks { reply }).await
+    }
+
+    pub async fn seek_video(
+        &self,
+        frame: u32,
+    ) -> Result<Result<ImageMeta, CoreError>, EngineError> {
+        self.request(|reply| EngineMsg::SeekVideo { frame, reply })
+            .await
     }
 
     /// Change the demosaic algorithm and re-decode the current image.
@@ -444,7 +461,8 @@ impl EngineHandle {
     }
 
     pub async fn get_perf_stats(&self) -> Result<crate::message::PerfStats, EngineError> {
-        self.request(|reply| EngineMsg::GetPerfStats { reply }).await
+        self.request(|reply| EngineMsg::GetPerfStats { reply })
+            .await
     }
 
     pub async fn denoise_estimate_profile(
@@ -953,8 +971,7 @@ impl Engine {
                                 partial.modules.insert(m, params.clone());
                             }
                         }
-                        serde_json::to_value(&partial)
-                            .map_err(|e| CoreError::Engine(e.to_string()))
+                        serde_json::to_value(&partial).map_err(|e| CoreError::Engine(e.to_string()))
                     }
                     None => Err(CoreError::NoImage),
                 });
@@ -986,7 +1003,8 @@ impl Engine {
             }
             EngineMsg::SetDisplayLook { look, reply } => {
                 if self.display_look != look {
-                    let was_dcp = crate::profile::DcpProfile::applies_to_display_look(self.display_look);
+                    let was_dcp =
+                        crate::profile::DcpProfile::applies_to_display_look(self.display_look);
                     let now_dcp = crate::profile::DcpProfile::applies_to_display_look(look);
                     self.display_look = look;
                     // Camera toggles the DCP look path — invalidate so look_tex
@@ -1025,10 +1043,7 @@ impl Engine {
                 let _ = reply.send(self.start_import(root, Some(paths)));
             }
             EngineMsg::GetAssetDetail { id, reply } => {
-                let _ = reply.send(
-                    self.catalog_mut()
-                        .and_then(|c| c.asset_detail(id)),
-                );
+                let _ = reply.send(self.catalog_mut().and_then(|c| c.asset_detail(id)));
             }
             EngineMsg::ListAlbums { reply } => {
                 let _ = reply.send(self.catalog_mut().and_then(|c| c.list_albums()));
@@ -1085,14 +1100,17 @@ impl Engine {
             EngineMsg::SetLut { path, reply } => {
                 self.set_lut(path, reply);
             }
+            EngineMsg::ListLooks { reply } => {
+                let _ = reply.send(crate::look::all_looks());
+            }
+            EngineMsg::SeekVideo { frame, reply } => {
+                self.seek_video(frame, reply);
+            }
             EngineMsg::SetDemosaic { algo, reply } => {
                 self.set_demosaic(algo, reply);
             }
             EngineMsg::GetGrid { query, reply } => {
-                let _ = reply.send(
-                    self.catalog_mut()
-                        .and_then(|c| c.grid(&query)),
-                );
+                let _ = reply.send(self.catalog_mut().and_then(|c| c.grid(&query)));
             }
             EngineMsg::ListFolders { reply } => {
                 let _ = reply.send(self.catalog_mut().and_then(|c| c.list_folders()));
@@ -1229,8 +1247,7 @@ impl Engine {
                 let _ = reply.send(self.denoise_ai_start());
             }
             EngineMsg::DenoiseAiCancel { job, reply } => {
-                self.ai_denoise
-                    .cancel(crate::denoise::ai::JobId(job));
+                self.ai_denoise.cancel(crate::denoise::ai::JobId(job));
                 let _ = reply.send(());
             }
             EngineMsg::DenoiseAiReset { reply } => {

@@ -1,10 +1,11 @@
 <script lang="ts">
   import { statusMessage, imageMeta, lastOpenedPath } from "../../../stores/app";
-  import { activePhoto, folder, photos } from "../../../stores/browse";
+  import { activePhoto, folder, libraryItems } from "../../../stores/browse";
   import { isBugReportOpen } from "../../../stores/ui";
+  import { workspace } from "../../../stores/workspace";
 
   const photoIndex = $derived(
-    $activePhoto ? $photos.findIndex((p) => p.path === $activePhoto!.path) + 1 : 0,
+    $activePhoto ? $libraryItems.findIndex((p) => p.path === $activePhoto!.path) + 1 : 0,
   );
 
   function basename(path: string | null | undefined): string {
@@ -69,10 +70,10 @@
   </div>
 
   <div class="flex min-w-0 items-center justify-end gap-3">
-    {#if $photos.length}
+    {#if $libraryItems.length}
       <span>
-        <span class="num">{photoIndex ? `${photoIndex} / ` : ""}{$photos.length}</span>
-        photos
+        <span class="num">{photoIndex ? `${photoIndex} / ` : ""}{$libraryItems.length}</span>
+        {$workspace === "video" ? "clips" : "photos"}
       </span>
     {/if}
     <button

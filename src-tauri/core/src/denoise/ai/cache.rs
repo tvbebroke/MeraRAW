@@ -88,8 +88,8 @@ impl CacheStore {
         if meta.len() as usize > MAX_FILE_BYTES {
             return Err(CoreError::Decode("denoise cache file too large".into()));
         }
-        let bytes =
-            std::fs::read(path).map_err(|e| CoreError::Decode(format!("denoise cache read: {e}")))?;
+        let bytes = std::fs::read(path)
+            .map_err(|e| CoreError::Decode(format!("denoise cache read: {e}")))?;
         if bytes.len() < 16 {
             return Err(CoreError::Decode("denoise cache truncated".into()));
         }

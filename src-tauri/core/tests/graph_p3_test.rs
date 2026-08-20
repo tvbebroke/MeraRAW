@@ -160,7 +160,10 @@ async fn p3_module_behavior() {
     }
     // orange lum lifts skin
     let lifted = rig.render(SKIN, |d| set(d, "hsl.orange.lum", json!(60)));
-    assert!(lifted[1] > base[1] + 3.0, "orange lum: {base:?} → {lifted:?}");
+    assert!(
+        lifted[1] > base[1] + 3.0,
+        "orange lum: {base:?} → {lifted:?}"
+    );
 
     // ---- color_grade: shadows zone leaves highlights alone
     let bright: [f32; 3] = [1.2, 1.2, 1.2];
@@ -189,10 +192,7 @@ async fn p3_module_behavior() {
     // ---- grade saturation: constant-hue chroma move on skin
     let satboost = rig.render(SKIN, |d| set(d, "color_grade.perceptual_sat", json!(60)));
     let dh = (hue_deg(satboost) - hue_deg(base)).abs();
-    assert!(
-        dh.min(360.0 - dh) < 5.0,
-        "sat boost shifted hue by {dh}°"
-    );
+    assert!(dh.min(360.0 - dh) < 5.0, "sat boost shifted hue by {dh}°");
     assert!(sat(satboost) > sat(base), "sat should rise");
 
     // ---- noise + sharpen: flat field is invariant (no fake detail)
@@ -226,7 +226,10 @@ async fn p3_module_behavior() {
     }
     let skin_cal = rig.render(SKIN, |d| set(d, "calibration.red_hue", json!(80)));
     let moved: f32 = (0..3).map(|c| (skin_cal[c] - base[c]).abs()).sum();
-    assert!(moved > 4.0, "calibration had no effect on color: {base:?} → {skin_cal:?}");
+    assert!(
+        moved > 4.0,
+        "calibration had no effect on color: {base:?} → {skin_cal:?}"
+    );
 
     // ---- shadow_tint pushes shadows toward magenta, spares highlights
     let dark_tinted = rig.render(dark, |d| set(d, "calibration.shadow_tint", json!(100)));

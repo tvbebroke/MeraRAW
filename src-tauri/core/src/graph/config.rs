@@ -177,7 +177,7 @@ struct EffectsU {
     vignette_midpoint: f32,
     width: u32,
     height: u32,
-    _pad: u32,
+    frame_index: u32,
 }
 
 fn rows(m: &Mat3) -> ([f32; 4], [f32; 4], [f32; 4]) {
@@ -195,13 +195,19 @@ struct LutU {
     size: u32,
     width: u32,
     height: u32,
-    _p0: u32,
+    shaper: u32,
     dmin: [f32; 4],
     dmax: [f32; 4],
     opacity: f32,
-    _p1: f32,
-    _p2: f32,
-    _p3: f32,
+    interp: u32,
+    kind: u32,
+    _p0: u32,
+    m_in0: [f32; 4],
+    m_in1: [f32; 4],
+    m_in2: [f32; 4],
+    m_out0: [f32; 4],
+    m_out1: [f32; 4],
+    m_out2: [f32; 4],
 }
 
 const IDENTITY: Mat3 = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]];
@@ -265,7 +271,20 @@ pub fn calibration_matrix(
     m
 }
 
-fn oklab_rows() -> ([f32; 4], [f32; 4], [f32; 4], [f32; 4], [f32; 4], [f32; 4], [f32; 4], [f32; 4], [f32; 4], [f32; 4], [f32; 4], [f32; 4]) {
+fn oklab_rows() -> (
+    [f32; 4],
+    [f32; 4],
+    [f32; 4],
+    [f32; 4],
+    [f32; 4],
+    [f32; 4],
+    [f32; 4],
+    [f32; 4],
+    [f32; 4],
+    [f32; 4],
+    [f32; 4],
+    [f32; 4],
+) {
     let m = color::oklab_mats();
     let (k0, k1, k2) = rows(&m.rec2020_to_lms);
     let (ki0, ki1, ki2) = rows(&m.lms_to_rec2020);
@@ -414,25 +433,20 @@ pub fn node_configs(
         let zones = [
             (p("shadows_hue"), p("shadows_sat"), p("shadows_lum")),
             (p("midtones_hue"), p("midtones_sat"), p("midtones_lum")),
-            (p("highlights_hue"), p("highlights_sat"), p("highlights_lum")),
+            (
+                p("highlights_hue"),
+                p("highlights_sat"),
+                p("highlights_lum"),
+            ),
         ];
         let gc = p("global_chroma");
         let ps = p("perceptual_sat");
-        let active = zones.iter().any(|(_, s, l)| *s != 0.0 || *l != 0.0)
-            || gc != 0.0
-            || ps != 0.0;
+        let active = zones.iter().any(|(_, s, l)| *s != 0.0 || *l != 0.0) || gc != 0.0 || ps != 0.0;
         if !active {
             out.push(NodeConfig::Skip);
         } else {
             let (k0, k1, k2, ki0, ki1, ki2, m0, m1, m2r, mi0, mi1, mi2) = oklab_rows();
-            let z = |i: usize| {
-                [
-                    zones[i].0.to_radians(),
-                    zones[i].1,
-                    zones[i].2,
-                    0.0,
-                ]
-            };
+            let z = |i: usize| [zones[i].0.to_radians(), zones[i].1, zones[i].2, 0.0];
             out.push(run(GradeU {
                 k0,
                 k1,
@@ -452,7 +466,7 @@ pub fn node_configs(
                 ranges: [p("shadow_range"), p("highlight_range"), gc, ps],
                 width: w,
                 height: h,
-                model: p("model").round().clamp(0.0, 2.0) as u32,
+                model: p("model").round().clamp(0.0, 3.0) as u32,
                 _p1: 0,
             }));
         }
@@ -573,24 +587,42 @@ pub fn node_configs(
         }
     }
 
-    // lut (3D look LUT) — active only when a .cube is loaded + opacity > 0.
-    // The cube data lives outside the doc (engine cache, keyed by path); the
-    // doc holds only the path (meta.lut_file) + this opacity.
+    // lut (3D look LUT) — active only when a .cube is loaded + opacity > 0
+    // + lut.enabled. Cube lives in the engine cache; doc holds path + params.
     {
-        let opacity = eff(doc, "lut", "opacity") / 100.0;
+        let p = crate::lut::params_from_doc(doc, eff(doc, "lut", "opacity"));
         match lut {
-            Some(cube) if opacity > 0.0 => {
+            Some(cube) if p.opacity > 0.0 => {
+                let (m_in, m_out) = crate::lut::CubeLut::shader_mats(&p);
+                let (in0, in1, in2) = rows(&m_in);
+                let (out0, out1, out2) = rows(&m_out);
                 let u = LutU {
                     size: cube.size as u32,
                     width: w,
                     height: h,
+                    shaper: p.shaper as u32,
+                    dmin: [
+                        cube.domain_min[0],
+                        cube.domain_min[1],
+                        cube.domain_min[2],
+                        0.0,
+                    ],
+                    dmax: [
+                        cube.domain_max[0],
+                        cube.domain_max[1],
+                        cube.domain_max[2],
+                        0.0,
+                    ],
+                    opacity: p.opacity,
+                    interp: p.interp as u32,
+                    kind: p.kind as u32,
                     _p0: 0,
-                    dmin: [cube.domain_min[0], cube.domain_min[1], cube.domain_min[2], 0.0],
-                    dmax: [cube.domain_max[0], cube.domain_max[1], cube.domain_max[2], 0.0],
-                    opacity,
-                    _p1: 0.0,
-                    _p2: 0.0,
-                    _p3: 0.0,
+                    m_in0: in0,
+                    m_in1: in1,
+                    m_in2: in2,
+                    m_out0: out0,
+                    m_out1: out1,
+                    m_out2: out2,
                 };
                 out.push(NodeConfig::Run {
                     uniforms: bytemuck::bytes_of(&u).to_vec(),
@@ -625,6 +657,11 @@ pub fn node_configs(
     // effects (grain / vignette / clarity) — identity when all amounts are 0
     {
         let clarity = eff(doc, "effects", "clarity");
+        let frame = doc
+            .unknown
+            .get("video_frame")
+            .and_then(|v| v.as_u64())
+            .unwrap_or(0) as u32;
         let grain = eff(doc, "effects", "grain_amount");
         let vignette = eff(doc, "effects", "vignette_amount");
         if clarity == 0.0 && grain == 0.0 && vignette == 0.0 {
@@ -638,7 +675,7 @@ pub fn node_configs(
                 vignette_midpoint: eff(doc, "effects", "vignette_midpoint") / 100.0,
                 width: w,
                 height: h,
-                _pad: 0,
+                frame_index: frame,
             }));
         }
     }
@@ -705,7 +742,10 @@ mod tests {
         assert!((r[1].abs() + r[2].abs()) > 0.05, "red unchanged: {r:?}");
         // row renorm spreads a little cross-effect; green must stay dominant
         let g = mat_vec(&m, [0.0, 1.0, 0.0]);
-        assert!(g[1] > 0.5 && g[1] > g[0] && g[1] > g[2], "green broke: {g:?}");
+        assert!(
+            g[1] > 0.5 && g[1] > g[0] && g[1] > g[2],
+            "green broke: {g:?}"
+        );
     }
 
     #[test]
@@ -719,5 +759,4 @@ mod tests {
         // lut node (idx 7) is skipped when no cube is loaded
         assert!(matches!(configs[7], NodeConfig::Skip));
     }
-
 }

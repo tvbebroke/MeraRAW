@@ -53,11 +53,7 @@ pub fn rasterize_brush_mask(
             .get("radius")
             .and_then(|v| v.as_f64())
             .unwrap_or(0.03) as f32;
-        let mode_add = stroke
-            .get("mode")
-            .and_then(|v| v.as_str())
-            .unwrap_or("add")
-            != "subtract";
+        let mode_add = stroke.get("mode").and_then(|v| v.as_str()).unwrap_or("add") != "subtract";
         let points = stroke
             .get("points")
             .and_then(|p| p.as_array())

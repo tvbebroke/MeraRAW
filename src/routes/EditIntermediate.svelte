@@ -7,8 +7,14 @@
   import { leftRailCollapsed, isZenMode, imageBrowserCollapsed } from "../stores/editor";
   import { shortcutLabels } from "../lib/shortcuts";
   import { fade } from "svelte/transition";
+  import { router } from "svelte-spa-router";
+  import { adoptWorkspaceFromRoute } from "../stores/workspace";
 
   const isZen = $derived($isZenMode);
+
+  $effect(() => {
+    adoptWorkspaceFromRoute(router.location);
+  });
 
   let windowWidth = $state(0);
   let windowHeight = $state(0);

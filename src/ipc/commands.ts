@@ -24,8 +24,8 @@ export function pingEngine(): Promise<EngineStatus> {
   return invoke<EngineStatus>("ping_engine");
 }
 
-export function pickFile(): Promise<string | null> {
-  return invoke<string | null>("pick_file");
+export function pickFile(kind?: "photo" | "video" | null): Promise<string | null> {
+  return invoke<string | null>("pick_file", { kind: kind ?? null });
 }
 
 export function pickFolder(): Promise<string | null> {
@@ -228,6 +228,35 @@ export function setLut(path: string | null): Promise<void> {
   return invoke<void>("set_lut", { path });
 }
 
+export interface LookInfo {
+  id: string;
+  name: string;
+  description: string;
+  category: string;
+  kind: number;
+  intensityDefault: number;
+  grainAmount: number;
+  grainSize: number;
+  /** sRGB 8-bit probes: shadow, skin, sky. */
+  preview: [[number, number, number], [number, number, number], [number, number, number]];
+}
+
+export function listLooks(): Promise<LookInfo[]> {
+  return invoke<LookInfo[]>("list_looks");
+}
+
+export function userLooksDir(): Promise<string> {
+  return invoke<string>("user_looks_dir");
+}
+
+export function deleteUserLook(id: string): Promise<void> {
+  return invoke<void>("delete_user_look", { id });
+}
+
+export function seekVideo(frame: number): Promise<import("./types").ImageMeta> {
+  return invoke("seek_video", { frame });
+}
+
 /** Change the demosaic algorithm and re-decode the current RAW. */
 export function setDemosaic(algo: string): Promise<ImageMeta> {
   return invoke<ImageMeta>("set_demosaic", { algo });
@@ -388,6 +417,7 @@ export function assistantSend(message: string, mode?: string): Promise<string> {
 export interface LicenseCheck {
   licensed: boolean;
   userId: string | null;
+  email: string | null;
   reason: string | null;
 }
 
@@ -401,6 +431,14 @@ export function licenseClearToken(): Promise<void> {
 
 export function licenseVerifyTokenLocally(token: string): Promise<boolean> {
   return invoke<boolean>("license_verify_token_locally", { token });
+}
+
+export function licenseRequestOtp(email: string): Promise<void> {
+  return invoke<void>("license_request_otp", { email });
+}
+
+export function licenseVerifyOtp(email: string, code: string): Promise<LicenseCheck> {
+  return invoke<LicenseCheck>("license_verify_otp", { email, code });
 }
 
 export function licenseSignInAndActivate(

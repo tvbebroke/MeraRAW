@@ -22,9 +22,9 @@
 //! the outer [`RCD_BORDER`] frame falls back to bilinear. (A tiled variant to cap
 //! peak memory is a future optimization.)
 
-use crate::image::{CfaImage, RgbImage};
 use super::bilinear::Bilinear;
 use super::Demosaic;
+use crate::image::{CfaImage, RgbImage};
 
 pub struct Rcd;
 
@@ -71,8 +71,7 @@ impl Demosaic for Rcd {
         };
         let hhpf = |x: usize, y: usize| -> f32 {
             let i = y * w + x;
-            (cfa[i - 3] - cfa[i - 1] - cfa[i + 1] + cfa[i + 3])
-                - 3.0 * (cfa[i - 2] + cfa[i + 2])
+            (cfa[i - 3] - cfa[i - 1] - cfa[i + 1] + cfa[i + 3]) - 3.0 * (cfa[i - 2] + cfa[i + 2])
                 + 6.0 * cfa[i]
         };
 
@@ -116,10 +115,10 @@ impl Demosaic for Rcd {
         let mut pq_dir = vec![0.5f32; w * h];
         for y in 4..h - 4 {
             for x in 4..w - 4 {
-                let p = (sq(phpf(x - 1, y - 1)) + sq(phpf(x, y)) + sq(phpf(x + 1, y + 1)))
-                    .max(EPSSQ);
-                let q = (sq(qhpf(x + 1, y - 1)) + sq(qhpf(x, y)) + sq(qhpf(x - 1, y + 1)))
-                    .max(EPSSQ);
+                let p =
+                    (sq(phpf(x - 1, y - 1)) + sq(phpf(x, y)) + sq(phpf(x + 1, y + 1))).max(EPSSQ);
+                let q =
+                    (sq(qhpf(x + 1, y - 1)) + sq(qhpf(x, y)) + sq(qhpf(x - 1, y + 1))).max(EPSSQ);
                 pq_dir[y * w + x] = p / (p + q);
             }
         }
@@ -128,8 +127,7 @@ impl Demosaic for Rcd {
         // undecided (0.5) trust the 4-diagonal neighborhood average instead.
         let disc = |dir: &[f32], i: usize| -> f32 {
             let central = dir[i];
-            let nb =
-                0.25 * (dir[i - w1 - 1] + dir[i - w1 + 1] + dir[i + w1 - 1] + dir[i + w1 + 1]);
+            let nb = 0.25 * (dir[i - w1 - 1] + dir[i - w1 + 1] + dir[i + w1 - 1] + dir[i + w1 + 1]);
             if (0.5 - central).abs() < (0.5 - nb).abs() {
                 nb
             } else {
@@ -244,8 +242,7 @@ impl Demosaic for Rcd {
                         s1 + (cc[i - w1] - cc[i + w1]).abs() + (cc[i + w1] - cc[i + w3]).abs();
                     let w_grad =
                         w1g + (cc[i - 1] - cc[i + 1]).abs() + (cc[i - 1] - cc[i - 3]).abs();
-                    let e_grad =
-                        e1 + (cc[i - 1] - cc[i + 1]).abs() + (cc[i + 1] - cc[i + 3]).abs();
+                    let e_grad = e1 + (cc[i - 1] - cc[i + 1]).abs() + (cc[i + 1] - cc[i + 3]).abs();
 
                     let n_est = cc[i - w1] - g[i - w1];
                     let s_est = cc[i + w1] - g[i + w1];
@@ -276,8 +273,8 @@ impl Demosaic for Rcd {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::image::CfaPattern;
     use crate::demosaic::tests_common::{max_interior_error, mosaic_from_fn};
+    use crate::image::CfaPattern;
 
     #[test]
     fn constant_field_reconstructs_exactly() {

@@ -29,11 +29,17 @@ impl std::fmt::Display for AdaptError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             AdaptError::NotMosaiced { cpp } => {
-                write!(f, "image is already demosaiced (cpp={cpp}); no CFA to interpolate")
+                write!(
+                    f,
+                    "image is already demosaiced (cpp={cpp}); no CFA to interpolate"
+                )
             }
             AdaptError::FloatData => write!(f, "floating-point raw data is not supported yet"),
             AdaptError::UnsupportedPattern => {
-                write!(f, "CFA is not a 2x2 Bayer pattern (X-Trans is out of scope)")
+                write!(
+                    f,
+                    "CFA is not a 2x2 Bayer pattern (X-Trans is out of scope)"
+                )
             }
             AdaptError::Decode(e) => write!(f, "decode failed: {e}"),
         }

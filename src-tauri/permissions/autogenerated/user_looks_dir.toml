@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-user-looks-dir"
+description = "Enables the user_looks_dir command without any pre-configured scope."
+commands.allow = ["user_looks_dir"]
+
+[[permission]]
+identifier = "deny-user-looks-dir"
+description = "Denies the user_looks_dir command without any pre-configured scope."
+commands.deny = ["user_looks_dir"]

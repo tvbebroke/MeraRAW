@@ -33,8 +33,14 @@ pub fn parse_tone_curve(
         let y = read_f32(data, off + i * 8 + 4)?;
         pts.push([x, y]);
     }
-    if pts.first().map(|p| p[0] > 1e-4 || p[1] > 1e-4).unwrap_or(true)
-        || pts.last().map(|p| (p[0] - 1.0).abs() > 1e-3 || (p[1] - 1.0).abs() > 1e-3).unwrap_or(true)
+    if pts
+        .first()
+        .map(|p| p[0] > 1e-4 || p[1] > 1e-4)
+        .unwrap_or(true)
+        || pts
+            .last()
+            .map(|p| (p[0] - 1.0).abs() > 1e-3 || (p[1] - 1.0).abs() > 1e-3)
+            .unwrap_or(true)
     {
         return Ok(None);
     }
@@ -100,6 +106,10 @@ mod tests {
             "MeraRAW Standard has no embedded curve"
         );
         let lifted = dcp.tone_curve().apply_rgb([0.18, 0.18, 0.18]);
-        assert!(lifted[0] > 0.25, "default curve should lift midtones: {}", lifted[0]);
+        assert!(
+            lifted[0] > 0.25,
+            "default curve should lift midtones: {}",
+            lifted[0]
+        );
     }
 }

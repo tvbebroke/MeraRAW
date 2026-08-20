@@ -9,6 +9,8 @@
   import BugReportModal from "./lib/components/shell/BugReportModal.svelte";
   import ShortcutsModal from "./lib/components/shell/ShortcutsModal.svelte";
   import CommandPalette from "./lib/components/shell/CommandPalette.svelte";
+  import LoginGate from "./lib/components/shell/LoginGate.svelte";
+  import WorkspaceChooser from "./lib/components/shell/WorkspaceChooser.svelte";
   import {
     isSettingsOpen,
     isExportOpen,
@@ -88,6 +90,9 @@
   <main class="min-h-0 flex-1">
     <Router {routes} />
   </main>
+
+  <LoginGate />
+  <WorkspaceChooser />
 
   {#if $isSettingsOpen}
     <SettingsModal />

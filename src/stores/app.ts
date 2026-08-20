@@ -24,13 +24,13 @@ export const displayLook = atom(1);
 export const previewBypass = atom(false);
 
 /** Histogram display mode (phase 12). Persisted via settings. */
-export type HistMode = "rgb" | "luma" | "parade";
+export type HistMode = "rgb" | "luma" | "parade" | "wave" | "scope";
 export type HistScale = "sqrt" | "linear" | "log";
 
 function readHistMode(): HistMode {
   try {
     const v = localStorage.getItem("hist-mode");
-    if (v === "luma" || v === "parade" || v === "rgb") return v;
+    if (v === "luma" || v === "parade" || v === "rgb" || v === "wave" || v === "scope") return v;
   } catch {
     /* ignore */
   }
@@ -89,3 +89,9 @@ export function sendViewCmd(cmd: Exclude<ViewCmd, null>): void {
 
 /** Current browse folder (catalog-backed). */
 export const currentFolder = atom<string | null>(null);
+
+/** Inclusive in/out marks for the open video clip (UI + clip export). */
+export const videoMark = atom<{ inFrame: number; outFrame: number }>({
+  inFrame: 0,
+  outFrame: 0,
+});

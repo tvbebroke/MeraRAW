@@ -21,9 +21,9 @@
 //! It runs whole-image with a bilinear-seeded border (median-refinement
 //! iterations, used only for the non-default `iterations > 1` mode, are omitted).
 
-use crate::image::{CfaImage, RgbImage};
 use super::bilinear::Bilinear;
 use super::Demosaic;
+use crate::image::{CfaImage, RgbImage};
 
 pub struct Lmmse;
 
@@ -74,8 +74,8 @@ impl Demosaic for Lmmse {
                 let i = y * w + x;
                 if pattern.color_at(x, y) == 1 {
                     // green sensel: difference to the interpolated opposite color
-                    let a = 0.25 * (gam[i - 2] + gam[i + 2])
-                        - 0.5 * (gam[i - 1] + gam[i] + gam[i + 1]);
+                    let a =
+                        0.25 * (gam[i - 2] + gam[i + 2]) - 0.5 * (gam[i - 1] + gam[i] + gam[i + 1]);
                     let b = 0.25 * (gam[i - w2] + gam[i + w2])
                         - 0.5 * (gam[i - w1] + gam[i] + gam[i + w1]);
                     hd[i] = clamp(a, -1.0, 0.0) + gam[i];
@@ -85,8 +85,8 @@ impl Demosaic for Lmmse {
                     let v0 = 0.0625
                         * (gam[i - w1 - 1] + gam[i - w1 + 1] + gam[i + w1 - 1] + gam[i + w1 + 1])
                         + 0.25 * gam[i];
-                    let mut gh =
-                        -0.25 * (gam[i - 2] + gam[i + 2]) + 0.5 * (gam[i - 1] + gam[i] + gam[i + 1]);
+                    let mut gh = -0.25 * (gam[i - 2] + gam[i + 2])
+                        + 0.5 * (gam[i - 1] + gam[i] + gam[i + 1]);
                     let yh = v0 + 0.5 * gh;
                     gh = if gam[i] > 1.75 * yh {
                         median3(gh, gam[i - 1], gam[i + 1])
@@ -187,7 +187,8 @@ impl Demosaic for Lmmse {
                 p[i] = gg[i]
                     + 0.25
                         * (p[i - w1] - gg[i - w1] + p[i - 1] - gg[i - 1] + p[i + 1] - gg[i + 1]
-                            + p[i + w1] - gg[i + w1]);
+                            + p[i + w1]
+                            - gg[i + w1]);
             }
         }
 
@@ -290,8 +291,8 @@ fn inv_gamma(y: f32) -> f32 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::image::CfaPattern;
     use crate::demosaic::tests_common::{max_interior_error, mosaic_from_fn};
+    use crate::image::CfaPattern;
 
     #[test]
     fn gamma_roundtrips() {

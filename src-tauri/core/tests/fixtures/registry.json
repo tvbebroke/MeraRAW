@@ -198,7 +198,7 @@
     "path": "color_grade.model",
     "ty": "f32",
     "min": 0.0,
-    "max": 2.0,
+    "max": 3.0,
     "default": 0.0,
     "ui": {
       "label": "Model",
@@ -1066,6 +1066,84 @@
     }
   },
   {
+    "path": "input.primaries",
+    "ty": "f32",
+    "min": 0.0,
+    "max": 7.0,
+    "default": 0.0,
+    "ui": {
+      "label": "Input Gamut",
+      "step": 1.0,
+      "scale": "linear",
+      "group": "Input"
+    }
+  },
+  {
+    "path": "input.transfer",
+    "ty": "f32",
+    "min": 0.0,
+    "max": 10.0,
+    "default": 0.0,
+    "ui": {
+      "label": "Camera Log",
+      "step": 1.0,
+      "scale": "linear",
+      "group": "Input"
+    }
+  },
+  {
+    "path": "lut.enabled",
+    "ty": "f32",
+    "min": 0.0,
+    "max": 1.0,
+    "default": 1.0,
+    "ui": {
+      "label": "Look Enabled",
+      "step": 1.0,
+      "scale": "linear",
+      "group": "LUT"
+    }
+  },
+  {
+    "path": "lut.input_primaries",
+    "ty": "f32",
+    "min": 0.0,
+    "max": 6.0,
+    "default": 1.0,
+    "ui": {
+      "label": "LUT Input",
+      "step": 1.0,
+      "scale": "linear",
+      "group": "LUT"
+    }
+  },
+  {
+    "path": "lut.interpolation",
+    "ty": "f32",
+    "min": 0.0,
+    "max": 1.0,
+    "default": 0.0,
+    "ui": {
+      "label": "LUT Interp",
+      "step": 1.0,
+      "scale": "linear",
+      "group": "LUT"
+    }
+  },
+  {
+    "path": "lut.kind",
+    "ty": "f32",
+    "min": 0.0,
+    "max": 3.0,
+    "default": 0.0,
+    "ui": {
+      "label": "LUT Kind",
+      "step": 1.0,
+      "scale": "linear",
+      "group": "LUT"
+    }
+  },
+  {
     "path": "lut.opacity",
     "ty": "f32",
     "min": 0.0,
@@ -1073,6 +1151,32 @@
     "default": 100.0,
     "ui": {
       "label": "LUT Opacity",
+      "step": 1.0,
+      "scale": "linear",
+      "group": "LUT"
+    }
+  },
+  {
+    "path": "lut.output_primaries",
+    "ty": "f32",
+    "min": 0.0,
+    "max": 6.0,
+    "default": 1.0,
+    "ui": {
+      "label": "LUT Output",
+      "step": 1.0,
+      "scale": "linear",
+      "group": "LUT"
+    }
+  },
+  {
+    "path": "lut.shaper",
+    "ty": "f32",
+    "min": 0.0,
+    "max": 10.0,
+    "default": 1.0,
+    "ui": {
+      "label": "LUT Shaper",
       "step": 1.0,
       "scale": "linear",
       "group": "LUT"

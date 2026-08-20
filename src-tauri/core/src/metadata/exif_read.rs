@@ -48,8 +48,8 @@ pub fn enrich_from_file(path: &Path, meta: &mut ImageMeta) {
         meta.shutter = exposure_string(&exif);
     }
     if meta.captured_at.is_none() {
-        meta.captured_at = ascii_field(&exif, Tag::DateTimeOriginal)
-            .or_else(|| ascii_field(&exif, Tag::DateTime));
+        meta.captured_at =
+            ascii_field(&exif, Tag::DateTimeOriginal).or_else(|| ascii_field(&exif, Tag::DateTime));
     }
     if let Some(o) = orientation_name(&exif) {
         // Prefer file EXIF for rendered sources; RAW already has bake-aware string.
@@ -157,13 +157,7 @@ fn read_gps(exif: &exif::Exif) -> Option<(f64, f64)> {
     Some((lat, lon))
 }
 
-fn decimal_coord(
-    exif: &exif::Exif,
-    tag: Tag,
-    ref_tag: Tag,
-    pos: u8,
-    neg: u8,
-) -> Option<f64> {
+fn decimal_coord(exif: &exif::Exif, tag: Tag, ref_tag: Tag, pos: u8, neg: u8) -> Option<f64> {
     let f = exif.get_field(tag, In::PRIMARY)?;
     let Value::Rational(coords) = &f.value else {
         return None;
@@ -223,6 +217,7 @@ mod tests {
             gps_lat: None,
             gps_lon: None,
             input_color_space: None,
+            video: None,
         };
         enrich_from_file(Path::new("/no/such.jpg"), &mut meta);
         assert!(meta.camera_make.is_empty());

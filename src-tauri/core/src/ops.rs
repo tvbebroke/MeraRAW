@@ -10,9 +10,17 @@ use crate::retouch::{new_retouch_id, RetouchSpot};
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(tag = "op", rename_all = "snake_case")]
 pub enum Op {
-    SetParam { path: String, value: serde_json::Value },
-    AddMask { kind: String, source: serde_json::Value },
-    RemoveMask { id: String },
+    SetParam {
+        path: String,
+        value: serde_json::Value,
+    },
+    AddMask {
+        kind: String,
+        source: serde_json::Value,
+    },
+    RemoveMask {
+        id: String,
+    },
     /// Adjust mask attributes (P4): any subset of opacity/feather/invert.
     RefineMask {
         id: String,
@@ -24,11 +32,21 @@ pub enum Op {
         invert: Option<bool>,
     },
     /// Replace mask geometry/source (move a radial, re-stroke a brush…).
-    SetMaskSource { id: String, source: serde_json::Value },
+    SetMaskSource {
+        id: String,
+        source: serde_json::Value,
+    },
     /// Object removal: new heal spot (brush source).
-    AddRetouchSpot { source: serde_json::Value },
-    RemoveRetouchSpot { id: String },
-    SetRetouchSource { id: String, source: serde_json::Value },
+    AddRetouchSpot {
+        source: serde_json::Value,
+    },
+    RemoveRetouchSpot {
+        id: String,
+    },
+    SetRetouchSource {
+        id: String,
+        source: serde_json::Value,
+    },
     RefineRetouchSpot {
         id: String,
         #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -36,9 +54,13 @@ pub enum Op {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         enabled: Option<bool>,
     },
-    ResetModule { module: String },
+    ResetModule {
+        module: String,
+    },
     ResetAll,
-    ApplyPreset { preset: PartialDoc },
+    ApplyPreset {
+        preset: PartialDoc,
+    },
 }
 
 impl Op {
@@ -138,7 +160,8 @@ fn check_value(
         ParamType::F32 => {
             let v = value
                 .as_f64()
-                .ok_or_else(|| format!("{}: expected number", spec.path))? as f32;
+                .ok_or_else(|| format!("{}: expected number", spec.path))?
+                as f32;
             if !v.is_finite() {
                 return Err(format!("{}: non-finite", spec.path));
             }
@@ -191,7 +214,13 @@ fn check_value(
 }
 
 const MASK_KINDS: &[&str] = &[
-    "subject", "sky", "background", "object", "radial", "linear", "brush",
+    "subject",
+    "sky",
+    "background",
+    "object",
+    "radial",
+    "linear",
+    "brush",
 ];
 
 /// THE guard-wall. Applies `op` to `doc` or rejects. Never partially
@@ -212,9 +241,9 @@ pub fn apply_op(doc: &mut EditDoc, op: &Op) -> Result<Option<String>, CoreError>
                     }
                 }
                 Some(id) => {
-                    let mask = doc.mask_mut(id).ok_or_else(|| {
-                        CoreError::InvalidOp(format!("mask not found: {id}"))
-                    })?;
+                    let mask = doc
+                        .mask_mut(id)
+                        .ok_or_else(|| CoreError::InvalidOp(format!("mask not found: {id}")))?;
                     let m = mask.modules.entry(r.module.clone()).or_default();
                     if is_default {
                         m.remove(&r.param);
@@ -305,7 +334,9 @@ pub fn apply_op(doc: &mut EditDoc, op: &Op) -> Result<Option<String>, CoreError>
             let before = doc.retouch.len();
             doc.retouch.retain(|s| s.id != *id);
             if doc.retouch.len() == before {
-                return Err(CoreError::InvalidOp(format!("retouch spot not found: {id}")));
+                return Err(CoreError::InvalidOp(format!(
+                    "retouch spot not found: {id}"
+                )));
             }
             doc.touch();
             Ok(None)
@@ -362,13 +393,7 @@ pub fn apply_op(doc: &mut EditDoc, op: &Op) -> Result<Option<String>, CoreError>
                     let path = format!("{module}.{param}");
                     let json = serde_json::to_value(value)
                         .map_err(|e| CoreError::InvalidOp(e.to_string()))?;
-                    apply_op(
-                        doc,
-                        &Op::SetParam {
-                            path,
-                            value: json,
-                        },
-                    )?;
+                    apply_op(doc, &Op::SetParam { path, value: json })?;
                 }
             }
             Ok(None)

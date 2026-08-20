@@ -22,7 +22,11 @@ fn main() -> ExitCode {
     }
     if args.is_empty() || args.iter().any(|a| a == "-h" || a == "--help") {
         print_usage();
-        return if args.is_empty() { ExitCode::FAILURE } else { ExitCode::SUCCESS };
+        return if args.is_empty() {
+            ExitCode::FAILURE
+        } else {
+            ExitCode::SUCCESS
+        };
     }
 
     let mut input: Option<PathBuf> = None;
@@ -150,7 +154,11 @@ fn print_usage() {
 fn print_algorithms() {
     println!("algorithms:");
     for &a in Algorithm::all() {
-        let status = if a.is_implemented() { "ready" } else { "planned" };
+        let status = if a.is_implemented() {
+            "ready"
+        } else {
+            "planned"
+        };
         println!("  {:<9} [{}]", a.name(), status);
     }
 }

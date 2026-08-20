@@ -24,6 +24,8 @@ pub const ENGINE_CRASHED: &str = "engine-crashed";
 pub const EXPORT_REQUESTED: &str = "export-requested";
 pub const IMPORT_REQUESTED: &str = "import-requested";
 pub const SETTINGS_REQUESTED: &str = "settings-requested";
+pub const PHOTO_WORKSPACE: &str = "photo-workspace";
+pub const VIDEO_WORKSPACE: &str = "video-workspace";
 pub const ASSISTANT_PROGRESS: &str = "assistant-progress";
 pub const DENOISE_PROGRESS: &str = "denoise-progress";
 pub const DENOISE_DONE: &str = "denoise-done";
@@ -41,9 +43,10 @@ pub fn forward_engine_event(app: &AppHandle, ev: meratech_core::message::EngineE
         E::DecodeError { message } => app.emit(DECODE_ERROR, message.clone()),
         E::DocUpdated { delta } => app.emit(DOC_UPDATED, delta.clone()),
         E::MaskReady { id } => app.emit(MASK_READY, id.clone()),
-        E::ImportProgress { done, total } => {
-            app.emit(IMPORT_PROGRESS, serde_json::json!({"done": done, "total": total}))
-        }
+        E::ImportProgress { done, total } => app.emit(
+            IMPORT_PROGRESS,
+            serde_json::json!({"done": done, "total": total}),
+        ),
         E::ImportDone { total } => app.emit(IMPORT_DONE, total),
         E::CatalogChanged => app.emit(CATALOG_CHANGED, ()),
         E::ExportProgress { phase, done, total } => app.emit(

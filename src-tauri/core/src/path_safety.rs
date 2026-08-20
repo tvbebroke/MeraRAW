@@ -80,7 +80,11 @@ fn is_denied(path: &Path) -> bool {
 
     #[cfg(windows)]
     {
-        let deny = ["\\windows\\system32", "\\windows\\syswow64", "\\$recycle.bin"];
+        let deny = [
+            "\\windows\\system32",
+            "\\windows\\syswow64",
+            "\\$recycle.bin",
+        ];
         if deny.iter().any(|d| lower.contains(d)) {
             return true;
         }
@@ -139,6 +143,19 @@ pub fn sanitize_user_path(path: &str) -> Option<PathBuf> {
 /// Clear or rewrite `lut_file` when the sidecar path is unsafe.
 pub fn sanitize_lut_path(path: Option<String>) -> Option<String> {
     let p = path?;
+    if let Some(id) = p.strip_prefix("bundled:") {
+        if crate::look::is_bundled_id(id) {
+            return Some(p);
+        }
+        return None;
+    }
+    if crate::look::is_user_id(&p) {
+        let stem = p.strip_prefix("user:").unwrap_or("");
+        if crate::look::user_cube_path(stem).is_some_and(|path| path.is_file()) {
+            return Some(p);
+        }
+        return None;
+    }
     sanitize_user_path(&p).map(|pb| pb.to_string_lossy().into_owned())
 }
 

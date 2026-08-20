@@ -10,8 +10,8 @@ mod open_url;
 mod paths;
 mod protocol;
 
-use tauri::Manager;
 use tauri::window::Monitor;
+use tauri::Manager;
 use tracing_subscriber::EnvFilter;
 
 /// A window or work-area rectangle in physical pixels.
@@ -134,7 +134,10 @@ fn has_saved_window_state(win: &tauri::WebviewWindow) -> bool {
     win.app_handle()
         .path()
         .app_config_dir()
-        .map(|dir| dir.join(tauri_plugin_window_state::DEFAULT_FILENAME).exists())
+        .map(|dir| {
+            dir.join(tauri_plugin_window_state::DEFAULT_FILENAME)
+                .exists()
+        })
         .unwrap_or(false)
 }
 
@@ -206,14 +209,17 @@ fn ensure_main_window_visible(win: &tauri::WebviewWindow) {
         })
         .cloned()
         .or_else(|| {
-            monitors.iter().find(|m| {
-                let mp = m.position();
-                let ms = m.size();
-                pos.x >= mp.x - 64
-                    && pos.y >= mp.y - 64
-                    && pos.x < mp.x + ms.width as i32
-                    && pos.y < mp.y + ms.height as i32
-            }).cloned()
+            monitors
+                .iter()
+                .find(|m| {
+                    let mp = m.position();
+                    let ms = m.size();
+                    pos.x >= mp.x - 64
+                        && pos.y >= mp.y - 64
+                        && pos.x < mp.x + ms.width as i32
+                        && pos.y < mp.y + ms.height as i32
+                })
+                .cloned()
         })
         .or_else(|| win.primary_monitor().ok().flatten())
         .unwrap_or_else(|| monitors[0].clone());
@@ -234,8 +240,13 @@ fn ensure_main_window_visible(win: &tauri::WebviewWindow) {
 
     let (default_size, min_size) = configured_window_sizes(win, monitor.scale_factor());
 
-    let FitAction::Reposition(fitted) =
-        fit_into_work_area(work, cur, min_size, default_size, has_saved_window_state(win));
+    let FitAction::Reposition(fitted) = fit_into_work_area(
+        work,
+        cur,
+        min_size,
+        default_size,
+        has_saved_window_state(win),
+    );
     if win.is_maximized().unwrap_or(false) {
         let _ = win.unmaximize();
     }
@@ -318,8 +329,9 @@ fn main() {
     load_dotenv();
     tracing_subscriber::fmt()
         .with_env_filter(
-            EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| EnvFilter::new("info,meratech_core=debug,meratech_editor=debug")),
+            EnvFilter::try_from_default_env().unwrap_or_else(|_| {
+                EnvFilter::new("info,meratech_core=debug,meratech_editor=debug")
+            }),
         )
         .init();
 
@@ -341,8 +353,8 @@ fn main() {
         .ok()
         .filter(|p| p.is_dir())
         .or_else(|| {
-            let dev = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-                .join("../meraraw-derivatives");
+            let dev =
+                std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../meraraw-derivatives");
             dev.is_dir().then_some(dev)
         });
     if let Some(dir) = profiles_dir {
@@ -437,6 +449,10 @@ fn main() {
             commands::remove_from_album,
             commands::set_camera_profile,
             commands::set_lut,
+            commands::list_looks,
+            commands::user_looks_dir,
+            commands::delete_user_look,
+            commands::seek_video,
             commands::set_demosaic,
             commands::pick_lut,
             commands::get_grid,
@@ -450,6 +466,8 @@ fn main() {
             license::license_check_local,
             license::license_clear_token,
             license::license_verify_token_locally,
+            license::license_request_otp,
+            license::license_verify_otp,
             license::license_sign_in_and_activate,
             license::license_supporter_status,
             license::license_start_checkout,
@@ -473,10 +491,10 @@ fn main() {
             }
 
             if std::env::var("MERATECH_BUNDLED_PRESETS").is_err() {
-                if let Ok(res) = app.path().resolve(
-                    "presets/bundled",
-                    tauri::path::BaseDirectory::Resource,
-                ) {
+                if let Ok(res) = app
+                    .path()
+                    .resolve("presets/bundled", tauri::path::BaseDirectory::Resource)
+                {
                     if res.is_dir() {
                         std::env::set_var("MERATECH_BUNDLED_PRESETS", &res);
                         tracing::info!(dir = %res.display(), "bundled presets dir");
@@ -539,9 +557,7 @@ fn main() {
         .run(tauri::generate_context!())
         .unwrap_or_else(|e| {
             eprintln!("MeraRAW failed to start: {e}");
-            eprintln!(
-                "On Linux install webkit2gtk4.1; on Windows install the WebView2 runtime."
-            );
+            eprintln!("On Linux install webkit2gtk4.1; on Windows install the WebView2 runtime.");
             std::process::exit(1);
         });
 }
@@ -552,12 +568,22 @@ mod window_geometry_tests {
 
     /// Built-in Liquid Retina XDR: 3456x2234 physical, 2x, menu bar removed.
     fn builtin_work_area() -> WinRect {
-        WinRect { x: 0, y: 50, w: 3456, h: 2184 }
+        WinRect {
+            x: 0,
+            y: 50,
+            w: 3456,
+            h: 2184,
+        }
     }
 
     /// External C27F390: 1920x1080, 1x, placed to the right of the built-in.
     fn external_work_area() -> WinRect {
-        WinRect { x: 3456, y: 25, w: 1920, h: 1055 }
+        WinRect {
+            x: 3456,
+            y: 25,
+            w: 1920,
+            h: 1055,
+        }
     }
 
     /// minWidth 1024 / minHeight 700 logical, at 2x and 1x.
@@ -578,7 +604,12 @@ mod window_geometry_tests {
 
     #[test]
     fn first_run_opens_at_configured_default() {
-        let cur = WinRect { x: 0, y: 0, w: 8304, h: 2040 };
+        let cur = WinRect {
+            x: 0,
+            y: 0,
+            w: 8304,
+            h: 2040,
+        };
         let work = builtin_work_area();
         assert_eq!(
             fit_into_work_area(work, cur, MIN_2X, DEFAULT_2X, false),
@@ -590,7 +621,12 @@ mod window_geometry_tests {
     #[test]
     fn runaway_saved_size_resets_to_default_instead_of_shrinking_to_junk() {
         // The first real state found on disk: 8304x2040.
-        let cur = WinRect { x: 286, y: 194, w: 8304, h: 2040 };
+        let cur = WinRect {
+            x: 286,
+            y: 194,
+            w: 8304,
+            h: 2040,
+        };
         let work = builtin_work_area();
         assert_eq!(
             fit_into_work_area(work, cur, MIN_2X, DEFAULT_2X, true),
@@ -603,7 +639,12 @@ mod window_geometry_tests {
         // 2076x700 — the runaway after two halvings. It fits the display, so
         // the fits-check alone accepted it and the app opened squat. Its
         // height is half the 1400px minimum, which is the tell.
-        let cur = WinRect { x: 2164, y: 115, w: 2076, h: 700 };
+        let cur = WinRect {
+            x: 2164,
+            y: 115,
+            w: 2076,
+            h: 700,
+        };
         let work = builtin_work_area();
         assert_eq!(
             fit_into_work_area(work, cur, MIN_2X, DEFAULT_2X, true),
@@ -614,7 +655,12 @@ mod window_geometry_tests {
 
     #[test]
     fn oversize_on_the_1x_external_also_resets_to_default() {
-        let cur = WinRect { x: 3500, y: 100, w: 3440, h: 2040 };
+        let cur = WinRect {
+            x: 3500,
+            y: 100,
+            w: 3440,
+            h: 2040,
+        };
         let work = external_work_area();
         assert_eq!(
             fit_into_work_area(work, cur, MIN_1X, DEFAULT_1X, true),
@@ -625,20 +671,40 @@ mod window_geometry_tests {
     #[test]
     fn a_saved_size_that_fits_is_left_alone() {
         // The whole point of "remember my size" — this must never be resized.
-        let cur = WinRect { x: 100, y: 100, w: 3000, h: 1900 };
+        let cur = WinRect {
+            x: 100,
+            y: 100,
+            w: 3000,
+            h: 1900,
+        };
         assert_eq!(
             fit_into_work_area(builtin_work_area(), cur, MIN_2X, DEFAULT_2X, true),
-            FitAction::Reposition(WinRect { x: 100, y: 100, w: 3000, h: 1900 })
+            FitAction::Reposition(WinRect {
+                x: 100,
+                y: 100,
+                w: 3000,
+                h: 1900
+            })
         );
     }
 
     #[test]
     fn a_size_at_the_minimum_is_left_alone() {
         // Deliberately small-but-legal windows must not be "helpfully" resized.
-        let cur = WinRect { x: 200, y: 200, w: 2048, h: 1400 };
+        let cur = WinRect {
+            x: 200,
+            y: 200,
+            w: 2048,
+            h: 1400,
+        };
         assert_eq!(
             fit_into_work_area(builtin_work_area(), cur, MIN_2X, DEFAULT_2X, true),
-            FitAction::Reposition(WinRect { x: 200, y: 200, w: 2048, h: 1400 })
+            FitAction::Reposition(WinRect {
+                x: 200,
+                y: 200,
+                w: 2048,
+                h: 1400
+            })
         );
     }
 
@@ -646,18 +712,38 @@ mod window_geometry_tests {
     fn below_minimum_is_kept_when_the_display_cannot_fit_the_minimum() {
         // Tiny display: the OS legitimately shrank the window below minHeight,
         // so that is not evidence of corruption.
-        let work = WinRect { x: 0, y: 0, w: 1200, h: 800 };
-        let cur = WinRect { x: 10, y: 10, w: 1100, h: 600 };
+        let work = WinRect {
+            x: 0,
+            y: 0,
+            w: 1200,
+            h: 800,
+        };
+        let cur = WinRect {
+            x: 10,
+            y: 10,
+            w: 1100,
+            h: 600,
+        };
         assert_eq!(
             fit_into_work_area(work, cur, MIN_2X, DEFAULT_2X, true),
-            FitAction::Reposition(WinRect { x: 10, y: 10, w: 1100, h: 600 })
+            FitAction::Reposition(WinRect {
+                x: 10,
+                y: 10,
+                w: 1100,
+                h: 600
+            })
         );
     }
 
     #[test]
     fn offscreen_but_fitting_window_is_pulled_back_without_resizing() {
         // Hanging off the right edge — the original bug this function existed for.
-        let cur = WinRect { x: 3300, y: 194, w: 2560, h: 1600 };
+        let cur = WinRect {
+            x: 3300,
+            y: 194,
+            w: 2560,
+            h: 1600,
+        };
         let FitAction::Reposition(r) =
             fit_into_work_area(builtin_work_area(), cur, MIN_2X, DEFAULT_2X, true);
         assert_eq!((r.w, r.h), (2560, 1600), "position fix must not resize");
@@ -670,8 +756,18 @@ mod window_geometry_tests {
 
     #[test]
     fn tiny_work_area_clamps_default_to_avail_floor() {
-        let work = WinRect { x: 0, y: 0, w: 300, h: 200 };
-        let cur = WinRect { x: 0, y: 0, w: 8304, h: 2040 };
+        let work = WinRect {
+            x: 0,
+            y: 0,
+            w: 300,
+            h: 200,
+        };
+        let cur = WinRect {
+            x: 0,
+            y: 0,
+            w: 8304,
+            h: 2040,
+        };
         // avail floors at 640×480 even on a smaller work area (see fit_into_work_area).
         let FitAction::Reposition(r) = fit_into_work_area(work, cur, MIN_2X, DEFAULT_2X, true);
         assert_eq!((r.w, r.h), (640, 480));

@@ -7,26 +7,6 @@ export const KNOWN_UNEXPOSED: { path: string; reason: string }[] = [
   { path: "detail.nlm_search", reason: "NLM internals; Phase 8 — expose or delete" },
   { path: "detail.nlm_center", reason: "NLM internals; Phase 8 — expose or delete" },
   { path: "detail.chroma_auto", reason: "auto chroma NR; Phase 8 — expose or delete" },
-  {
-    path: "effects.clarity",
-    reason: "Unwired; ships into Light when the engine path exists",
-  },
-  {
-    path: "effects.grain_amount",
-    reason: "Unwired grain; hide until dispatched to the engine",
-  },
-  {
-    path: "effects.grain_size",
-    reason: "Unwired grain; hide until dispatched to the engine",
-  },
-  {
-    path: "effects.vignette_amount",
-    reason: "Unwired vignette; hide until dispatched to the engine",
-  },
-  {
-    path: "effects.vignette_midpoint",
-    reason: "Unwired vignette; hide until dispatched to the engine",
-  },
 ];
 
 /** ui.group → panel files that consume it. Color Grade / Tone span two panels. */
@@ -38,7 +18,8 @@ export const GROUP_PANELS: Record<string, string[]> = {
   Detail: ["DetailSettings.svelte"],
   "Color Grade": ["ColorSettings.svelte", "GradingSettings.svelte"],
   Tone: ["LightSettings.svelte", "ToneCurve.svelte"],
-  LUT: ["LutSettings.svelte"],
+  LUT: ["LutSettings.svelte", "GradingSettings.svelte"],
+  Input: ["CameraSettings.svelte"],
   HSL: ["ColorSettings.svelte"],
   Crop: ["CropSettings.svelte"],
   Perspective: ["CropSettings.svelte"],
@@ -60,10 +41,6 @@ export const UNCALLED_OK: { command: string; reason: string }[] = [
   {
     command: "fail_on_purpose",
     reason: "debug probe; wrapper only, ACL is capabilities-dev",
-  },
-  {
-    command: "license_clear_token",
-    reason: "no logout UI yet; Phase 9",
   },
   {
     command: "license_verify_token_locally",

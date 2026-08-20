@@ -10,6 +10,9 @@
   } from "../../../analytics/telemetry";
   import { telemetryConfigured } from "../../../config";
   import { histMode, setHistMode, type HistMode } from "../../../stores/app";
+  import { licenseStatus } from "../../../stores/session";
+  import { licenseClearToken } from "../../../ipc/commands";
+  import { formatAppError } from "../../../ipc/types";
 
   // Modal active tab state
   type Tab = "general" | "editor" | "performance" | "export";
@@ -25,7 +28,7 @@
   const histogramType = $derived($histMode);
   function onHistogramType(e: Event) {
     const v = (e.currentTarget as HTMLSelectElement).value as HistMode;
-    if (v === "rgb" || v === "luma" || v === "parade") setHistMode(v);
+    if (v === "rgb" || v === "luma" || v === "parade" || v === "wave" || v === "scope") setHistMode(v);
   }
   
   let gpuAcceleration = $state(true);
@@ -50,6 +53,25 @@
     const dir = await pickFolder();
     if (dir) {
       await importAndBrowse(dir);
+    }
+  }
+
+  let signingOut = $state(false);
+  async function signOut() {
+    signingOut = true;
+    try {
+      await licenseClearToken();
+      licenseStatus.set({
+        licensed: false,
+        userId: null,
+        email: null,
+        reason: "signed out",
+      });
+      close();
+    } catch (e) {
+      console.error(formatAppError(e));
+    } finally {
+      signingOut = false;
     }
   }
 </script>
@@ -144,6 +166,20 @@
         <h2 class="content-title capitalize">{activeTab}</h2>
         {#if activeTab === "general"}
           <div class="settings-list">
+            <div class="setting-row">
+              <span class="setting-label">Account</span>
+              <div class="flex items-center gap-2">
+                <span class="setting-desc truncate max-w-[220px]">
+                  {$licenseStatus?.email || ($licenseStatus?.licensed ? "Signed in" : "Not signed in")}
+                </span>
+                {#if $licenseStatus?.licensed}
+                  <button class="action-btn" disabled={signingOut} onclick={() => void signOut()}>
+                    {signingOut ? "Signing out…" : "Sign out"}
+                  </button>
+                {/if}
+              </div>
+            </div>
+
             <!-- Default Import Folder -->
             <div class="setting-row">
               <span class="setting-label">Default import directory</span>
@@ -247,6 +283,8 @@
                 <option value="rgb">RGB overlay</option>
                 <option value="luma">Luminance channel</option>
                 <option value="parade">RGB parade</option>
+                <option value="wave">Luma waveform</option>
+                <option value="scope">Vectorscope</option>
               </select>
             </div>
 

@@ -3,9 +3,9 @@
 use super::config::{mask_node_configs, node_configs, NodeConfig};
 use super::mask_stage_index;
 use super::resources::{
-    make_chain_tex, make_mask_tex, make_tex, BlendUniforms, CropUniform, DcpLookUniforms,
-    DcpMeta, ExtractUniforms, MaskGeomUniforms, MaskSampleUniforms, PassResources,
-    PresentUniforms, PipeKind, MAX_STROKE_POINTS, NODE_PIPES,
+    make_chain_tex, make_mask_tex, make_tex, BlendUniforms, CropUniform, DcpLookUniforms, DcpMeta,
+    ExtractUniforms, MaskGeomUniforms, MaskSampleUniforms, PassResources, PipeKind,
+    PresentUniforms, MAX_STROKE_POINTS, NODE_PIPES,
 };
 use super::{FinalTag, RenderGraph, NODES};
 use crate::doc::EditDoc;
@@ -57,7 +57,10 @@ impl RenderGraph {
             buf
         };
         self.dcp_tables_buf = Some(make_storage("dcp-tables", bytemuck::cast_slice(&tables)));
-        self.dcp_tone_buf = Some(make_storage("dcp-tone", bytemuck::cast_slice(&data.tone_lut)));
+        self.dcp_tone_buf = Some(make_storage(
+            "dcp-tone",
+            bytemuck::cast_slice(&data.tone_lut),
+        ));
         self.dcp_meta = Some(DcpMeta {
             has_map1: has1,
             has_map2: if has1 == 1 { has2 } else { 0 },
@@ -107,12 +110,13 @@ impl RenderGraph {
 
     fn ensure_pools(&mut self, gpu: &GpuContext, uniforms: usize, luts: usize, strokes: usize) {
         while self.pool.len() < uniforms {
-            self.pool.push(gpu.device.create_buffer(&wgpu::BufferDescriptor {
-                label: Some("mask-pool-u"),
-                size: 512,
-                usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-                mapped_at_creation: false,
-            }));
+            self.pool
+                .push(gpu.device.create_buffer(&wgpu::BufferDescriptor {
+                    label: Some("mask-pool-u"),
+                    size: 512,
+                    usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+                    mapped_at_creation: false,
+                }));
         }
         while self.lut_pool.len() < luts {
             self.lut_pool
@@ -180,10 +184,19 @@ impl RenderGraph {
                 *slot = Some(make_chain_tex(gpu, out_w, out_h, NODES[i].0));
             }
             self.scratch = (0..2)
-                .map(|i| make_chain_tex(gpu, out_w, out_h, if i == 0 { "scratch-a" } else { "scratch-b" }))
+                .map(|i| {
+                    make_chain_tex(
+                        gpu,
+                        out_w,
+                        out_h,
+                        if i == 0 { "scratch-a" } else { "scratch-b" },
+                    )
+                })
                 .collect();
             self.composite = (0..2)
-                .map(|i| make_chain_tex(gpu, out_w, out_h, if i == 0 { "comp-a" } else { "comp-b" }))
+                .map(|i| {
+                    make_chain_tex(gpu, out_w, out_h, if i == 0 { "comp-a" } else { "comp-b" })
+                })
                 .collect();
             self.mask_tex.clear();
             self.out_tex = Some(make_tex(
@@ -208,12 +221,7 @@ impl RenderGraph {
             }
         }
         let n_masks = doc.masks.len();
-        self.ensure_pools(
-            gpu,
-            n_masks * (2 + NODES.len()),
-            n_masks,
-            n_masks,
-        );
+        self.ensure_pools(gpu, n_masks * (2 + NODES.len()), n_masks, n_masks);
 
         let configs = node_configs(doc, as_shot_cct, out_w, out_h, lut);
 
@@ -423,8 +431,7 @@ impl RenderGraph {
                     .unwrap_or("");
                 let produced = match src_type {
                     "radial" | "linear" | "brush" => {
-                        let (kind, pa, pb, rotation, strokes) =
-                            parse_geometry(&mask.source);
+                        let (kind, pa, pb, rotation, strokes) = parse_geometry(&mask.source);
                         let ub = &self.pool[pool_i];
                         pool_i += 1;
                         let sb = &self.strokes_pool[strokes_i];
@@ -475,11 +482,10 @@ impl RenderGraph {
                                 },
                             ],
                         });
-                        let mut pass =
-                            encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
-                                label: Some("mask-geom"),
-                                timestamp_writes: None,
-                            });
+                        let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
+                            label: Some("mask-geom"),
+                            timestamp_writes: None,
+                        });
                         pass.set_pipeline(&self.mask_geom.pipeline);
                         pass.set_bind_group(0, &bind, &[]);
                         pass.dispatch_workgroups(out_w.div_ceil(16), out_h.div_ceil(16), 1);
@@ -491,8 +497,7 @@ impl RenderGraph {
                             let ub = &self.pool[pool_i];
                             pool_i += 1;
                             // background kind = inverse of the subject mask
-                            let invert =
-                                (mask.invert ^ (mask.kind == "background")) as u32;
+                            let invert = (mask.invert ^ (mask.kind == "background")) as u32;
                             let u = MaskSampleUniforms {
                                 out_w,
                                 out_h,
@@ -511,37 +516,32 @@ impl RenderGraph {
                             gpu.queue.write_buffer(ub, 0, bytemuck::bytes_of(&u));
                             let mview = mtex.create_view(&Default::default());
                             let eview = extract_tex.create_view(&Default::default());
-                            let bind =
-                                gpu.device.create_bind_group(&wgpu::BindGroupDescriptor {
-                                    label: Some("mask-sample-bind"),
-                                    layout: &self.mask_sample.layout,
-                                    entries: &[
-                                        wgpu::BindGroupEntry {
-                                            binding: 0,
-                                            resource: wgpu::BindingResource::TextureView(
-                                                small_view,
-                                            ),
-                                        },
-                                        wgpu::BindGroupEntry {
-                                            binding: 1,
-                                            resource: wgpu::BindingResource::Sampler(
-                                                &self.sampler,
-                                            ),
-                                        },
-                                        wgpu::BindGroupEntry {
-                                            binding: 2,
-                                            resource: wgpu::BindingResource::TextureView(&eview),
-                                        },
-                                        wgpu::BindGroupEntry {
-                                            binding: 3,
-                                            resource: wgpu::BindingResource::TextureView(&mview),
-                                        },
-                                        wgpu::BindGroupEntry {
-                                            binding: 4,
-                                            resource: ub.as_entire_binding(),
-                                        },
-                                    ],
-                                });
+                            let bind = gpu.device.create_bind_group(&wgpu::BindGroupDescriptor {
+                                label: Some("mask-sample-bind"),
+                                layout: &self.mask_sample.layout,
+                                entries: &[
+                                    wgpu::BindGroupEntry {
+                                        binding: 0,
+                                        resource: wgpu::BindingResource::TextureView(small_view),
+                                    },
+                                    wgpu::BindGroupEntry {
+                                        binding: 1,
+                                        resource: wgpu::BindingResource::Sampler(&self.sampler),
+                                    },
+                                    wgpu::BindGroupEntry {
+                                        binding: 2,
+                                        resource: wgpu::BindingResource::TextureView(&eview),
+                                    },
+                                    wgpu::BindGroupEntry {
+                                        binding: 3,
+                                        resource: wgpu::BindingResource::TextureView(&mview),
+                                    },
+                                    wgpu::BindGroupEntry {
+                                        binding: 4,
+                                        resource: ub.as_entire_binding(),
+                                    },
+                                ],
+                            });
                             let mut pass =
                                 encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
                                     label: Some("mask-sample"),
@@ -549,11 +549,7 @@ impl RenderGraph {
                                 });
                             pass.set_pipeline(&self.mask_sample.pipeline);
                             pass.set_bind_group(0, &bind, &[]);
-                            pass.dispatch_workgroups(
-                                out_w.div_ceil(16),
-                                out_h.div_ceil(16),
-                                1,
-                            );
+                            pass.dispatch_workgroups(out_w.div_ceil(16), out_h.div_ceil(16), 1);
                             self.last_passes_run.push(format!("mask:{}", mask.kind));
                             true
                         } else {
@@ -581,7 +577,8 @@ impl RenderGraph {
                     let lut_buf = if let Some(lut_data) = lut {
                         let lb = &self.lut_pool[lut_i];
                         lut_i += 1;
-                        gpu.queue.write_buffer(lb, 0, bytemuck::cast_slice(lut_data));
+                        gpu.queue
+                            .write_buffer(lb, 0, bytemuck::cast_slice(lut_data));
                         lb
                     } else {
                         &self.lut_buffer
@@ -863,19 +860,12 @@ fn dispatch_node(
 }
 
 /// Parse geometry source → (shader kind, pa, pb, rotation, stroke points).
-fn parse_geometry(
-    source: &serde_json::Value,
-) -> (u32, [f32; 2], [f32; 2], f32, Vec<[f32; 4]>) {
+fn parse_geometry(source: &serde_json::Value) -> (u32, [f32; 2], [f32; 2], f32, Vec<[f32; 4]>) {
     let get2 = |key: &str, default: [f32; 2]| -> [f32; 2] {
         source
             .get(key)
             .and_then(|v| v.as_array())
-            .and_then(|a| {
-                Some([
-                    a.first()?.as_f64()? as f32,
-                    a.get(1)?.as_f64()? as f32,
-                ])
-            })
+            .and_then(|a| Some([a.first()?.as_f64()? as f32, a.get(1)?.as_f64()? as f32]))
             .unwrap_or(default)
     };
     match source.get("type").and_then(|t| t.as_str()) {
@@ -910,9 +900,10 @@ fn parse_geometry(
                     if let Some(points) = stroke.get("points").and_then(|p| p.as_array()) {
                         for p in points {
                             if let Some(a) = p.as_array() {
-                                if let (Some(x), Some(y)) =
-                                    (a.first().and_then(|v| v.as_f64()), a.get(1).and_then(|v| v.as_f64()))
-                                {
+                                if let (Some(x), Some(y)) = (
+                                    a.first().and_then(|v| v.as_f64()),
+                                    a.get(1).and_then(|v| v.as_f64()),
+                                ) {
                                     if pts.len() < MAX_STROKE_POINTS {
                                         pts.push([x as f32, y as f32, r, hardness]);
                                     }
@@ -1024,12 +1015,18 @@ impl RenderGraph {
         let configs = {
             let mut doc = EditDoc::new("/lut-test.ARW");
             doc.set("lut", "opacity", crate::doc::ParamValue::F32(opacity));
+            // Working-linear interpretation so CPU/GPU share CubeLut::apply_working.
+            doc.set("lut", "input_primaries", crate::doc::ParamValue::F32(0.0));
+            doc.set("lut", "output_primaries", crate::doc::ParamValue::F32(0.0));
+            doc.set("lut", "shaper", crate::doc::ParamValue::F32(0.0));
+            doc.set("lut", "interpolation", crate::doc::ParamValue::F32(0.0));
             super::config::node_configs(&doc, 5200.0, w, h, Some(cube))
         };
         let NodeConfig::Run { uniforms, lut } = &configs[lut_idx] else {
             panic!("lut node did not activate");
         };
-        gpu.queue.write_buffer(&self.node_uniforms[lut_idx], 0, uniforms);
+        gpu.queue
+            .write_buffer(&self.node_uniforms[lut_idx], 0, uniforms);
         gpu.queue.write_buffer(
             &self.lut3d_buffer,
             0,
@@ -1113,7 +1110,9 @@ mod tests {
                 crop_preview: false,
             };
             graph
-                .render(&gpu, &tex_view, w, h, &view, doc, 5200.0, &seg, None, None, None)
+                .render(
+                    &gpu, &tex_view, w, h, &view, doc, 5200.0, &seg, None, None, None,
+                )
                 .unwrap()
         };
 
@@ -1234,12 +1233,14 @@ mod tests {
                 max_err = max_err.max((out[i * 3 + c] - exp[c]).abs());
             }
         }
-        assert!(max_err < 0.01, "GPU vs CPU dcp_look max abs err = {max_err}");
+        assert!(
+            max_err < 0.01,
+            "GPU vs CPU dcp_look max abs err = {max_err}"
+        );
     }
 
-    /// The 3D-LUT shader must match a CPU reference (sRGB-encode → trilinear →
-    /// sRGB-decode → opacity mix) within f16 + interpolation tolerance, and a
-    /// non-identity LUT must actually move pixels.
+    /// The 3D-LUT shader must match CubeLut::apply_working (tetrahedral,
+    /// tagged spaces) within f16 + interpolation tolerance.
     #[test]
     fn gpu_lut_matches_cpu_reference() {
         // A "swap R and B" 3D LUT — strong, unambiguous, easy to reason about.
@@ -1274,31 +1275,16 @@ mod tests {
         };
         let mut graph = RenderGraph::new(&gpu);
 
-        let srgb_enc = |c: f32| {
-            let x = c.clamp(0.0, 1.0);
-            if x <= 0.0031308 { 12.92 * x } else { 1.055 * x.powf(1.0 / 2.4) - 0.055 }
-        };
-        let srgb_dec = |c: f32| {
-            let x = c.clamp(0.0, 1.0);
-            if x <= 0.04045 { x / 12.92 } else { ((x + 0.055) / 1.055).powf(2.4) }
-        };
         let opacity = 100.0f32;
         let samples = [0.05f32, 0.2, 0.5, 0.85];
         let mut rgba = Vec::new();
         let mut cpu: Vec<[f32; 3]> = Vec::new();
+        let params = crate::lut::LutParams::working_linear();
         for &r in &samples {
             for &g in &samples {
                 for &b in &samples {
                     rgba.extend_from_slice(&[r, g, b, 1.0]);
-                    let enc = [srgb_enc(r), srgb_enc(g), srgb_enc(b)];
-                    let looked = cube.apply_pixel(enc);
-                    let dec = [srgb_dec(looked[0]), srgb_dec(looked[1]), srgb_dec(looked[2])];
-                    let o = opacity / 100.0;
-                    cpu.push([
-                        r * (1.0 - o) + dec[0] * o,
-                        g * (1.0 - o) + dec[1] * o,
-                        b * (1.0 - o) + dec[2] * o,
-                    ]);
+                    cpu.push(cube.apply_working([r, g, b], &params));
                 }
             }
         }

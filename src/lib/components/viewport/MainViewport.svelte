@@ -15,6 +15,7 @@
   } from "../../../ipc/commands";
   import { onEngineReady, onFrameReady } from "../../../ipc/events";
   import CropOverlay from "../../../crop/CropOverlay.svelte";
+  import VideoScrubber from "./VideoScrubber.svelte";
   import {
     contentDims,
     contentNormToImageNorm,
@@ -28,6 +29,7 @@
     displayLook,
     engineReady,
     imageDims,
+    imageMeta,
     imageOpen,
     lastOpenedPath,
     previewBypass,
@@ -41,8 +43,15 @@
     brushRadius,
   } from "../../../stores/app";
   import { doc, reconcile } from "../../../stores/doc";
+  import { setWorkspace, workspace } from "../../../stores/workspace";
 
   let { minimal = false }: { minimal?: boolean } = $props();
+  const isVideoWs = $derived($workspace === "video");
+  const mediaMismatch = $derived(
+    $imageOpen &&
+      ((isVideoWs && $imageMeta?.kind !== "video") ||
+        (!isVideoWs && $imageMeta?.kind === "video")),
+  );
 
   interface ViewState {
     scale: number | null;
@@ -668,6 +677,17 @@
   onpointerleave={() => (chromeVisible = false)}
   onpointerenter={bumpChrome}
 >
+  {#if mediaMismatch}
+    <div class="mismatch">
+      {#if $imageMeta?.kind === "video"}
+        <span>This file is a clip.</span>
+        <button type="button" class="tb-btn" onclick={() => setWorkspace("video")}>Open in Video Editor</button>
+      {:else}
+        <span>This file is a still.</span>
+        <button type="button" class="tb-btn" onclick={() => setWorkspace("photo")}>Open in Photo Editor</button>
+      {/if}
+    </div>
+  {/if}
   <!-- Main Viewport — frame:// JPEG transport -->
   <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div
@@ -729,7 +749,7 @@
       </div>
     {/if}
 
-    {#if $cropActive && displaySrc}
+    {#if $cropActive && displaySrc && !isVideoWs}
       <CropOverlay {wrapEl} />
     {/if}
 
@@ -749,6 +769,10 @@
       <div class="absolute text-[11px] text-red-400">{error}</div>
     {/if}
   </div>
+
+  {#if $imageMeta?.kind === "video"}
+    <VideoScrubber />
+  {/if}
 
   {#if !minimal}
     <div class="viewer-toolbar" class:is-dim={!chromeVisible}>
@@ -782,3 +806,17 @@
     onclose={() => (ctxMenu = null)}
   />
 {/if}
+
+<style>
+  .mismatch {
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px;
+    font-size: 12px;
+    color: var(--color-fg);
+    background: var(--color-sunken);
+    border-bottom: 1px solid var(--color-border);
+  }
+</style>

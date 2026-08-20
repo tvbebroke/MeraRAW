@@ -174,8 +174,7 @@ impl DenoiseSettings {
     }
 
     pub fn ai_active(&self) -> bool {
-        matches!(self.mode, DenoiseMode::Ai | DenoiseMode::AiPlusClassical)
-            && self.ai_amount > 0.0
+        matches!(self.mode, DenoiseMode::Ai | DenoiseMode::AiPlusClassical) && self.ai_amount > 0.0
     }
 }
 

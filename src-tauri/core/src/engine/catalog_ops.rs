@@ -16,7 +16,10 @@ impl Engine {
     ) -> Result<u64, CoreError> {
         let root = crate::path_safety::simplify_path(root);
         if !root.exists() {
-            return Err(CoreError::Io(format!("folder not found: {}", root.display())));
+            return Err(CoreError::Io(format!(
+                "folder not found: {}",
+                root.display()
+            )));
         }
         if !root.is_dir() {
             return Err(CoreError::Io(format!("not a folder: {}", root.display())));
@@ -38,9 +41,8 @@ impl Engine {
         let cat = self.catalog_mut()?;
         let selected_only = only_paths.is_some();
         let files = only_paths.unwrap_or_else(|| crate::catalog::scan_folder(&root));
-        let root_canon = crate::path_safety::simplify_path(
-            root.canonicalize().unwrap_or_else(|_| root.clone()),
-        );
+        let root_canon =
+            crate::path_safety::simplify_path(root.canonicalize().unwrap_or_else(|_| root.clone()));
         let todo: Vec<PathBuf> = files
             .into_iter()
             .filter(|p| {
@@ -117,7 +119,9 @@ impl Engine {
         import_id: u64,
         file: Result<crate::catalog::ImportedFile, CoreError>,
     ) {
-        let Some(st) = &mut self.import_state else { return };
+        let Some(st) = &mut self.import_state else {
+            return;
+        };
         if st.id != import_id {
             return; // stale import
         }
@@ -211,15 +215,15 @@ impl Engine {
     /// changed (cache by source hash — never re-infer on param edits).
     pub(super) fn ensure_segmentations(&mut self) {
         let Some(cur) = &mut self.current else { return };
-        let Some(small) = cur.small_cpu.clone() else { return };
+        let Some(small) = cur.small_cpu.clone() else {
+            return;
+        };
         let generation = self.generation;
         // collect work first (avoid holding doc borrow while mutating)
         let jobs: Vec<(String, String, u64, serde_json::Value)> = cur.docs[cur.active_doc]
             .masks
             .iter()
-            .filter(|m| {
-                m.source.get("type").and_then(|t| t.as_str()) == Some("segmented")
-            })
+            .filter(|m| m.source.get("type").and_then(|t| t.as_str()) == Some("segmented"))
             .map(|m| {
                 use std::hash::{Hash, Hasher};
                 let mut h = std::collections::hash_map::DefaultHasher::new();
@@ -253,10 +257,7 @@ impl Engine {
                                 .and_then(|h| h.get("point"))
                                 .and_then(|p| p.as_array())
                                 .and_then(|a| {
-                                    Some((
-                                        a.first()?.as_f64()? as f32,
-                                        a.get(1)?.as_f64()? as f32,
-                                    ))
+                                    Some((a.first()?.as_f64()? as f32, a.get(1)?.as_f64()? as f32))
                                 })
                                 .unwrap_or((0.5, 0.5));
                             seg.object(&input, p)

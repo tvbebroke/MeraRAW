@@ -60,10 +60,14 @@ impl RgbF32Buf {
         let mut out = vec![0.0f32; nw * nh * 3];
         for ny in 0..nh {
             let y0 = (ny as f32 * scale) as usize;
-            let y1 = (((ny + 1) as f32 * scale) as usize).min(self.height).max(y0 + 1);
+            let y1 = (((ny + 1) as f32 * scale) as usize)
+                .min(self.height)
+                .max(y0 + 1);
             for nx in 0..nw {
                 let x0 = (nx as f32 * scale) as usize;
-                let x1 = (((nx + 1) as f32 * scale) as usize).min(self.width).max(x0 + 1);
+                let x1 = (((nx + 1) as f32 * scale) as usize)
+                    .min(self.width)
+                    .max(x0 + 1);
                 let mut acc = [0.0f32; 3];
                 let n = ((y1 - y0) * (x1 - x0)) as f32;
                 for y in y0..y1 {
@@ -95,8 +99,7 @@ impl RgbF32Buf {
         for i in 0..px {
             let si = i * 3;
             let di = i * 8;
-            out[di..di + 2]
-                .copy_from_slice(&half::f16::from_f32(self.data[si]).to_le_bytes());
+            out[di..di + 2].copy_from_slice(&half::f16::from_f32(self.data[si]).to_le_bytes());
             out[di + 2..di + 4]
                 .copy_from_slice(&half::f16::from_f32(self.data[si + 1]).to_le_bytes());
             out[di + 4..di + 6]
@@ -125,10 +128,8 @@ pub fn rgba8_to_jpeg(
             rgba.len()
         )));
     }
-    let img: ImageBuffer<Rgba<u8>, _> =
-        ImageBuffer::from_raw(width, height, rgba.to_vec()).ok_or_else(|| {
-            crate::error::CoreError::Io("rgba buffer dimensions mismatch".into())
-        })?;
+    let img: ImageBuffer<Rgba<u8>, _> = ImageBuffer::from_raw(width, height, rgba.to_vec())
+        .ok_or_else(|| crate::error::CoreError::Io("rgba buffer dimensions mismatch".into()))?;
     let mut out = Vec::new();
     image::codecs::jpeg::JpegEncoder::new_with_quality(&mut out, quality.clamp(1, 100))
         .encode_image(&img)

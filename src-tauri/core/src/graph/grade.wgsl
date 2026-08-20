@@ -1,11 +1,12 @@
 // Color grade (slot 5) — 3-way wheels + global chroma + perceptual sat.
-// The wheels can inject color three different ways, selected by u.model:
+// The wheels can inject color four different ways, selected by u.model:
 //   0 Perceptual — Oklab constant-hue chroma moves (clean, no hue crosstalk).
 //   1 Classic    — additive colored offsets in linear RGB (lift/gain wheels;
 //                  hue crosstalk = punchy, "Resolve-style" look).
 //   2 Light      — von Kries multiply in LMS cone space (tints behave like
 //                  colored illumination; filmic, physically grounded).
-// All three are identity at zero wheels and share the same global chroma +
+//   3 Board      — ASC CDL slope/offset/power from highlight/shadow/mid lum.
+// All four are identity at zero wheels and share the same global chroma +
 // perceptual-saturation + gamut-compress finish. Matrices supplied CPU-side.
 
 struct GradeUniforms {
@@ -144,6 +145,25 @@ fn grade_light(rgb0: vec3<f32>, w: vec3<f32>) -> vec3<f32> {
   );
 }
 
+// Model 3 — Color Board / ASC CDL. Identity at slope=1, offset=0, power=1
+// which is all wheel luminance = 0. Shadows lum → offset (lift), midtones lum
+// → power (gamma), highlights lum → slope (gain). Hue/sat still tint like Classic.
+fn grade_cdl(rgb0: vec3<f32>, w: vec3<f32>) -> vec3<f32> {
+  let slope = max(1.0 + w.z * u.highlights.z * 0.01, 0.0);
+  let offset = w.x * u.shadows.z * 0.01;
+  let power = clamp(1.0 - w.y * u.midtones.z * 0.008, 0.1, 4.0);
+  var rgb = rgb0 * slope + vec3<f32>(offset);
+  rgb = pow(max(rgb, vec3<f32>(0.0)), vec3<f32>(power));
+  var zones = array<vec4<f32>, 3>(u.shadows, u.midtones, u.highlights);
+  for (var i = 0; i < 3; i++) {
+    let z = zones[i];
+    let wi = w[i];
+    let dir = hue_rgb(z.x) - vec3<f32>(0.5);
+    rgb += wi * (z.y * 0.01) * 0.12 * dir;
+  }
+  return max(rgb, vec3<f32>(0.0));
+}
+
 @compute @workgroup_size(16, 16)
 fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
   if (gid.x >= u.width || gid.y >= u.height) {
@@ -201,11 +221,13 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
 
     outc = gamut_compress(from_oklab(vec3<f32>(max(l, 0.0), a, b)));
   } else {
-    // ===== Models 1 & 2 — inject color, then shared chroma/sat finish =====
+    // ===== Models 1–3 — inject color, then shared chroma/sat finish =====
     let w = zone_weights(to_oklab(rgb0).x);
     var graded: vec3<f32>;
     if (u.model == 1u) {
       graded = grade_classic(rgb0, w);
+    } else if (u.model == 3u) {
+      graded = grade_cdl(rgb0, w);
     } else {
       graded = grade_light(rgb0, w);
     }

@@ -16,7 +16,9 @@ use std::path::PathBuf;
 fn main() {
     let mut args = std::env::args().skip(1);
     let path = PathBuf::from(args.next().expect("usage: render_check <raw> [out] [mode]"));
-    let out = args.next().unwrap_or_else(|| "/tmp/render_check.png".into());
+    let out = args
+        .next()
+        .unwrap_or_else(|| "/tmp/render_check.png".into());
     let mode = args.next().unwrap_or_else(|| "edited".into());
 
     let dec = RawlerDecoder::default();
@@ -78,7 +80,14 @@ fn main() {
             ("color_grade.highlights_sat", json!(55.0)),
             ("color_grade.perceptual_sat", json!(15.0)),
         ] {
-            apply_op(&mut doc, &Op::SetParam { path: p.into(), value: v }).unwrap();
+            apply_op(
+                &mut doc,
+                &Op::SetParam {
+                    path: p.into(),
+                    value: v,
+                },
+            )
+            .unwrap();
         }
         println!("grade model = {gm}");
     }
@@ -95,7 +104,19 @@ fn main() {
     };
     let t0 = std::time::Instant::now();
     let frame = graph
-        .render(&gpu, &tv, payload.width, payload.height, &view, &doc, payload.meta.estimated_cct.unwrap_or(5200.0), &Default::default(), None, None, None)
+        .render(
+            &gpu,
+            &tv,
+            payload.width,
+            payload.height,
+            &view,
+            &doc,
+            payload.meta.estimated_cct.unwrap_or(5200.0),
+            &Default::default(),
+            None,
+            None,
+            None,
+        )
         .expect("render");
     println!(
         "render {}x{} in {} ms, passes: {:?}",
@@ -110,8 +131,7 @@ fn main() {
         .chunks_exact(4)
         .flat_map(|p| [p[0], p[1], p[2]])
         .collect();
-    image::save_buffer(&out, &rgb, view.out_w, view.out_h, image::ColorType::Rgb8)
-        .expect("png");
+    image::save_buffer(&out, &rgb, view.out_w, view.out_h, image::ColorType::Rgb8).expect("png");
     println!("wrote {out}");
 }
 

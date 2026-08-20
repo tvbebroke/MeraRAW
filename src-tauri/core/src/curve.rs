@@ -24,7 +24,13 @@ impl MonotonicCubic {
     fn new(mut pts: Vec<[f32; 2]>) -> Self {
         if pts.first().map(|p| p[0] > 1e-6).unwrap_or(true) {
             // Anchor at x=0 using the first point's y, clamped to the LUT domain.
-            pts.insert(0, [0.0, pts.first().map(|p| p[1]).unwrap_or(0.0).clamp(0.0, 1.0)]);
+            pts.insert(
+                0,
+                [
+                    0.0,
+                    pts.first().map(|p| p[1]).unwrap_or(0.0).clamp(0.0, 1.0),
+                ],
+            );
         }
         if pts.last().map(|p| p[0] < 1.0 - 1e-6).unwrap_or(true) {
             pts.push([1.0, 1.0]);
@@ -159,11 +165,7 @@ impl ProfileToneCurve {
     }
 
     pub fn apply_rgb(&self, rgb: [f32; 3]) -> [f32; 3] {
-        [
-            self.eval(rgb[0]),
-            self.eval(rgb[1]),
-            self.eval(rgb[2]),
-        ]
+        [self.eval(rgb[0]), self.eval(rgb[1]), self.eval(rgb[2])]
     }
 }
 
@@ -265,7 +267,10 @@ mod tests {
 
     #[test]
     fn point_curve_passes_through_points() {
-        let lut = build_lut(&[[0.0, 0.0], [0.5, 0.7], [1.0, 1.0]], &ToneParams::default());
+        let lut = build_lut(
+            &[[0.0, 0.0], [0.5, 0.7], [1.0, 1.0]],
+            &ToneParams::default(),
+        );
         let mid = lut[LUT_SIZE / 2];
         assert!((mid - 0.7).abs() < 0.01, "mid={mid}");
     }

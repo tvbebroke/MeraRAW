@@ -14,9 +14,9 @@
 //! and filter taps are mathematical facts. Runs whole-image with a
 //! bilinear-seeded border.
 
-use crate::image::{CfaImage, RgbImage};
 use super::bilinear::Bilinear;
 use super::Demosaic;
+use crate::image::{CfaImage, RgbImage};
 
 pub struct Ddfapd;
 
@@ -230,8 +230,10 @@ fn refine(
     blue_col: &impl Fn(usize) -> bool,
 ) {
     let n = w * h;
-    let fir_h = |a: &[f32], x: isize, y: isize| (g(a, x - 1, y) + g(a, x, y) + g(a, x + 1, y)) / 3.0;
-    let fir_v = |a: &[f32], x: isize, y: isize| (g(a, x, y - 1) + g(a, x, y) + g(a, x, y + 1)) / 3.0;
+    let fir_h =
+        |a: &[f32], x: isize, y: isize| (g(a, x - 1, y) + g(a, x, y) + g(a, x + 1, y)) / 3.0;
+    let fir_v =
+        |a: &[f32], x: isize, y: isize| (g(a, x, y - 1) + g(a, x, y) + g(a, x, y + 1)) / 3.0;
     let kb_h = |a: &[f32], x: isize, y: isize| 0.5 * (g(a, x - 1, y) + g(a, x + 1, y));
     let kb_v = |a: &[f32], x: isize, y: isize| 0.5 * (g(a, x, y - 1) + g(a, x, y + 1));
 
@@ -244,11 +246,19 @@ fn refine(
             let (xi, yi) = (x as isize, y as isize);
             match fc(x, y) {
                 0 => {
-                    let m = if mask[i] { fir_h(&rg, xi, yi) } else { fir_v(&rg, xi, yi) };
+                    let m = if mask[i] {
+                        fir_h(&rg, xi, yi)
+                    } else {
+                        fir_v(&rg, xi, yi)
+                    };
                     green[i] = r[i] - m;
                 }
                 2 => {
-                    let m = if mask[i] { fir_h(&bg, xi, yi) } else { fir_v(&bg, xi, yi) };
+                    let m = if mask[i] {
+                        fir_h(&bg, xi, yi)
+                    } else {
+                        fir_v(&bg, xi, yi)
+                    };
                     green[i] = b[i] - m;
                 }
                 _ => {}
@@ -287,11 +297,19 @@ fn refine(
             let (xi, yi) = (x as isize, y as isize);
             match fc(x, y) {
                 2 => {
-                    let m = if mask[i] { fir_h(&rb, xi, yi) } else { fir_v(&rb, xi, yi) };
+                    let m = if mask[i] {
+                        fir_h(&rb, xi, yi)
+                    } else {
+                        fir_v(&rb, xi, yi)
+                    };
                     r[i] = b[i] + m;
                 }
                 0 => {
-                    let m = if mask[i] { fir_h(&rb, xi, yi) } else { fir_v(&rb, xi, yi) };
+                    let m = if mask[i] {
+                        fir_h(&rb, xi, yi)
+                    } else {
+                        fir_v(&rb, xi, yi)
+                    };
                     b[i] = r[i] - m;
                 }
                 _ => {}
@@ -303,8 +321,8 @@ fn refine(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::image::CfaPattern;
     use crate::demosaic::tests_common::{max_interior_error, mosaic_from_fn};
+    use crate::image::CfaPattern;
 
     #[test]
     fn constant_field_reconstructs() {

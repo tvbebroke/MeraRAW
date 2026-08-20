@@ -30,8 +30,8 @@ fn read_to_string_capped(path: &Path, max_bytes: u64) -> Result<String, CoreErro
 /// `doc.source_ref.path` for filesystem writes).
 pub fn write_sidecar(source: &Path, doc: &EditDoc) -> Result<PathBuf, CoreError> {
     let path = sidecar_path(source);
-    let json = serde_json::to_string_pretty(&doc.to_json())
-        .map_err(|e| CoreError::Io(e.to_string()))?;
+    let json =
+        serde_json::to_string_pretty(&doc.to_json()).map_err(|e| CoreError::Io(e.to_string()))?;
     let tmp = path.with_extension("mrt.json.tmp");
     std::fs::write(&tmp, json.as_bytes())?;
     std::fs::rename(&tmp, &path)?;
@@ -130,7 +130,10 @@ mod tests {
         assert_eq!(written, dir.join("IMG_0001.mrt.json"));
 
         let loaded = load_sidecar(&src).unwrap().expect("sidecar exists");
-        assert_eq!(loaded.get("exposure", "stops"), Some(&ParamValue::F32(0.75)));
+        assert_eq!(
+            loaded.get("exposure", "stops"),
+            Some(&ParamValue::F32(0.75))
+        );
         assert_eq!(loaded.doc_id, doc.doc_id);
 
         std::fs::remove_dir_all(&dir).ok();
@@ -195,7 +198,10 @@ mod tests {
             doc.get("white_balance", "temp"),
             Some(&ParamValue::F32(5800.0))
         );
-        assert_eq!(doc.get("white_balance", "tint"), Some(&ParamValue::F32(12.0)));
+        assert_eq!(
+            doc.get("white_balance", "tint"),
+            Some(&ParamValue::F32(12.0))
+        );
         assert_eq!(
             doc.get("tone_curve", "contrast"),
             Some(&ParamValue::F32(15.0))

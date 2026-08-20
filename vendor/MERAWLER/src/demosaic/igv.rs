@@ -14,9 +14,9 @@
 //! a 0..65535 scale (note the `/65535`, `/3145680 = 48·65535`, and `LIM(.,0,1)`
 //! clamps); we scale in/out to match and copy the constants verbatim.
 
-use crate::image::{CfaImage, RgbImage};
 use super::bilinear::Bilinear;
 use super::Demosaic;
+use crate::image::{CfaImage, RgbImage};
 
 pub struct Igv;
 
@@ -79,10 +79,14 @@ impl Demosaic for Igv {
             let mut col = 5 + (fc(row, 1) & 1);
             while col < w - 5 {
                 let i = row * w + col;
-                let ng = EPS + ((g[i - v1] - g[i - v3]).abs() + (mos[i] - mos[i - v2]).abs()) / SCALE;
-                let eg = EPS + ((g[i + h1] - g[i + h3]).abs() + (mos[i] - mos[i + h2]).abs()) / SCALE;
-                let wg = EPS + ((g[i - h1] - g[i - h3]).abs() + (mos[i] - mos[i - h2]).abs()) / SCALE;
-                let sg = EPS + ((g[i + v1] - g[i + v3]).abs() + (mos[i] - mos[i + v2]).abs()) / SCALE;
+                let ng =
+                    EPS + ((g[i - v1] - g[i - v3]).abs() + (mos[i] - mos[i - v2]).abs()) / SCALE;
+                let eg =
+                    EPS + ((g[i + h1] - g[i + h3]).abs() + (mos[i] - mos[i + h2]).abs()) / SCALE;
+                let wg =
+                    EPS + ((g[i - h1] - g[i - h3]).abs() + (mos[i] - mos[i - h2]).abs()) / SCALE;
+                let sg =
+                    EPS + ((g[i + v1] - g[i + v3]).abs() + (mos[i] - mos[i + v2]).abs()) / SCALE;
                 // high-order interpolation (Li & Randhawa), 48*65535 = 3145680
                 let nv = lim(
                     (23.0 * g[i - v1] + 23.0 * g[i - v3] + g[i - v5] + g[i + v1] + 40.0 * mos[i]
@@ -138,7 +142,9 @@ impl Demosaic for Igv {
                     vdif[(i + v6) >> 1],
                 );
                 let ng = lim(
-                    EPSSQ + 78.0 * sqr(vd) + 69.0 * (sqr(vd2m) + sqr(vd2p))
+                    EPSSQ
+                        + 78.0 * sqr(vd)
+                        + 69.0 * (sqr(vd2m) + sqr(vd2p))
                         + 51.0 * (sqr(vd4m) + sqr(vd4p))
                         + 21.0 * (sqr(vd6m) + sqr(vd6p))
                         - 6.0 * sqr(vd2m + vd + vd2p)
@@ -157,7 +163,9 @@ impl Demosaic for Igv {
                     hdif[(i + h6) >> 1],
                 );
                 let eg = lim(
-                    EPSSQ + 78.0 * sqr(hd) + 69.0 * (sqr(hd2m) + sqr(hd2p))
+                    EPSSQ
+                        + 78.0 * sqr(hd)
+                        + 69.0 * (sqr(hd2m) + sqr(hd2p))
                         + 51.0 * (sqr(hd4m) + sqr(hd4p))
                         + 21.0 * (sqr(hd6m) + sqr(hd6p))
                         - 6.0 * sqr(hd2m + hd + hd2p)
@@ -209,8 +217,8 @@ impl Demosaic for Igv {
                     let nev = med3(ch[i - v1 + h1], ch[i - v3 + h1], ch[i - v1 + h3]);
                     let swv = med3(ch[i + v1 - h1], ch[i + v3 - h1], ch[i + v1 - h3]);
                     let sev = med3(ch[i + v1 + h1], ch[i + v3 + h1], ch[i + v1 + h3]);
-                    ch[i] = (nwg * nwv + neg * nev + swg * swv + seg * sev)
-                        / (nwg + neg + swg + seg);
+                    ch[i] =
+                        (nwg * nwv + neg * nev + swg * swv + seg * sev) / (nwg + neg + swg + seg);
                     col += 2;
                 }
                 row += 2;
@@ -265,8 +273,8 @@ impl Demosaic for Igv {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::image::CfaPattern;
     use crate::demosaic::tests_common::{max_interior_error, mosaic_from_fn};
+    use crate::image::CfaPattern;
 
     #[test]
     fn constant_field_reconstructs() {

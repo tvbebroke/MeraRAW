@@ -18,9 +18,15 @@
   import { folder, folders, activePhoto } from "../../../stores/browse";
   import { undo, redo } from "../../../ipc/commands";
   import { reconcile } from "../../../stores/doc";
+  import {
+    isLibraryRoute,
+    setWorkspace,
+    workspace,
+  } from "../../../stores/workspace";
 
   // Lazy so the page still renders in a plain browser (no Tauri runtime)
-  const isLibrary = $derived(router.location === "/library");
+  const isLibrary = $derived(isLibraryRoute(router.location));
+  const isVideo = $derived($workspace === "video");
 
   let isFullscreen = $state(false);
 
@@ -57,7 +63,7 @@
   }
 
   async function openRaw() {
-    const path = await pickFile();
+    const path = await pickFile($workspace);
     if (path) void openPath(path);
   }
 
@@ -87,6 +93,24 @@
     data-tauri-drag-region
   />
   <span data-tauri-drag-region class="ml-[8px] text-[13px] font-medium text-fg">MeraRAW</span>
+  <div class="ws-switch" data-tauri-drag-region="false" role="tablist" aria-label="Editor">
+    <button
+      type="button"
+      role="tab"
+      class="ws-chip"
+      class:is-on={!isVideo}
+      aria-selected={!isVideo}
+      onclick={() => setWorkspace("photo")}
+    >Photo</button>
+    <button
+      type="button"
+      role="tab"
+      class="ws-chip"
+      class:is-on={isVideo}
+      aria-selected={isVideo}
+      onclick={() => setWorkspace("video")}
+    >Video</button>
+  </div>
   {#if folderName || fileName}
     <span class="crumb-sep" aria-hidden="true">/</span>
     {#if folderName}
@@ -122,21 +146,21 @@
 
     {#if isLibrary}
       <button
-        onclick={() => safePush("/edit")}
-        aria-label="Edit"
-        title="Edit ({shortcutLabels.edit})"
+        onclick={() => safePush(isVideo ? "/grade" : "/edit")}
+        aria-label={isVideo ? "Grade" : "Edit"}
+        title={isVideo ? "Grade" : `Edit (${shortcutLabels.edit})`}
         class="quiet-btn"
         data-tauri-drag-region="false"
       >
-        Edit
+        {isVideo ? "Grade" : "Edit"}
       </button>
     {:else}
       <IconButton
         icon={libraryIcon}
         label="Library"
-        title="Library ({shortcutLabels.library})"
+        title={isVideo ? "Clips" : `Library (${shortcutLabels.library})`}
         iconClass="h-[15px] w-[19px]"
-        onclick={() => safePush("/library")}
+        onclick={() => safePush(isVideo ? "/clips" : "/library")}
       />
       <button
         type="button"
@@ -164,6 +188,32 @@
   .crumb-file {
     font-size: 13px;
     color: var(--color-fg);
+  }
+  .ws-switch {
+    display: flex;
+    gap: 2px;
+    margin-left: 12px;
+    padding: 2px;
+    border-radius: 8px;
+    background: var(--color-sunken);
+    border: 1px solid var(--color-border);
+  }
+  .ws-chip {
+    height: 22px;
+    padding: 0 9px;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--color-secondary);
+    font: inherit;
+    font-size: 12px;
+    cursor: pointer;
+  }
+  .ws-chip:hover { color: var(--color-fg); }
+  .ws-chip.is-on {
+    background: var(--color-active);
+    color: var(--color-fg);
+    font-weight: 500;
   }
   .quiet-btn {
     height: 26px;

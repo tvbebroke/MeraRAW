@@ -23,6 +23,8 @@ import {
   onPreviewReady,
   onSettingsRequested,
   onExportRequested,
+  onPhotoWorkspace,
+  onVideoWorkspace,
 } from "../../ipc/events";
 import { importAndBrowse, initBrowseBridge, pickAndImportFolder } from "../../stores/browse";
 import {
@@ -39,6 +41,7 @@ import {
 } from "../../stores/app";
 import { clearDoc, reconcile, setDoc } from "../../stores/doc";
 import { isExportOpen, isSettingsOpen } from "../../stores/ui";
+import { libraryRoute, setWorkspace, syncWorkspaceToOpenFile } from "../../stores/workspace";
 import { licenseStatus } from "../../stores/session";
 import { loadRegistry } from "./params";
 
@@ -65,7 +68,7 @@ export async function openPath(path: string): Promise<void> {
     statusMessage.set("decoding…");
     const d = await getDoc();
     if (d) setDoc(d);
-    push("/edit");
+    push(syncWorkspaceToOpenFile(path, m.kind));
   } catch (e) {
     decodeState.set("error");
     statusMessage.set(isAppError(e) ? `${e.kind}: ${e.message}` : String(e));
@@ -80,6 +83,7 @@ export function initEngineBridge(): () => void {
       licenseStatus.set({
         licensed: false,
         userId: null,
+        email: null,
         reason: isAppError(e) ? `${e.kind}: ${e.message}` : String(e),
       });
     });
@@ -129,15 +133,17 @@ export function initEngineBridge(): () => void {
     }),
     onDocUpdated((delta) => reconcile(delta)),
     onFolderOpened((path) => {
-      push("/library");
+      push(libraryRoute());
       void importAndBrowse(path).catch(() => null);
     }),
     onImportRequested(() => {
-      push("/library");
+      push(libraryRoute());
       void pickAndImportFolder().catch(() => null);
     }),
     onExportRequested(() => isExportOpen.set(true)),
     onSettingsRequested(() => isSettingsOpen.set(true)),
+    onPhotoWorkspace(() => setWorkspace("photo")),
+    onVideoWorkspace(() => setWorkspace("video")),
   ];
 
   const stopBrowse = initBrowseBridge();

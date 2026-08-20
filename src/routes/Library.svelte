@@ -9,16 +9,25 @@
   import {
     activePhoto,
     folder,
+    libraryItems,
     openPhoto as browseOpenPhoto,
     patchPhotoMeta,
     photos,
     thumbUrl,
   } from "../stores/browse";
   import type { GridItem } from "../ipc/types";
-  import { push } from "svelte-spa-router";
+  import { push, router } from "svelte-spa-router";
   import { fade, scale } from "svelte/transition";
   import { cubicOut } from "svelte/easing";
   import { shortcutLabels } from "../lib/shortcuts";
+  import { adoptWorkspaceFromRoute, editorRoute, setWorkspace, workspace } from "../stores/workspace";
+  import { isVideoPath } from "../lib/media";
+
+  $effect(() => {
+    adoptWorkspaceFromRoute(router.location);
+  });
+
+  const isVideo = $derived($workspace === "video");
 
   // Window dimensions for responsive boundaries
   let windowWidth = $state(0);
@@ -118,7 +127,7 @@
   let selectedPath = $state<string | null>(null);
 
   const filteredPhotos = $derived.by(() => {
-    let items = $photos.filter((p) =>
+    let items = $libraryItems.filter((p) =>
       p.filename.toLowerCase().includes(searchQuery.toLowerCase()),
     );
     switch (sortMode) {
@@ -154,10 +163,10 @@
     await browseOpenPhoto(photo);
     if (typeof document !== "undefined" && (document as any).startViewTransition) {
       (document as any).startViewTransition(() => {
-        push("/edit");
+        push(editorRoute());
       });
     } else {
-      push("/edit");
+      push(editorRoute());
     }
   }
 
@@ -245,7 +254,7 @@
   const ctxItems = $derived<ContextMenuItem[]>([
     {
       type: "item",
-      label: "Open in editor",
+      label: isVideo ? "Open in video editor" : "Open in editor",
       shortcut: shortcutLabels.openPhoto,
       onclick: () => { if (ctxPhoto) void openPhoto(ctxPhoto); },
     },
@@ -421,14 +430,27 @@
               </svg>
             </div>
             <p class="text-[13px] font-medium text-subtle">No folder open</p>
-            <p class="text-[11px] text-subtle">Select a folder from the sidebar to browse your photos</p>
+            <p class="text-[11px] text-subtle">
+              Select a folder from the sidebar to browse your {isVideo ? "clips" : "photos"}
+            </p>
           </div>
         {:else if filteredPhotos.length === 0}
           <!-- Empty state: folder open but no matching photos -->
           <div class="flex h-full flex-col items-center justify-center gap-3 text-center">
-            <p class="text-[13px] font-medium text-subtle">No photos found</p>
+            <p class="text-[13px] font-medium text-subtle">{isVideo ? "No clips found" : "No photos found"}</p>
             {#if searchQuery}
               <p class="empty-state text-[11px] text-subtle">No results for "{searchQuery}"</p>
+            {:else if $photos.length > 0}
+              <p class="text-[11px] text-subtle">
+                This folder has {isVideo ? "photos" : "clips"}. Switch editors to see them.
+              </p>
+              <button
+                type="button"
+                class="mt-1 rounded-[8px] border border-border px-3 py-[5px] text-[12px] text-fg"
+                onclick={() => setWorkspace(isVideo ? "photo" : "video")}
+              >
+                Open {isVideo ? "Photo" : "Video"} Editor
+              </button>
             {/if}
           </div>
         {:else}
@@ -454,7 +476,7 @@
                     />
                   {:else}
                     <div class="photo-thumb-placeholder">
-                      <span class="text-[10px] font-semibold tracking-widest text-subtle">RAW</span>
+                      <span class="text-[10px] font-semibold tracking-widest text-subtle">{isVideoPath(photo.filename) || isVideo ? "CLIP" : "RAW"}</span>
                     </div>
                   {/if}
                 </div>

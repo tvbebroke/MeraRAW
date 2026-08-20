@@ -1,9 +1,12 @@
 import Library from "./routes/Library.svelte";
 import EditIntermediate from "./routes/EditIntermediate.svelte";
+import HomeRedirect from "./routes/HomeRedirect.svelte";
 
 export default {
-  "/": EditIntermediate,
+  "/": HomeRedirect,
   "/library": Library,
   "/edit": EditIntermediate,
-  "*": EditIntermediate,
+  "/clips": Library,
+  "/grade": EditIntermediate,
+  "*": HomeRedirect,
 };

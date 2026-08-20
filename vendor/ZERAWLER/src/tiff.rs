@@ -21,9 +21,7 @@ pub fn read_rgb(path: &Path) -> Result<RgbImage, Error> {
         .map_err(|e| Error::Output(format!("{}: {e}", path.display())))?;
     let (w, h) = (img.width() as usize, img.height() as usize);
     let data = match img {
-        image::DynamicImage::ImageRgb32F(buf) => {
-            buf.pixels().map(|p| [p[0], p[1], p[2]]).collect()
-        }
+        image::DynamicImage::ImageRgb32F(buf) => buf.pixels().map(|p| [p[0], p[1], p[2]]).collect(),
         image::DynamicImage::ImageRgba32F(buf) => {
             buf.pixels().map(|p| [p[0], p[1], p[2]]).collect()
         }

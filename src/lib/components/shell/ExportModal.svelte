@@ -2,8 +2,9 @@
   import { fade, scale } from "svelte/transition";
   import { isExportOpen } from "../../../stores/ui";
   import ToggleSwitch from "../primitives/ToggleSwitch.svelte";
-  import { folder, photos } from "../../../stores/browse";
-  import { decodeState } from "../../../stores/app";
+  import { folder, libraryItems } from "../../../stores/browse";
+  import { decodeState, imageMeta, videoMark } from "../../../stores/app";
+  import { workspace } from "../../../stores/workspace";
   import { pickFolder } from "../../fs";
   import {
     cancelExportBatch,
@@ -33,6 +34,8 @@
   let copyright = $state("");
   let exportPath = $state("");
   let scope = $state<Scope>("current");
+  let videoClip = $state(false);
+  let videoAudio = $state(true);
   let busy = $state(false);
   let status = $state<string | null>(null);
   let progress = $state<{ phase: string; pct: number } | null>(null);
@@ -40,8 +43,11 @@
 
   const decodeReady = $derived($decodeState === "ready");
   const lossy = $derived(format === "jpeg" || format === "heic");
-  const folderCount = $derived($photos.length);
+  const folderCount = $derived($libraryItems.length);
   const batchMode = $derived(scope === "folder");
+  const isVideo = $derived($imageMeta?.kind === "video");
+  const noun = $derived($workspace === "video" ? "clips" : "photos");
+  const currentNoun = $derived(isVideo ? "clip" : "photo");
 
   // Default export path to active folder if set
   $effect(() => {
@@ -121,6 +127,10 @@
       stripMetadata: metadataPolicy === "stripAll",
       copyright: copyright.trim() || null,
       watermarkText: null,
+      videoClip: isVideo && videoClip && !batchMode,
+      videoIn: isVideo && videoClip ? $videoMark.inFrame : null,
+      videoOut: isVideo && videoClip ? $videoMark.outFrame : null,
+      videoAudio: isVideo && videoClip && videoAudio,
     };
   }
 
@@ -130,9 +140,9 @@
     progress = null;
 
     if (batchMode) {
-      const paths = $photos.map((p) => p.path).filter(Boolean);
+      const paths = $libraryItems.map((p) => p.path).filter(Boolean);
       if (paths.length === 0) {
-        status = "No photos in the current folder to export.";
+        status = `No ${noun} in the current folder to export.`;
         busy = false;
         return;
       }
@@ -144,7 +154,7 @@
       status = `Queuing ${paths.length} exports…`;
       try {
         const n = await exportBatch(paths, buildSettings());
-        status = `Exporting ${n} photos…`;
+        status = `Exporting ${n} ${noun}…`;
       } catch (e) {
         status = `Export failed: ${formatAppError(e)}`;
         progress = null;
@@ -204,7 +214,7 @@
     onclick={(e) => e.stopPropagation()}
   >
     <header class="flex shrink-0 items-center justify-between border-b border-border px-6 py-4">
-      <h3 class="text-sm font-semibold text-fg">Export Photo</h3>
+      <h3 class="text-sm font-semibold text-fg">{isVideo ? "Export Clip" : "Export Photo"}</h3>
       <button class="close-btn" onclick={close} aria-label="Close export dialog">
         <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
           <path d="M1 1L11 11M11 1L1 11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
@@ -223,7 +233,7 @@
               disabled={busy}
               onclick={() => (scope = "current")}
             >
-              Current photo
+              Current {currentNoun}
             </button>
             <button
               type="button"
@@ -236,9 +246,31 @@
           </div>
           <p class="setting-desc">
             {batchMode
-              ? "Exports every photo in the current library folder with its own sidecar edits."
-              : "Exports the photo currently open in the editor."}
+              ? `Exports every ${$workspace === "video" ? "clip" : "photo"} in the current library folder with its own sidecar edits.`
+              : isVideo && videoClip
+                ? "Every frame from In to Out goes through the same graph as preview, then FFmpeg muxes H.264 (no dropped frames). Audio is copied when present, otherwise the clip is silent. Delivery is Rec.709 SDR."
+                : isVideo
+                  ? "Exports the current video frame as a still through the same graph as preview. Audio is not muxed. HDR/log inputs are tone-mapped to Rec.709 SDR."
+                  : "Exports the photo currently open in the editor."}
           </p>
+          {#if isVideo && !batchMode}
+            <div class="mt-2">
+              <ToggleSwitch
+                checked={videoClip}
+                label={`Clip ${$videoMark.inFrame}–${$videoMark.outFrame} → H.264`}
+                onchange={(v) => (videoClip = v)}
+              />
+            </div>
+            {#if videoClip}
+              <div class="mt-2">
+                <ToggleSwitch
+                  checked={videoAudio}
+                  label="Copy source audio"
+                  onchange={(v) => (videoAudio = v)}
+                />
+              </div>
+            {/if}
+          {/if}
         </div>
 
         <div class="setting-group">
@@ -359,7 +391,7 @@
       {/if}
       {#if batchMode && folderCount === 0 && !busy}
         <p class="status-line status-line--warn">
-          No photos in the current folder.
+          No {noun} in the current folder.
         </p>
       {/if}
 

@@ -15,8 +15,9 @@
     {
       title: "Navigation & Layout",
       items: [
-        { label: "Go to Library View", key: shortcutLabels.library },
-        { label: "Go to Editor View", key: shortcutLabels.edit },
+        { label: "Photo Editor / Video Editor", key: "Title bar" },
+        { label: "Go to Library / Clips", key: shortcutLabels.library },
+        { label: "Go to Editor / Grade", key: shortcutLabels.edit },
         { label: "Toggle Left Sidebar", key: shortcutLabels.sidebar },
         { label: "Toggle Details Panel (Library)", key: shortcutLabels.details },
         { label: "Toggle Filmstrip (Editor)", key: shortcutLabels.filmstrip },
@@ -28,9 +29,9 @@
       title: "Tool Switching",
       items: [
         { label: "Focus Light section", key: shortcutLabels.toolEdit },
-        { label: "Focus Crop section", key: shortcutLabels.toolCrop },
-        { label: "Focus Mask section", key: shortcutLabels.toolMask },
-        { label: "Focus Retouch section", key: shortcutLabels.toolAi },
+        { label: "Focus Crop section (Photo)", key: shortcutLabels.toolCrop },
+        { label: "Focus Mask section (Photo)", key: shortcutLabels.toolMask },
+        { label: "Focus Retouch section (Photo)", key: shortcutLabels.toolAi },
         { label: "Focus Presets section", key: shortcutLabels.toolPresets },
         { label: "Open AI Agent", key: shortcutLabels.toolChat },
       ]
@@ -45,6 +46,14 @@
         { label: "Undo last change", key: shortcutLabels.undo },
         { label: "Redo last change", key: shortcutLabels.redo },
         { label: "Next / Previous Photo", key: "← / →" },
+        { label: "Video frame step (Edit)", key: "← / →" },
+        { label: "Play / Pause video", key: shortcutLabels.videoPlay },
+        { label: "Reverse play (video)", key: "J" },
+        { label: "Pause video", key: "K" },
+        { label: "Mark In / Out (video)", key: "I / O" },
+        { label: "Previous / Next Look", key: "[ / ]" },
+        { label: "Copy Grade", key: shortcutLabels.copyGrade },
+        { label: "Paste Grade", key: shortcutLabels.pasteGrade },
         { label: "Open Selected Photo", key: shortcutLabels.openPhoto },
         { label: "Close active dialog / Deselect", key: shortcutLabels.escape },
       ]

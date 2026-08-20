@@ -56,7 +56,19 @@ async fn radial_mask_scopes_exposure_to_center() {
     let mut doc = EditDoc::new("/synthetic.ARW");
 
     let base = graph
-        .render(&gpu, &tv, W, H, &view(), &doc, AS_SHOT, &HashMap::new(), None, None, None)
+        .render(
+            &gpu,
+            &tv,
+            W,
+            H,
+            &view(),
+            &doc,
+            AS_SHOT,
+            &HashMap::new(),
+            None,
+            None,
+            None,
+        )
         .unwrap();
     let base_center = px(&base, W / 2, H / 2);
     let base_corner = px(&base, 1, 1);
@@ -82,7 +94,19 @@ async fn radial_mask_scopes_exposure_to_center() {
 
     graph.invalidate_from_module("masks");
     let masked = graph
-        .render(&gpu, &tv, W, H, &view(), &doc, AS_SHOT, &HashMap::new(), None, None, None)
+        .render(
+            &gpu,
+            &tv,
+            W,
+            H,
+            &view(),
+            &doc,
+            AS_SHOT,
+            &HashMap::new(),
+            None,
+            None,
+            None,
+        )
         .unwrap();
     assert!(
         graph
@@ -118,7 +142,19 @@ async fn radial_mask_scopes_exposure_to_center() {
     .unwrap();
     graph.invalidate_from_module("masks");
     let inverted = graph
-        .render(&gpu, &tv, W, H, &view(), &doc, AS_SHOT, &HashMap::new(), None, None, None)
+        .render(
+            &gpu,
+            &tv,
+            W,
+            H,
+            &view(),
+            &doc,
+            AS_SHOT,
+            &HashMap::new(),
+            None,
+            None,
+            None,
+        )
         .unwrap();
     let center_i = px(&inverted, W / 2, H / 2);
     let corner_i = px(&inverted, 1, 1);
@@ -144,7 +180,19 @@ async fn radial_mask_scopes_exposure_to_center() {
     .unwrap();
     graph.invalidate_from_module("masks");
     let zeroed = graph
-        .render(&gpu, &tv, W, H, &view(), &doc, AS_SHOT, &HashMap::new(), None, None, None)
+        .render(
+            &gpu,
+            &tv,
+            W,
+            H,
+            &view(),
+            &doc,
+            AS_SHOT,
+            &HashMap::new(),
+            None,
+            None,
+            None,
+        )
         .unwrap();
     assert_eq!(px(&zeroed, 1, 1), base_corner);
     assert_eq!(px(&zeroed, W / 2, H / 2), base_center);
@@ -191,7 +239,19 @@ async fn segmented_mask_blends_via_small_texture() {
     seg.insert(id.clone(), small_tex.create_view(&Default::default()));
 
     let frame = graph
-        .render(&gpu, &tv, W, H, &view(), &doc, AS_SHOT, &seg, None, None, None)
+        .render(
+            &gpu,
+            &tv,
+            W,
+            H,
+            &view(),
+            &doc,
+            AS_SHOT,
+            &seg,
+            None,
+            None,
+            None,
+        )
         .unwrap();
     let left = px(&frame, 4, H / 2);
     let right = px(&frame, W - 4, H / 2);
@@ -203,7 +263,19 @@ async fn segmented_mask_blends_via_small_texture() {
     // without the segmentation texture (inference pending) the mask is inert
     graph.invalidate_all();
     let pending = graph
-        .render(&gpu, &tv, W, H, &view(), &doc, AS_SHOT, &HashMap::new(), None, None, None)
+        .render(
+            &gpu,
+            &tv,
+            W,
+            H,
+            &view(),
+            &doc,
+            AS_SHOT,
+            &HashMap::new(),
+            None,
+            None,
+            None,
+        )
         .unwrap();
     let l2 = px(&pending, 4, H / 2);
     let r2 = px(&pending, W - 4, H / 2);

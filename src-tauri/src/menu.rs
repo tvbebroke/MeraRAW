@@ -31,9 +31,16 @@ pub fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
         .item(&MenuItem::with_id(
             app,
             "open-file",
-            "Open…",
+            "Open Photo…",
             true,
             Some("CmdOrCtrl+O"),
+        )?)
+        .item(&MenuItem::with_id(
+            app,
+            "open-video",
+            "Open Video…",
+            true,
+            Some("CmdOrCtrl+Shift+V"),
         )?)
         .item(&MenuItem::with_id(
             app,
@@ -42,14 +49,32 @@ pub fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
             true,
             Some("CmdOrCtrl+Shift+O"),
         )?)
-        .item(&MenuItem::with_id(app, "import", "Add Photos…", true, None::<&str>)?)
-        .item(&MenuItem::with_id(app, "export", "Export…", true, None::<&str>)?)
+        .item(&MenuItem::with_id(
+            app,
+            "import",
+            "Add Folder…",
+            true,
+            None::<&str>,
+        )?)
+        .item(&MenuItem::with_id(
+            app,
+            "export",
+            "Export…",
+            true,
+            None::<&str>,
+        )?)
         .separator()
         .item(&PredefinedMenuItem::close_window(app, None)?)
         .build()?;
 
     let edit = SubmenuBuilder::new(app, "Edit")
-        .item(&MenuItem::with_id(app, "undo", "Undo", false, Some("CmdOrCtrl+Z"))?)
+        .item(&MenuItem::with_id(
+            app,
+            "undo",
+            "Undo",
+            false,
+            Some("CmdOrCtrl+Z"),
+        )?)
         .item(&MenuItem::with_id(
             app,
             "redo",
@@ -64,9 +89,42 @@ pub fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
         .build()?;
 
     let view = SubmenuBuilder::new(app, "View")
-        .item(&MenuItem::with_id(app, "zoom-in", "Zoom In", false, Some("CmdOrCtrl+="))?)
-        .item(&MenuItem::with_id(app, "zoom-out", "Zoom Out", false, Some("CmdOrCtrl+-"))?)
-        .item(&MenuItem::with_id(app, "zoom-fit", "Fit", false, Some("CmdOrCtrl+0"))?)
+        .item(&MenuItem::with_id(
+            app,
+            "zoom-in",
+            "Zoom In",
+            false,
+            Some("CmdOrCtrl+="),
+        )?)
+        .item(&MenuItem::with_id(
+            app,
+            "zoom-out",
+            "Zoom Out",
+            false,
+            Some("CmdOrCtrl+-"),
+        )?)
+        .item(&MenuItem::with_id(
+            app,
+            "zoom-fit",
+            "Fit",
+            false,
+            Some("CmdOrCtrl+0"),
+        )?)
+        .separator()
+        .item(&MenuItem::with_id(
+            app,
+            "photo-workspace",
+            "Photo Editor",
+            true,
+            None::<&str>,
+        )?)
+        .item(&MenuItem::with_id(
+            app,
+            "video-workspace",
+            "Video Editor",
+            true,
+            None::<&str>,
+        )?)
         .separator()
         .item(&MenuItem::with_id(
             app,
@@ -78,7 +136,13 @@ pub fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
         .build()?;
 
     let help = SubmenuBuilder::new(app, "Help")
-        .item(&MenuItem::with_id(app, "docs", "Documentation", true, None::<&str>)?)
+        .item(&MenuItem::with_id(
+            app,
+            "docs",
+            "Documentation",
+            true,
+            None::<&str>,
+        )?)
         .build()?;
 
     Menu::with_items(app, &[&app_menu, &file, &edit, &view, &help])
@@ -91,14 +155,40 @@ pub fn handle_menu_event(app: &AppHandle, event: MenuEvent) {
             app.clone()
                 .dialog()
                 .file()
-                .add_filter("Images", crate::commands::IMAGE_EXTENSIONS)
+                .set_title("Open photo")
+                .add_filter("Photos", crate::commands::PHOTO_EXTENSIONS)
                 .pick_file(move |f| {
                     if let Some(path) = f {
                         let path = path.to_string();
-                        tracing::info!(path = %path, "menu: open file");
+                        tracing::info!(path = %path, "menu: open photo");
                         events::emit_path_event(&app, events::FILE_OPENED, &path);
                     }
                 });
+        }
+        "open-video" => {
+            let app = app.clone();
+            app.clone()
+                .dialog()
+                .file()
+                .set_title("Open video")
+                .add_filter("Video", crate::commands::VIDEO_EXTENSIONS)
+                .pick_file(move |f| {
+                    if let Some(path) = f {
+                        let path = path.to_string();
+                        tracing::info!(path = %path, "menu: open video");
+                        events::emit_path_event(&app, events::FILE_OPENED, &path);
+                    }
+                });
+        }
+        "photo-workspace" => {
+            if let Err(e) = app.emit(events::PHOTO_WORKSPACE, ()) {
+                tracing::error!(error = %e, "emit photo-workspace failed");
+            }
+        }
+        "video-workspace" => {
+            if let Err(e) = app.emit(events::VIDEO_WORKSPACE, ()) {
+                tracing::error!(error = %e, "emit video-workspace failed");
+            }
         }
         "open-folder" => {
             let app = app.clone();
@@ -125,7 +215,8 @@ pub fn handle_menu_event(app: &AppHandle, event: MenuEvent) {
                 tracing::error!(error = %e, "emit settings-requested failed");
             }
         }
-        "toggle-devtools" => {
+        "toggle-devtools" =>
+        {
             #[cfg(debug_assertions)]
             if let Some(w) = app.get_webview_window("main") {
                 if w.is_devtools_open() {

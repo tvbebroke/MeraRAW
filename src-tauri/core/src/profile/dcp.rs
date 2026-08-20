@@ -129,16 +129,16 @@ fn read_u32_array(data: &[u8], typ: u16, count: u32, val: u32) -> Result<Vec<u32
     }
     let off = val as usize;
     let need = off
-        .checked_add(count.checked_mul(4).ok_or_else(|| {
-            CoreError::InvalidOp("DCP array size overflow".into())
-        })?)
+        .checked_add(
+            count
+                .checked_mul(4)
+                .ok_or_else(|| CoreError::InvalidOp("DCP array size overflow".into()))?,
+        )
         .ok_or_else(|| CoreError::InvalidOp("DCP array size overflow".into()))?;
     if need > data.len() {
         return Err(CoreError::InvalidOp("DCP array out of bounds".into()));
     }
-    (0..count)
-        .map(|i| read_u32(data, off + i * 4))
-        .collect()
+    (0..count).map(|i| read_u32(data, off + i * 4)).collect()
 }
 
 fn read_float_array(data: &[u8], typ: u16, count: u32, val: u32) -> Result<Vec<f32>, CoreError> {
@@ -151,9 +151,11 @@ fn read_float_array(data: &[u8], typ: u16, count: u32, val: u32) -> Result<Vec<f
     let count = count as usize;
     let off = val as usize;
     let need = off
-        .checked_add(count.checked_mul(4).ok_or_else(|| {
-            CoreError::InvalidOp("DCP array size overflow".into())
-        })?)
+        .checked_add(
+            count
+                .checked_mul(4)
+                .ok_or_else(|| CoreError::InvalidOp("DCP array size overflow".into()))?,
+        )
         .ok_or_else(|| CoreError::InvalidOp("DCP array size overflow".into()))?;
     if need > data.len() {
         return Err(CoreError::InvalidOp("DCP array out of bounds".into()));
@@ -354,10 +356,7 @@ impl DcpProfile {
         illuminants.dedup_by(|a, b| (a.0 - b.0).abs() < 1.0);
 
         if illuminants.is_empty() {
-            return Err(dcp_err(format!(
-                "no usable matrices in {}",
-                path.display()
-            )));
+            return Err(dcp_err(format!("no usable matrices in {}", path.display())));
         }
 
         let ill1_cct = illuminant_code_cct(ill1);
@@ -479,7 +478,10 @@ impl DcpProfile {
                 m.hue_div,
                 m.sat_div,
                 m.val_div,
-                m.deltas.iter().map(|d| [d[0], d[1], d[2], 0.0]).collect::<Vec<[f32; 4]>>(),
+                m.deltas
+                    .iter()
+                    .map(|d| [d[0], d[1], d[2], 0.0])
+                    .collect::<Vec<[f32; 4]>>(),
             )
         };
         let valid = |m: &Option<HueSatMap>| m.as_ref().filter(|x| x.is_valid()).map(conv);
@@ -503,10 +505,7 @@ impl DcpProfile {
         let cct = cal.estimate_cct(wb);
         let cam_to_xyz_d50 = self.cam_to_xyz_d50_at(cct)?;
         let adapt = bradford_adapt(D50_XYZ, D65_XYZ);
-        Some(mat_mul(
-            &XYZ_TO_REC2020,
-            &mat_mul(&adapt, &cam_to_xyz_d50),
-        ))
+        Some(mat_mul(&XYZ_TO_REC2020, &mat_mul(&adapt, &cam_to_xyz_d50)))
     }
 }
 
@@ -541,10 +540,7 @@ mod tests {
         let mid = dcp.tone_curve().apply_rgb([0.18, 0.18, 0.18]);
         assert!(mid[0] > 0.25, "tone curve should lift midtones");
         let cal = CameraCalibration {
-            calibrations: vec![(
-                2856.0,
-                [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]],
-            )],
+            calibrations: vec![(2856.0, [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]])],
         };
         let m = dcp.cam_to_rec2020(&[1.0, 1.0, 1.0, 1.0], &cal).unwrap();
         let out = mat_vec(&m, [0.5, 0.5, 0.5]);

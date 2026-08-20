@@ -18,6 +18,8 @@
     "hsl",
     "tone_curve",
     "lut",
+    "effects",
+    "input",
   ];
 
   let presets = $state<PresetCatalogEntry[]>([]);

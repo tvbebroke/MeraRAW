@@ -85,9 +85,7 @@ impl RawlerDecoder {
         // Apple ProRAW is a linear DNG (already demosaiced: cpp == 3) from an
         // Apple device — surface it distinctly since it edits differently from
         // a mosaiced sensor RAW.
-        let is_proraw = ext == "DNG"
-            && raw.cpp == 3
-            && md.make.to_lowercase().contains("apple");
+        let is_proraw = ext == "DNG" && raw.cpp == 3 && md.make.to_lowercase().contains("apple");
         let format = if is_proraw { "ProRAW".into() } else { ext };
         let mut meta = ImageMeta {
             path: path.to_string_lossy().into_owned(),
@@ -102,19 +100,14 @@ impl RawlerDecoder {
                 .or_else(|| exif.lens_make.clone())
                 .map(|s| s.trim().to_string())
                 .filter(|s| !s.is_empty()),
-            iso: exif
-                .iso_speed_ratings
-                .map(|v| v as u32)
-                .or(exif.iso_speed),
-            shutter: exif
-                .exposure_time
-                .map(|r| {
-                    if r.n < r.d {
-                        format!("1/{}", (r.d as f32 / r.n.max(1) as f32).round() as u32)
-                    } else {
-                        format!("{:.1}s", r.n as f32 / r.d.max(1) as f32)
-                    }
-                }),
+            iso: exif.iso_speed_ratings.map(|v| v as u32).or(exif.iso_speed),
+            shutter: exif.exposure_time.map(|r| {
+                if r.n < r.d {
+                    format!("1/{}", (r.d as f32 / r.n.max(1) as f32).round() as u32)
+                } else {
+                    format!("{:.1}s", r.n as f32 / r.d.max(1) as f32)
+                }
+            }),
             aperture: exif.fnumber.map(|r| r.n as f32 / r.d.max(1) as f32),
             focal_mm: exif.focal_length.map(|r| r.n as f32 / r.d.max(1) as f32),
             captured_at: exif.date_time_original.clone(),
@@ -131,6 +124,7 @@ impl RawlerDecoder {
             gps_lat: None,
             gps_lon: None,
             input_color_space: None, // RAW → camera→Rec.2020 via DCP, not ICC
+            video: None,
         };
         // GPS (and any missing tags) from container EXIF when readable (DNG/JPEG…).
         crate::metadata::enrich_from_file(path, &mut meta);
@@ -478,9 +472,11 @@ fn rawler_cam_rgb(raw: &rawler::RawImage) -> Result<(Vec<[f32; 3]>, usize, usize
             px.width,
             px.height,
         ),
-        Intermediate::Monochrome(px) => {
-            (px.data.iter().map(|v| [*v, *v, *v]).collect(), px.width, px.height)
-        }
+        Intermediate::Monochrome(px) => (
+            px.data.iter().map(|v| [*v, *v, *v]).collect(),
+            px.width,
+            px.height,
+        ),
     })
 }
 
@@ -499,8 +495,8 @@ fn merawler_cam_rgb(
         return None; // already demosaiced (e.g. Apple ProRAW) or multi-channel
     };
     let pattern = bayer_pattern(&raw.camera.cfa)?; // X-Trans / 4-color → None
-    // P0 hot/dead pixel suppression (denoise doc 04) — same-CFA-neighbor median.
-    // Always-on for the merawler path; toggle→re-decode lands with the panel.
+                                                   // P0 hot/dead pixel suppression (denoise doc 04) — same-CFA-neighbor median.
+                                                   // Always-on for the merawler path; toggle→re-decode lands with the panel.
     let mut mosaic = px.data;
     let _fixed = crate::denoise::hot_pixel_suppress(&mut mosaic, px.width, px.height, 4.0, 1.0);
     let cfa = merawler::CfaImage {
@@ -522,7 +518,10 @@ fn bayer_pattern(cfa: &rawler::cfa::CFA) -> Option<merawler::CfaPattern> {
 
 /// Crop the full-sensor demosaic to rawler's net output region — `crop_area`
 /// (or `active_area`) in full-sensor coordinates.
-fn crop_to_output(rgb: merawler::RgbImage, raw: &rawler::RawImage) -> (Vec<[f32; 3]>, usize, usize) {
+fn crop_to_output(
+    rgb: merawler::RgbImage,
+    raw: &rawler::RawImage,
+) -> (Vec<[f32; 3]>, usize, usize) {
     let rect = raw.crop_area.or(raw.active_area);
     match rect {
         Some(r)
@@ -563,7 +562,9 @@ mod integration_tests {
     #[test]
     #[ignore]
     fn corpus_decodes_every_vendor_format() {
-        let Ok(home) = std::env::var("HOME") else { return };
+        let Ok(home) = std::env::var("HOME") else {
+            return;
+        };
         let dir = std::path::PathBuf::from(home).join("Desktop/test-claude-raw/raw-samples");
         if !dir.exists() {
             eprintln!("skip: corpus not present at {}", dir.display());
@@ -573,7 +574,12 @@ mod integration_tests {
         let mut files: Vec<_> = std::fs::read_dir(&dir)
             .expect("read corpus dir")
             .filter_map(|e| e.ok().map(|e| e.path()))
-            .filter(|p| p.is_file() && !p.file_name().is_some_and(|n| n.to_string_lossy().starts_with('.')))
+            .filter(|p| {
+                p.is_file()
+                    && !p
+                        .file_name()
+                        .is_some_and(|n| n.to_string_lossy().starts_with('.'))
+            })
             .collect();
         files.sort();
         assert!(!files.is_empty(), "corpus dir is empty");
@@ -621,7 +627,11 @@ mod integration_tests {
 
         println!("\n  {decoded}/{} decoded", files.len());
         assert_eq!(decoded, files.len(), "every corpus file must decode");
-        assert!(failures.is_empty(), "corpus failures:\n  - {}", failures.join("\n  - "));
+        assert!(
+            failures.is_empty(),
+            "corpus failures:\n  - {}",
+            failures.join("\n  - ")
+        );
     }
 
     /// End-to-end: the merawler path must produce the same cropped dimensions as
@@ -629,7 +639,9 @@ mod integration_tests {
     /// with finite values. Skips when the sample RAW isn't present.
     #[test]
     fn merawler_path_matches_dims_and_differs() {
-        let Ok(home) = std::env::var("HOME") else { return };
+        let Ok(home) = std::env::var("HOME") else {
+            return;
+        };
         let p = std::path::PathBuf::from(home).join("Desktop/test-claude-raw/DSC07078.ARW");
         if !p.exists() {
             eprintln!("skip: sample RAW not present");
@@ -658,7 +670,11 @@ mod integration_tests {
                 .zip(&out.working.data)
                 .map(|(a, b)| (*a - *b).abs() as f64)
                 .sum();
-            assert!(diff > 0.0, "{}: identical to rawler — not applied", algo.name());
+            assert!(
+                diff > 0.0,
+                "{}: identical to rawler — not applied",
+                algo.name()
+            );
         }
     }
 
@@ -667,7 +683,9 @@ mod integration_tests {
     /// report their algorithm. Skips per-backend when workers are missing.
     #[test]
     fn zerawler_sidecar_decodes() {
-        let Ok(home) = std::env::var("HOME") else { return };
+        let Ok(home) = std::env::var("HOME") else {
+            return;
+        };
         let p = std::path::PathBuf::from(home).join("Desktop/test-claude-raw/DSC07078.ARW");
         if !p.exists() {
             eprintln!("skip: sample RAW not present");

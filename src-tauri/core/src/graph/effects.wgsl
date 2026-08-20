@@ -9,7 +9,7 @@ struct EffectsUniforms {
   vignette_midpoint: f32,// 0..1 — where falloff starts (higher = tighter)
   width: u32,
   height: u32,
-  _pad: u32,
+  frame_index: u32,
 };
 
 @group(0) @binding(0) var src: texture_2d<f32>;
@@ -74,7 +74,8 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
   // ---- grain: luminance-aware, size-controlled ----
   if (u.grain_amount > 0.0) {
     let cell = max(u.grain_size, 1.0);
-    let gp = floor(vec2<f32>(gid.xy) / cell);
+    let gp = floor(vec2<f32>(gid.xy) / cell)
+      + vec2<f32>(f32(u.frame_index) * 19.0, f32(u.frame_index) * 7.0);
     let n = hash21(gp) * 2.0 - 1.0;
     let luma = dot(max(rgb, vec3<f32>(0.0)), LUMA_W);
     // More grain in midtones; less in deep shadows / speculars.

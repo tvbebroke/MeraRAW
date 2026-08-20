@@ -147,7 +147,11 @@ mod tests {
 
     #[test]
     fn injector_matches_model_variance() {
-        let p = NoiseProfile { a: 1e-3, b: 1e-6, source: super::super::profile::ProfileSource::Default };
+        let p = NoiseProfile {
+            a: 1e-3,
+            b: 1e-6,
+            source: super::super::profile::ProfileSource::Default,
+        };
         let clean = vec![0.25f32; 50000];
         let noisy = add_poisson_gaussian(&clean, &p, 9);
         let m = noisy.iter().sum::<f32>() / noisy.len() as f32;

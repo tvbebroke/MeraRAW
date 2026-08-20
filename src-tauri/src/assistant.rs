@@ -83,7 +83,9 @@ fn model() -> String {
 }
 
 fn api_key() -> Option<String> {
-    std::env::var("ANTHROPIC_API_KEY").ok().filter(|k| !k.is_empty())
+    std::env::var("ANTHROPIC_API_KEY")
+        .ok()
+        .filter(|k| !k.is_empty())
 }
 
 fn mock_mode() -> bool {
@@ -194,9 +196,16 @@ async fn execute_tool(
     input: &Value,
 ) -> (Value, Option<Vec<u8>>) {
     let progress = |label: String| {
-        let _ = app.emit(crate::events::ASSISTANT_PROGRESS, json!({"kind": "tool", "label": label}));
+        let _ = app.emit(
+            crate::events::ASSISTANT_PROGRESS,
+            json!({"kind": "tool", "label": label}),
+        );
     };
-    let op_result = |r: Result<Result<meratech_core::ops::DocDelta, meratech_core::error::CoreError>, meratech_core::engine::EngineError>| -> Value {
+    let op_result = |r: Result<
+        Result<meratech_core::ops::DocDelta, meratech_core::error::CoreError>,
+        meratech_core::engine::EngineError,
+    >|
+     -> Value {
         match r {
             Ok(Ok(delta)) => json!({"ok": true, "doc": delta.doc, "newMaskId": delta.new_mask_id}),
             Ok(Err(e)) => json!({"ok": false, "error": e.to_string()}),
@@ -218,8 +227,12 @@ async fn execute_tool(
                     .await;
                 match r {
                     Ok(Ok(_)) => results.push(json!({"path": path, "ok": true})),
-                    Ok(Err(e)) => results.push(json!({"path": path, "ok": false, "error": e.to_string()})),
-                    Err(e) => results.push(json!({"path": path, "ok": false, "error": e.to_string()})),
+                    Ok(Err(e)) => {
+                        results.push(json!({"path": path, "ok": false, "error": e.to_string()}))
+                    }
+                    Err(e) => {
+                        results.push(json!({"path": path, "ok": false, "error": e.to_string()}))
+                    }
                 }
             }
             // return the resulting doc once (compact)
@@ -249,9 +262,13 @@ async fn execute_tool(
             let kind = input["kind"].as_str().unwrap_or("subject").to_string();
             progress(format!("creating {kind} mask (local model)"));
             let source = match kind.as_str() {
-                "radial" => json!({"type":"radial","center":[0.5,0.5],"radii":[0.3,0.25],"rotation":0}),
+                "radial" => {
+                    json!({"type":"radial","center":[0.5,0.5],"radii":[0.3,0.25],"rotation":0})
+                }
                 "linear" => json!({"type":"linear","start":[0.5,0.0],"end":[0.5,0.6]}),
-                "object" => json!({"type":"segmented","model":"object_v1","hint":{"point": input["point"]}}),
+                "object" => {
+                    json!({"type":"segmented","model":"object_v1","hint":{"point": input["point"]}})
+                }
                 _ => json!({"type":"segmented","model":"subject_v1","hint":null}),
             };
             let r = engine.apply_op(Op::AddMask { kind, source }).await;
@@ -412,7 +429,8 @@ fn strip_stale_images(messages: &mut [Value]) {
         if let Some(arr) = m["content"].as_array_mut() {
             for (bi, b) in arr.iter_mut().enumerate() {
                 if b["type"] == "image" && last != Some((mi, bi)) {
-                    *b = json!({"type": "text", "text": "[earlier preview omitted to save tokens]"});
+                    *b =
+                        json!({"type": "text", "text": "[earlier preview omitted to save tokens]"});
                 }
             }
         }
@@ -538,8 +556,7 @@ pub async fn run(
                 Some("tool_use") => {
                     let name = block["name"].as_str().unwrap_or("");
                     let id = block["id"].as_str().unwrap_or("");
-                    let (result, image) =
-                        execute_tool(&app, &engine, name, &block["input"]).await;
+                    let (result, image) = execute_tool(&app, &engine, name, &block["input"]).await;
                     let content = if let Some(jpeg) = image {
                         let b = base64::engine::general_purpose::STANDARD.encode(jpeg);
                         json!([
@@ -567,7 +584,10 @@ pub async fn run(
         }
         return Ok(final_text);
     }
-    Ok("(stopped: edit loop reached its iteration cap — every applied move is on your undo stack)".into())
+    Ok(
+        "(stopped: edit loop reached its iteration cap — every applied move is on your undo stack)"
+            .into(),
+    )
 }
 
 /// Mock executor: a canned tool sequence through the REAL execute_tool path
@@ -586,12 +606,18 @@ async fn run_mock(app: &AppHandle, engine: &EngineHandle) -> Result<String, AppE
         ),
         ("render_preview", json!({})),
         // the "look again, pull back" move
-        ("set_params", json!({"sets": [{"path": "color_grade.highlights_sat", "value": 8}]})),
+        (
+            "set_params",
+            json!({"sets": [{"path": "color_grade.highlights_sat", "value": 8}]}),
+        ),
         // guard-wall probe: extreme value must clamp, junk path must error
-        ("set_params", json!({"sets": [
-            {"path": "exposure.stops", "value": 400},
-            {"path": "hax.pwn", "value": 1}
-        ]})),
+        (
+            "set_params",
+            json!({"sets": [
+                {"path": "exposure.stops", "value": 400},
+                {"path": "hax.pwn", "value": 1}
+            ]}),
+        ),
         ("sample_color", json!({"x": 0.5, "y": 0.4})),
     ];
     let mut transcript = Vec::new();
@@ -632,10 +658,10 @@ pub async fn assistant_send(
         mode.unwrap_or_else(|| "edit".into()),
     )
     .await?;
-    let _ = app.emit(crate::events::ASSISTANT_PROGRESS, json!({"kind": "done", "label": ""}));
-    events::forward_engine_event(
-        &app,
-        meratech_core::message::EngineEvent::CatalogChanged,
+    let _ = app.emit(
+        crate::events::ASSISTANT_PROGRESS,
+        json!({"kind": "done", "label": ""}),
     );
+    events::forward_engine_event(&app, meratech_core::message::EngineEvent::CatalogChanged);
     Ok(text)
 }

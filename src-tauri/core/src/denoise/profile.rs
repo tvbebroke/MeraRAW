@@ -107,8 +107,7 @@ pub fn vst_inverse_unbiased(d: f32, p: &NoiseProfile) -> f32 {
     // f(0) is the lowest meaningful stabilized value; below it, clamp to 0.
     let d = d.max(0.5); // series diverges near 0; f(0) ≥ 2·sqrt(3/8) ≈ 1.22
     const SQ32: f32 = 1.224_744_9; // sqrt(3/2)
-    let inv = d * d * 0.25 + 0.25 * SQ32 / d - 1.375 / (d * d)
-        + 0.625 * SQ32 / (d * d * d)
+    let inv = d * d * 0.25 + 0.25 * SQ32 / d - 1.375 / (d * d) + 0.625 * SQ32 / (d * d * d)
         - 0.125
         - sigma2;
     (p.a * inv).max(0.0)
@@ -290,7 +289,11 @@ mod tests {
         // Denoising in VST space returns E[f(z)]; inverting that with the
         // algebraic inverse is biased dark at low counts. The unbiased
         // inverse must land closer to the true mean.
-        let p = NoiseProfile { a: 4e-3, b: 1e-5, source: ProfileSource::Default };
+        let p = NoiseProfile {
+            a: 4e-3,
+            b: 1e-5,
+            source: ProfileSource::Default,
+        };
         let level = 0.004f32; // deep shadow, sigma comparable to signal
         let clean = vec![level; 40000];
         let noisy = synth_noisy(&clean, &p, 11);
@@ -307,7 +310,10 @@ mod tests {
             err_unb < 0.5 * level || err_unb <= err_alg * 1.5,
             "unbiased {unb} (err {err_unb}) vs algebraic {alg} (err {err_alg}) at level {level}"
         );
-        assert!(err_unb < 0.5 * level.max(0.002), "unbiased error too large: {unb} vs {level}");
+        assert!(
+            err_unb < 0.5 * level.max(0.002),
+            "unbiased error too large: {unb} vs {level}"
+        );
     }
 
     #[test]

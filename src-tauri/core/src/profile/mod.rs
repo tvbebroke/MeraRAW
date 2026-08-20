@@ -95,12 +95,13 @@ pub struct ProfileIndex {
     pub cameras: BTreeMap<String, Vec<ProfileRef>>,
 }
 
-fn deserialize_cameras<'de, D>(deserializer: D) -> Result<BTreeMap<String, Vec<ProfileRef>>, D::Error>
+fn deserialize_cameras<'de, D>(
+    deserializer: D,
+) -> Result<BTreeMap<String, Vec<ProfileRef>>, D::Error>
 where
     D: serde::Deserializer<'de>,
 {
-    let raw: BTreeMap<String, Vec<serde_json::Value>> =
-        BTreeMap::deserialize(deserializer)?;
+    let raw: BTreeMap<String, Vec<serde_json::Value>> = BTreeMap::deserialize(deserializer)?;
     raw.into_iter()
         .map(|(k, vals)| {
             let refs = vals
@@ -331,12 +332,10 @@ mod tests {
             gps_lat: None,
             gps_lon: None,
             input_color_space: None,
+            video: None,
         };
         let profiles = resolve_profiles(&meta, &index);
-        assert!(
-            !profiles.is_empty(),
-            "expected ILCE-7M4 profiles in index"
-        );
+        assert!(!profiles.is_empty(), "expected ILCE-7M4 profiles in index");
         assert!(default_profile(&profiles).is_some());
     }
 
@@ -369,6 +368,7 @@ mod tests {
             gps_lat: None,
             gps_lon: None,
             input_color_space: Some("sRGB".into()),
+            video: None,
         };
         assert!(resolve_profiles(&meta, &index).is_empty());
         assert!(choose_profile(&meta, &index, None).is_none());

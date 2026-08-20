@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-license-request-otp"
+description = "Enables the license_request_otp command without any pre-configured scope."
+commands.allow = ["license_request_otp"]
+
+[[permission]]
+identifier = "deny-license-request-otp"
+description = "Denies the license_request_otp command without any pre-configured scope."
+commands.deny = ["license_request_otp"]

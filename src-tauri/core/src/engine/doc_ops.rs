@@ -66,7 +66,12 @@ impl Engine {
         };
         let Some((doc, label)) = restored else {
             return Err(CoreError::InvalidOp(
-                if undo { "nothing to undo" } else { "nothing to redo" }.into(),
+                if undo {
+                    "nothing to undo"
+                } else {
+                    "nothing to redo"
+                }
+                .into(),
             ));
         };
         *c.doc_mut() = doc;
@@ -113,7 +118,13 @@ impl Engine {
         std::fs::create_dir_all(&dir)?;
         let safe: String = name
             .chars()
-            .map(|ch| if ch.is_alphanumeric() || ch == '-' || ch == '_' { ch } else { '_' })
+            .map(|ch| {
+                if ch.is_alphanumeric() || ch == '-' || ch == '_' {
+                    ch
+                } else {
+                    '_'
+                }
+            })
             .collect();
         let file = crate::doc::PresetFile {
             label: Some(name.to_string()),
@@ -215,9 +226,8 @@ pub(super) fn load_preset_file(name: &str) -> Result<crate::doc::PresetFile, Cor
                 return Err(CoreError::Io("preset file too large".into()));
             }
             let text = std::fs::read_to_string(&path)?;
-            let file: crate::doc::PresetFile = serde_json::from_str(&text).map_err(|e| {
-                CoreError::Io(format!("preset parse: {e}"))
-            })?;
+            let file: crate::doc::PresetFile = serde_json::from_str(&text)
+                .map_err(|e| CoreError::Io(format!("preset parse: {e}")))?;
             return Ok(file);
         }
     }
@@ -252,9 +262,7 @@ pub(super) fn list_preset_catalog() -> Vec<crate::doc::PresetCatalogEntry> {
                     .and_then(|t| serde_json::from_str::<crate::doc::PresetFile>(&t).ok())
                 {
                     Some(file) => {
-                        label = file
-                            .label
-                            .unwrap_or_else(|| humanize_preset_id(id));
+                        label = file.label.unwrap_or_else(|| humanize_preset_id(id));
                         tags = file.tags;
                     }
                     None => {

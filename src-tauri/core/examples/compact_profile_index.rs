@@ -13,14 +13,11 @@ fn main() {
 
     let mut slim: BTreeMap<String, Vec<String>> = BTreeMap::new();
     for (camera, refs) in index.cameras {
-        slim.insert(
-            camera,
-            refs.into_iter().map(|r| r.file).collect(),
-        );
+        slim.insert(camera, refs.into_iter().map(|r| r.file).collect());
     }
 
-    let out = serde_json::to_string_pretty(&serde_json::json!({ "cameras": slim }))
-        .expect("serialize");
+    let out =
+        serde_json::to_string_pretty(&serde_json::json!({ "cameras": slim })).expect("serialize");
     std::fs::write(&path, out).expect("write");
     eprintln!("compacted {}", path.display());
 }

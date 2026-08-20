@@ -53,15 +53,16 @@ impl CropParams {
             right: effective_f32(doc, "crop", "right"),
             bottom: effective_f32(doc, "crop", "bottom"),
             angle: effective_f32(doc, "crop", "angle"),
-            rotate_90: effective_f32(doc, "crop", "rotate_90").round().clamp(0.0, 3.0) as u32,
+            rotate_90: effective_f32(doc, "crop", "rotate_90")
+                .round()
+                .clamp(0.0, 3.0) as u32,
             flip_h: b("flip_h"),
             flip_v: b("flip_v"),
             aspect_locked: b("aspect_locked"),
             aspect_w: effective_f32(doc, "crop", "aspect_w"),
             aspect_h: effective_f32(doc, "crop", "aspect_h"),
             constrain_crop: b("constrain_crop"),
-            persp_vertical: (effective_f32(doc, "crop", "persp_vertical") / 100.0)
-                .clamp(-1.0, 1.0),
+            persp_vertical: (effective_f32(doc, "crop", "persp_vertical") / 100.0).clamp(-1.0, 1.0),
             persp_horizontal: (effective_f32(doc, "crop", "persp_horizontal") / 100.0)
                 .clamp(-1.0, 1.0),
         }
