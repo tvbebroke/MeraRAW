@@ -83,9 +83,14 @@ impl EngineHandle {
     pub async fn open_image(
         &self,
         path: PathBuf,
+        doc_id: Option<String>,
     ) -> Result<Result<ImageMeta, CoreError>, EngineError> {
-        self.request(|reply| EngineMsg::OpenImage { path, reply })
-            .await
+        self.request(|reply| EngineMsg::OpenImage {
+            path,
+            doc_id,
+            reply,
+        })
+        .await
     }
 
     pub async fn request_frame(
@@ -162,8 +167,12 @@ impl EngineHandle {
             .await
     }
 
-    pub async fn virtual_copy(&self) -> Result<Result<String, CoreError>, EngineError> {
-        self.request(|reply| EngineMsg::VirtualCopy { reply }).await
+    pub async fn virtual_copy(
+        &self,
+        path: Option<String>,
+    ) -> Result<Result<String, CoreError>, EngineError> {
+        self.request(|reply| EngineMsg::VirtualCopy { path, reply })
+            .await
     }
 
     pub async fn switch_doc(
@@ -172,6 +181,33 @@ impl EngineHandle {
     ) -> Result<Result<DocDelta, CoreError>, EngineError> {
         self.request(|reply| EngineMsg::SwitchDoc { doc_id, reply })
             .await
+    }
+
+    pub async fn list_docs(&self) -> Result<Vec<crate::message::DocRef>, EngineError> {
+        self.request(|reply| EngineMsg::ListDocs { reply }).await
+    }
+
+    pub async fn delete_virtual_copy(
+        &self,
+        doc_id: String,
+    ) -> Result<Result<(), CoreError>, EngineError> {
+        self.request(|reply| EngineMsg::DeleteVirtualCopy { doc_id, reply })
+            .await
+    }
+
+    pub async fn apply_grade_to_paths(
+        &self,
+        paths: Vec<String>,
+        modules: crate::doc::ModuleParams,
+        lut_file: Option<String>,
+    ) -> Result<Result<u32, CoreError>, EngineError> {
+        self.request(|reply| EngineMsg::ApplyGradeToPaths {
+            paths,
+            modules,
+            lut_file,
+            reply,
+        })
+        .await
     }
 
     pub async fn save_preset(
@@ -218,6 +254,15 @@ impl EngineHandle {
     pub async fn set_clip_warnings(&self, hi: bool, lo: bool) -> Result<(), EngineError> {
         self.request(|reply| EngineMsg::SetClipWarnings { hi, lo, reply })
             .await
+    }
+
+    pub async fn set_proof_target(&self, space: u32, gamut: bool) -> Result<(), EngineError> {
+        self.request(|reply| EngineMsg::SetProofTarget {
+            space,
+            gamut,
+            reply,
+        })
+        .await
     }
 
     // ---- Phase 5: catalog ----
@@ -352,6 +397,14 @@ impl EngineHandle {
         self.request(|reply| EngineMsg::ListFolders { reply }).await
     }
 
+    pub async fn forget_folder(
+        &self,
+        root: String,
+    ) -> Result<Result<(), CoreError>, EngineError> {
+        self.request(|reply| EngineMsg::ForgetFolder { root, reply })
+            .await
+    }
+
     pub async fn set_asset_meta(
         &self,
         ids: Vec<i64>,
@@ -432,10 +485,12 @@ impl EngineHandle {
         &self,
         name: String,
         modules: Vec<String>,
+        grade: Option<crate::doc::ModuleParams>,
     ) -> Result<Result<(), CoreError>, EngineError> {
         self.request(|reply| EngineMsg::SavePresetToDisk {
             name,
             modules,
+            grade,
             reply,
         })
         .await
@@ -592,6 +647,9 @@ struct Engine {
     /// Viewport clipping blinkies (highlight / shadow).
     clip_hi: bool,
     clip_lo: bool,
+    /// Soft-proof target: 0 off, 1 sRGB, 2 P3, 3 Adobe, 4 ProPhoto.
+    proof_space: u32,
+    proof_gamut: bool,
     /// Dedicated graph for assistant previews (own small caches — never
     /// thrashes the viewport graph).
     preview_graph: Option<RenderGraph>,
@@ -693,6 +751,8 @@ async fn run(
         display_look: 1, // Camera by default (matches export; preview now WYSIWYG)
         clip_hi: false,
         clip_lo: false,
+        proof_space: 0,
+        proof_gamut: false,
         preview_graph: None,
         export_graph: None,
         export_job: None,
@@ -795,7 +855,11 @@ impl Engine {
                 let v = self.frame_version;
                 let _ = reply.send(render_test_frame(width, height, v));
             }
-            EngineMsg::OpenImage { path, reply } => self.open_image(path, reply),
+            EngineMsg::OpenImage {
+                path,
+                doc_id,
+                reply,
+            } => self.open_image(path, doc_id, reply),
             EngineMsg::PreviewDone {
                 generation,
                 rgba,
@@ -931,17 +995,9 @@ impl Engine {
                 }
                 let _ = reply.send(result);
             }
-            EngineMsg::VirtualCopy { reply } => {
-                let _ = reply.send(match &mut self.current {
-                    Some(c) => {
-                        let mut copy = c.doc().clone();
-                        copy.doc_id = format!("vc-{}", c.docs.len());
-                        let id = copy.doc_id.clone();
-                        c.docs.push(copy); // shares the decoded base buffer
-                        Ok(id)
-                    }
-                    None => Err(CoreError::NoImage),
-                });
+            EngineMsg::VirtualCopy { path, reply } => {
+                let result = self.make_virtual_copy(path);
+                let _ = reply.send(result);
             }
             EngineMsg::SwitchDoc { doc_id, reply } => {
                 let result = (|| {
@@ -958,6 +1014,36 @@ impl Engine {
                 if result.is_ok() {
                     self.full_redraw();
                 }
+                let _ = reply.send(result);
+            }
+            EngineMsg::ListDocs { reply } => {
+                let list = self
+                    .current
+                    .as_ref()
+                    .map(|c| {
+                        c.docs
+                            .iter()
+                            .enumerate()
+                            .map(|(i, d)| crate::message::DocRef {
+                                doc_id: d.doc_id.clone(),
+                                active: i == c.active_doc,
+                            })
+                            .collect()
+                    })
+                    .unwrap_or_default();
+                let _ = reply.send(list);
+            }
+            EngineMsg::DeleteVirtualCopy { doc_id, reply } => {
+                let result = self.delete_virtual_copy(&doc_id);
+                let _ = reply.send(result);
+            }
+            EngineMsg::ApplyGradeToPaths {
+                paths,
+                modules,
+                lut_file,
+                reply,
+            } => {
+                let result = self.apply_grade_to_paths(paths, modules, lut_file);
                 let _ = reply.send(result);
             }
             EngineMsg::SavePreset { modules, reply } => {
@@ -1024,6 +1110,18 @@ impl Engine {
                     self.clip_lo = lo;
                     if let Some(g) = &mut self.graph {
                         g.set_clip_warnings(hi, lo);
+                    }
+                    self.render_now();
+                }
+                let _ = reply.send(());
+            }
+            EngineMsg::SetProofTarget { space, gamut, reply } => {
+                let space = space.min(4);
+                if self.proof_space != space || self.proof_gamut != gamut {
+                    self.proof_space = space;
+                    self.proof_gamut = gamut && space > 0;
+                    if let Some(g) = &mut self.graph {
+                        g.set_proof(self.proof_space, self.proof_gamut);
                     }
                     self.render_now();
                 }
@@ -1115,6 +1213,13 @@ impl Engine {
             EngineMsg::ListFolders { reply } => {
                 let _ = reply.send(self.catalog_mut().and_then(|c| c.list_folders()));
             }
+            EngineMsg::ForgetFolder { root, reply } => {
+                let result = self.catalog_mut().and_then(|c| c.forget_folder(&root));
+                if result.is_ok() {
+                    self.emit(EngineEvent::CatalogChanged);
+                }
+                let _ = reply.send(result);
+            }
             EngineMsg::SetAssetMeta { ids, patch, reply } => {
                 let _ = reply.send(self.set_asset_meta(&ids, &patch));
             }
@@ -1199,9 +1304,10 @@ impl Engine {
             EngineMsg::SavePresetToDisk {
                 name,
                 modules,
+                grade,
                 reply,
             } => {
-                let _ = reply.send(self.save_preset_to_disk(&name, &modules));
+                let _ = reply.send(self.save_preset_to_disk(&name, &modules, grade.as_ref()));
             }
             EngineMsg::ListPresets { reply } => {
                 let _ = reply.send(list_presets());

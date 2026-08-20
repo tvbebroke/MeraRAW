@@ -63,10 +63,21 @@ pub struct Mask {
     /// SAME shape as global modules — scoped overrides (schema §4).
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub modules: ModuleParams,
+    /// Blend onto the image under this mask: normal | multiply | screen.
+    #[serde(default = "default_blend", skip_serializing_if = "is_normal_blend")]
+    pub blend: String,
 }
 
 fn default_opacity() -> f32 {
     100.0
+}
+
+fn default_blend() -> String {
+    "normal".into()
+}
+
+fn is_normal_blend(s: &str) -> bool {
+    s.is_empty() || s == "normal"
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -115,6 +126,9 @@ pub struct EditDoc {
     /// master; the sidecar stores brush strokes so fills can be rebuilt.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub retouch: Vec<crate::retouch::RetouchSpot>,
+    /// Sibling virtual copies stored next to the primary in one sidecar.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub copies: Vec<serde_json::Value>,
     #[serde(default)]
     pub meta: DocMeta,
     /// Forward-compat: unknown future fields round-trip unharmed (§6).
@@ -136,6 +150,7 @@ impl EditDoc {
             modules: BTreeMap::new(),
             masks: Vec::new(),
             retouch: Vec::new(),
+            copies: Vec::new(),
             meta: DocMeta {
                 created_at: Some(now.clone()),
                 modified_at: Some(now),
@@ -428,6 +443,7 @@ mod tests {
                     "radii": [0.3, 0.2],
                     "rotation": 0
                 }),
+                blend: "normal".into(),
                 modules: {
                     let mut m = ModuleParams::new();
                     m.entry("exposure".into())
@@ -436,6 +452,7 @@ mod tests {
                     m
                 },
             }],
+            copies: vec![],
             retouch: vec![crate::retouch::RetouchSpot {
                 id: "r-spot".into(),
                 enabled: true,

@@ -3,9 +3,10 @@ import { reportFrontendStatus } from "./ipc/commands";
 
 export async function runDevHarness(imageVersion: number): Promise<void> {
   const { invoke } = await import("@tauri-apps/api/core");
-  if (await invoke<boolean>("selftest_enabled")) {
+  const scope = await invoke<string>("selftest_enabled");
+  if (scope) {
     const { runSelfTest } = await import("./selftest");
-    void runSelfTest(imageVersion);
+    void runSelfTest(imageVersion, scope);
     return;
   }
   if (await invoke<boolean>("live_assistant_enabled")) {

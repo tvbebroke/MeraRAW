@@ -30,6 +30,8 @@ pub enum Op {
         feather: Option<f32>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         invert: Option<bool>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        blend: Option<String>,
     },
     /// Replace mask geometry/source (move a radial, re-stroke a brush…).
     SetMaskSource {
@@ -108,7 +110,14 @@ impl Op {
     }
 }
 
-const MASK_SOURCE_TYPES: &[&str] = &["segmented", "radial", "linear", "brush", "composite"];
+const MASK_SOURCE_TYPES: &[&str] = &[
+    "segmented",
+    "radial",
+    "linear",
+    "brush",
+    "composite",
+    "parametric",
+];
 
 fn check_mask_source(source: &serde_json::Value) -> Result<(), CoreError> {
     let ty = source
@@ -221,7 +230,12 @@ const MASK_KINDS: &[&str] = &[
     "radial",
     "linear",
     "brush",
+    "parametric",
 ];
+
+fn default_blend_for_kind(_kind: &str) -> String {
+    "normal".into()
+}
 
 /// THE guard-wall. Applies `op` to `doc` or rejects. Never partially
 /// mutates on rejection.
@@ -268,6 +282,7 @@ pub fn apply_op(doc: &mut EditDoc, op: &Op) -> Result<Option<String>, CoreError>
                 invert: false,
                 feather: 0.0,
                 source: source.clone(),
+                blend: default_blend_for_kind(kind),
                 modules: Default::default(),
             });
             doc.touch();
@@ -287,6 +302,7 @@ pub fn apply_op(doc: &mut EditDoc, op: &Op) -> Result<Option<String>, CoreError>
             opacity,
             feather,
             invert,
+            blend,
         } => {
             let mask = doc
                 .mask_mut(id)
@@ -305,6 +321,13 @@ pub fn apply_op(doc: &mut EditDoc, op: &Op) -> Result<Option<String>, CoreError>
             }
             if let Some(i) = invert {
                 mask.invert = *i;
+            }
+            if let Some(b) = blend {
+                let b = b.to_lowercase();
+                if !matches!(b.as_str(), "normal" | "multiply" | "screen") {
+                    return Err(CoreError::InvalidOp(format!("unknown blend: {b}")));
+                }
+                mask.blend = b;
             }
             doc.touch();
             Ok(None)
@@ -375,7 +398,25 @@ pub fn apply_op(doc: &mut EditDoc, op: &Op) -> Result<Option<String>, CoreError>
             Ok(None)
         }
         Op::ResetModule { module } => {
+            let enabled = doc
+                .modules
+                .get(module)
+                .and_then(|m| m.get("enabled"))
+                .cloned();
             doc.modules.remove(module.as_str());
+            if let Some(v) = enabled {
+                let off = match &v {
+                    ParamValue::F32(x) => *x < 0.5,
+                    ParamValue::Bool(b) => !*b,
+                    _ => false,
+                };
+                if off {
+                    doc.modules
+                        .entry(module.clone())
+                        .or_default()
+                        .insert("enabled".into(), v);
+                }
+            }
             doc.touch();
             Ok(None)
         }
@@ -655,5 +696,35 @@ mod tests {
         // validator logic via a fake spec is covered by P3. Placeholder:
         // non-curve params unaffected.
         assert!(d.modules.is_empty());
+    }
+
+    #[test]
+    fn reset_module_preserves_disabled() {
+        let mut d = doc();
+        apply_op(
+            &mut d,
+            &Op::SetParam {
+                path: "exposure.stops".into(),
+                value: json!(1.5),
+            },
+        )
+        .unwrap();
+        apply_op(
+            &mut d,
+            &Op::SetParam {
+                path: "exposure.enabled".into(),
+                value: json!(0.0),
+            },
+        )
+        .unwrap();
+        apply_op(
+            &mut d,
+            &Op::ResetModule {
+                module: "exposure".into(),
+            },
+        )
+        .unwrap();
+        assert_eq!(d.get("exposure", "stops"), None);
+        assert_eq!(d.get("exposure", "enabled"), Some(&ParamValue::F32(0.0)));
     }
 }

@@ -2,9 +2,8 @@
 import { invoke } from "@tauri-apps/api/core";
 import type {
   AppInfo,
-  BrowseRoot,
-  DirEntry,
   DocDelta,
+  DocRef,
   EditDocMirror,
   EngineStatus,
   ExportSettings,
@@ -36,16 +35,8 @@ export function readFileMeta(path: string): Promise<FileMeta> {
   return invoke<FileMeta>("read_file_meta", { path });
 }
 
-export function browseRoots(): Promise<BrowseRoot[]> {
-  return invoke<BrowseRoot[]>("browse_roots");
-}
-
-export function listDir(path: string): Promise<DirEntry[]> {
-  return invoke<DirEntry[]>("list_dir", { path });
-}
-
-export function openImage(path: string): Promise<ImageMeta> {
-  return invoke<ImageMeta>("open_image", { path });
+export function openImage(path: string, docId?: string | null): Promise<ImageMeta> {
+  return invoke<ImageMeta>("open_image", { path, docId: docId ?? null });
 }
 
 export function requestFrame(view: ViewParams): Promise<FrameInfo> {
@@ -141,12 +132,32 @@ export function restoreSnapshot(name: string): Promise<DocDelta> {
   return invoke<DocDelta>("restore_snapshot", { name });
 }
 
-export function virtualCopy(): Promise<string> {
-  return invoke<string>("virtual_copy");
+export function virtualCopy(path?: string | null): Promise<string> {
+  return invoke<string>("virtual_copy", { path: path ?? null });
 }
 
 export function switchDoc(docId: string): Promise<DocDelta> {
   return invoke<DocDelta>("switch_doc", { docId });
+}
+
+export function listDocs(): Promise<DocRef[]> {
+  return invoke<DocRef[]>("list_docs");
+}
+
+export function deleteVirtualCopy(docId: string): Promise<void> {
+  return invoke<void>("delete_virtual_copy", { docId });
+}
+
+export function applyGradeToPaths(
+  paths: string[],
+  modules: Record<string, Record<string, unknown>>,
+  lutFile?: string | null,
+): Promise<number> {
+  return invoke<number>("apply_grade_to_paths", {
+    paths,
+    modules,
+    lutFile: lutFile ?? null,
+  });
 }
 
 export function savePreset(modules: string[]): Promise<unknown> {
@@ -272,6 +283,18 @@ export function listFolders(): Promise<import("./types").FolderItem[]> {
   return invoke("list_folders");
 }
 
+export function discoverMediaFolders(): Promise<import("./types").DiscoveredFolder[]> {
+  return invoke("discover_media_folders");
+}
+
+export function listFolderChildren(path: string): Promise<import("./types").FolderChild[]> {
+  return invoke("list_folder_children", { path });
+}
+
+export function forgetFolder(root: string): Promise<void> {
+  return invoke("forget_folder", { root });
+}
+
 export function setAssetMeta(
   ids: number[],
   patch: import("./types").MetaPatch,
@@ -300,6 +323,11 @@ export function setDisplayLook(look: number): Promise<void> {
 
 export function setClipWarnings(hi: boolean, lo: boolean): Promise<void> {
   return invoke<void>("set_clip_warnings", { hi, lo });
+}
+
+/** View-only soft proof. `space`: 0 off, 1 sRGB, 2 P3, 3 Adobe RGB, 4 ProPhoto. */
+export function setProofTarget(space: number, gamut: boolean): Promise<void> {
+  return invoke<void>("set_proof_target", { space, gamut });
 }
 
 // ---- Phase 7: export + presets ----
@@ -367,9 +395,18 @@ export function applyPreset(name: string): Promise<DocDelta> {
   return invoke<DocDelta>("apply_preset", { name });
 }
 
-/** Save the listed modules' current params as a named preset (P7). */
-export function savePresetNamed(name: string, modules: string[]): Promise<void> {
-  return invoke<void>("save_preset", { name, modules });
+/** Save the listed modules' current params as a named preset (P7).
+ *  Pass `grade` to persist a copied look without requiring the current doc. */
+export function savePresetNamed(
+  name: string,
+  modules: string[],
+  grade?: Record<string, Record<string, unknown>> | null,
+): Promise<void> {
+  return invoke<void>("save_preset", {
+    name,
+    modules,
+    grade: grade ?? null,
+  });
 }
 
 /** Batch a set of param changes as ONE undoable history step (apply_preset). */
@@ -468,8 +505,8 @@ export function openExternalUrl(url: string): Promise<void> {
   return invoke<void>("open_external_url", { url });
 }
 
-export function selftestEnabled(): Promise<boolean> {
-  return invoke<boolean>("selftest_enabled");
+export function selftestEnabled(): Promise<string> {
+  return invoke<string>("selftest_enabled");
 }
 
 export function liveAssistantEnabled(): Promise<boolean> {

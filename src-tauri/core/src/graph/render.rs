@@ -16,6 +16,83 @@ use crate::profile::hue_sat_map::cct_weight;
 use crate::profile::DcpProfile;
 use std::collections::HashMap;
 
+fn blend_mode_id(blend: &str) -> u32 {
+    match blend {
+        "multiply" => 1,
+        "screen" => 2,
+        _ => 0,
+    }
+}
+
+fn pack_mat3_cols(m: &crate::color::Mat3) -> [[f32; 4]; 3] {
+    [
+        [m[0][0], m[1][0], m[2][0], 0.0],
+        [m[0][1], m[1][1], m[2][1], 0.0],
+        [m[0][2], m[1][2], m[2][2], 0.0],
+    ]
+}
+
+fn proof_matrices(space: u32) -> ([[f32; 4]; 3], [[f32; 4]; 3], u32) {
+    if space == 0 {
+        let z = [0.0f32; 4];
+        return ([z, z, z], [z, z, z], 0);
+    }
+    let target = match space {
+        2 => crate::export::TargetSpace::DisplayP3,
+        3 => crate::export::TargetSpace::AdobeRgb,
+        4 => crate::export::TargetSpace::ProPhoto,
+        _ => crate::export::TargetSpace::Srgb,
+    };
+    let to_target = crate::export::target_from_rec2020(target);
+    let to_srgb = crate::color::mat_mul(&crate::color::XYZ_TO_SRGB, &crate::color::REC2020_TO_XYZ);
+    let identity = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]];
+    let inv = crate::color::mat_inverse(&to_target).unwrap_or(identity);
+    let target_to_srgb = crate::color::mat_mul(&to_srgb, &inv);
+    (
+        pack_mat3_cols(&to_target),
+        pack_mat3_cols(&target_to_srgb),
+        space,
+    )
+}
+
+fn mask_sample_uniforms(
+    source: &serde_json::Value,
+    out_w: u32,
+    out_h: u32,
+    img_w: f32,
+    img_h: f32,
+    scale: f32,
+    view: &ViewParams,
+    feather: f32,
+    opacity: f32,
+    invert: u32,
+    crop: CropUniform,
+    param_mode: u32,
+) -> MaskSampleUniforms {
+    let f = |k: &str, d: f64| source.get(k).and_then(|v| v.as_f64()).unwrap_or(d) as f32;
+    MaskSampleUniforms {
+        out_w,
+        out_h,
+        img_w,
+        img_h,
+        scale,
+        center_x: view.center_x,
+        center_y: view.center_y,
+        feather,
+        opacity,
+        invert,
+        crop,
+        luma_lo: f("luma_lo", 0.0),
+        luma_hi: f("luma_hi", 1.0),
+        chroma_lo: f("chroma_lo", 0.0),
+        chroma_hi: f("chroma_hi", 1.0),
+        hue_lo: f("hue_lo", 0.0),
+        hue_hi: f("hue_hi", 0.0),
+        softness: f("softness", 0.05),
+        param_mode,
+    }
+}
+
 impl RenderGraph {
     /// Upload the DCP look's HSV delta tables (map1|map2|look, concatenated)
     /// and tone LUT once per profile. cct only affects the per-render blend
@@ -85,6 +162,11 @@ impl RenderGraph {
     pub fn set_clip_warnings(&mut self, hi: bool, lo: bool) {
         self.clip_hi = hi;
         self.clip_lo = lo;
+    }
+
+    pub fn set_proof(&mut self, space: u32, gamut: bool) {
+        self.proof_space = space.min(4);
+        self.proof_gamut = gamut && space > 0;
     }
 
     pub fn invalidate_from_module(&mut self, module: &str) {
@@ -498,21 +580,20 @@ impl RenderGraph {
                             pool_i += 1;
                             // background kind = inverse of the subject mask
                             let invert = (mask.invert ^ (mask.kind == "background")) as u32;
-                            let u = MaskSampleUniforms {
+                            let u = mask_sample_uniforms(
+                                &mask.source,
                                 out_w,
                                 out_h,
-                                img_w: img_w as f32,
-                                img_h: img_h as f32,
+                                img_w as f32,
+                                img_h as f32,
                                 scale,
-                                center_x: view.center_x,
-                                center_y: view.center_y,
+                                view,
                                 feather,
                                 opacity,
                                 invert,
-                                crop: crop_u,
-                                _p0: 0,
-                                _p1: 0,
-                            };
+                                crop_u,
+                                0,
+                            );
                             gpu.queue.write_buffer(ub, 0, bytemuck::bytes_of(&u));
                             let mview = mtex.create_view(&Default::default());
                             let eview = extract_tex.create_view(&Default::default());
@@ -555,6 +636,63 @@ impl RenderGraph {
                         } else {
                             false // inference pending — mask contributes nothing yet
                         }
+                    }
+                    "parametric" => {
+                        let ub = &self.pool[pool_i];
+                        pool_i += 1;
+                        let u = mask_sample_uniforms(
+                            &mask.source,
+                            out_w,
+                            out_h,
+                            img_w as f32,
+                            img_h as f32,
+                            scale,
+                            view,
+                            feather,
+                            opacity,
+                            mask.invert as u32,
+                            crop_u,
+                            1,
+                        );
+                        gpu.queue.write_buffer(ub, 0, bytemuck::bytes_of(&u));
+                        let mview = mtex.create_view(&Default::default());
+                        let eview = extract_tex.create_view(&Default::default());
+                        let bind = gpu.device.create_bind_group(&wgpu::BindGroupDescriptor {
+                            label: Some("mask-param-bind"),
+                            layout: &self.mask_sample.layout,
+                            entries: &[
+                                wgpu::BindGroupEntry {
+                                    // R32 dummy is not filterable; param_mode does not sample this.
+                                    binding: 0,
+                                    resource: wgpu::BindingResource::TextureView(&eview),
+                                },
+                                wgpu::BindGroupEntry {
+                                    binding: 1,
+                                    resource: wgpu::BindingResource::Sampler(&self.sampler),
+                                },
+                                wgpu::BindGroupEntry {
+                                    binding: 2,
+                                    resource: wgpu::BindingResource::TextureView(&eview),
+                                },
+                                wgpu::BindGroupEntry {
+                                    binding: 3,
+                                    resource: wgpu::BindingResource::TextureView(&mview),
+                                },
+                                wgpu::BindGroupEntry {
+                                    binding: 4,
+                                    resource: ub.as_entire_binding(),
+                                },
+                            ],
+                        });
+                        let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
+                            label: Some("mask-param"),
+                            timestamp_writes: None,
+                        });
+                        pass.set_pipeline(&self.mask_sample.pipeline);
+                        pass.set_bind_group(0, &bind, &[]);
+                        pass.dispatch_workgroups(out_w.div_ceil(16), out_h.div_ceil(16), 1);
+                        self.last_passes_run.push(format!("mask:{}", mask.kind));
+                        true
                     }
                     _ => false,
                 };
@@ -619,7 +757,7 @@ impl RenderGraph {
                     bytemuck::bytes_of(&BlendUniforms {
                         width: out_w,
                         height: out_h,
-                        _p0: 0,
+                        mode: blend_mode_id(&mask.blend),
                         _p1: 0,
                     }),
                 );
@@ -678,6 +816,7 @@ impl RenderGraph {
                 .duration_since(std::time::UNIX_EPOCH)
                 .map(|d| (d.as_millis() % u32::MAX as u128) as u32)
                 .unwrap_or(0);
+            let (m, n, space) = proof_matrices(self.proof_space);
             let u = PresentUniforms {
                 width: out_w,
                 height: out_h,
@@ -686,7 +825,13 @@ impl RenderGraph {
                 clip_hi: u32::from(self.clip_hi),
                 clip_lo: u32::from(self.clip_lo),
                 _p0: millis,
-                _p1: 0,
+                _p1: space | if self.proof_gamut { 16 } else { 0 },
+                m0: m[0],
+                m1: m[1],
+                m2: m[2],
+                n0: n[0],
+                n1: n[1],
+                n2: n[2],
             };
             gpu.queue
                 .write_buffer(&self.present_uniforms, 0, bytemuck::bytes_of(&u));
@@ -734,6 +879,7 @@ impl RenderGraph {
     fn pipe_for(&self, kind: PipeKind) -> &PassResources {
         match kind {
             PipeKind::Matrix => &self.simple_pipes["matrix"],
+            PipeKind::Highlights => &self.simple_pipes["highlights"],
             PipeKind::Calibration => &self.simple_pipes["calibration"],
             PipeKind::Noise => &self.simple_pipes["noise"],
             PipeKind::Grade => &self.simple_pipes["grade"],

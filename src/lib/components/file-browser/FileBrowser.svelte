@@ -1,22 +1,42 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import GlassPanel from "../primitives/GlassPanel.svelte";
+  import ContextMenu from "../primitives/ContextMenu.svelte";
+  import type { ContextMenuItem } from "../primitives/ContextMenu.svelte";
   import { leftRailCollapsed } from "../../../stores/editor";
   import {
+    addFolderShortcut,
+    addFolderShortcuts,
     browseBusy,
     folder,
+    folderKinds,
+    folderKindFor,
+    folderSections,
     folders,
     loadFolder,
     pickAndImportFolder,
     refreshFolders,
+    removeFolderShortcut,
+    setFolderKind,
+    sameFolderPath,
+    type FolderMediaKind,
   } from "../../../stores/browse";
+  import type { DiscoveredFolder, FolderItem } from "../../../ipc/types";
+  import { discoverMediaFolders } from "../../../ipc/commands";
+  import FolderNode from "./FolderNode.svelte";
 
-  import { workspace } from "../../../stores/workspace";
+  import { setWorkspace, workspace } from "../../../stores/workspace";
 
   let { class: cls = "" }: { class?: string } = $props();
   const isVideo = $derived($workspace === "video");
 
   let searchQuery = $state("");
+  let ctxMenu = $state<{ x: number; y: number; item: FolderItem } | null>(null);
+  let finding = $state(false);
+  let findError = $state<string | null>(null);
+  let found = $state<DiscoveredFolder[]>([]);
+  let findOpen = $state(false);
+  let addingAll = $state(false);
 
   onMount(() => {
     void refreshFolders();
@@ -26,24 +46,119 @@
     await pickAndImportFolder();
   }
 
-  function selectFolder(root: string) {
-    void loadFolder(root);
+  function selectFolderPath(path: string, section: "photo" | "video") {
+    if (section === "video" && $workspace !== "video") setWorkspace("video");
+    else if (section === "photo" && $workspace !== "photo") setWorkspace("photo");
+    void loadFolder(path);
   }
 
-  const filteredFolders = $derived(
-    $folders.filter((f) => {
+  function folderCtx(e: MouseEvent, path: string) {
+    const item = $folders.find((f) => sameFolderPath(f.root, path));
+    if (!item) return;
+    openCtx(e, item);
+  }
+
+  function matchesSearch(f: FolderItem, q: string): boolean {
+    if (!q) return true;
+    return f.name.toLowerCase().includes(q) || f.root.toLowerCase().includes(q);
+  }
+
+  const searched = $derived(
+    $folders.filter((f) => matchesSearch(f, searchQuery.toLowerCase())),
+  );
+
+  const photoFolders = $derived(
+    searched.filter((f) => folderSections(f, folderKindFor(f.root, $folderKinds)).includes("photo")),
+  );
+  const videoFolders = $derived(
+    searched.filter((f) => folderSections(f, folderKindFor(f.root, $folderKinds)).includes("video")),
+  );
+
+  const newFound = $derived(
+    found.filter((f) => {
+      if ($folders.some((p) => sameFolderPath(p.root, f.path))) return false;
       if (!searchQuery) return true;
       const q = searchQuery.toLowerCase();
-      return (
-        f.name.toLowerCase().includes(q) || f.root.toLowerCase().includes(q)
-      );
+      return f.name.toLowerCase().includes(q) || f.path.toLowerCase().includes(q);
     }),
   );
+
+  async function findFolders() {
+    finding = true;
+    findError = null;
+    findOpen = true;
+    try {
+      found = await discoverMediaFolders();
+    } catch (e) {
+      findError = e instanceof Error ? e.message : "Could not search this computer.";
+      found = [];
+    } finally {
+      finding = false;
+    }
+  }
+
+  async function pinFound(path: string) {
+    found = found.filter((f) => !sameFolderPath(f.path, path));
+    await addFolderShortcut(path);
+  }
+
+  async function pinAllFound() {
+    const roots = newFound.map((f) => f.path);
+    if (!roots.length) return;
+    addingAll = true;
+    try {
+      await addFolderShortcuts(roots);
+      found = [];
+      findOpen = false;
+    } finally {
+      addingAll = false;
+    }
+  }
+
+  const ctxItems = $derived.by((): ContextMenuItem[] => {
+    if (!ctxMenu) return [];
+    const item = ctxMenu.item;
+    const current: FolderMediaKind = folderKindFor(item.root, $folderKinds);
+    return [
+      { type: "header", label: item.name },
+      {
+        type: "item",
+        label: "Auto (from files)",
+        onclick: () => setFolderKind(item.root, "auto"),
+        disabled: current === "auto",
+      },
+      {
+        type: "item",
+        label: "Keep in Photos",
+        onclick: () => setFolderKind(item.root, "photo"),
+        disabled: current === "photo",
+      },
+      {
+        type: "item",
+        label: "Keep in Videos",
+        onclick: () => setFolderKind(item.root, "video"),
+        disabled: current === "video",
+      },
+      { type: "separator" },
+      {
+        type: "item",
+        label: "Remove shortcut",
+        danger: true,
+        onclick: () => void removeFolderShortcut(item.root),
+      },
+    ];
+  });
+
+  function openCtx(e: MouseEvent, item: FolderItem) {
+    e.preventDefault();
+    e.stopPropagation();
+    ctxMenu = { x: e.clientX, y: e.clientY, item };
+  }
 </script>
 
 <GlassPanel
   variant="quiet"
-  class="flex min-h-0 flex-1 flex-col overflow-hidden {cls}"
+  class="flex h-full min-h-0 min-w-0 w-full flex-col overflow-hidden {cls}"
 >
   <!-- 34px header: title + affordances on one line, no separate toolbar row. -->
   <div class="panel-header">
@@ -100,7 +215,7 @@
       <circle cx="6.5" cy="6.5" r="4.5" stroke="currentColor" stroke-width="1.5" />
       <path d="M10 10L13.5 13.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
     </svg>
-    <input class="search-input" type="search" placeholder={isVideo ? "Search folders" : "Search photos"} bind:value={searchQuery} />
+    <input class="search-input" type="search" placeholder="Search folders" bind:value={searchQuery} />
     {#if searchQuery}
       <button class="mr-icon-btn" onclick={() => (searchQuery = "")} aria-label="Clear search">
         <svg width="9" height="9" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
@@ -111,55 +226,120 @@
   </div>
 
   <div class="min-h-0 flex-1 overflow-y-auto p-[6px] custom-scrollbar">
-    {#if $browseBusy && filteredFolders.length === 0}
+    {#if findOpen}
+      <p class="eyebrow px-[10px] pt-[8px] pb-[4px]">Found</p>
+      {#if finding}
+        <p class="empty-state">Searching Pictures, Movies, Downloads…</p>
+      {:else if findError}
+        <p class="empty-state">{findError}</p>
+      {:else if newFound.length === 0}
+        <p class="empty-state">{searchQuery ? `No folders matching “${searchQuery}”` : "No new photo or video folders on this computer."}</p>
+      {:else}
+        <ul>
+          {#each newFound as item (item.path)}
+            <li>
+              <FolderNode
+                name={item.name}
+                path={item.path}
+                count={item.photoCount + item.videoCount}
+                section="found"
+                selectOnClick={false}
+                showPin={true}
+                onPin={() => void pinFound(item.path)}
+                onSelectFolder={selectFolderPath}
+              />
+            </li>
+          {/each}
+        </ul>
+        <div class="found-actions">
+          <button type="button" class="import-btn" onclick={() => void pinAllFound()} disabled={addingAll || $browseBusy}>
+            {addingAll ? "Adding…" : `Add all (${newFound.length})`}
+          </button>
+          <button type="button" class="import-btn" onclick={() => (findOpen = false)}>Hide</button>
+        </div>
+      {/if}
+    {/if}
+
+    {#if $browseBusy && searched.length === 0 && !findOpen}
       <p class="empty-state">Loading…</p>
-    {:else if filteredFolders.length === 0}
+    {:else if searched.length === 0 && !findOpen}
       <p class="empty-state">
         {searchQuery ? `No folders matching “${searchQuery}”` : isVideo ? "No clips here. Import a folder to begin." : "No photos here. Import a folder to begin."}
       </p>
     {:else}
-      <p class="eyebrow px-[10px] pt-[8px] pb-[4px]">Folders</p>
-      <ul>
-        {#each filteredFolders as item (item.root)}
-          <li>
-            <!-- Rail row: fixed icon column, flexible label, mono count.
-                 Active = sunken + weight 500, never an accent bar. -->
-            <button
-              type="button"
-              title={item.root}
-              class="rail-item {$folder === item.root ? 'rail-item--active' : ''}"
-              onclick={() => selectFolder(item.root)}
-            >
-              <span class="rail-icon">
-                {#if $folder === item.root}
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M6 14l1.45-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.55 6A2 2 0 0 1 18.45 20H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h7a2 2 0 0 1 2 2v2"/>
-                  </svg>
-                {:else}
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M20 20H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2z"/>
-                  </svg>
-                {/if}
-              </span>
-              <span class="rail-label">{item.name}</span>
-              <span class="rail-count">{item.photoCount}</span>
-            </button>
-          </li>
-        {/each}
-      </ul>
+      {#if photoFolders.length}
+        <p class="eyebrow px-[10px] pt-[8px] pb-[4px]">Photos</p>
+        <ul>
+          {#each photoFolders as item (item.root)}
+            <li>
+              <FolderNode
+                name={item.name}
+                path={item.root}
+                count={item.photoCount ?? 0}
+                accessible={item.accessible}
+                section="photo"
+                activePath={$folder}
+                onSelectFolder={selectFolderPath}
+                onContextMenu={folderCtx}
+              />
+            </li>
+          {/each}
+        </ul>
+      {/if}
+
+      {#if videoFolders.length}
+        <p class="eyebrow px-[10px] pt-[12px] pb-[4px]">Videos</p>
+        <ul>
+          {#each videoFolders as item (item.root)}
+            <li>
+              <FolderNode
+                name={item.name}
+                path={item.root}
+                count={item.videoCount ?? 0}
+                accessible={item.accessible}
+                section="video"
+                activePath={$folder}
+                onSelectFolder={selectFolderPath}
+                onContextMenu={folderCtx}
+              />
+            </li>
+          {/each}
+        </ul>
+      {/if}
     {/if}
   </div>
   <div class="import-row">
+    <button type="button" class="import-btn" onclick={() => void findFolders()} disabled={finding}>
+      {finding ? "Finding folders…" : "Find folders"}
+    </button>
     <button type="button" class="import-btn" onclick={addFolder} disabled={$browseBusy}>
       + Import {$workspace === "video" ? "clips" : "photos"}
     </button>
   </div>
 </GlassPanel>
 
+{#if ctxMenu}
+  <ContextMenu
+    x={ctxMenu.x}
+    y={ctxMenu.y}
+    items={ctxItems}
+    onclose={() => (ctxMenu = null)}
+  />
+{/if}
+
 <style>
   .import-row {
     flex: none;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
     padding: 8px 10px 12px;
+  }
+  .found-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 4px 0 8px;
   }
   .import-btn {
     width: 100%;

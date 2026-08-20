@@ -36,6 +36,7 @@ import {
   imageMeta,
   imageOpen,
   lastOpenedPath,
+  lastOpenedDocId,
   selectedMask,
   statusMessage,
 } from "../../stores/app";
@@ -53,21 +54,25 @@ declare global {
 
 let autoOpened = false;
 
-export async function openPath(path: string): Promise<void> {
+export async function openPath(path: string, docId?: string | null): Promise<void> {
   try {
     const name = path.split(/[/\\]/).pop() || path;
     statusMessage.set(`opening ${name}…`);
     decodeState.set("preview");
     selectedMask.set(null);
     clearDoc();
-    const m = await openImage(path);
+    lastOpenedDocId.set(docId ?? null);
+    const m = await openImage(path, docId);
     imageMeta.set(m);
     imageDims.set({ w: m.width, h: m.height });
     imageOpen.set(true);
     lastOpenedPath.set(path);
     statusMessage.set("decoding…");
     const d = await getDoc();
-    if (d) setDoc(d);
+    if (d) {
+      setDoc(d);
+      lastOpenedDocId.set(d.doc_id);
+    }
     push(syncWorkspaceToOpenFile(path, m.kind));
   } catch (e) {
     decodeState.set("error");

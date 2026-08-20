@@ -12,10 +12,12 @@
     libraryItems,
     openPhoto,
     thumbUrl,
+    gridKey,
   } from "../../../stores/browse";
   import { imageMeta } from "../../../stores/app";
   import { editorRoute, isEditorRoute, workspace } from "../../../stores/workspace";
   import { isVideoPath } from "../../media";
+  import { copyGradeFrom, pasteGradeOnto } from "../../grade";
 
   let {
     onResizeStart,
@@ -50,7 +52,9 @@
     const list = libraryItems.get();
     if (!list.length) return;
     const current = activePhoto.get();
-    const currentIndex = current ? list.findIndex((p) => p.path === current.path) : -1;
+    const currentIndex = current
+      ? list.findIndex((p) => gridKey(p) === gridKey(current))
+      : -1;
     const nextIndex =
       e.key === "ArrowLeft"
         ? Math.max(0, currentIndex - 1)
@@ -108,6 +112,23 @@
       label: "Export…",
       shortcut: shortcutLabels.export,
       onclick: () => isExportOpen.set(true),
+    },
+    { type: "separator" },
+    {
+      type: "item",
+      label: "Copy grade",
+      shortcut: shortcutLabels.copyGrade,
+      onclick: () => {
+        if (ctxPhoto) void copyGradeFrom(ctxPhoto.path);
+      },
+    },
+    {
+      type: "item",
+      label: "Paste grade",
+      shortcut: shortcutLabels.pasteGrade,
+      onclick: () => {
+        if (ctxPhoto) void pasteGradeOnto(ctxPhoto.path);
+      },
     },
     { type: "separator" },
     {
@@ -179,10 +200,10 @@
     onwheel={handleWheel}
     class="flex min-w-0 flex-1 items-center gap-[10px] overflow-x-auto pl-[28px] transition-[opacity,transform] duration-200 {$imageBrowserCollapsed ? 'pointer-events-none opacity-0' : 'opacity-100'}"
   >
-    {#each $libraryItems as photo (photo.path)}
+    {#each $libraryItems as photo (gridKey(photo))}
       <button
         type="button"
-        class="filmstrip-card {$activePhoto?.path === photo.path ? 'filmstrip-card--active' : ''}"
+        class="filmstrip-card {($activePhoto && gridKey($activePhoto) === gridKey(photo)) ? 'filmstrip-card--active' : ''}"
         title={photo.filename}
         onclick={() => openPhoto(photo)}
         oncontextmenu={(e) => handleThumbContextMenu(e, photo)}

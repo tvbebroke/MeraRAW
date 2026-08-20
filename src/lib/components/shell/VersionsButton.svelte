@@ -12,17 +12,23 @@
 <script lang="ts">
   import {
     getHistory,
+    listDocs,
     listSnapshots,
     restoreSnapshot,
     snapshot,
+    switchDoc,
     undo,
+    virtualCopy,
+    deleteVirtualCopy,
   } from "../../../ipc/commands";
+  import type { DocRef } from "../../../ipc/types";
   import { reconcile } from "../../../stores/doc";
   import { imageOpen } from "../../../stores/app";
 
   let open = $state(false);
   let history = $state<string[]>([]);
   let versions = $state<string[]>([]);
+  let copies = $state<DocRef[]>([]);
   let naming = $state(false);
   let draftName = $state("");
   let busy = $state(false);
@@ -31,9 +37,10 @@
   async function refresh() {
     error = null;
     try {
-      const [h, v] = await Promise.all([getHistory(), listSnapshots()]);
+      const [h, v, d] = await Promise.all([getHistory(), listSnapshots(), listDocs()]);
       history = h;
       versions = v;
+      copies = d;
     } catch (e) {
       error = String(e);
     }
@@ -90,6 +97,45 @@
     }
   }
 
+  async function makeCopy() {
+    busy = true;
+    error = null;
+    try {
+      await virtualCopy();
+      await refresh();
+    } catch (e) {
+      error = String(e);
+    } finally {
+      busy = false;
+    }
+  }
+
+  async function dropCopy(id: string) {
+    busy = true;
+    error = null;
+    try {
+      await deleteVirtualCopy(id);
+      await refresh();
+    } catch (e) {
+      error = String(e);
+    } finally {
+      busy = false;
+    }
+  }
+
+  async function openCopy(id: string) {
+    busy = true;
+    error = null;
+    try {
+      reconcile(await switchDoc(id));
+      await refresh();
+    } catch (e) {
+      error = String(e);
+    } finally {
+      busy = false;
+    }
+  }
+
   function onKey(e: KeyboardEvent) {
     if (e.key === "Escape" && open) {
       e.stopPropagation();
@@ -117,6 +163,37 @@
       <!-- svelte-ignore a11y_click_events_have_key_events -->
       <div class="ver-scrim" onclick={() => (open = false)}></div>
       <div class="ver-popover" role="dialog" aria-label="Versions and history">
+        <div class="ver-section">Virtual copies</div>
+        {#if copies.length <= 1}
+          <div class="ver-empty">One version of this file.</div>
+        {:else}
+          {#each copies as copy, i (copy.docId)}
+            <button
+              class="ver-row"
+              class:ver-row--active={copy.active}
+              disabled={busy || copy.active}
+              onclick={() => void openCopy(copy.docId)}
+            >
+              <span class="ver-label">{i === 0 ? "Master" : copy.docId}</span>
+              {#if copy.active}<span class="ver-hint">open</span>{/if}
+            </button>
+            {#if i > 0}
+              <button
+                class="ver-row ver-row--action"
+                disabled={busy}
+                onclick={() => void dropCopy(copy.docId)}
+              >
+                <span class="ver-label">Delete {copy.docId}</span>
+              </button>
+            {/if}
+          {/each}
+        {/if}
+        <button class="ver-row ver-row--action" disabled={busy} onclick={() => void makeCopy()}>
+          <span class="ver-label">Create virtual copy</span>
+        </button>
+
+        <div class="ver-sep"></div>
+
         <div class="ver-section">Saved versions</div>
         {#if versions.length === 0}
           <div class="ver-empty">No saved versions yet.</div>
@@ -233,6 +310,7 @@
   .ver-row:hover:not(:disabled) { background: var(--color-hover); }
   .ver-row:disabled { opacity: 0.5; cursor: default; }
   .ver-row--action { color: var(--color-secondary); }
+  .ver-row--active { background: var(--color-hover); }
 
   .ver-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .ver-hint { flex: none; font-size: 10.5px; color: var(--color-subtle); }

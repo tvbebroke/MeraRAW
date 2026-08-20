@@ -183,9 +183,9 @@ fn heic_dimensions(path: &Path) -> Result<(u32, u32), CoreError> {
     #[cfg(not(target_os = "macos"))]
     {
         let _ = path;
-        return Err(CoreError::Decode(
+        Err(CoreError::Decode(
             "HEIC/HEIF import is only available on macOS in this build.".into(),
-        ));
+        ))
     }
     #[cfg(target_os = "macos")]
     {

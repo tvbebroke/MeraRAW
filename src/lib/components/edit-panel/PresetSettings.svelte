@@ -8,6 +8,7 @@
     type PresetCatalogEntry,
   } from "../../../ipc/commands";
   import { reconcile, doc } from "../../../stores/doc";
+  import { gradeClipboard } from "../../grade";
 
   const SAVE_MODULES = [
     "exposure",
@@ -20,6 +21,7 @@
     "lut",
     "effects",
     "input",
+    "highlights",
   ];
 
   let presets = $state<PresetCatalogEntry[]>([]);
@@ -76,6 +78,27 @@
       saveStatus = `Save failed: ${e}`;
     }
   }
+
+  async function saveCopied() {
+    const name = saveName.trim();
+    if (!name) {
+      saveStatus = "Enter a name";
+      return;
+    }
+    const clip = $gradeClipboard;
+    if (!clip) {
+      saveStatus = "Copy a grade first";
+      return;
+    }
+    try {
+      await savePresetNamed(name, [], clip.modules);
+      saveStatus = `Saved copied grade “${name}”`;
+      saveName = "";
+      await refresh();
+    } catch (e) {
+      saveStatus = `Save failed: ${e}`;
+    }
+  }
 </script>
 
 <CollapsibleSection id="presets" title="Presets">
@@ -89,6 +112,9 @@
       }}
     />
     <button type="button" class="rail-btn" onclick={() => void save()}>Save</button>
+    {#if $gradeClipboard}
+      <button type="button" class="rail-btn" onclick={() => void saveCopied()}>Save copy</button>
+    {/if}
   </div>
   {#if saveStatus}
     <p class="rail-empty">{saveStatus}</p>

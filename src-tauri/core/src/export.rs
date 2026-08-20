@@ -144,7 +144,7 @@ const PROPHOTO_TO_XYZ_D50: Mat3 = [
 const D65_XYZ: [f32; 3] = [0.95047, 1.0, 1.08883];
 const D50_XYZ: [f32; 3] = [0.96422, 1.0, 0.82521];
 
-fn target_from_rec2020(target: TargetSpace) -> Mat3 {
+pub(crate) fn target_from_rec2020(target: TargetSpace) -> Mat3 {
     match target {
         // ProPhoto is D50: adapt the working white (D65) before the matrix.
         TargetSpace::ProPhoto => {
@@ -882,35 +882,38 @@ pub fn encode_and_write(
                         .into(),
                 ));
             }
-            let p = dir.join(format!("{stem}.heic"));
-            let png = encode_png(enc, icc.as_deref(), exif.as_deref())?;
-            let nanos = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .map(|d| d.as_nanos())
-                .unwrap_or(0);
-            let tmp = std::env::temp_dir().join(format!("meraraw-{stem}-{nanos}.png"));
-            std::fs::write(&tmp, &png)?;
-            let out = std::process::Command::new("/usr/bin/sips")
-                .args(["-s", "format", "heic"])
-                .args([
-                    "-s",
-                    "formatOptions",
-                    &settings.quality.clamp(1, 100).to_string(),
-                ])
-                .arg(&tmp)
-                .arg("--out")
-                .arg(&p)
-                .output();
-            let _ = std::fs::remove_file(&tmp);
-            match out {
-                Ok(o) if o.status.success() => p,
-                Ok(o) => {
-                    return Err(CoreError::Io(format!(
-                        "sips heic failed: {}",
-                        String::from_utf8_lossy(&o.stderr).trim()
-                    )))
+            #[cfg(target_os = "macos")]
+            {
+                let p = dir.join(format!("{stem}.heic"));
+                let png = encode_png(enc, icc.as_deref(), exif.as_deref())?;
+                let nanos = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map(|d| d.as_nanos())
+                    .unwrap_or(0);
+                let tmp = std::env::temp_dir().join(format!("meraraw-{stem}-{nanos}.png"));
+                std::fs::write(&tmp, &png)?;
+                let out = std::process::Command::new("/usr/bin/sips")
+                    .args(["-s", "format", "heic"])
+                    .args([
+                        "-s",
+                        "formatOptions",
+                        &settings.quality.clamp(1, 100).to_string(),
+                    ])
+                    .arg(&tmp)
+                    .arg("--out")
+                    .arg(&p)
+                    .output();
+                let _ = std::fs::remove_file(&tmp);
+                match out {
+                    Ok(o) if o.status.success() => p,
+                    Ok(o) => {
+                        return Err(CoreError::Io(format!(
+                            "sips heic failed: {}",
+                            String::from_utf8_lossy(&o.stderr).trim()
+                        )))
+                    }
+                    Err(e) => return Err(CoreError::Io(format!("sips spawn: {e}"))),
                 }
-                Err(e) => return Err(CoreError::Io(format!("sips spawn: {e}"))),
             }
         }
     };

@@ -9,6 +9,7 @@ export const statusMessage = atom("");
 
 export const imageOpen = atom(false);
 export const lastOpenedPath = atom<string | null>(null);
+export const lastOpenedDocId = atom<string | null>(null);
 export const imageMeta = atom<ImageMeta | null>(null);
 export const imageDims = atom<{ w: number; h: number } | null>(null);
 export type DecodeState = "idle" | "preview" | "ready" | "error";

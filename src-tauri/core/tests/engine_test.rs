@@ -64,7 +64,7 @@ async fn denoise_events_flow_end_to_end() {
     let handle = engine::spawn_with_events(Some(ev_tx));
 
     handle
-        .open_image(raw)
+        .open_image(raw, None)
         .await
         .expect("open reply")
         .expect("open ok");

@@ -55,22 +55,6 @@ export const UNCALLED_OK: { command: string; reason: string }[] = [
     reason: "no close-document control in the shell yet",
   },
   {
-    command: "list_dir",
-    reason: "filesystem browser replaced by catalog get_grid",
-  },
-  {
-    command: "browse_roots",
-    reason: "filesystem roots replaced by catalog list_folders",
-  },
-  {
-    command: "virtual_copy",
-    reason: "virtual copies UI not built",
-  },
-  {
-    command: "switch_doc",
-    reason: "virtual copies UI not built",
-  },
-  {
     command: "denoise_estimate_profile",
     reason: "profile-estimate control not exposed; AI denoise uses start/cancel",
   },

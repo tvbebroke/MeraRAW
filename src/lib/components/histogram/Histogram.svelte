@@ -264,8 +264,8 @@
 
   {#if embedded}
     <div class="relative flex h-full min-h-0 flex-col">
-      <div class="mb-[6px] flex items-center justify-between gap-1 shrink-0">
-        <div class="flex gap-[2px]">
+      <div class="mb-[6px] flex min-w-0 items-center justify-between gap-1 shrink-0">
+        <div class="flex min-w-0 flex-wrap gap-[2px]">
           {#each modes as m}
             <button
               type="button"
@@ -332,7 +332,7 @@
           <button
             type="button"
             class="truncate {clipLo ? 'text-sky-300 animate-pulse' : 'hover:text-secondary'}"
-            title="Toggle shadow clipping overlay"
+            title="Toggle shadow clipping blinkies"
             onclick={() => {
               clipLo = !clipLo;
               syncClip();
@@ -344,7 +344,7 @@
           <button
             type="button"
             class="truncate {clipHi ? 'text-red-300 animate-pulse' : 'hover:text-secondary'}"
-            title="Toggle highlight clipping overlay"
+            title="Toggle highlight clipping blinkies"
             onclick={() => {
               clipHi = !clipHi;
               syncClip();

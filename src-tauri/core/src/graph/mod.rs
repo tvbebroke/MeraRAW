@@ -64,6 +64,9 @@ pub struct RenderGraph {
     /// Highlight / shadow clipping overlays (viewport only).
     clip_hi: bool,
     clip_lo: bool,
+    /// Soft-proof target: 0 off, 1 sRGB, 2 P3, 3 Adobe RGB, 4 ProPhoto.
+    proof_space: u32,
+    proof_gamut: bool,
 
     // ---- DCP look (GPU port; replaces the CPU readback pass) ----
     dcp_look: PassResources,

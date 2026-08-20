@@ -54,9 +54,31 @@ pub struct FolderItem {
     pub root: String,
     /// Last path component for display (e.g. "2024-Graduation").
     pub name: String,
+    /// Stills (RAW + rendered) under this root.
     pub photo_count: i64,
+    /// Clips under this root.
+    pub video_count: i64,
     /// False when the import root is missing (e.g. external drive unmounted).
     pub accessible: bool,
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DiscoveredFolder {
+    pub path: String,
+    pub name: String,
+    pub photo_count: i64,
+    pub video_count: i64,
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FolderChild {
+    pub name: String,
+    pub path: String,
+    pub is_dir: bool,
+    /// `"photo"` or `"video"` for files; `None` for directories.
+    pub kind: Option<String>,
 }
 
 #[derive(Debug, Clone, serde::Serialize)]
@@ -77,6 +99,10 @@ pub struct GridItem {
     pub has_thumb: bool,
     /// False when the original file is not reachable on disk.
     pub accessible: bool,
+    /// Sidecar `EditDoc.doc_id`. Empty for a file with no sidecar / no copies.
+    /// Virtual copies share `path` with the master and are distinguished here.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub doc_id: String,
 }
 
 #[derive(Debug, Clone, Default, serde::Deserialize)]
@@ -155,6 +181,39 @@ fn is_allowed_flag(flag: &str) -> bool {
     matches!(flag, "none" | "pick" | "reject")
 }
 
+/// One grid row per sidecar doc when virtual copies exist (same master path).
+fn expand_virtual_copies(items: Vec<GridItem>) -> Vec<GridItem> {
+    let mut out = Vec::with_capacity(items.len());
+    for item in items {
+        if !item.has_edits {
+            out.push(item);
+            continue;
+        }
+        let Ok(Some(doc)) = sidecar::load_sidecar(Path::new(&item.path)) else {
+            out.push(item);
+            continue;
+        };
+        let docs = sidecar::split_copies(doc);
+        if docs.len() <= 1 {
+            let mut row = item;
+            if let Some(d) = docs.first() {
+                row.doc_id = d.doc_id.clone();
+            }
+            out.push(row);
+            continue;
+        }
+        for (i, d) in docs.iter().enumerate() {
+            let mut row = item.clone();
+            row.doc_id = d.doc_id.clone();
+            if i > 0 {
+                row.filename = format!("{} · copy {i}", item.filename);
+            }
+            out.push(row);
+        }
+    }
+    out
+}
+
 /// Strip trailing `/` or `\` so Windows and Unix roots compare cleanly.
 pub fn trim_path_root(root: &str) -> &str {
     root.trim_end_matches(['/', '\\'])
@@ -205,6 +264,15 @@ fn sql_under_folder(root: &str) -> (String, Vec<String>) {
         params.push(back);
     }
     (format!("({})", parts.join(" OR ")), params)
+}
+
+/// SQL predicate: asset filename is a known clip extension.
+fn sql_video_filename_pred() -> String {
+    crate::video::VIDEO_EXTENSIONS
+        .iter()
+        .map(|ext| format!("lower(filename) LIKE '%.{ext}'"))
+        .collect::<Vec<_>>()
+        .join(" OR ")
 }
 
 pub struct Catalog {
@@ -343,6 +411,25 @@ impl Catalog {
         self.conn
             .execute("INSERT OR IGNORE INTO folders(root) VALUES(?1)", [root])
             .map_err(db_err)?;
+        self.write_folder_manifest()
+    }
+
+    /// Drop a sidebar shortcut. Originals on disk are not touched.
+    pub fn forget_folder(&mut self, root: &str) -> Result<(), CoreError> {
+        let mut to_delete = folder_root_variants(root);
+        let simple = crate::path_safety::simplify_path_str(root);
+        if !to_delete.iter().any(|x| x == &simple) {
+            to_delete.push(simple);
+        }
+        for v in &to_delete {
+            self.conn
+                .execute("DELETE FROM folders WHERE root = ?1", [v])
+                .map_err(db_err)?;
+        }
+        self.write_folder_manifest()
+    }
+
+    fn write_folder_manifest(&self) -> Result<(), CoreError> {
         let roots = self.folders()?;
         std::fs::write(
             self.dir.join("folders.json"),
@@ -362,19 +449,25 @@ impl Catalog {
         Ok(rows.filter_map(|r| r.ok()).collect())
     }
 
-    /// Imported roots with counts and live volume availability.
+    /// Imported roots with still/clip counts and live volume availability.
     pub fn list_folders(&self) -> Result<Vec<FolderItem>, CoreError> {
         let mut out = Vec::new();
+        let video_pred = sql_video_filename_pred();
         for root in self.folders()? {
             let root_trim = crate::path_safety::simplify_path_str(&root);
             let (clause, params) = sql_under_folder(&root_trim);
-            let sql = format!("SELECT COUNT(*) FROM assets WHERE {clause}");
-            let photo_count: i64 = self
+            let sql = format!(
+                "SELECT
+                    COALESCE(SUM(CASE WHEN {video_pred} THEN 0 ELSE 1 END), 0),
+                    COALESCE(SUM(CASE WHEN {video_pred} THEN 1 ELSE 0 END), 0)
+                 FROM assets WHERE {clause}"
+            );
+            let (photo_count, video_count): (i64, i64) = self
                 .conn
                 .query_row(&sql, rusqlite::params_from_iter(params.iter()), |r| {
-                    r.get(0)
+                    Ok((r.get(0)?, r.get(1)?))
                 })
-                .unwrap_or(0);
+                .unwrap_or((0, 0));
             let accessible = Path::new(&root_trim).exists();
             let name = Path::new(&root_trim)
                 .file_name()
@@ -385,6 +478,7 @@ impl Catalog {
                 root: root_trim,
                 name,
                 photo_count,
+                video_count,
                 accessible,
             });
         }
@@ -629,11 +723,14 @@ impl Catalog {
                         blur_score: r.get(11)?,
                         has_thumb: r.get::<_, i64>(12)? != 0,
                         accessible: Path::new(&path).exists(),
+                        doc_id: String::new(),
                     })
                 },
             )
             .map_err(db_err)?;
-        Ok(rows.filter_map(|r| r.ok()).collect())
+        Ok(expand_virtual_copies(
+            rows.filter_map(|r| r.ok()).collect(),
+        ))
     }
 
     pub fn asset_detail(&self, id: i64) -> Result<Option<AssetDetail>, CoreError> {
@@ -872,6 +969,16 @@ impl Catalog {
         Ok(touched)
     }
 
+    pub fn mark_has_edits(&self, path: &str, has: bool) -> Result<(), CoreError> {
+        self.conn
+            .execute(
+                "UPDATE assets SET has_edits = ?1 WHERE path = ?2",
+                rusqlite::params![has as i64, path],
+            )
+            .map_err(db_err)?;
+        Ok(())
+    }
+
     pub fn keywords_of(&self, id: i64) -> Vec<String> {
         self.conn
             .prepare("SELECT keyword FROM keywords WHERE asset_id = ?1 ORDER BY keyword")
@@ -928,9 +1035,15 @@ pub fn scan_folder(root: &Path) -> Vec<PathBuf> {
         };
         for entry in rd.flatten() {
             let p = crate::path_safety::simplify_path(entry.path());
+            let name = p
+                .file_name()
+                .map(|n| n.to_string_lossy().into_owned())
+                .unwrap_or_default();
+            if name.starts_with('.') {
+                continue;
+            }
             if p.is_dir() {
-                let name = p.file_name().map(|n| n.to_string_lossy().into_owned());
-                if !name.map(|n| n.starts_with('.')).unwrap_or(true) {
+                if !skip_dir_name(&name) {
                     stack.push(p);
                 }
             } else if raw_dec.probe(&p) || std_dec.probe(&p) || crate::video::is_video_path(&p) {
@@ -940,6 +1053,250 @@ pub fn scan_folder(root: &Path) -> Vec<PathBuf> {
     }
     out.sort();
     out
+}
+
+const SKIP_DIR_NAMES: &[&str] = &[
+    "library",
+    "applications",
+    "system",
+    "appdata",
+    "windows",
+    "program files",
+    "program files (x86)",
+    "node_modules",
+    "vendor",
+    "dist",
+    "build",
+    "caches",
+    "__pycache__",
+    "site-packages",
+    ".git",
+    ".trash",
+    "trash",
+];
+
+fn skip_dir_name(name: &str) -> bool {
+    if name.starts_with('.') {
+        return true;
+    }
+    let lower = name.to_ascii_lowercase();
+    if lower.ends_with(".app") || lower.ends_with(".photoslibrary") {
+        return true;
+    }
+    SKIP_DIR_NAMES.iter().any(|s| lower == *s)
+}
+
+fn media_search_roots() -> Vec<PathBuf> {
+    let home = std::env::var("HOME")
+        .or_else(|_| std::env::var("USERPROFILE"))
+        .unwrap_or_else(|_| ".".into());
+    let home = PathBuf::from(home);
+    let mut roots: Vec<PathBuf> = [
+        "Desktop",
+        "Documents",
+        "Pictures",
+        "Movies",
+        "Videos",
+        "Downloads",
+        "DCIM",
+    ]
+    .into_iter()
+    .map(|n| home.join(n))
+    .filter(|p| p.is_dir())
+    .collect();
+
+    #[cfg(target_os = "macos")]
+    if let Ok(volumes) = std::fs::read_dir("/Volumes") {
+        let boot = Path::new("/").canonicalize().ok();
+        for entry in volumes.flatten() {
+            let path = entry.path();
+            if !path.is_dir() {
+                continue;
+            }
+            let name = entry.file_name().to_string_lossy().into_owned();
+            if name.starts_with('.') {
+                continue;
+            }
+            if boot
+                .as_ref()
+                .and_then(|b| path.canonicalize().ok().map(|c| c == *b))
+                .unwrap_or(false)
+            {
+                continue;
+            }
+            roots.push(path);
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    for mount in ["/media", "/mnt", "/run/media"] {
+        let Ok(rd) = std::fs::read_dir(mount) else {
+            continue;
+        };
+        for entry in rd.flatten() {
+            let path = entry.path();
+            if path.is_dir() && !entry.file_name().to_string_lossy().starts_with('.') {
+                roots.push(path);
+            }
+        }
+    }
+
+    roots
+}
+
+fn file_media_kind(
+    path: &Path,
+    raw: &RawlerDecoder,
+    std: &crate::raw::StandardDecoder,
+) -> Option<&'static str> {
+    if crate::video::is_video_path(path) {
+        Some("video")
+    } else if raw.probe(path) || std.probe(path) {
+        Some("photo")
+    } else {
+        None
+    }
+}
+
+/// Walk Pictures/Movies/Downloads/Desktop (and mounted volumes) for folders
+/// that contain stills or clips as direct children.
+pub fn discover_media_folders() -> Vec<DiscoveredFolder> {
+    discover_media_folders_in(&media_search_roots(), 4, 120, 4000)
+}
+
+pub fn discover_media_folders_in(
+    roots: &[PathBuf],
+    max_depth: u32,
+    max_results: usize,
+    max_visit: usize,
+) -> Vec<DiscoveredFolder> {
+    let raw = RawlerDecoder::default();
+    let std = crate::raw::StandardDecoder;
+    let mut found = Vec::new();
+    let mut visited = 0usize;
+
+    for root in roots {
+        if !root.is_dir() {
+            continue;
+        }
+        let mut stack = vec![(root.clone(), 0u32)];
+        while let Some((dir, depth)) = stack.pop() {
+            if visited >= max_visit || found.len() >= max_results {
+                break;
+            }
+            visited += 1;
+            let rd = match std::fs::read_dir(&dir) {
+                Ok(rd) => rd,
+                Err(_) => continue,
+            };
+            let mut photos = 0i64;
+            let mut videos = 0i64;
+            let mut subdirs = Vec::new();
+            for entry in rd.flatten() {
+                let p = crate::path_safety::simplify_path(entry.path());
+                let name = p
+                    .file_name()
+                    .map(|n| n.to_string_lossy().into_owned())
+                    .unwrap_or_default();
+                if p.is_dir() {
+                    if !skip_dir_name(&name) && depth < max_depth {
+                        subdirs.push(p);
+                    }
+                } else if let Some(kind) = file_media_kind(&p, &raw, &std) {
+                    if kind == "video" {
+                        videos += 1;
+                    } else {
+                        photos += 1;
+                    }
+                }
+            }
+            if photos + videos > 0 {
+                let path = crate::path_safety::simplify_path_str(&dir.to_string_lossy());
+                let name = Path::new(&path)
+                    .file_name()
+                    .map(|s| s.to_string_lossy().into_owned())
+                    .filter(|s| !s.is_empty())
+                    .unwrap_or_else(|| path.clone());
+                found.push(DiscoveredFolder {
+                    path,
+                    name,
+                    photo_count: photos,
+                    video_count: videos,
+                });
+            }
+            if depth < max_depth {
+                stack.extend(subdirs.into_iter().map(|p| (p, depth + 1)));
+            }
+        }
+    }
+
+    found.sort_by(|a, b| {
+        a.name
+            .to_ascii_lowercase()
+            .cmp(&b.name.to_ascii_lowercase())
+            .then_with(|| a.path.cmp(&b.path))
+    });
+    found.dedup_by(|a, b| a.path == b.path);
+    found
+}
+
+/// Immediate children of a folder: subfolders (not skipped) then valid media files.
+pub fn list_folder_children(dir: &Path) -> Result<Vec<FolderChild>, CoreError> {
+    let dir = crate::path_safety::simplify_path(dir.to_path_buf());
+    if !dir.is_dir() {
+        return Err(CoreError::Io(format!("not a folder: {}", dir.display())));
+    }
+    let raw = RawlerDecoder::default();
+    let std = crate::raw::StandardDecoder;
+    let mut folders = Vec::new();
+    let mut files = Vec::new();
+    let rd = match std::fs::read_dir(&dir) {
+        Ok(rd) => rd,
+        Err(e) if e.kind() == std::io::ErrorKind::PermissionDenied => {
+            return Err(CoreError::InvalidOp("permission denied".into()));
+        }
+        Err(e) => {
+            return Err(CoreError::Io(format!("read_dir {}: {e}", dir.display())));
+        }
+    };
+    for entry in rd.flatten() {
+        let p = crate::path_safety::simplify_path(entry.path());
+        let name = p
+            .file_name()
+            .map(|n| n.to_string_lossy().into_owned())
+            .unwrap_or_default();
+        if name.starts_with('.') {
+            continue;
+        }
+        if p.is_dir() {
+            if skip_dir_name(&name) {
+                continue;
+            }
+            folders.push(FolderChild {
+                name,
+                path: crate::path_safety::simplify_path_str(&p.to_string_lossy()),
+                is_dir: true,
+                kind: None,
+            });
+        } else if let Some(kind) = file_media_kind(&p, &raw, &std) {
+            files.push(FolderChild {
+                name,
+                path: crate::path_safety::simplify_path_str(&p.to_string_lossy()),
+                is_dir: false,
+                kind: Some(kind.to_string()),
+            });
+        }
+    }
+    let by_name = |a: &FolderChild, b: &FolderChild| {
+        a.name
+            .to_ascii_lowercase()
+            .cmp(&b.name.to_ascii_lowercase())
+            .then_with(|| a.path.cmp(&b.path))
+    };
+    folders.sort_by(by_name);
+    files.sort_by(by_name);
+    folders.extend(files);
+    Ok(folders)
 }
 
 /// Process one file: metadata + sidecar + previews + cull signals.
@@ -1132,6 +1489,193 @@ mod tests {
     }
 
     #[test]
+    fn scan_folder_skips_junk_and_hidden() {
+        let dir = std::env::temp_dir().join(format!(
+            "meratech-scan-skip-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::remove_dir_all(&dir).ok();
+        std::fs::create_dir_all(dir.join("node_modules")).unwrap();
+        std::fs::write(dir.join("keep.ARW"), b"raw").unwrap();
+        std::fs::write(dir.join(".hidden.ARW"), b"raw").unwrap();
+        std::fs::write(dir.join("node_modules").join("pkg.jpg"), b"jpg").unwrap();
+        let names: Vec<String> = scan_folder(&dir)
+            .into_iter()
+            .filter_map(|p| p.file_name().map(|n| n.to_string_lossy().into_owned()))
+            .collect();
+        std::fs::remove_dir_all(&dir).ok();
+        assert!(names.iter().any(|n| n == "keep.ARW"), "{names:?}");
+        assert!(!names.iter().any(|n| n == "pkg.jpg"), "{names:?}");
+        assert!(!names.iter().any(|n| n == ".hidden.ARW"), "{names:?}");
+    }
+
+    #[test]
+    fn list_folders_splits_stills_and_clips() {
+        let (mut cat, dir) = tmp_cat("media-kind");
+        let root = dir.join("shoot").to_string_lossy().into_owned();
+        let still = format!("{root}/IMG_0001.ARW");
+        let clip = format!("{root}/A001.MOV");
+        cat.upsert_asset(
+            &still,
+            &root,
+            "h",
+            100,
+            0,
+            &meta_stub(&still),
+            None,
+            false,
+            None,
+            None,
+        )
+        .unwrap();
+        cat.upsert_asset(
+            &clip,
+            &root,
+            "h",
+            100,
+            0,
+            &meta_stub(&clip),
+            None,
+            false,
+            None,
+            None,
+        )
+        .unwrap();
+        cat.remember_folder(&root).unwrap();
+        let folders = cat.list_folders().unwrap();
+        assert_eq!(folders.len(), 1);
+        assert_eq!(folders[0].photo_count, 1, "{folders:?}");
+        assert_eq!(folders[0].video_count, 1, "{folders:?}");
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn discover_finds_direct_media_folders() {
+        let dir = std::env::temp_dir().join(format!(
+            "meratech-discover-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::remove_dir_all(&dir).ok();
+        let photos = dir.join("vacation");
+        let clips = dir.join("reels");
+        let skip = dir.join("node_modules");
+        std::fs::create_dir_all(&photos).unwrap();
+        std::fs::create_dir_all(&clips).unwrap();
+        std::fs::create_dir_all(&skip).unwrap();
+        std::fs::write(photos.join("IMG_1.ARW"), b"raw").unwrap();
+        std::fs::write(clips.join("A001.MOV"), b"mov").unwrap();
+        std::fs::write(skip.join("x.jpg"), b"jpg").unwrap();
+        let found = super::discover_media_folders_in(std::slice::from_ref(&dir), 2, 20, 50);
+        std::fs::remove_dir_all(&dir).ok();
+        let names: Vec<&str> = found.iter().map(|f| f.name.as_str()).collect();
+        assert!(names.contains(&"vacation"), "{found:?}");
+        assert!(names.contains(&"reels"), "{found:?}");
+        assert!(!names.contains(&"node_modules"), "{found:?}");
+        let vac = found.iter().find(|f| f.name == "vacation").unwrap();
+        assert_eq!(vac.photo_count, 1);
+        assert_eq!(vac.video_count, 0);
+        let reels = found.iter().find(|f| f.name == "reels").unwrap();
+        assert_eq!(reels.photo_count, 0);
+        assert_eq!(reels.video_count, 1);
+    }
+
+    #[test]
+    fn list_folder_children_nests_dirs_and_media() {
+        let dir = std::env::temp_dir().join(format!(
+            "meratech-children-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::remove_dir_all(&dir).ok();
+        std::fs::create_dir_all(dir.join("day1")).unwrap();
+        std::fs::write(dir.join("IMG_1.ARW"), b"raw").unwrap();
+        std::fs::write(dir.join("clip.MOV"), b"mov").unwrap();
+        std::fs::write(dir.join("notes.txt"), b"skip").unwrap();
+        std::fs::write(dir.join("day1").join("IMG_2.ARW"), b"raw").unwrap();
+        let kids = super::list_folder_children(&dir).unwrap();
+        std::fs::remove_dir_all(&dir).ok();
+        assert!(kids.iter().any(|c| c.is_dir && c.name == "day1"), "{kids:?}");
+        assert!(
+            kids.iter()
+                .any(|c| !c.is_dir && c.name == "IMG_1.ARW" && c.kind.as_deref() == Some("photo")),
+            "{kids:?}"
+        );
+        assert!(
+            kids.iter()
+                .any(|c| !c.is_dir && c.name == "clip.MOV" && c.kind.as_deref() == Some("video")),
+            "{kids:?}"
+        );
+        assert!(!kids.iter().any(|c| c.name == "notes.txt"), "{kids:?}");
+        assert!(!kids.iter().any(|c| c.name == "IMG_2.ARW"), "{kids:?}");
+    }
+
+    #[test]
+    fn list_folder_children_skips_hidden_and_junk_dirs() {
+        let dir = std::env::temp_dir().join(format!(
+            "meratech-children-skip-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::remove_dir_all(&dir).ok();
+        std::fs::create_dir_all(dir.join("node_modules")).unwrap();
+        std::fs::create_dir_all(dir.join(".hidden-dir")).unwrap();
+        std::fs::write(dir.join(".hidden.ARW"), b"raw").unwrap();
+        std::fs::write(dir.join("visible.ARW"), b"raw").unwrap();
+        std::fs::write(dir.join("node_modules").join("x.jpg"), b"jpg").unwrap();
+        let kids = super::list_folder_children(&dir).unwrap();
+        std::fs::remove_dir_all(&dir).ok();
+        assert!(kids.iter().any(|c| c.name == "visible.ARW"), "{kids:?}");
+        assert!(!kids.iter().any(|c| c.name.starts_with('.')), "{kids:?}");
+        assert!(!kids.iter().any(|c| c.name == "node_modules"), "{kids:?}");
+    }
+
+    #[test]
+    fn forget_folder_drops_shortcut_keeps_assets() {
+        let (mut cat, dir) = tmp_cat("forget-folder");
+        let root = dir.join("shoot").to_string_lossy().into_owned();
+        let still = format!("{root}/IMG_0001.ARW");
+        cat.upsert_asset(
+            &still,
+            &root,
+            "h",
+            100,
+            0,
+            &meta_stub(&still),
+            None,
+            false,
+            None,
+            None,
+        )
+        .unwrap();
+        cat.remember_folder(&root).unwrap();
+        assert_eq!(cat.list_folders().unwrap().len(), 1);
+        cat.forget_folder(&root).unwrap();
+        assert!(cat.list_folders().unwrap().is_empty());
+        let grid = cat
+            .grid(&GridQuery {
+                folder: Some(root.clone()),
+                ..Default::default()
+            })
+            .unwrap();
+        assert_eq!(grid.len(), 1, "forgetting a shortcut must not delete files");
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
     fn grid_folder_filter_matches_windows_backslash_paths() {
         let (mut cat, dir) = tmp_cat("win-paths");
         let root = r"C:\Users\test\photos";
@@ -1181,6 +1725,7 @@ mod tests {
         let folders = cat.list_folders().unwrap();
         assert_eq!(folders.len(), 1);
         assert_eq!(folders[0].photo_count, 2);
+        assert_eq!(folders[0].video_count, 0);
 
         // Legacy DB rows with \\?\ must still match a picker-style query.
         let (mut cat_v, dir_v) = tmp_cat("win-verbatim");
@@ -1417,5 +1962,50 @@ mod tests {
         assert!(laplacian_variance(&noisy) > 100.0);
         // identical images → identical phash
         assert_eq!(average_hash(&flat), average_hash(&flat.clone()));
+    }
+
+    #[test]
+    fn grid_expands_virtual_copies() {
+        let dir = std::env::temp_dir().join(format!(
+            "meratech-vc-grid-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::remove_dir_all(&dir).ok();
+        let photos = dir.join("photos");
+        std::fs::create_dir_all(&photos).unwrap();
+        let img = photos.join("IMG_1.ARW");
+        std::fs::write(&img, b"fake-raw").unwrap();
+
+        let mut primary = EditDoc::new(img.to_str().unwrap());
+        primary.set("exposure", "stops", ParamValue::F32(0.5));
+        let mut copy = primary.clone();
+        copy.doc_id = "vc-1".into();
+        copy.set("exposure", "stops", ParamValue::F32(1.5));
+        sidecar::write_sidecar(&img, &sidecar::bundle_copies(&[primary, copy])).unwrap();
+
+        let mut cat = Catalog::open_at(dir.join("catalog")).unwrap();
+        cat.upsert_asset(
+            img.to_str().unwrap(),
+            photos.to_str().unwrap(),
+            "h",
+            8,
+            1,
+            &meta_stub(img.to_str().unwrap()),
+            None,
+            true,
+            None,
+            None,
+        )
+        .unwrap();
+        let items = cat.grid(&GridQuery::default()).unwrap();
+        assert_eq!(items.len(), 2, "{items:?}");
+        assert_eq!(items[0].path, items[1].path);
+        assert_eq!(items[1].doc_id, "vc-1");
+        assert!(items[1].filename.contains("copy 1"), "{}", items[1].filename);
+        std::fs::remove_dir_all(&dir).ok();
     }
 }

@@ -194,6 +194,42 @@ impl Engine {
         Ok(())
     }
 
+    pub(super) fn apply_grade_to_paths(
+        &mut self,
+        paths: Vec<String>,
+        modules: crate::doc::ModuleParams,
+        lut_file: Option<String>,
+    ) -> Result<u32, CoreError> {
+        let open = self
+            .current
+            .as_ref()
+            .map(|c| c.path.to_string_lossy().into_owned());
+        let mut n = 0u32;
+        for path in &paths {
+            if open.as_deref() == Some(path.as_str()) {
+                if let Some(c) = self.current.as_mut() {
+                    sidecar::merge_grade(c.doc_mut(), &modules, lut_file.clone());
+                    c.doc_dirty = true;
+                }
+            } else {
+                sidecar::apply_grade_to_path(std::path::Path::new(path), &modules, lut_file.clone())?;
+            }
+            if let Ok(cat) = self.catalog_mut() {
+                let _ = cat.mark_has_edits(path, true);
+            }
+            n += 1;
+        }
+        if open.as_ref().is_some_and(|p| paths.iter().any(|x| x == p)) {
+            if let Some(g) = &mut self.graph {
+                g.invalidate_all();
+            }
+            self.schedule_render();
+            self.schedule_settle();
+        }
+        self.emit(EngineEvent::CatalogChanged);
+        Ok(n)
+    }
+
     /// Wipe + rescan the manifest roots (R8 recovery path). Roots run
     /// sequentially; later roots are queued onto the import state.
     pub(super) fn rebuild_index(&mut self) -> Result<u64, CoreError> {

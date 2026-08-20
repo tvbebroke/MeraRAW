@@ -137,6 +137,7 @@ async fn radial_mask_scopes_exposure_to_center() {
             opacity: None,
             feather: None,
             invert: Some(true),
+            blend: None,
         },
     )
     .unwrap();
@@ -175,6 +176,7 @@ async fn radial_mask_scopes_exposure_to_center() {
             opacity: Some(0.0),
             feather: None,
             invert: None,
+            blend: None,
         },
     )
     .unwrap();
@@ -280,4 +282,111 @@ async fn segmented_mask_blends_via_small_texture() {
     let l2 = px(&pending, 4, H / 2);
     let r2 = px(&pending, W - 4, H / 2);
     assert_eq!(l2, r2, "pending segmentation must render as no-op");
+}
+
+fn luma_ramp_tex(gpu: &GpuContext) -> wgpu::Texture {
+    let mut bytes = Vec::with_capacity((W * H * 8) as usize);
+    for _y in 0..H {
+        for x in 0..W {
+            let v = x as f32 / (W - 1) as f32;
+            let h = half::f16::from_f32(v);
+            bytes.extend_from_slice(&h.to_le_bytes());
+            bytes.extend_from_slice(&h.to_le_bytes());
+            bytes.extend_from_slice(&h.to_le_bytes());
+            bytes.extend_from_slice(&half::f16::ONE.to_le_bytes());
+        }
+    }
+    upload_working_texture(gpu, &bytes, W, H)
+}
+
+#[tokio::test]
+async fn parametric_luma_mask_scopes_grey_ramp() {
+    let Ok(gpu) = GpuContext::init().await else {
+        eprintln!("no GPU; skipping");
+        return;
+    };
+    let tex = luma_ramp_tex(&gpu);
+    let tv = tex.create_view(&Default::default());
+    let mut graph = RenderGraph::new(&gpu);
+    let mut doc = EditDoc::new("/synthetic.ARW");
+
+    let base = graph
+        .render(
+            &gpu,
+            &tv,
+            W,
+            H,
+            &view(),
+            &doc,
+            AS_SHOT,
+            &HashMap::new(),
+            None,
+            None,
+            None,
+        )
+        .unwrap();
+    let base_lo = px(&base, 1, H / 2);
+    let base_mid = px(&base, W / 2, H / 2);
+    let base_hi = px(&base, W - 2, H / 2);
+
+    let id = apply_op(
+        &mut doc,
+        &Op::AddMask {
+            kind: "parametric".into(),
+            source: json!({
+                "type": "parametric",
+                "luma_lo": 0.4,
+                "luma_hi": 0.6,
+                "chroma_lo": 0.0,
+                "chroma_hi": 1.0,
+                "hue_lo": 0.0,
+                "hue_hi": 0.0,
+                "softness": 0.02
+            }),
+        },
+    )
+    .unwrap()
+    .unwrap();
+    apply_op(
+        &mut doc,
+        &Op::SetParam {
+            path: format!("mask.{id}.exposure.stops"),
+            value: json!(2.0),
+        },
+    )
+    .unwrap();
+
+    graph.invalidate_from_module("masks");
+    let masked = graph
+        .render(
+            &gpu,
+            &tv,
+            W,
+            H,
+            &view(),
+            &doc,
+            AS_SHOT,
+            &HashMap::new(),
+            None,
+            None,
+            None,
+        )
+        .unwrap();
+    let lo = px(&masked, 1, H / 2);
+    let mid = px(&masked, W / 2, H / 2);
+    let hi = px(&masked, W - 2, H / 2);
+    assert!(
+        mid[1] as i32 > base_mid[1] as i32 + 12,
+        "mid-luma band must brighten: {base_mid:?} → {mid:?}"
+    );
+    for c in 0..3 {
+        assert!(
+            (lo[c] as i32 - base_lo[c] as i32).abs() <= 3,
+            "low luma must not change: {base_lo:?} → {lo:?}"
+        );
+        assert!(
+            (hi[c] as i32 - base_hi[c] as i32).abs() <= 3,
+            "high luma must not change: {base_hi:?} → {hi:?}"
+        );
+    }
 }

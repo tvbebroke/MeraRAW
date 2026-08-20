@@ -402,8 +402,7 @@ pub fn looks_dir() -> PathBuf {
 }
 
 pub fn is_user_id(id: &str) -> bool {
-    id.strip_prefix("user:")
-        .is_some_and(|stem| user_stem_ok(stem))
+    id.strip_prefix("user:").is_some_and(user_stem_ok)
 }
 
 fn user_stem_ok(stem: &str) -> bool {
@@ -542,7 +541,7 @@ pub fn scan_user_looks() -> Vec<LookInfo> {
             preview,
         });
     }
-    out.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+    out.sort_by_key(|a| a.name.to_lowercase());
     out
 }
 

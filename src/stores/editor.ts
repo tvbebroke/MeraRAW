@@ -84,10 +84,3 @@ export const editFocus = atom<EditFocus>(null);
 
 export const histogramOpen = atom<boolean>(true);
 export const commandPaletteOpen = atom<boolean>(false);
-
-/** Re-export browse atoms so older intern imports keep compiling. */
-export {
-  folder,
-  photos,
-  activePhoto,
-} from "./browse";

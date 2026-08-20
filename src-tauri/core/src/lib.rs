@@ -21,6 +21,7 @@ pub mod error;
 pub mod export;
 pub mod gpu;
 pub mod graph;
+pub mod highlights;
 pub mod idt;
 pub mod image;
 pub mod look;

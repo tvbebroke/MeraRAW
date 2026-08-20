@@ -87,52 +87,131 @@ impl Engine {
     }
 
     pub(super) fn flush_sidecar_now(&mut self) {
-        if let Some(c) = &mut self.current {
-            // primary doc only; virtual copies are in-memory until P5
-            if c.doc_dirty && c.active_doc == 0 {
-                match sidecar::write_sidecar(&c.path, &c.docs[0]) {
-                    Ok(p) => {
-                        c.doc_dirty = false;
-                        tracing::debug!(path = %p.display(), "sidecar written");
-                    }
-                    Err(e) => tracing::error!(error = %e, "sidecar write failed"),
+        let Some(c) = &self.current else {
+            return;
+        };
+        if !c.doc_dirty {
+            return;
+        }
+        let path = c.path.clone();
+        let bundled = sidecar::bundle_copies(&c.docs);
+        let has_edits = !bundled.modules.is_empty()
+            || !bundled.masks.is_empty()
+            || !bundled.copies.is_empty();
+        match sidecar::write_sidecar(&path, &bundled) {
+            Ok(p) => {
+                if let Some(c) = &mut self.current {
+                    c.doc_dirty = false;
+                }
+                tracing::debug!(path = %p.display(), "sidecar written");
+                if let Ok(cat) = self.catalog_mut() {
+                    let _ = cat.mark_has_edits(&path.to_string_lossy(), has_edits);
                 }
             }
+            Err(e) => tracing::error!(error = %e, "sidecar write failed"),
         }
     }
+
+    /// Clone the active (or on-disk primary) edit into a new virtual copy.
+    /// Never deletes or rewrites the original image bytes.
+    pub(super) fn make_virtual_copy(
+        &mut self,
+        path: Option<String>,
+    ) -> Result<String, CoreError> {
+        let requested = path.filter(|p| !p.is_empty());
+        let current_path = self
+            .current
+            .as_ref()
+            .map(|c| c.path.to_string_lossy().into_owned());
+        if requested.is_none() || requested.as_deref() == current_path.as_deref() {
+            let c = self.current.as_mut().ok_or(CoreError::NoImage)?;
+            let mut copy = c.doc().clone();
+            copy.copies.clear();
+            copy.doc_id = format!("vc-{}", c.docs.len());
+            let id = copy.doc_id.clone();
+            c.docs.push(copy);
+            c.doc_dirty = true;
+            self.flush_sidecar_now();
+            self.emit(EngineEvent::CatalogChanged);
+            return Ok(id);
+        }
+        let p = std::path::PathBuf::from(requested.unwrap());
+        let id = sidecar::add_virtual_copy(&p)?;
+        if let Ok(cat) = self.catalog_mut() {
+            let _ = cat.mark_has_edits(&p.to_string_lossy(), true);
+        }
+        self.emit(EngineEvent::CatalogChanged);
+        Ok(id)
+    }
+
+    /// Remove a non-master virtual copy from the open image. The RAW is untouched.
+    pub(super) fn delete_virtual_copy(&mut self, doc_id: &str) -> Result<(), CoreError> {
+        let switch_needed = {
+            let c = self.current.as_mut().ok_or(CoreError::NoImage)?;
+            if c.docs.len() <= 1 {
+                return Err(CoreError::InvalidOp("cannot delete the only version".into()));
+            }
+            let idx = c
+                .docs
+                .iter()
+                .position(|d| d.doc_id == doc_id)
+                .ok_or_else(|| CoreError::InvalidOp(format!("no doc {doc_id}")))?;
+            if idx == 0 {
+                return Err(CoreError::InvalidOp("cannot delete the master".into()));
+            }
+            c.docs.remove(idx);
+            if c.active_doc == idx {
+                c.active_doc = 0;
+            } else if c.active_doc > idx {
+                c.active_doc -= 1;
+            }
+            c.doc_dirty = true;
+            true
+        };
+        self.flush_sidecar_now();
+        if switch_needed {
+            self.full_redraw();
+        }
+        self.emit(EngineEvent::CatalogChanged);
+        Ok(())
+    }
+
     pub(super) fn save_preset_to_disk(
         &mut self,
         name: &str,
         modules: &[String],
+        grade: Option<&crate::doc::ModuleParams>,
     ) -> Result<(), CoreError> {
-        let c = self.current.as_ref().ok_or(CoreError::NoImage)?;
+        let name = validate_preset_name(name)?;
         let mut partial = crate::doc::PartialDoc {
             modules: Default::default(),
         };
-        for m in modules {
-            if let Some(params) = c.doc().modules.get(m) {
-                partial.modules.insert(m.clone(), params.clone());
+        if let Some(src) = grade {
+            for key in PRESET_SAVE_MODULES {
+                if let Some(params) = src.get(*key) {
+                    partial.modules.insert((*key).to_string(), params.clone());
+                }
+            }
+        } else {
+            let c = self.current.as_ref().ok_or(CoreError::NoImage)?;
+            for m in modules {
+                if !PRESET_SAVE_MODULES.contains(&m.as_str()) {
+                    continue;
+                }
+                if let Some(params) = c.doc().modules.get(m) {
+                    partial.modules.insert(m.clone(), params.clone());
+                }
             }
         }
         let dir = presets_dir();
         std::fs::create_dir_all(&dir)?;
-        let safe: String = name
-            .chars()
-            .map(|ch| {
-                if ch.is_alphanumeric() || ch == '-' || ch == '_' {
-                    ch
-                } else {
-                    '_'
-                }
-            })
-            .collect();
         let file = crate::doc::PresetFile {
             label: Some(name.to_string()),
             tags: Vec::new(),
             modules: partial.modules,
         };
         std::fs::write(
-            dir.join(format!("{safe}.json")),
+            dir.join(format!("{name}.json")),
             serde_json::to_string_pretty(&file).map_err(|e| CoreError::Io(e.to_string()))?,
         )?;
         Ok(())
@@ -156,6 +235,21 @@ pub fn bundled_presets_dir() -> Option<PathBuf> {
     }
     None
 }
+
+/// Modules a named preset may persist. Crop / masks / retouch stay off this list.
+const PRESET_SAVE_MODULES: &[&str] = &[
+    "exposure",
+    "white_balance",
+    "calibration",
+    "detail",
+    "color_grade",
+    "hsl",
+    "tone_curve",
+    "lut",
+    "effects",
+    "input",
+    "highlights",
+];
 
 /// Reject path separators / traversal — preset names are identifiers only.
 fn validate_preset_name(name: &str) -> Result<&str, CoreError> {
@@ -210,6 +304,56 @@ pub(super) fn list_presets() -> Vec<String> {
     names.sort();
     names.dedup();
     names
+}
+
+pub(super) fn auto_preset_for(camera: &str, iso: Option<u32>) -> Option<String> {
+    let cam = camera.trim().to_lowercase();
+    let cam_key = format!("camera:{cam}");
+    let iso_key = iso.map(|i| format!("iso:{i}"));
+    let mut best: Option<(i32, String)> = None;
+    for name in list_presets() {
+        let Ok(file) = load_preset_file(&name) else {
+            continue;
+        };
+        let tags: Vec<String> = file.tags.iter().map(|t| t.to_lowercase()).collect();
+        if tags.is_empty() {
+            continue;
+        }
+        let cam_tags: Vec<&str> = tags
+            .iter()
+            .filter(|t| !t.starts_with("iso:"))
+            .map(|s| s.as_str())
+            .collect();
+        let iso_tags: Vec<&str> = tags
+            .iter()
+            .filter(|t| t.starts_with("iso:"))
+            .map(|s| s.as_str())
+            .collect();
+        let cam_hit = !cam.is_empty()
+            && cam_tags.iter().any(|t| {
+                *t == cam
+                    || *t == cam_key
+                    || t.strip_prefix("camera:").is_some_and(|rest| rest == cam)
+                    || cam.contains(t)
+            });
+        let iso_hit = iso_key
+            .as_ref()
+            .is_some_and(|k| iso_tags.iter().any(|t| *t == k));
+        let ok = match (!cam_tags.is_empty(), !iso_tags.is_empty()) {
+            (true, true) => cam_hit && iso_hit,
+            (true, false) => cam_hit,
+            (false, true) => iso_hit,
+            (false, false) => false,
+        };
+        if !ok {
+            continue;
+        }
+        let score = i32::from(cam_hit) * 2 + i32::from(iso_hit);
+        if best.as_ref().is_none_or(|(s, _)| score > *s) {
+            best = Some((score, name));
+        }
+    }
+    best.map(|(_, n)| n)
 }
 
 pub(super) fn load_preset(name: &str) -> Result<crate::doc::PartialDoc, CoreError> {
@@ -286,4 +430,18 @@ pub(super) fn list_preset_catalog() -> Vec<crate::doc::PresetCatalogEntry> {
 
     entries.sort_by(|a, b| a.label.cmp(&b.label));
     entries
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn preset_name_rejects_traversal() {
+        assert!(validate_preset_name("../x").is_err());
+        assert!(validate_preset_name("ok-name").is_ok());
+        assert!(validate_preset_name("My Look").is_ok());
+        assert!(validate_preset_name("a/b").is_err());
+        assert!(validate_preset_name("").is_err());
+    }
 }

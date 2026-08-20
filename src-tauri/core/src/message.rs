@@ -10,6 +10,13 @@ use tokio::sync::oneshot;
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct DocRef {
+    pub doc_id: String,
+    pub active: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct EngineStatus {
     pub alive: bool,
     pub gpu_ready: bool,
@@ -186,6 +193,7 @@ pub enum EngineMsg {
     // ---- Phase 1 ----
     OpenImage {
         path: PathBuf,
+        doc_id: Option<String>,
         reply: oneshot::Sender<Result<ImageMeta, CoreError>>,
     },
     RequestFrame {
@@ -232,12 +240,28 @@ pub enum EngineMsg {
         reply: oneshot::Sender<Result<crate::ops::DocDelta, CoreError>>,
     },
     /// Clone the active doc (new id), sharing the decoded base buffer.
+    /// `path` set = persist a copy for that file even if it is not the open image.
     VirtualCopy {
+        path: Option<String>,
         reply: oneshot::Sender<Result<String, CoreError>>,
     },
     SwitchDoc {
         doc_id: String,
         reply: oneshot::Sender<Result<crate::ops::DocDelta, CoreError>>,
+    },
+    ListDocs {
+        reply: oneshot::Sender<Vec<DocRef>>,
+    },
+    /// Drop a virtual copy from the open image. Master (first doc) cannot be removed.
+    DeleteVirtualCopy {
+        doc_id: String,
+        reply: oneshot::Sender<Result<(), CoreError>>,
+    },
+    ApplyGradeToPaths {
+        paths: Vec<String>,
+        modules: crate::doc::ModuleParams,
+        lut_file: Option<String>,
+        reply: oneshot::Sender<Result<u32, CoreError>>,
     },
     /// Extract chosen modules' params as a PartialDoc (preset save).
     SavePreset {
@@ -280,6 +304,12 @@ pub enum EngineMsg {
     SetClipWarnings {
         hi: bool,
         lo: bool,
+        reply: oneshot::Sender<()>,
+    },
+    /// View-only soft proof: 0 off, 1 sRGB, 2 Display P3, 3 Adobe RGB, 4 ProPhoto.
+    SetProofTarget {
+        space: u32,
+        gamut: bool,
         reply: oneshot::Sender<()>,
     },
     // ---- Phase 5: catalog ----
@@ -349,6 +379,10 @@ pub enum EngineMsg {
     ListFolders {
         reply: oneshot::Sender<Result<Vec<crate::catalog::FolderItem>, CoreError>>,
     },
+    ForgetFolder {
+        root: String,
+        reply: oneshot::Sender<Result<(), CoreError>>,
+    },
     SetAssetMeta {
         ids: Vec<i64>,
         patch: crate::catalog::MetaPatch,
@@ -403,6 +437,7 @@ pub enum EngineMsg {
     SavePresetToDisk {
         name: String,
         modules: Vec<String>,
+        grade: Option<crate::doc::ModuleParams>,
         reply: oneshot::Sender<Result<(), CoreError>>,
     },
     ListPresets {

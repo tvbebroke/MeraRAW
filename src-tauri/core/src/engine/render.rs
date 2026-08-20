@@ -184,6 +184,7 @@ impl Engine {
             let g = self.graph.as_mut().unwrap();
             g.set_look(display_look);
             g.set_clip_warnings(self.clip_hi, self.clip_lo);
+            g.set_proof(self.proof_space, self.proof_gamut);
         }
         let (w, h) = (*w, *h);
         let seg_views: std::collections::HashMap<String, wgpu::TextureView> = cur

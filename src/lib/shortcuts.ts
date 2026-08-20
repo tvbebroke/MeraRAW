@@ -2,7 +2,7 @@ import { push, router } from "svelte-spa-router";
 import { leftRailCollapsed, isZenMode, imageBrowserCollapsed, photoDetailsCollapsed, commandPaletteOpen } from "../stores/editor";
 import { isSettingsOpen, isExportOpen, isBugReportOpen, classicLook, isShortcutsOpen } from "../stores/ui";
 import { applyEditFocus, showAiPanel } from "./editor/focus";
-import { activePhoto, libraryItems, openPhoto } from "../stores/browse";
+import { activePhoto, libraryItems, openPhoto, gridKey } from "../stores/browse";
 import { imageMeta } from "../stores/app";
 import { editorRoute, isEditorRoute, isLibraryRoute, libraryRoute, workspace } from "../stores/workspace";
 import { copyGrade, pasteGrade } from "./grade";
@@ -50,7 +50,7 @@ function prevPhoto() {
   const list = libraryItems.get();
   if (!list.length) return;
   const current = activePhoto.get();
-  const idx = current ? list.findIndex((p) => p.path === current.path) : -1;
+  const idx = current ? list.findIndex((p) => gridKey(p) === gridKey(current)) : -1;
   const next = Math.max(0, idx - 1);
   if (next !== idx) void openPhoto(list[next]);
 }
@@ -59,7 +59,7 @@ function nextPhoto() {
   const list = libraryItems.get();
   if (!list.length) return;
   const current = activePhoto.get();
-  const idx = current ? list.findIndex((p) => p.path === current.path) : -1;
+  const idx = current ? list.findIndex((p) => gridKey(p) === gridKey(current)) : -1;
   const next = Math.min(list.length - 1, idx === -1 ? 0 : idx + 1);
   if (next !== idx) void openPhoto(list[next]);
 }

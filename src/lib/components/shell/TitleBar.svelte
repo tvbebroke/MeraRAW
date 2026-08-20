@@ -83,7 +83,7 @@
 
 <header
   data-tauri-drag-region
-  class="relative flex h-[42px] shrink-0 items-center pr-3 {isFullscreen ? 'pl-4' : 'pl-[88px]'} border-b border-border/80"
+  class="relative flex h-[42px] shrink-0 items-center pr-3 {isFullscreen ? 'pl-4' : 'pl-[76px]'} border-b border-border/80"
 >
   <img
     src={logoIcon}

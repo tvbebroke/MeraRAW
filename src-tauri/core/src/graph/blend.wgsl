@@ -5,7 +5,7 @@
 struct BlendUniforms {
   width: u32,
   height: u32,
-  _p0: u32,
+  mode: u32,
   _p1: u32,
 };
 
@@ -23,6 +23,12 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
   let c = vec2<i32>(gid.xy);
   let b = textureLoad(base, c, 0);
   let l = textureLoad(local_t, c, 0);
-  let m = textureLoad(mask_t, c, 0).r;
-  textureStore(dst, c, vec4<f32>(mix(b.rgb, l.rgb, clamp(m, 0.0, 1.0)), b.a));
+  let m = clamp(textureLoad(mask_t, c, 0).r, 0.0, 1.0);
+  var mixed = l.rgb;
+  if (u.mode == 1u) {
+    mixed = b.rgb * l.rgb;
+  } else if (u.mode == 2u) {
+    mixed = vec3<f32>(1.0) - (vec3<f32>(1.0) - b.rgb) * (vec3<f32>(1.0) - l.rgb);
+  }
+  textureStore(dst, c, vec4<f32>(mix(b.rgb, mixed, m), b.a));
 }

@@ -41,6 +41,7 @@
   <ParamRow path="white_balance.tint" label="Tint" />
   <ParamRow path="color_grade.perceptual_sat" label="Vibrance" />
   <ParamRow path="color_grade.global_chroma" label="Saturation" />
+  <ParamRow path="hsl.enabled" label="HSL mixer on" />
   <Disclosure label="Color Mixer">
     <div class="swatches">
       {#each mixerColors as c (c.id)}

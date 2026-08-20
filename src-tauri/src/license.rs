@@ -297,6 +297,17 @@ async fn http_text(resp: reqwest::Response) -> Result<String, AppError> {
     } else {
         // Never log full error bodies (may contain tokens / PII).
         tracing::warn!(%status, body_len = body.len(), "license http error");
+        if let Ok(v) = serde_json::from_str::<serde_json::Value>(&body) {
+            if let Some(msg) = v["error"].as_str() {
+                let msg = msg.trim();
+                if (8..180).contains(&msg.len())
+                    && !msg.to_lowercase().contains("token")
+                    && !msg.contains("Bearer")
+                {
+                    return Err(AppError::Internal(msg.into()));
+                }
+            }
+        }
         let hint = if body.contains("No active license") {
             "No beta license yet. Sign up and log in on meratech.co first, then try again."
         } else if body.contains("STRIPE_PRICE_ID") {
@@ -315,6 +326,8 @@ async fn http_text(resp: reqwest::Response) -> Result<String, AppError> {
             "That code didn't match. Check the email and try again."
         } else if status.as_u16() == 401 || status.as_u16() == 403 {
             "Authentication failed."
+        } else if status.as_u16() == 500 {
+            "Could not send the sign-in email. Try again in a moment."
         } else {
             "Server request failed."
         };
@@ -365,7 +378,7 @@ async fn activate_with_access_token(
     Ok(verify["user_id"].as_str().unwrap_or("").to_string())
 }
 
-/// Email OTP via Supabase Auth. Delivery is the project's Auth SMTP (Resend).
+/// Email OTP via generateLink + Resend (not GoTrue /otp, which sends a magic link).
 #[tauri::command]
 pub async fn license_request_otp(email: String) -> Result<(), AppError> {
     let email = normalize_email(&email)?;
@@ -374,13 +387,11 @@ pub async fn license_request_otp(email: String) -> Result<(), AppError> {
     let client = reqwest::Client::new();
 
     let resp = client
-        .post(format!("{base}/auth/v1/otp"))
+        .post(format!("{base}/functions/v1/request-login-otp"))
         .header("apikey", &anon)
+        .header("Authorization", format!("Bearer {anon}"))
         .header("Content-Type", "application/json")
-        .json(&serde_json::json!({
-            "email": email,
-            "create_user": true,
-        }))
+        .json(&serde_json::json!({ "email": email }))
         .send()
         .await
         .map_err(|e| {

@@ -26,8 +26,14 @@ struct MaskSampleUniforms {
   crop_persp_v: f32,
   crop_persp_h: f32,
   _pad_crop: u32,
-  _p0: u32,
-  _p1: u32,
+  luma_lo: f32,
+  luma_hi: f32,
+  chroma_lo: f32,
+  chroma_hi: f32,
+  hue_lo: f32,
+  hue_hi: f32,
+  softness: f32,
+  param_mode: u32,
 };
 
 @group(0) @binding(0) var mask_src: texture_2d<f32>; // small model mask
@@ -56,6 +62,9 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
 
   var m = 0.0;
   if (cm.inside == 1u) {
+    if (u.param_mode == 1u) {
+      m = 1.0;
+    } else {
     // joint bilateral: sample the small mask around uv, weight by guide
     // luma similarity at viewport res
     let center = textureLoad(guide, vec2<i32>(gid.xy), 0).rgb;
@@ -91,6 +100,39 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
       }
     }
     m = acc / max(wsum, 1e-6);
+    }
+    if (u.param_mode == 1u) {
+      let g = textureLoad(guide, vec2<i32>(gid.xy), 0).rgb;
+      let y = dot(max(g, vec3<f32>(0.0)), LUMA_W);
+      let mx = max(g.r, max(g.g, g.b));
+      let mn = min(g.r, min(g.g, g.b));
+      let chroma = mx - mn;
+      var hue = 0.0;
+      if (chroma > 1e-5) {
+        if (mx == g.r) {
+          hue = (g.g - g.b) / chroma;
+        } else if (mx == g.g) {
+          hue = 2.0 + (g.b - g.r) / chroma;
+        } else {
+          hue = 4.0 + (g.r - g.g) / chroma;
+        }
+        hue = hue * 60.0;
+        if (hue < 0.0) {
+          hue = hue + 360.0;
+        }
+      }
+      let soft = max(u.softness, 0.001);
+      let ly = smoothstep(u.luma_lo - soft, u.luma_lo + soft, y)
+        * (1.0 - smoothstep(u.luma_hi - soft, u.luma_hi + soft, y));
+      let cy = smoothstep(u.chroma_lo - soft, u.chroma_lo + soft, chroma)
+        * (1.0 - smoothstep(u.chroma_hi - soft, u.chroma_hi + soft, chroma));
+      var hy = 1.0;
+      if (u.hue_hi > u.hue_lo) {
+        hy = smoothstep(u.hue_lo - 8.0, u.hue_lo + 8.0, hue)
+          * (1.0 - smoothstep(u.hue_hi - 8.0, u.hue_hi + 8.0, hue));
+      }
+      m = m * ly * cy * hy;
+    }
     // feather: soften the transition band
     let f = clamp(u.feather, 0.0, 0.9);
     if (f > 0.01) {

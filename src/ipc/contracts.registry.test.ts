@@ -53,6 +53,16 @@ function mixerBands(src: string): string[] {
   return [...block[1].matchAll(/id: "([a-z]+)"/g)].map((m) => m[1]);
 }
 
+function hslMixerBands(specs: SpecDump[]): string[] {
+  return [
+    ...new Set(
+      specs
+        .filter((s) => /^hsl\.[a-z]+\.(hue|sat|lum)$/.test(s.path))
+        .map((s) => s.path.split(".")[1]),
+    ),
+  ];
+}
+
 describe("contract A — param registry", () => {
   it("committed registry.json fixture exists", () => {
     expect(existsSync(FIXTURE), "run UPDATE_FIXTURES=1 cargo test -p meratech-core --lib").toBe(
@@ -75,13 +85,7 @@ describe("contract A — param registry", () => {
   it("every ParamRow / setParam path exists in the registry", () => {
     const specs = JSON.parse(readFileSync(FIXTURE, "utf8")) as SpecDump[];
     const registry = new Set(specs.map((s) => s.path));
-    const hslBands = [
-      ...new Set(
-        specs
-          .filter((s) => s.path.startsWith("hsl."))
-          .map((s) => s.path.split(".")[1]),
-      ),
-    ];
+    const hslBands = hslMixerBands(specs);
 
     const files = [
       ...walkSvelte(COMPONENTS),
@@ -97,13 +101,7 @@ describe("contract A — param registry", () => {
 
   it("every registry path is referenced or listed in KNOWN_UNEXPOSED", () => {
     const specs = JSON.parse(readFileSync(FIXTURE, "utf8")) as SpecDump[];
-    const hslBands = [
-      ...new Set(
-        specs
-          .filter((s) => s.path.startsWith("hsl."))
-          .map((s) => s.path.split(".")[1]),
-      ),
-    ];
+    const hslBands = hslMixerBands(specs);
     const files = [
       ...walkSvelte(COMPONENTS),
       join(ROOT, "src/crop/cropMath.ts"),
@@ -134,13 +132,7 @@ describe("contract A — param registry", () => {
 
   it("ColorSettings mixer bands match the registry hsl.* set", () => {
     const specs = JSON.parse(readFileSync(FIXTURE, "utf8")) as SpecDump[];
-    const fromReg = [
-      ...new Set(
-        specs
-          .filter((s) => s.path.startsWith("hsl."))
-          .map((s) => s.path.split(".")[1]),
-      ),
-    ].sort();
+    const fromReg = hslMixerBands(specs).sort();
     const ui = mixerBands(
       readFileSync(join(COMPONENTS, "edit-panel/ColorSettings.svelte"), "utf8"),
     );

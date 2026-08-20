@@ -98,7 +98,7 @@ async function waitLuma(
   throw new Error(`waitLuma timeout, last=${last}`);
 }
 
-export async function runSelfTest(latestVersion: number): Promise<void> {
+export async function runSelfTest(_latestVersion: number, scope = "1"): Promise<void> {
   const fail = (m: string) => reportFrontendStatus(`selftest-fail: ${m}`);
   try {
     // 0) demosaic switch re-decodes and repaints (merawler engine). Runs first
@@ -150,30 +150,35 @@ export async function runSelfTest(latestVersion: number): Promise<void> {
     await frameReset;
     await settleFrames();
 
-    // luma baseline for the edit/undo checks — taken after step 0 + reset so
-    // it is the decoded, unedited rcd frame
-    const baseline = await centerLuma(latestVersion);
+    // luma baseline from the pixels on screen (not the boot FrameReady
+    // version — that can be a cached frame and makes exposure look like a no-op).
+    const baseline = await centerLuma(Date.now());
 
     // 1) exposure +1.5 stops through the real op path
-    const frameP = nextFrame();
     const delta = await setParam("exposure.stops", 1.5);
     if (delta.label !== "exposure.stops" || delta.undoDepth < 1) {
       return void (await fail(`bad delta ${JSON.stringify(delta)}`));
     }
-    const brighter = await centerLuma(await frameP);
+    const brighter = await waitLuma((l) => l > baseline + 8, 8000);
     if (brighter <= baseline + 8) {
       return void (await fail(`exposure no-op: ${baseline} → ${brighter}`));
     }
 
     // 2) undo restores (depth is relative — the reset above is history too)
-    const frameP2 = nextFrame();
     const d2 = await undo();
     if (d2.undoDepth !== delta.undoDepth - 1) {
       return void (await fail("undo depth"));
     }
-    const restored = await centerLuma(await frameP2);
+    const restored = await waitLuma((l) => Math.abs(l - baseline) <= 6, 8000);
     if (Math.abs(restored - baseline) > 6) {
       return void (await fail(`undo mismatch: ${baseline} vs ${restored}`));
+    }
+
+    // MERATECH_SELFTEST=exposure stops after the pixel checks that used to
+    // false-fail on a stale FrameReady (`exposure no-op: X → X`).
+    if (scope === "exposure") {
+      await reportFrontendStatus("selftest-pass");
+      return;
     }
 
     // 3) guard-wall: unknown path must reject as typed error

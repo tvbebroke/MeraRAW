@@ -10,6 +10,7 @@ use crate::registry::effective_f32 as eff;
 /// (node name, doc module) in fixed pipeline order (spec 3.2).
 pub const NODES: &[(&str, &str)] = &[
     ("exposure", "exposure"),
+    ("highlights", "highlights"),
     ("white_balance", "white_balance"),
     ("calibration", "calibration"),
     ("noise", "detail"),
@@ -48,6 +49,15 @@ struct MatrixU {
     width: u32,
     height: u32,
     _pad: u32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
+struct HighlightsU {
+    amount: f32,
+    clip: f32,
+    width: u32,
+    height: u32,
 }
 
 #[repr(C)]
@@ -212,6 +222,13 @@ struct LutU {
 
 const IDENTITY: Mat3 = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]];
 
+fn module_enabled(doc: &EditDoc, module: &str) -> bool {
+    doc.get(module, "enabled")
+        .and_then(|v| v.as_f32())
+        .map(|v| v >= 0.5)
+        .unwrap_or(true)
+}
+
 /// Rotate `v` around the gray axis (1,1,1)/√3 by `deg` (Rodrigues).
 fn rotate_gray(v: [f32; 3], deg: f32) -> [f32; 3] {
     let k = 1.0 / 3f32.sqrt();
@@ -305,7 +322,7 @@ pub fn node_configs(
     // exposure
     {
         let stops = eff(doc, "exposure", "stops");
-        if stops == 0.0 {
+        if !module_enabled(doc, "exposure") || stops == 0.0 {
             out.push(NodeConfig::Skip);
         } else {
             let (m0, m1, m2) = rows(&IDENTITY);
@@ -321,6 +338,21 @@ pub fn node_configs(
         }
     }
 
+    // highlights (clipped-channel reconstruct)
+    {
+        let amount = eff(doc, "highlights", "amount") / 100.0;
+        if !module_enabled(doc, "highlights") || amount <= 1e-4 {
+            out.push(NodeConfig::Skip);
+        } else {
+            out.push(run(HighlightsU {
+                amount,
+                clip: eff(doc, "highlights", "clip").max(0.5),
+                width: w,
+                height: h,
+            }));
+        }
+    }
+
     // white_balance (absent = as-shot = identity)
     {
         let temp = doc
@@ -332,7 +364,7 @@ pub fn node_configs(
             .and_then(|v| v.as_f32())
             .unwrap_or(0.0);
         let m = color::wb_matrix_rec2020(temp, tint, as_shot_cct);
-        if color::mat_is_identity(&m, 1e-4) {
+        if !module_enabled(doc, "white_balance") || color::mat_is_identity(&m, 1e-4) {
             out.push(NodeConfig::Skip);
         } else {
             let (m0, m1, m2) = rows(&m);
@@ -360,7 +392,9 @@ pub fn node_configs(
             p("blue_sat"),
             p("shadow_tint"),
         );
-        if [rh, rs, gh, gs, bh, bs, st].iter().all(|v| *v == 0.0) {
+        if !module_enabled(doc, "calibration")
+            || [rh, rs, gh, gs, bh, bs, st].iter().all(|v| *v == 0.0)
+        {
             out.push(NodeConfig::Skip);
         } else {
             let m = calibration_matrix(rh, rs, gh, gs, bh, bs);
@@ -390,7 +424,7 @@ pub fn node_configs(
             .unwrap_or(800) as u32;
         let profile = crate::denoise::NoiseProfile::from_iso(iso_hint);
         let settings = crate::denoise::DenoiseSettings::from_doc(doc, &profile);
-        if !settings.classical_active() {
+        if !module_enabled(doc, "detail") || !settings.classical_active() {
             out.push(NodeConfig::Skip);
         } else {
             // Preview is already downsampled by extract; treat σ as full-res
@@ -442,7 +476,7 @@ pub fn node_configs(
         let gc = p("global_chroma");
         let ps = p("perceptual_sat");
         let active = zones.iter().any(|(_, s, l)| *s != 0.0 || *l != 0.0) || gc != 0.0 || ps != 0.0;
-        if !active {
+        if !module_enabled(doc, "color_grade") || !active {
             out.push(NodeConfig::Skip);
         } else {
             let (k0, k1, k2, ki0, ki1, ki2, m0, m1, m2r, mi0, mi1, mi2) = oklab_rows();
@@ -486,7 +520,7 @@ pub fn node_configs(
             bands[i] = [hue, sat, lum, 0.0];
             active |= hue != 0.0 || sat != 0.0 || lum != 0.0;
         }
-        if !active {
+        if !module_enabled(doc, "hsl") || !active {
             out.push(NodeConfig::Skip);
         } else {
             let (k0, k1, k2, ki0, ki1, ki2, m0, m1, m2r, mi0, mi1, mi2) = oklab_rows();
@@ -537,8 +571,12 @@ pub fn node_configs(
             lights: eff(doc, "tone_curve", "lights"),
             highlights: eff(doc, "tone_curve", "highlights"),
         };
-        if curve::should_run(&rgb, &r_pts, &g_pts, &b_pts, &tp) {
-            let luma = curve::build_lut(&rgb, &tp);
+        let sigmoid = eff(doc, "tone_curve", "sigmoid");
+        if !module_enabled(doc, "tone_curve") {
+            out.push(NodeConfig::Skip);
+        } else if curve::should_run(&rgb, &r_pts, &g_pts, &b_pts, &tp) || sigmoid > 0.0 {
+            let mut luma = curve::build_lut(&rgb, &tp);
+            curve::apply_sigmoid(&mut luma, sigmoid);
             let r_lut = if r_pts.is_empty() {
                 curve::identity_lut()
             } else {
@@ -560,7 +598,7 @@ pub fn node_configs(
             packed.extend(g_lut);
             packed.extend(b_lut);
             let mut flags = 0u32;
-            if !curve::is_identity(&rgb, &tp) {
+            if !curve::is_identity(&rgb, &tp) || sigmoid > 0.0 {
                 flags |= 1;
             }
             if !r_pts.is_empty() {
@@ -636,7 +674,7 @@ pub fn node_configs(
     // sharpen (detail slot 8)
     {
         let amount = eff(doc, "detail", "sharpen_amount");
-        if amount == 0.0 {
+        if !module_enabled(doc, "detail") || amount == 0.0 {
             out.push(NodeConfig::Skip);
         } else {
             let radius = eff(doc, "detail", "sharpen_radius");
@@ -664,7 +702,7 @@ pub fn node_configs(
             .unwrap_or(0) as u32;
         let grain = eff(doc, "effects", "grain_amount");
         let vignette = eff(doc, "effects", "vignette_amount");
-        if clarity == 0.0 && grain == 0.0 && vignette == 0.0 {
+        if !module_enabled(doc, "effects") || (clarity == 0.0 && grain == 0.0 && vignette == 0.0) {
             out.push(NodeConfig::Skip);
         } else {
             out.push(run(EffectsU {
@@ -753,10 +791,19 @@ mod tests {
         let mut doc = EditDoc::new("/x.ARW");
         doc.set("detail", "sharpen_amount", ParamValue::F32(50.0));
         let configs = node_configs(&doc, 5200.0, 10, 10, None);
-        // sharpen node (now idx 8 after inserting lut) runs; noise (idx 3) skipped
-        assert!(matches!(configs[8], NodeConfig::Run { .. }));
-        assert!(matches!(configs[3], NodeConfig::Skip));
-        // lut node (idx 7) is skipped when no cube is loaded
-        assert!(matches!(configs[7], NodeConfig::Skip));
+        // sharpen node (idx 9 after highlights+lut); noise (idx 4) skipped
+        assert!(matches!(configs[9], NodeConfig::Run { .. }));
+        assert!(matches!(configs[4], NodeConfig::Skip));
+        // lut node (idx 8) is skipped when no cube is loaded
+        assert!(matches!(configs[8], NodeConfig::Skip));
+    }
+
+    #[test]
+    fn disabled_module_skips_even_when_params_are_set() {
+        let mut doc = EditDoc::new("/x.ARW");
+        doc.set("exposure", "stops", ParamValue::F32(1.0));
+        doc.set("exposure", "enabled", ParamValue::F32(0.0));
+        let configs = node_configs(&doc, 5200.0, 10, 10, None);
+        assert!(matches!(configs[0], NodeConfig::Skip));
     }
 }

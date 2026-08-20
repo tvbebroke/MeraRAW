@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-set-proof-target"
+description = "Enables the set_proof_target command without any pre-configured scope."
+commands.allow = ["set_proof_target"]
+
+[[permission]]
+identifier = "deny-set-proof-target"
+description = "Denies the set_proof_target command without any pre-configured scope."
+commands.deny = ["set_proof_target"]

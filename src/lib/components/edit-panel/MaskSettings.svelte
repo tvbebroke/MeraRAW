@@ -11,7 +11,7 @@
     $selectedMask ? (masks.find((m) => m.id === $selectedMask) ?? null) : null,
   );
 
-  type MaskKind = "brush" | "linear" | "radial" | "subject" | "sky" | "background";
+  type MaskKind = "brush" | "linear" | "radial" | "subject" | "sky" | "background" | "parametric";
 
   async function addMask(kind: MaskKind) {
     const source =
@@ -21,6 +21,17 @@
           ? { type: "linear", x0: 0.5, y0: 0.2, x1: 0.5, y1: 0.8 }
           : kind === "radial"
             ? { type: "radial", cx: 0.5, cy: 0.5, rx: 0.3, ry: 0.3 }
+            : kind === "parametric"
+              ? {
+                  type: "parametric",
+                  luma_lo: 0,
+                  luma_hi: 1,
+                  chroma_lo: 0,
+                  chroma_hi: 1,
+                  hue_lo: 0,
+                  hue_hi: 0,
+                  softness: 0.05,
+                }
             : kind === "sky"
               ? { type: "segmented", model: "sky_v1", hint: null }
               : { type: "segmented", model: "subject_v1", hint: null };
@@ -59,7 +70,7 @@
   }
 
   async function refine(
-    partial: { opacity?: number; feather?: number; invert?: boolean },
+    partial: { opacity?: number; feather?: number; invert?: boolean; blend?: string },
     live = false,
   ) {
     if (!$selectedMask) return;
@@ -68,6 +79,21 @@
     } catch {
       /* ignore */
     }
+  }
+
+  async function setParametric(key: string, value: number, live = false) {
+    if (!active || (active.kind !== "parametric" && active.source?.type !== "parametric")) return;
+    const source = { ...active.source, type: "parametric", [key]: value };
+    try {
+      reconcile(await applyOp({ op: "set_mask_source", id: active.id, source }, live));
+    } catch {
+      /* ignore */
+    }
+  }
+
+  function num(source: Record<string, unknown>, key: string, fallback: number) {
+    const v = source[key];
+    return typeof v === "number" ? v : fallback;
   }
 </script>
 
@@ -80,6 +106,7 @@
     <button type="button" class="rail-btn" onclick={() => void addMask("subject")}>Subject</button>
     <button type="button" class="rail-btn" onclick={() => void addMask("sky")}>Sky</button>
     <button type="button" class="rail-btn" onclick={() => void addMask("background")}>Background</button>
+    <button type="button" class="rail-btn" onclick={() => void addMask("parametric")}>Parametric</button>
   </div>
 
   <ParamRow
@@ -123,6 +150,90 @@
         onchange={(v) => void refine({ invert: v })}
       />
     </div>
+    <p class="group-label">Blend</p>
+    <div class="grid2">
+      {#each ["normal", "multiply", "screen"] as mode (mode)}
+        <button
+          type="button"
+          class="rail-btn"
+          class:on={(active.blend ?? "normal") === mode}
+          onclick={() => void refine({ blend: mode })}
+        >{mode}</button>
+      {/each}
+    </div>
+    {#if active.kind === "parametric" || active.source?.type === "parametric"}
+      <p class="group-label">Parametric range</p>
+      <ParamRow
+        label="Luma lo"
+        min={0}
+        max={1}
+        step={0.01}
+        value={num(active.source, "luma_lo", 0)}
+        resetValue={0}
+        oninput={(v) => void setParametric("luma_lo", v, true)}
+        onchange={(v) => void setParametric("luma_lo", v, false)}
+      />
+      <ParamRow
+        label="Luma hi"
+        min={0}
+        max={1}
+        step={0.01}
+        value={num(active.source, "luma_hi", 1)}
+        resetValue={1}
+        oninput={(v) => void setParametric("luma_hi", v, true)}
+        onchange={(v) => void setParametric("luma_hi", v, false)}
+      />
+      <ParamRow
+        label="Chroma lo"
+        min={0}
+        max={1}
+        step={0.01}
+        value={num(active.source, "chroma_lo", 0)}
+        resetValue={0}
+        oninput={(v) => void setParametric("chroma_lo", v, true)}
+        onchange={(v) => void setParametric("chroma_lo", v, false)}
+      />
+      <ParamRow
+        label="Chroma hi"
+        min={0}
+        max={1}
+        step={0.01}
+        value={num(active.source, "chroma_hi", 1)}
+        resetValue={1}
+        oninput={(v) => void setParametric("chroma_hi", v, true)}
+        onchange={(v) => void setParametric("chroma_hi", v, false)}
+      />
+      <ParamRow
+        label="Hue lo"
+        min={0}
+        max={360}
+        step={1}
+        value={num(active.source, "hue_lo", 0)}
+        resetValue={0}
+        oninput={(v) => void setParametric("hue_lo", v, true)}
+        onchange={(v) => void setParametric("hue_lo", v, false)}
+      />
+      <ParamRow
+        label="Hue hi"
+        min={0}
+        max={360}
+        step={1}
+        value={num(active.source, "hue_hi", 0)}
+        resetValue={0}
+        oninput={(v) => void setParametric("hue_hi", v, true)}
+        onchange={(v) => void setParametric("hue_hi", v, false)}
+      />
+      <ParamRow
+        label="Softness"
+        min={0}
+        max={0.3}
+        step={0.005}
+        value={num(active.source, "softness", 0.05)}
+        resetValue={0.05}
+        oninput={(v) => void setParametric("softness", v, true)}
+        onchange={(v) => void setParametric("softness", v, false)}
+      />
+    {/if}
   {/if}
 
   <p class="group-label">Active masks</p>
@@ -166,6 +277,10 @@
     cursor: pointer;
     text-align: left;
     flex: 1;
+  }
+  .rail-btn.on {
+    border-color: var(--color-accent);
+    color: var(--color-fg);
   }
   .del {
     border: 0;

@@ -23,6 +23,7 @@
     ></button>
   {/each}
 </div>
+<ParamRow path="calibration.enabled" label="Calibration on" />
 <ParamRow path={active.hue} label="Hue" />
 <ParamRow path={active.sat} label="Sat" />
 <ParamRow path="calibration.shadow_tint" label="Shadow Tint" />

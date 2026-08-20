@@ -10,8 +10,14 @@ struct PresentUniforms {
   look: u32,    // 0 = Neutral, 1 = Camera (punchy)
   clip_hi: u32, // 1 = highlight blinkies on
   clip_lo: u32, // 1 = shadow blinkies on
-  _p0: u32,
-  _p1: u32,
+  _p0: u32,     // millis for blink pulse
+  _p1: u32,     // bits 0-3 proof space (0 = off), bit 4 = gamut check
+  m0: vec4<f32>,
+  m1: vec4<f32>,
+  m2: vec4<f32>,
+  n0: vec4<f32>,
+  n1: vec4<f32>,
+  n2: vec4<f32>,
 };
 
 @group(0) @binding(0) var src: texture_2d<f32>;
@@ -104,8 +110,23 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
   let p = textureLoad(src, vec2<i32>(gid.xy), 0);
   var encoded = vec3<f32>(0.0863, 0.0863, 0.0941); // app bg
   if (p.a > 0.0) {
-    let c = REC2020_TO_SRGB * max(p.rgb, vec3<f32>(0.0));
-    if (u.look == 2u) {
+    var c: vec3<f32>;
+    var paint_gamut = false;
+    let space = u._p1 & 7u;
+    if (space == 0u) {
+      c = REC2020_TO_SRGB * max(p.rgb, vec3<f32>(0.0));
+    } else {
+      let M = mat3x3<f32>(u.m0.xyz, u.m1.xyz, u.m2.xyz);
+      let N = mat3x3<f32>(u.n0.xyz, u.n1.xyz, u.n2.xyz);
+      let t = M * p.rgb;
+      if ((u._p1 & 16u) != 0u && (t.x < 0.0 || t.y < 0.0 || t.z < 0.0)) {
+        paint_gamut = true;
+      }
+      c = N * max(t, vec3<f32>(0.0));
+    }
+    if (paint_gamut) {
+      encoded = vec3<f32>(1.0, 0.0, 1.0);
+    } else if (u.look == 2u) {
       // AgX already outputs display-encoded sRGB — no second OETF.
       encoded = agx(max(c, vec3<f32>(0.0)));
     } else if (u.look == 3u || u.look == 4u) {
@@ -122,17 +143,19 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
     }
     // Clipping blinkies on display-encoded output (matches histogram clip %).
     // Pulse via _p0 = millis so warnings flash while frames keep updating.
-    let pulse = 0.55 + 0.45 * abs(sin(f32(u._p0) * 0.012566)); // ~2 Hz
-    if (u.clip_hi != 0u) {
-      let hi = encoded.r >= 0.995 || encoded.g >= 0.995 || encoded.b >= 0.995;
-      if (hi) {
-        encoded = mix(encoded, vec3<f32>(1.0, 0.05, 0.05), pulse);
+    if (!paint_gamut) {
+      let pulse = 0.55 + 0.45 * abs(sin(f32(u._p0) * 0.012566)); // ~2 Hz
+      if (u.clip_hi != 0u) {
+        let hi = encoded.r >= 0.995 || encoded.g >= 0.995 || encoded.b >= 0.995;
+        if (hi) {
+          encoded = mix(encoded, vec3<f32>(1.0, 0.05, 0.05), pulse);
+        }
       }
-    }
-    if (u.clip_lo != 0u) {
-      let lo = encoded.r <= 0.004 && encoded.g <= 0.004 && encoded.b <= 0.004;
-      if (lo) {
-        encoded = mix(encoded, vec3<f32>(0.15, 0.45, 1.0), pulse);
+      if (u.clip_lo != 0u) {
+        let lo = encoded.r <= 0.004 && encoded.g <= 0.004 && encoded.b <= 0.004;
+        if (lo) {
+          encoded = mix(encoded, vec3<f32>(0.15, 0.45, 1.0), pulse);
+        }
       }
     }
   }

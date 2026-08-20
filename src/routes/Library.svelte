@@ -2,24 +2,32 @@
   import GlassPanel from "../lib/components/primitives/GlassPanel.svelte";
   import FileBrowser from "../lib/components/file-browser/FileBrowser.svelte";
   import PhotoDetailsPanel from "../lib/components/library/PhotoDetailsPanel.svelte";
+  import CollectionFilters from "../lib/components/library/CollectionFilters.svelte";
   import ContextMenu from "../lib/components/primitives/ContextMenu.svelte";
   import type { ContextMenuItem } from "../lib/components/primitives/ContextMenu.svelte";
   import { leftRailCollapsed, photoDetailsCollapsed } from "../stores/editor";
   import { isExportOpen } from "../stores/ui";
   import {
     activePhoto,
+    applyLibraryFilters,
+    clearLibraryFilters,
     folder,
+    libraryFilters,
+    libraryFiltersActive,
     libraryItems,
     openPhoto as browseOpenPhoto,
     patchPhotoMeta,
     photos,
     thumbUrl,
+    gridKey,
   } from "../stores/browse";
   import type { GridItem } from "../ipc/types";
   import { push, router } from "svelte-spa-router";
   import { fade, scale } from "svelte/transition";
   import { cubicOut } from "svelte/easing";
   import { shortcutLabels } from "../lib/shortcuts";
+  import { copyGradeFrom, pasteGradeOnto, pasteGradeOntoPaths } from "../lib/grade";
+  import { virtualCopy } from "../ipc/commands";
   import { adoptWorkspaceFromRoute, editorRoute, setWorkspace, workspace } from "../stores/workspace";
   import { isVideoPath } from "../lib/media";
 
@@ -110,11 +118,27 @@
     else if (e.key === "ArrowRight") rightRailWidth = Math.max(200, Math.min(maxRightRailWidth, rightRailWidth - 10));
   }
 
-  // Sort / filter state
+  // Sort is client-side (name asc/desc isn't a catalog sort). Filters go to get_grid.
   type SortMode = "date-desc" | "date-asc" | "name-asc" | "name-desc" | "rating";
   let sortMode = $state<SortMode>("date-desc");
-  let searchQuery = $state("");
+  let searchQuery = $state($libraryFilters.text);
   let showSortMenu = $state(false);
+  let searchTimer: ReturnType<typeof setTimeout> | undefined;
+
+  $effect(() => {
+    const t = $libraryFilters.text;
+    searchQuery = t;
+    if (t === "") window.clearTimeout(searchTimer);
+  });
+
+  function onSearchInput(e: Event) {
+    const value = (e.currentTarget as HTMLInputElement).value;
+    searchQuery = value;
+    window.clearTimeout(searchTimer);
+    searchTimer = window.setTimeout(() => {
+      void applyLibraryFilters({ text: value });
+    }, 250);
+  }
 
   const sortLabels: Record<SortMode, string> = {
     "date-desc": "Newest first",
@@ -124,12 +148,14 @@
     "rating":    "Rating",
   };
 
-  let selectedPath = $state<string | null>(null);
+  let selectedKey = $state<string | null>(null);
+  let selectedKeys = $state<string[]>([]);
+  let selectAnchor = $state<string | null>(null);
+
+  const selectedSet = $derived(new Set(selectedKeys));
 
   const filteredPhotos = $derived.by(() => {
-    let items = $libraryItems.filter((p) =>
-      p.filename.toLowerCase().includes(searchQuery.toLowerCase()),
-    );
+    let items = [...$libraryItems];
     switch (sortMode) {
       case "date-desc":
         items = [...items].sort((a, b) =>
@@ -154,12 +180,30 @@
     return items;
   });
 
-  function selectPhoto(photo: GridItem) {
-    selectedPath = photo.path;
+  function selectPhoto(photo: GridItem, e?: MouseEvent | KeyboardEvent) {
+    const list = filteredPhotos;
+    const key = gridKey(photo);
+    if (e && "shiftKey" in e && e.shiftKey && selectAnchor) {
+      const a = list.findIndex((p) => gridKey(p) === selectAnchor);
+      const b = list.findIndex((p) => gridKey(p) === key);
+      if (a >= 0 && b >= 0) {
+        const [lo, hi] = a < b ? [a, b] : [b, a];
+        selectedKeys = list.slice(lo, hi + 1).map(gridKey);
+      }
+    } else if (e && "metaKey" in e && (e.metaKey || e.ctrlKey)) {
+      selectedKeys = selectedSet.has(key)
+        ? selectedKeys.filter((k) => k !== key)
+        : [...selectedKeys, key];
+      selectAnchor = key;
+    } else {
+      selectedKeys = [key];
+      selectAnchor = key;
+    }
+    selectedKey = key;
   }
 
   async function openPhoto(photo: GridItem) {
-    selectedPath = photo.path;
+    selectedKey = gridKey(photo);
     await browseOpenPhoto(photo);
     if (typeof document !== "undefined" && (document as any).startViewTransition) {
       (document as any).startViewTransition(() => {
@@ -192,9 +236,15 @@
     }
   }
 
-  const highlightPath = $derived(selectedPath ?? $activePhoto?.path ?? null);
+  const highlightKey = $derived(selectedKey ?? ($activePhoto ? gridKey($activePhoto) : null));
   const selected = $derived(
-    filteredPhotos.find((p) => p.path === highlightPath) ?? null,
+    filteredPhotos.find((p) => gridKey(p) === highlightKey) ?? null,
+  );
+
+  const selectedItems = $derived(
+    selectedKeys
+      .map((k) => filteredPhotos.find((p) => gridKey(p) === k))
+      .filter((p): p is GridItem => !!p),
   );
 
   // Keyboard navigation across the photo grid
@@ -218,8 +268,18 @@
     const list = filteredPhotos;
     if (!list.length) return;
 
+    if (e.key === "Escape") {
+      selectedKeys = highlightKey ? [highlightKey] : [];
+      return;
+    }
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "a") {
+      e.preventDefault();
+      selectedKeys = list.map(gridKey);
+      return;
+    }
+
     if (e.key === "Enter") {
-      const current = list.find((p) => p.path === highlightPath);
+      const current = list.find((p) => gridKey(p) === highlightKey);
       if (current) void openPhoto(current);
       return;
     }
@@ -227,7 +287,7 @@
     if (!["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(e.key)) return;
     e.preventDefault();
 
-    const currentIndex = highlightPath ? list.findIndex((p) => p.path === highlightPath) : -1;
+    const currentIndex = highlightKey ? list.findIndex((p) => gridKey(p) === highlightKey) : -1;
     const cols = getColumnCount();
     let nextIndex = currentIndex;
 
@@ -236,7 +296,7 @@
     else if (e.key === "ArrowUp") nextIndex = Math.max(0, currentIndex - cols);
     else if (e.key === "ArrowDown") nextIndex = Math.min(list.length - 1, currentIndex === -1 ? 0 : currentIndex + cols);
 
-    if (nextIndex !== currentIndex) selectPhoto(list[nextIndex]);
+    if (nextIndex !== currentIndex) selectPhoto(list[nextIndex], e);
   }
 
   // ── Context Menu ─────────────────────────────────────────
@@ -267,6 +327,44 @@
     { type: "separator" },
     {
       type: "item",
+      label: "Copy grade",
+      shortcut: shortcutLabels.copyGrade,
+      onclick: () => {
+        if (ctxPhoto) void copyGradeFrom(ctxPhoto.path);
+      },
+    },
+    {
+      type: "item",
+      label: "Paste grade",
+      shortcut: shortcutLabels.pasteGrade,
+      onclick: () => {
+        if (ctxPhoto) void pasteGradeOnto(ctxPhoto.path);
+      },
+    },
+    {
+      type: "item",
+      label: selectedKeys.length > 1 ? `Paste grade to ${selectedKeys.length} selected` : "Paste grade to selected",
+      disabled: selectedKeys.length < 1,
+      onclick: () => {
+        const paths = [
+          ...new Set(
+            (selectedItems.length ? selectedItems : ctxPhoto ? [ctxPhoto] : []).map((p) => p.path),
+          ),
+        ];
+        void pasteGradeOntoPaths(paths);
+      },
+    },
+    {
+      type: "item",
+      label: "Create virtual copy",
+      onclick: () => {
+        if (!ctxPhoto) return;
+        void virtualCopy(ctxPhoto.path);
+      },
+    },
+    { type: "separator" },
+    {
+      type: "item",
       label: "Copy file path",
       onclick: () => {
         if (ctxPhoto) navigator.clipboard?.writeText(ctxPhoto.path);
@@ -277,7 +375,10 @@
       type: "item",
       label: "Deselect",
       shortcut: shortcutLabels.escape,
-      onclick: () => (selectedPath = null),
+      onclick: () => {
+        selectedKey = null;
+        selectedKeys = [];
+      },
     },
   ]);
 </script>
@@ -288,7 +389,7 @@
   in:fade={{ duration: 200, delay: 100 }}
   out:fade={{ duration: 150 }}
   style="grid-template-columns: auto minmax(0, 1fr) auto;"
-  class="relative grid h-full min-h-0 gap-[11px] px-[11px] pb-[11px]"
+  class="relative grid h-full min-h-0 w-full flex-1 gap-[11px] px-[11px] pb-[11px]"
 >
   <!-- Animated Left Rail Container -->
   <div 
@@ -351,7 +452,7 @@
     {/if}
     <GlassPanel class="flex-1 flex min-h-0 flex-col overflow-hidden">
       <!-- Toolbar -->
-      <div class="flex shrink-0 items-center gap-[8px] px-[18px] pt-[18px] pb-[12px]">
+      <div class="flex shrink-0 flex-wrap items-center gap-[8px] px-[18px] pt-[18px] pb-[12px]">
         <!-- Sort / Filter button -->
         <div class="relative">
           <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -395,14 +496,17 @@
           {/if}
         </div>
 
+        <CollectionFilters />
+
         <div class="flex-1"></div>
 
         <!-- Search bar -->
         <label class="search-wrap">
           <input
             type="search"
-            placeholder="Search"
-            bind:value={searchQuery}
+            placeholder="Search filename, camera, keywords"
+            value={searchQuery}
+            oninput={onSearchInput}
             class="search-input"
           />
           <div class="search-icon-circle">
@@ -438,8 +542,15 @@
           <!-- Empty state: folder open but no matching photos -->
           <div class="flex h-full flex-col items-center justify-center gap-3 text-center">
             <p class="text-[13px] font-medium text-subtle">{isVideo ? "No clips found" : "No photos found"}</p>
-            {#if searchQuery}
-              <p class="empty-state text-[11px] text-subtle">No results for "{searchQuery}"</p>
+            {#if libraryFiltersActive($libraryFilters)}
+              <p class="empty-state text-[11px] text-subtle">No results match these filters</p>
+              <button
+                type="button"
+                class="mt-1 rounded-[8px] border border-border px-3 py-[5px] text-[12px] text-fg"
+                onclick={() => void clearLibraryFilters()}
+              >
+                Clear filters
+              </button>
             {:else if $photos.length > 0}
               <p class="text-[11px] text-subtle">
                 This folder has {isVideo ? "photos" : "clips"}. Switch editors to see them.
@@ -454,13 +565,28 @@
             {/if}
           </div>
         {:else}
+          {#if selectedKeys.length === 2}
+            {@const pair = selectedItems}
+            {#if pair.length === 2}
+              <div class="cull-compare">
+                {#each pair as photo (gridKey(photo))}
+                  <button type="button" class="cull-pane" onclick={() => void openPhoto(photo)}>
+                    {#if photo.hasThumb}
+                      <img src={thumbUrl(photo.id)} alt={photo.filename} />
+                    {/if}
+                    <span>{photo.filename}</span>
+                  </button>
+                {/each}
+              </div>
+            {/if}
+          {/if}
           <!-- Photo Grid -->
           <div class="photo-grid" bind:this={gridEl}>
-            {#each filteredPhotos as photo (photo.path)}
+            {#each filteredPhotos as photo (gridKey(photo))}
               <!-- svelte-ignore a11y_no_static_element_interactions -->
               <button
-                class="photo-card {highlightPath === photo.path ? 'photo-card--active' : ''}"
-                onclick={() => selectPhoto(photo)}
+                class="photo-card {highlightKey === gridKey(photo) ? 'photo-card--active' : ''} {selectedSet.has(gridKey(photo)) && highlightKey !== gridKey(photo) ? 'photo-card--selected' : ''}"
+                onclick={(e) => selectPhoto(photo, e)}
                 ondblclick={() => openPhoto(photo)}
                 oncontextmenu={(e) => handlePhotoContextMenu(e, photo)}
                 title={photo.filename}
@@ -472,7 +598,7 @@
                       alt={photo.filename}
                       loading="lazy"
                       class="photo-thumb"
-                      style={highlightPath === photo.path ? 'view-transition-name: active-image;' : ''}
+                      style={highlightKey === gridKey(photo) ? 'view-transition-name: active-image;' : ''}
                     />
                   {:else}
                     <div class="photo-thumb-placeholder">
@@ -767,6 +893,42 @@
     border-color: var(--color-fg);
     box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.3), 0 2px 8px rgba(0, 0, 0, 0.2);
     background: var(--color-hover);
+  }
+  .photo-card--selected {
+    border-color: var(--color-accent);
+    box-shadow: 0 0 0 1px var(--color-accent);
+  }
+  .cull-compare {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin: 0 0 12px;
+  }
+  .cull-pane {
+    appearance: none;
+    border: 1px solid var(--color-border-strong);
+    border-radius: 10px;
+    overflow: hidden;
+    background: var(--color-sunken);
+    color: var(--color-fg);
+    cursor: pointer;
+    padding: 0;
+    text-align: left;
+  }
+  .cull-pane img {
+    display: block;
+    width: 100%;
+    aspect-ratio: 3 / 2;
+    object-fit: cover;
+  }
+  .cull-pane span {
+    display: block;
+    padding: 6px 10px;
+    font-size: 11px;
+    color: var(--color-secondary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .photo-thumb-wrap {

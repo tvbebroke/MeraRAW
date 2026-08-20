@@ -190,7 +190,7 @@ pub fn land_from_tags(
     override_t: Option<Transfer>,
     override_p: Option<Primaries>,
 ) -> VideoLand {
-    let transfer = override_t.unwrap_or_else(|| match probe.color_transfer.as_deref() {
+    let transfer = override_t.unwrap_or(match probe.color_transfer.as_deref() {
         Some("smpte2084" | "smpte2084-1") => Transfer::Pq,
         Some("arib-std-b67" | "hlg") => Transfer::Hlg,
         Some("bt709" | "smpte170m" | "bt470bg") => Transfer::Rec709,
@@ -200,7 +200,7 @@ pub fn land_from_tags(
         Some("smpte428") => Transfer::Linear,
         _ => Transfer::Srgb,
     });
-    let primaries = override_p.unwrap_or_else(|| match probe.color_primaries.as_deref() {
+    let primaries = override_p.unwrap_or(match probe.color_primaries.as_deref() {
         Some("bt2020") => Primaries::Rec2020,
         Some("smpte432" | "displayp3") => Primaries::DisplayP3,
         Some("bt709" | "smpte170m") => Primaries::Rec709,
@@ -440,8 +440,8 @@ impl Decoder for VideoDecoder {
     ) -> Result<Option<(Vec<u8>, u32, u32)>, CoreError> {
         let land = VideoLand::default();
         let buf = decode_frame(path, 0, land)?;
-        let mut rgba = vec![0u8; (buf.width * buf.height * 4) as usize];
-        for i in 0..(buf.width * buf.height) as usize {
+        let mut rgba = vec![0u8; buf.width * buf.height * 4];
+        for i in 0..(buf.width * buf.height) {
             let enc = idt::encode(
                 Transfer::Srgb,
                 [

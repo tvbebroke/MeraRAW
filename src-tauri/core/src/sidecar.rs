@@ -26,8 +26,93 @@ fn read_to_string_capped(path: &Path, max_bytes: u64) -> Result<String, CoreErro
     std::fs::read_to_string(path).map_err(|e| CoreError::Io(e.to_string()))
 }
 
-/// Write the edit sidecar next to `source` (authoritative path — never trust
-/// `doc.source_ref.path` for filesystem writes).
+pub const GRADE_MODULES: &[&str] = &[
+    "exposure",
+    "white_balance",
+    "color_grade",
+    "hsl",
+    "tone_curve",
+    "lut",
+    "effects",
+    "input",
+    "highlights",
+];
+
+/// Copy look modules onto `dest` without touching crop / masks / retouch / calibration / detail.
+pub fn merge_grade(
+    dest: &mut EditDoc,
+    src: &crate::doc::ModuleParams,
+    lut_file: Option<String>,
+) {
+    for name in GRADE_MODULES {
+        dest.modules.remove(*name);
+        if let Some(m) = src.get(*name) {
+            dest.modules.insert((*name).to_string(), m.clone());
+        }
+    }
+    dest.meta.lut_file = crate::path_safety::sanitize_lut_path(lut_file.filter(|s| !s.is_empty()));
+    dest.touch();
+}
+
+pub fn apply_grade_to_path(
+    path: &Path,
+    src: &crate::doc::ModuleParams,
+    lut_file: Option<String>,
+) -> Result<(), CoreError> {
+    let mut doc = load_sidecar(path)?.unwrap_or_else(|| EditDoc::new(&path.to_string_lossy()));
+    merge_grade(&mut doc, src, lut_file);
+    write_sidecar(path, &doc)?;
+    Ok(())
+}
+
+/// Clone the primary doc into a new virtual copy and persist the sidecar.
+/// Does not touch the original image file.
+pub fn add_virtual_copy(path: &Path) -> Result<String, CoreError> {
+    let mut docs = match load_sidecar(path)? {
+        Some(d) => split_copies(d),
+        None => vec![EditDoc::new(&path.to_string_lossy())],
+    };
+    if docs.is_empty() {
+        docs.push(EditDoc::new(&path.to_string_lossy()));
+    }
+    let mut copy = docs[0].clone();
+    copy.copies.clear();
+    copy.doc_id = format!("vc-{}", docs.len());
+    let id = copy.doc_id.clone();
+    docs.push(copy);
+    write_sidecar(path, &bundle_copies(&docs))?;
+    Ok(id)
+}
+
+/// Primary + virtual copies in one sidecar (`copies` on the primary).
+pub fn split_copies(mut doc: EditDoc) -> Vec<EditDoc> {
+    let extra = std::mem::take(&mut doc.copies);
+    let mut docs = vec![doc];
+    for v in extra {
+        if let Ok(mut c) = EditDoc::from_json(v) {
+            c.copies.clear();
+            docs.push(c);
+        }
+    }
+    docs
+}
+
+pub fn bundle_copies(docs: &[EditDoc]) -> EditDoc {
+    let mut primary = docs
+        .first()
+        .cloned()
+        .unwrap_or_else(|| EditDoc::new(""));
+    primary.copies = docs
+        .iter()
+        .skip(1)
+        .map(|d| {
+            let mut c = d.clone();
+            c.copies.clear();
+            c.to_json()
+        })
+        .collect();
+    primary
+}
 pub fn write_sidecar(source: &Path, doc: &EditDoc) -> Result<PathBuf, CoreError> {
     let path = sidecar_path(source);
     let json =
@@ -228,6 +313,90 @@ mod tests {
         let loaded = load_edits(&src).unwrap().expect("edits");
         assert_eq!(loaded.get("exposure", "stops"), Some(&ParamValue::F32(0.5)));
 
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn merge_grade_leaves_crop_masks_and_detail() {
+        let mut dest = EditDoc::new("/dest.ARW");
+        dest.set("crop", "left", ParamValue::F32(0.12));
+        dest.set("detail", "sharpen_amount", ParamValue::F32(40.0));
+        dest.set("exposure", "stops", ParamValue::F32(-1.0));
+        dest.masks.push(crate::doc::Mask {
+            id: "keep".into(),
+            kind: "radial".into(),
+            opacity: 80.0,
+            invert: false,
+            feather: 10.0,
+            source: serde_json::json!({"type": "radial"}),
+            blend: "normal".into(),
+            modules: Default::default(),
+        });
+        let mut src = crate::doc::ModuleParams::new();
+        src.entry("exposure".into())
+            .or_default()
+            .insert("stops".into(), ParamValue::F32(1.25));
+        merge_grade(&mut dest, &src, None);
+        assert_eq!(dest.get("crop", "left"), Some(&ParamValue::F32(0.12)));
+        assert_eq!(
+            dest.get("detail", "sharpen_amount"),
+            Some(&ParamValue::F32(40.0))
+        );
+        assert_eq!(dest.masks.len(), 1);
+        assert_eq!(dest.get("exposure", "stops"), Some(&ParamValue::F32(1.25)));
+    }
+
+    #[test]
+    fn merge_grade_drops_unsafe_lut_path() {
+        let mut dest = EditDoc::new("/dest.ARW");
+        dest.meta.lut_file = Some("/tmp/ok.cube".into());
+        merge_grade(&mut dest, &crate::doc::ModuleParams::new(), Some("/etc/passwd".into()));
+        assert!(dest.meta.lut_file.is_none());
+    }
+
+    #[test]
+    fn virtual_copies_round_trip_in_sidecar() {
+        let mut primary = EditDoc::new("/a.ARW");
+        primary.set("exposure", "stops", ParamValue::F32(0.2));
+        let mut copy = EditDoc::new("/a.ARW");
+        copy.doc_id = "vc-1".into();
+        copy.set("exposure", "stops", ParamValue::F32(1.5));
+        let bundled = bundle_copies(&[primary, copy]);
+        assert_eq!(bundled.copies.len(), 1);
+        let split = split_copies(bundled);
+        assert_eq!(split.len(), 2);
+        assert_eq!(split[1].doc_id, "vc-1");
+        assert_eq!(
+            split[1].get("exposure", "stops"),
+            Some(&ParamValue::F32(1.5))
+        );
+        assert!(split[0].copies.is_empty());
+    }
+
+    #[test]
+    fn add_virtual_copy_persists_without_touching_source() {
+        let dir = std::env::temp_dir().join(format!(
+            "meratech-vc-add-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::remove_dir_all(&dir).ok();
+        std::fs::create_dir_all(&dir).unwrap();
+        let img = dir.join("IMG.ARW");
+        std::fs::write(&img, b"raw").unwrap();
+        let mut primary = EditDoc::new(img.to_str().unwrap());
+        primary.set("exposure", "stops", ParamValue::F32(0.4));
+        write_sidecar(&img, &primary).unwrap();
+        let id = add_virtual_copy(&img).unwrap();
+        assert_eq!(id, "vc-1");
+        assert_eq!(std::fs::read(&img).unwrap(), b"raw");
+        let loaded = load_sidecar(&img).unwrap().unwrap();
+        let split = split_copies(loaded);
+        assert_eq!(split.len(), 2);
+        assert_eq!(split[1].doc_id, "vc-1");
         std::fs::remove_dir_all(&dir).ok();
     }
 }

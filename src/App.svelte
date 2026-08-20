@@ -87,8 +87,10 @@
   oncontextmenu={(e) => e.preventDefault()}
 >
   <TitleBar />
-  <main class="min-h-0 flex-1">
-    <Router {routes} />
+  <main class="relative min-h-0 min-w-0 flex-1 overflow-hidden">
+    <div class="route-stage">
+      <Router {routes} />
+    </div>
   </main>
 
   <LoginGate />

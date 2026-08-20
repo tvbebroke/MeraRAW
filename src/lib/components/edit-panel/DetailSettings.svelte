@@ -85,6 +85,7 @@
 </script>
 
 <CollapsibleSection id="detail" title="Detail">
+  <ParamRow path="detail.enabled" label="Detail on" />
   <p class="group-label">Sharpening</p>
   <ParamRow path="detail.sharpen_amount" label="Amount" />
   <ParamRow path="detail.sharpen_radius" label="Radius" />

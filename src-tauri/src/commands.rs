@@ -40,15 +40,6 @@ pub struct FileMeta {
     pub ext: Option<String>,
 }
 
-#[derive(serde::Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct DirEntry {
-    pub name: String,
-    pub path: String,
-    pub is_dir: bool,
-    pub size: u64,
-}
-
 #[tauri::command]
 pub async fn app_info(engine: State<'_, EngineHandle>) -> Result<AppInfo, AppError> {
     let info = engine.info().await?;
@@ -184,94 +175,23 @@ pub async fn read_file_meta(path: String) -> Result<FileMeta, AppError> {
     }
 }
 
-#[derive(serde::Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct BrowseRoot {
-    pub name: String,
-    pub path: String,
-}
-
 #[tauri::command]
-pub async fn browse_roots() -> Result<Vec<BrowseRoot>, AppError> {
-    let home = std::env::var("HOME").unwrap_or_else(|_| "/Users".into());
-    let mut roots = vec![
-        BrowseRoot {
-            name: "Desktop".into(),
-            path: format!("{home}/Desktop"),
-        },
-        BrowseRoot {
-            name: "Documents".into(),
-            path: format!("{home}/Documents"),
-        },
-        BrowseRoot {
-            name: "Pictures".into(),
-            path: format!("{home}/Pictures"),
-        },
-        BrowseRoot {
-            name: "Downloads".into(),
-            path: format!("{home}/Downloads"),
-        },
-        BrowseRoot {
-            name: "Home".into(),
-            path: home.clone(),
-        },
-    ];
-    roots.retain(|r| std::path::Path::new(&r.path).exists());
-
-    if let Ok(volumes) = std::fs::read_dir("/Volumes") {
-        for entry in volumes.flatten() {
-            let path = entry.path();
-            if !path.is_dir() {
-                continue;
-            }
-            let name = entry.file_name().to_string_lossy().into_owned();
-            if name.starts_with('.') {
-                continue;
-            }
-            roots.push(BrowseRoot {
-                name,
-                path: path.to_string_lossy().into_owned(),
-            });
-        }
-    }
-    Ok(roots)
-}
-
-#[tauri::command]
-pub async fn list_dir(path: String) -> Result<Vec<DirEntry>, AppError> {
-    let path = crate::paths::validate_existing_path(&path)?;
-    let mut entries = Vec::new();
-    let mut rd = match tokio::fs::read_dir(&path).await {
-        Ok(rd) => rd,
-        Err(e) if crate::paths::is_permission_denied(&e) => {
-            return Err(AppError::Io(crate::paths::permission_denied_message(&path)));
-        }
-        Err(e) => return Err(e.into()),
-    };
-    while let Some(entry) = rd.next_entry().await? {
-        let md = entry.metadata().await?;
-        entries.push(DirEntry {
-            name: entry.file_name().to_string_lossy().into_owned(),
-            path: entry.path().to_string_lossy().into_owned(),
-            is_dir: md.is_dir(),
-            size: md.len(),
-        });
-    }
-    entries
-        .sort_by(|a, b| (b.is_dir, a.name.to_lowercase()).cmp(&(a.is_dir, b.name.to_lowercase())));
-    Ok(entries)
-}
-
-#[tauri::command]
+/// Tauri deserializes invoke args by field name; these camelCase names are the
+/// IPC contract with `src/ipc/commands.ts` and must not be snake_cased.
+#[allow(non_snake_case)]
 pub async fn open_image(
     engine: State<'_, EngineHandle>,
     path: String,
+    docId: Option<String>,
 ) -> Result<meratech_core::raw::ImageMeta, AppError> {
     let path = crate::paths::validate_existing_path(&path)?;
     // Fail fast with a clear macOS TCC / iCloud message — RawSource reports
     // the same failure as a cryptic "Operation not permitted (os error 1)".
     crate::paths::ensure_readable(&path)?;
-    engine.open_image(path).await?.map_err(AppError::from)
+    engine
+        .open_image(path, docId.filter(|s| !s.is_empty()))
+        .await?
+        .map_err(AppError::from)
 }
 
 #[tauri::command]
@@ -364,8 +284,17 @@ pub async fn restore_snapshot(
 }
 
 #[tauri::command]
-pub async fn virtual_copy(engine: State<'_, EngineHandle>) -> Result<String, AppError> {
-    engine.virtual_copy().await?.map_err(AppError::from)
+pub async fn virtual_copy(
+    engine: State<'_, EngineHandle>,
+    path: Option<String>,
+) -> Result<String, AppError> {
+    let path = match path {
+        Some(p) if !p.is_empty() => {
+            Some(crate::paths::validate_existing_path(&p)?.to_string_lossy().into_owned())
+        }
+        _ => None,
+    };
+    engine.virtual_copy(path).await?.map_err(AppError::from)
 }
 
 #[tauri::command]
@@ -377,6 +306,48 @@ pub async fn switch_doc(
     docId: String,
 ) -> Result<meratech_core::ops::DocDelta, AppError> {
     engine.switch_doc(docId).await?.map_err(AppError::from)
+}
+
+#[tauri::command]
+pub async fn list_docs(
+    engine: State<'_, EngineHandle>,
+) -> Result<Vec<meratech_core::message::DocRef>, AppError> {
+    Ok(engine.list_docs().await?)
+}
+
+#[tauri::command]
+/// Tauri deserializes invoke args by field name; these camelCase names are the
+/// IPC contract with `src/ipc/commands.ts` and must not be snake_cased.
+#[allow(non_snake_case)]
+pub async fn delete_virtual_copy(
+    engine: State<'_, EngineHandle>,
+    docId: String,
+) -> Result<(), AppError> {
+    engine
+        .delete_virtual_copy(docId)
+        .await?
+        .map_err(AppError::from)
+}
+
+#[tauri::command]
+/// Tauri deserializes invoke args by field name; these camelCase names are the
+/// IPC contract with `src/ipc/commands.ts` and must not be snake_cased.
+#[allow(non_snake_case)]
+pub async fn apply_grade_to_paths(
+    engine: State<'_, EngineHandle>,
+    paths: Vec<String>,
+    modules: meratech_core::doc::ModuleParams,
+    lutFile: Option<String>,
+) -> Result<u32, AppError> {
+    let mut validated = Vec::with_capacity(paths.len());
+    for p in paths {
+        let path = crate::paths::validate_existing_path(&p)?;
+        validated.push(path.to_string_lossy().into_owned());
+    }
+    engine
+        .apply_grade_to_paths(validated, modules, lutFile)
+        .await?
+        .map_err(AppError::from)
 }
 
 fn dig_surface_enabled() -> bool {
@@ -507,9 +478,10 @@ pub async fn save_preset(
     engine: State<'_, EngineHandle>,
     name: String,
     modules: Vec<String>,
+    grade: Option<meratech_core::doc::ModuleParams>,
 ) -> Result<(), AppError> {
     engine
-        .save_preset_to_disk(name, modules)
+        .save_preset_to_disk(name, modules, grade)
         .await?
         .map_err(AppError::from)
 }
@@ -773,6 +745,33 @@ pub async fn list_folders(
 }
 
 #[tauri::command]
+pub async fn discover_media_folders(
+) -> Result<Vec<meratech_core::catalog::DiscoveredFolder>, AppError> {
+    tokio::task::spawn_blocking(meratech_core::catalog::discover_media_folders)
+        .await
+        .map_err(|e| AppError::Internal(format!("discover join: {e}")))
+}
+
+#[tauri::command]
+pub async fn list_folder_children(
+    path: String,
+) -> Result<Vec<meratech_core::catalog::FolderChild>, AppError> {
+    let path = crate::paths::validate_existing_path(&path)?;
+    if !path.is_dir() {
+        return Err(AppError::InvalidOp("not a folder".into()));
+    }
+    tokio::task::spawn_blocking(move || meratech_core::catalog::list_folder_children(&path))
+        .await
+        .map_err(|e| AppError::Internal(format!("list children join: {e}")))?
+        .map_err(AppError::from)
+}
+
+#[tauri::command]
+pub async fn forget_folder(engine: State<'_, EngineHandle>, root: String) -> Result<(), AppError> {
+    engine.forget_folder(root).await?.map_err(AppError::from)
+}
+
+#[tauri::command]
 pub async fn set_asset_meta(
     engine: State<'_, EngineHandle>,
     ids: Vec<i64>,
@@ -827,12 +826,22 @@ pub async fn set_clip_warnings(
     Ok(engine.set_clip_warnings(hi, lo).await?)
 }
 
+/// View-only soft proof. `space`: 0 off, 1 sRGB, 2 Display P3, 3 Adobe RGB, 4 ProPhoto.
 #[tauri::command]
-pub async fn selftest_enabled() -> Result<bool, AppError> {
+pub async fn set_proof_target(
+    engine: State<'_, EngineHandle>,
+    space: u32,
+    gamut: bool,
+) -> Result<(), AppError> {
+    Ok(engine.set_proof_target(space, gamut).await?)
+}
+
+#[tauri::command]
+pub async fn selftest_enabled() -> Result<String, AppError> {
     if !dig_surface_enabled() {
-        return Ok(false);
+        return Ok(String::new());
     }
-    Ok(std::env::var("MERATECH_SELFTEST").is_ok_and(|v| !v.is_empty()))
+    Ok(std::env::var("MERATECH_SELFTEST").unwrap_or_default())
 }
 
 #[tauri::command]

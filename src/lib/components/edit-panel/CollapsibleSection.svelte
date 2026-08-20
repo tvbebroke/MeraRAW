@@ -8,13 +8,14 @@
     type SectionId,
   } from "../../../stores/editor";
   import { registry } from "../../engine/params";
-  import { doc } from "../../../stores/doc";
+  import { doc, docParam, reconcile } from "../../../stores/doc";
   import { imageMeta, selectedMask } from "../../../stores/app";
   import {
     resetSection,
     sectionCanReset,
     sectionIsModified,
   } from "../../editor/sectionState";
+  import { setParam } from "../../../ipc/commands";
 
   let {
     id,
@@ -26,6 +27,19 @@
   const open = $derived(known ? $openSections[id] : true);
   const modified = $derived(
     sectionIsModified(id, $doc, $registry, $imageMeta, $selectedMask),
+  );
+
+  const enabled = $derived.by(() => {
+    if (id === "light") return (docParam($doc, "exposure", "enabled") ?? 1) >= 0.5;
+    if (id === "color") return (docParam($doc, "white_balance", "enabled") ?? 1) >= 0.5;
+    if (id === "curve") return (docParam($doc, "tone_curve", "enabled") ?? 1) >= 0.5;
+    if (id === "detail") return (docParam($doc, "detail", "enabled") ?? 1) >= 0.5;
+    if (id === "grading") return (docParam($doc, "color_grade", "enabled") ?? 1) >= 0.5;
+    if (id === "camera") return (docParam($doc, "calibration", "enabled") ?? 1) >= 0.5;
+    return true;
+  });
+  const hasPower = $derived(
+    id === "light" || id === "color" || id === "curve" || id === "detail" || id === "grading" || id === "camera",
   );
 
   $effect(() => {
@@ -46,11 +60,32 @@
     if (!sectionCanReset(id)) return;
     void resetSection(id, $registry, $imageMeta, $selectedMask);
   }
+
+  function onPower(e: MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    const next = enabled ? 0 : 1;
+    if (id === "light") void setParam("exposure.enabled", next).then(reconcile);
+    else if (id === "color") void setParam("white_balance.enabled", next).then(reconcile);
+    else if (id === "curve") void setParam("tone_curve.enabled", next).then(reconcile);
+    else if (id === "detail") void setParam("detail.enabled", next).then(reconcile);
+    else if (id === "grading") void setParam("color_grade.enabled", next).then(reconcile);
+    else if (id === "camera") void setParam("calibration.enabled", next).then(reconcile);
+  }
 </script>
 
-<section class="acc" class:is-open={open} data-section={id}>
+<section class="acc" class:is-open={open} class:is-off={hasPower && !enabled} data-section={id}>
   <div class="acc-head">
-    {#if modified}
+    {#if hasPower}
+      <button
+        type="button"
+        class="acc-power"
+        class:on={enabled}
+        onclick={onPower}
+        title={enabled ? "Disable module" : "Enable module"}
+        aria-pressed={enabled}
+      ></button>
+    {:else if modified}
       <span class="acc-dot" aria-hidden="true"></span>
     {/if}
     <button
@@ -89,6 +124,7 @@
     flex-shrink: 0;
     border-bottom: 1px solid var(--color-border);
   }
+  .acc.is-off { opacity: 0.45; }
   .acc-head {
     display: flex;
     align-items: center;
@@ -116,6 +152,20 @@
     border-radius: 50%;
     background: var(--color-fg);
     flex: none;
+  }
+  .acc-power {
+    flex: none;
+    width: 10px;
+    height: 10px;
+    padding: 0;
+    border: 1px solid var(--color-subtle);
+    border-radius: 50%;
+    background: transparent;
+    cursor: pointer;
+  }
+  .acc-power.on {
+    background: var(--color-fg);
+    border-color: var(--color-fg);
   }
   .acc-title {
     flex: 1;

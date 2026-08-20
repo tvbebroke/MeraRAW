@@ -9,8 +9,10 @@
     applyOp,
     reportFrontendStatus,
     requestFrame,
+    setClipWarnings,
     setDisplayLook,
     setPreviewBypass,
+    setProofTarget,
     wbFromPoint,
   } from "../../../ipc/commands";
   import { onEngineReady, onFrameReady } from "../../../ipc/events";
@@ -87,6 +89,10 @@
   let splitRatio = $state(0.5);
   let splitDragging = false;
   let compareBusy = $state(false);
+  let blinkies = $state(false);
+  let proofSpace = $state(0);
+  let proofGamut = $state(false);
+  const PROOF_LABELS = ["Proof", "sRGB", "P3", "Adobe", "ProPhoto"];
 
   /** Cursor loupe (magnifier), not full-viewport 1:1. */
   let loupeOn = $state(false);
@@ -265,6 +271,23 @@
     if (!ctx) return null;
     ctx.drawImage(img, 0, 0);
     return c.toDataURL("image/jpeg", 0.9);
+  }
+
+  function toggleBlinkies() {
+    blinkies = !blinkies;
+    void setClipWarnings(blinkies, blinkies).catch(() => {});
+  }
+
+  function cycleProof() {
+    proofSpace = (proofSpace + 1) % 5;
+    if (proofSpace === 0) proofGamut = false;
+    void setProofTarget(proofSpace, proofGamut).catch(() => {});
+  }
+
+  function toggleGamut() {
+    if (proofSpace === 0) proofSpace = 1;
+    proofGamut = !proofGamut;
+    void setProofTarget(proofSpace, proofGamut).catch(() => {});
   }
 
   async function toggleCompare() {
@@ -672,7 +695,7 @@
 
 <GlassPanel
   variant="viewport"
-  class="flex min-h-0 flex-1 flex-col overflow-hidden"
+  class="relative flex h-full min-h-0 min-w-0 w-full flex-1 flex-col overflow-hidden"
   onpointermove={bumpChrome}
   onpointerleave={() => (chromeVisible = false)}
   onpointerenter={bumpChrome}
@@ -694,7 +717,7 @@
     bind:this={wrapEl}
     role="img"
     aria-label="Develop preview"
-    class="viewport-surround relative min-h-0 flex-1 flex items-center justify-center overflow-hidden select-none {$cropActive ? 'cursor-default' : 'cursor-grab active:cursor-grabbing'}"
+    class="viewport-surround relative flex min-h-0 min-w-0 flex-1 items-center justify-center overflow-hidden select-none {$cropActive ? 'cursor-default' : 'cursor-grab active:cursor-grabbing'}"
     onwheel={onWheel}
     onpointerdown={onPointerDown}
     onpointermove={onPointerMove}
@@ -704,7 +727,7 @@
     oncontextmenu={handleContextMenu}
   >
     {#if displaySrc}
-      <div class="relative max-h-full max-w-full flex items-center justify-center">
+      <div class="absolute inset-0 flex items-center justify-center">
         <img
           src={displaySrc}
           alt=""
@@ -786,6 +809,15 @@
       </button>
       <button type="button" onclick={() => void toggleCompare()} disabled={compareBusy} class="tb-btn" class:is-on={compareSplit}>
         Compare
+      </button>
+      <button type="button" onclick={toggleBlinkies} class="tb-btn" class:is-on={blinkies}>
+        Blinkies
+      </button>
+      <button type="button" onclick={cycleProof} class="tb-btn" class:is-on={proofSpace > 0}>
+        {PROOF_LABELS[proofSpace]}
+      </button>
+      <button type="button" onclick={toggleGamut} class="tb-btn" class:is-on={proofGamut} disabled={proofSpace === 0 && !proofGamut}>
+        Gamut
       </button>
       <span class="tb-sep"></span>
       {#each LOOKS as look}

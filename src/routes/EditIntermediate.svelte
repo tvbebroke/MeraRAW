@@ -108,20 +108,17 @@
   in:fade={{ duration: 180, delay: 60 }}
   out:fade={{ duration: 120 }}
   style="
-    grid-template-columns: auto minmax(0, 1fr) {isZen ? 0 : rightRailWidth}px;
+    display: grid;
+    grid-template-columns: {$leftRailCollapsed ? 0 : leftRailWidth}px minmax(0, 1fr) {isZen ? 0 : rightRailWidth}px;
     grid-template-rows: minmax(0, 1fr) auto 22px;
-    transition: {isResizingRight || isResizingBottom ? 'none' : 'grid-template-columns 220ms var(--ease-out)'};
+    transition: {isResizingLeft || isResizingRight || isResizingBottom ? 'none' : 'grid-template-columns 220ms var(--ease-out)'};
   "
-  class="relative grid h-full min-h-0"
+  class="relative h-full w-full min-h-0 min-w-0 overflow-hidden"
 >
   <div
-    style="
-      width: {$leftRailCollapsed ? '0px' : `${leftRailWidth}px`};
-      transition: {isResizingLeft ? 'none' : 'width 220ms var(--ease-out)'};
-    "
-    class="relative min-h-0 border-r border-border/80 {$leftRailCollapsed ? 'overflow-hidden pointer-events-none' : ''}"
+    class="relative row-span-2 flex h-full min-h-0 min-w-0 flex-col overflow-hidden bg-sidebar border-r border-border {$leftRailCollapsed ? 'pointer-events-none' : ''}"
   >
-    <FileBrowser class="h-full" />
+    <FileBrowser class="h-full w-full min-h-0 min-w-0" />
     {#if !$leftRailCollapsed}
       <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
       <div
@@ -133,7 +130,7 @@
     {/if}
   </div>
 
-  <div class="relative min-h-0 flex flex-col bg-canvas">
+  <div class="relative flex min-h-0 min-w-0 flex-col overflow-hidden bg-canvas">
     {#if $leftRailCollapsed}
       <button
         type="button"
@@ -150,7 +147,7 @@
     <MainViewport />
   </div>
 
-  <div class="relative min-h-0 row-span-2 border-l border-border/80 {isZen ? 'overflow-hidden pointer-events-none' : ''}">
+  <div class="relative row-span-2 flex h-full min-h-0 min-w-0 flex-col overflow-hidden bg-sidebar border-l border-border {isZen ? 'pointer-events-none' : ''}">
     {#if !isZen}
       <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
       <div
@@ -160,7 +157,7 @@
         onmousedown={handleRightResizeStart}
       ></div>
     {/if}
-    <div class="h-full min-h-0 {isZen ? 'opacity-0' : 'opacity-100'}">
+    <div class="flex h-full min-h-0 min-w-0 flex-col {isZen ? 'opacity-0' : 'opacity-100'}">
       <EditPanel />
     </div>
   </div>
@@ -170,7 +167,7 @@
       height: {$imageBrowserCollapsed ? '36px' : `${bottomRailHeight}px`};
       transition: {isResizingBottom ? 'none' : 'height 220ms var(--ease-out)'};
     "
-    class="relative z-10 col-span-2 min-w-0 border-t border-border/80"
+    class="relative z-10 min-w-0 overflow-hidden border-t border-border bg-sidebar"
   >
     <ImageBrowser
       onResizeStart={$imageBrowserCollapsed ? undefined : handleBottomResizeStart}

@@ -8,6 +8,7 @@ impl Engine {
     pub(super) fn open_image(
         &mut self,
         path: PathBuf,
+        doc_id: Option<String>,
         reply: oneshot::Sender<Result<ImageMeta, CoreError>>,
     ) {
         self.flush_sidecar_now();
@@ -111,6 +112,27 @@ impl Engine {
         meta.demosaic = demosaic.name().to_string();
         meta.available_demosaic = available;
 
+        let mut docs = sidecar::split_copies(doc);
+        if docs
+            .first()
+            .is_some_and(|d| d.modules.is_empty() && d.masks.is_empty())
+            && (!meta.camera_model.is_empty() || meta.iso.is_some())
+        {
+            if let Some(name) = super::doc_ops::auto_preset_for(&meta.camera_model, meta.iso) {
+                if let Ok(partial) = super::doc_ops::load_preset(&name) {
+                    let _ = crate::ops::apply_op(
+                        &mut docs[0],
+                        &crate::ops::Op::ApplyPreset { preset: partial },
+                    );
+                }
+            }
+        }
+
+        let active_doc = doc_id
+            .as_ref()
+            .and_then(|id| docs.iter().position(|d| &d.doc_id == id))
+            .unwrap_or(0);
+
         self.current = Some(CurrentImage {
             path: path.clone(),
             meta: meta.clone(),
@@ -119,8 +141,8 @@ impl Engine {
             working: None,
             small_cpu: None,
             clean_rgb: None,
-            docs: vec![doc],
-            active_doc: 0,
+            docs,
+            active_doc,
             history: History::default(),
             snapshots: Vec::new(),
             gesture_before: None,
@@ -506,7 +528,9 @@ impl Engine {
             meta: cur.meta.clone(),
         };
         let mut boxed = DecodedPayload::from_decoded(payload);
-        boxed.meta.video.as_mut().map(|v| v.frame = frame);
+        if let Some(v) = boxed.meta.video.as_mut() {
+            v.frame = frame;
+        }
         if let Some(cur) = self.current.as_mut() {
             cur.doc_mut()
                 .unknown

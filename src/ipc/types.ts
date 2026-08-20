@@ -13,6 +13,11 @@ export interface EngineStatus {
   adapter: string | null;
 }
 
+export interface DocRef {
+  docId: string;
+  active: boolean;
+}
+
 export interface FileMeta {
   path: string;
   exists: boolean;
@@ -20,18 +25,6 @@ export interface FileMeta {
   size: number;
   modifiedMs: number | null;
   ext: string | null;
-}
-
-export interface DirEntry {
-  name: string;
-  path: string;
-  isDir: boolean;
-  size: number;
-}
-
-export interface BrowseRoot {
-  name: string;
-  path: string;
 }
 
 export interface ImageMeta {
@@ -113,6 +106,7 @@ export interface MaskMirror {
   opacity: number;
   invert: boolean;
   feather: number;
+  blend?: string;
   source: { type: string } & Record<string, unknown>;
   modules?: Record<string, Record<string, unknown>>;
 }
@@ -155,6 +149,7 @@ export type Op =
       opacity?: number;
       feather?: number;
       invert?: boolean;
+      blend?: string;
     }
   | { op: "set_mask_source"; id: string; source: unknown }
   | { op: "add_retouch_spot"; source: unknown }
@@ -185,13 +180,30 @@ export interface GridItem {
   blurScore: number | null;
   hasThumb: boolean;
   accessible: boolean;
+  /** Sidecar doc id; virtual copies share `path` with the master. */
+  docId?: string;
 }
 
 export interface FolderItem {
   root: string;
   name: string;
   photoCount: number;
+  videoCount: number;
   accessible: boolean;
+}
+
+export interface DiscoveredFolder {
+  path: string;
+  name: string;
+  photoCount: number;
+  videoCount: number;
+}
+
+export interface FolderChild {
+  name: string;
+  path: string;
+  isDir: boolean;
+  kind: "photo" | "video" | null;
 }
 
 export interface GridQuery {

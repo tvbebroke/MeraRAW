@@ -42,6 +42,7 @@ pub struct ParamSpec {
 /// P2 ships exposure + white_balance; P3 fills the rest at their slots.
 pub const MODULE_ORDER: &[&str] = &[
     "exposure",      // 1: linear multiply
+    "highlights",    // 1b: clipped-channel reconstruction
     "white_balance", // 2: chromatic adaptation
     "calibration",   // 3 (P3)
     "detail",        // 4 (P3, noise; sharpen pass at slot 8)
@@ -95,6 +96,34 @@ fn build_registry() -> BTreeMap<&'static str, ParamSpec> {
     let mut specs = vec![
         // ---- slot 1–2 (P2 reference modules) ----
         f32_spec("exposure.stops", -5.0, 5.0, 0.0, "Exposure", 0.01, "Light"),
+        f32_spec("exposure.enabled", 0.0, 1.0, 1.0, "Exposure On", 1.0, "Light"),
+        f32_spec(
+            "highlights.amount",
+            0.0,
+            100.0,
+            0.0,
+            "Highlight Reconstruct",
+            1.0,
+            "Light",
+        ),
+        f32_spec(
+            "highlights.clip",
+            0.5,
+            2.0,
+            1.0,
+            "Highlight Clip",
+            0.01,
+            "Light",
+        ),
+        f32_spec(
+            "highlights.enabled",
+            0.0,
+            1.0,
+            1.0,
+            "Highlights On",
+            1.0,
+            "Light",
+        ),
         f32_spec(
             "white_balance.temp",
             2000.0,
@@ -110,6 +139,15 @@ fn build_registry() -> BTreeMap<&'static str, ParamSpec> {
             150.0,
             0.0,
             "Tint",
+            1.0,
+            "White Balance",
+        ),
+        f32_spec(
+            "white_balance.enabled",
+            0.0,
+            1.0,
+            1.0,
+            "White Balance On",
             1.0,
             "White Balance",
         ),
@@ -174,6 +212,15 @@ fn build_registry() -> BTreeMap<&'static str, ParamSpec> {
             100.0,
             0.0,
             "Shadow Tint",
+            1.0,
+            "Calibration",
+        ),
+        f32_spec(
+            "calibration.enabled",
+            0.0,
+            1.0,
+            1.0,
+            "Calibration On",
             1.0,
             "Calibration",
         ),
@@ -332,6 +379,15 @@ fn build_registry() -> BTreeMap<&'static str, ParamSpec> {
             1.0,
             "Detail",
         ),
+        f32_spec(
+            "detail.enabled",
+            0.0,
+            1.0,
+            1.0,
+            "Detail On",
+            1.0,
+            "Detail",
+        ),
         // ---- slot 5: color_grade (schema §3.5) ----
         // Grading model: 0=Perceptual (Oklab), 1=Classic (RGB offset),
         // 2=Light (LMS von Kries), 3=Color Board (ASC CDL slope/offset/power).
@@ -461,6 +517,15 @@ fn build_registry() -> BTreeMap<&'static str, ParamSpec> {
             0.01,
             "Color Grade",
         ),
+        f32_spec(
+            "color_grade.enabled",
+            0.0,
+            1.0,
+            1.0,
+            "Grade On",
+            1.0,
+            "Color Grade",
+        ),
         // ---- slot 7: tone_curve (schema §3.7) ----
         f32_spec(
             "tone_curve.contrast",
@@ -496,6 +561,24 @@ fn build_registry() -> BTreeMap<&'static str, ParamSpec> {
             100.0,
             0.0,
             "Highlights",
+            1.0,
+            "Tone",
+        ),
+        f32_spec(
+            "tone_curve.sigmoid",
+            0.0,
+            100.0,
+            0.0,
+            "Sigmoid",
+            1.0,
+            "Tone",
+        ),
+        f32_spec(
+            "tone_curve.enabled",
+            0.0,
+            1.0,
+            1.0,
+            "Tone Curve On",
             1.0,
             "Tone",
         ),
@@ -584,6 +667,24 @@ fn build_registry() -> BTreeMap<&'static str, ParamSpec> {
             "Vignette Mid",
             1.0,
             "Effects",
+        ),
+        f32_spec(
+            "effects.enabled",
+            0.0,
+            1.0,
+            1.0,
+            "Effects On",
+            1.0,
+            "Effects",
+        ),
+        f32_spec(
+            "hsl.enabled",
+            0.0,
+            1.0,
+            1.0,
+            "HSL On",
+            1.0,
+            "HSL",
         ),
     ];
     // tone curve point list (Curve type — UI widget later; ops/assistant now)
@@ -780,7 +881,8 @@ mod tests {
     #[test]
     fn module_order_contains_reference_modules() {
         assert_eq!(MODULE_ORDER[0], "exposure");
-        assert_eq!(MODULE_ORDER[1], "white_balance");
+        assert_eq!(MODULE_ORDER[1], "highlights");
+        assert_eq!(MODULE_ORDER[2], "white_balance");
     }
 
     #[test]

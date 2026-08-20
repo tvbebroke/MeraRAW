@@ -26,6 +26,19 @@
     }
   },
   {
+    "path": "calibration.enabled",
+    "ty": "f32",
+    "min": 0.0,
+    "max": 1.0,
+    "default": 1.0,
+    "ui": {
+      "label": "Calibration On",
+      "step": 1.0,
+      "scale": "linear",
+      "group": "Calibration"
+    }
+  },
+  {
     "path": "calibration.green_hue",
     "ty": "f32",
     "min": -100.0,
@@ -88,6 +101,19 @@
       "step": 1.0,
       "scale": "linear",
       "group": "Calibration"
+    }
+  },
+  {
+    "path": "color_grade.enabled",
+    "ty": "f32",
+    "min": 0.0,
+    "max": 1.0,
+    "default": 1.0,
+    "ui": {
+      "label": "Grade On",
+      "step": 1.0,
+      "scale": "linear",
+      "group": "Color Grade"
     }
   },
   {
@@ -507,6 +533,19 @@
     }
   },
   {
+    "path": "detail.enabled",
+    "ty": "f32",
+    "min": 0.0,
+    "max": 1.0,
+    "default": 1.0,
+    "ui": {
+      "label": "Detail On",
+      "step": 1.0,
+      "scale": "linear",
+      "group": "Detail"
+    }
+  },
+  {
     "path": "detail.hot_pixels",
     "ty": "f32",
     "min": 0.0,
@@ -689,6 +728,19 @@
     }
   },
   {
+    "path": "effects.enabled",
+    "ty": "f32",
+    "min": 0.0,
+    "max": 1.0,
+    "default": 1.0,
+    "ui": {
+      "label": "Effects On",
+      "step": 1.0,
+      "scale": "linear",
+      "group": "Effects"
+    }
+  },
+  {
     "path": "effects.grain_amount",
     "ty": "f32",
     "min": 0.0,
@@ -741,6 +793,19 @@
     }
   },
   {
+    "path": "exposure.enabled",
+    "ty": "f32",
+    "min": 0.0,
+    "max": 1.0,
+    "default": 1.0,
+    "ui": {
+      "label": "Exposure On",
+      "step": 1.0,
+      "scale": "linear",
+      "group": "Light"
+    }
+  },
+  {
     "path": "exposure.stops",
     "ty": "f32",
     "min": -5.0,
@@ -749,6 +814,45 @@
     "ui": {
       "label": "Exposure",
       "step": 0.01,
+      "scale": "linear",
+      "group": "Light"
+    }
+  },
+  {
+    "path": "highlights.amount",
+    "ty": "f32",
+    "min": 0.0,
+    "max": 100.0,
+    "default": 0.0,
+    "ui": {
+      "label": "Highlight Reconstruct",
+      "step": 1.0,
+      "scale": "linear",
+      "group": "Light"
+    }
+  },
+  {
+    "path": "highlights.clip",
+    "ty": "f32",
+    "min": 0.5,
+    "max": 2.0,
+    "default": 1.0,
+    "ui": {
+      "label": "Highlight Clip",
+      "step": 0.01,
+      "scale": "linear",
+      "group": "Light"
+    }
+  },
+  {
+    "path": "highlights.enabled",
+    "ty": "f32",
+    "min": 0.0,
+    "max": 1.0,
+    "default": 1.0,
+    "ui": {
+      "label": "Highlights On",
+      "step": 1.0,
       "scale": "linear",
       "group": "Light"
     }
@@ -826,6 +930,19 @@
     "default": 0.0,
     "ui": {
       "label": "Blue Sat",
+      "step": 1.0,
+      "scale": "linear",
+      "group": "HSL"
+    }
+  },
+  {
+    "path": "hsl.enabled",
+    "ty": "f32",
+    "min": 0.0,
+    "max": 1.0,
+    "default": 1.0,
+    "ui": {
+      "label": "HSL On",
       "step": 1.0,
       "scale": "linear",
       "group": "HSL"
@@ -1209,6 +1326,19 @@
     }
   },
   {
+    "path": "tone_curve.enabled",
+    "ty": "f32",
+    "min": 0.0,
+    "max": 1.0,
+    "default": 1.0,
+    "ui": {
+      "label": "Tone Curve On",
+      "step": 1.0,
+      "scale": "linear",
+      "group": "Tone"
+    }
+  },
+  {
     "path": "tone_curve.highlights",
     "ty": "f32",
     "min": -100.0,
@@ -1297,6 +1427,32 @@
       "step": 1.0,
       "scale": "linear",
       "group": "Tone"
+    }
+  },
+  {
+    "path": "tone_curve.sigmoid",
+    "ty": "f32",
+    "min": 0.0,
+    "max": 100.0,
+    "default": 0.0,
+    "ui": {
+      "label": "Sigmoid",
+      "step": 1.0,
+      "scale": "linear",
+      "group": "Tone"
+    }
+  },
+  {
+    "path": "white_balance.enabled",
+    "ty": "f32",
+    "min": 0.0,
+    "max": 1.0,
+    "default": 1.0,
+    "ui": {
+      "label": "White Balance On",
+      "step": 1.0,
+      "scale": "linear",
+      "group": "White Balance"
     }
   },
   {

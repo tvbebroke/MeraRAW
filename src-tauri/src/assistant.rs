@@ -282,6 +282,7 @@ async fn execute_tool(
                     opacity: input["opacity"].as_f64().map(|v| v as f32),
                     feather: input["feather"].as_f64().map(|v| v as f32),
                     invert: input["invert"].as_bool(),
+                    blend: input["blend"].as_str().map(|s| s.to_string()),
                 })
                 .await;
             (op_result(r), None)

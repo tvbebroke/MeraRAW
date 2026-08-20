@@ -70,7 +70,16 @@ pub(super) struct PresentUniforms {
     pub clip_lo: u32,
     /// Milliseconds (for blink pulse in present.wgsl).
     pub _p0: u32,
+    /// Soft proof: bits 0–3 = space (0 off), bit 4 = gamut check.
     pub _p1: u32,
+    /// Rec.2020 → proof target (column-major xyz, w unused).
+    pub m0: [f32; 4],
+    pub m1: [f32; 4],
+    pub m2: [f32; 4],
+    /// Proof target → sRGB display (column-major).
+    pub n0: [f32; 4],
+    pub n1: [f32; 4],
+    pub n2: [f32; 4],
 }
 
 #[repr(C)]
@@ -112,8 +121,14 @@ pub(super) struct MaskSampleUniforms {
     pub opacity: f32,
     pub invert: u32,
     pub crop: CropUniform,
-    pub _p0: u32,
-    pub _p1: u32,
+    pub luma_lo: f32,
+    pub luma_hi: f32,
+    pub chroma_lo: f32,
+    pub chroma_hi: f32,
+    pub hue_lo: f32,
+    pub hue_hi: f32,
+    pub softness: f32,
+    pub param_mode: u32,
 }
 
 #[repr(C)]
@@ -121,7 +136,8 @@ pub(super) struct MaskSampleUniforms {
 pub(super) struct BlendUniforms {
     pub width: u32,
     pub height: u32,
-    pub _p0: u32,
+    /// 0 normal, 1 multiply, 2 screen
+    pub mode: u32,
     pub _p1: u32,
 }
 
@@ -352,6 +368,7 @@ pub fn upload_small_mask(gpu: &GpuContext, data: &[f32], w: u32, h: u32) -> wgpu
 #[derive(Clone, Copy, PartialEq)]
 pub(super) enum PipeKind {
     Matrix,
+    Highlights,
     Calibration,
     Noise,
     Grade,
@@ -371,6 +388,7 @@ impl PipeKind {
 
 pub(super) const NODE_PIPES: &[PipeKind] = &[
     PipeKind::Matrix,
+    PipeKind::Highlights,
     PipeKind::Matrix,
     PipeKind::Calibration,
     PipeKind::Noise,
@@ -424,6 +442,7 @@ impl RenderGraph {
         let mut simple_pipes = HashMap::new();
         for (name, src) in [
             ("matrix", include_str!("color_matrix.wgsl")),
+            ("highlights", include_str!("highlights.wgsl")),
             ("calibration", include_str!("calibration.wgsl")),
             ("noise", include_str!("noise.wgsl")),
             ("grade", include_str!("grade.wgsl")),
@@ -575,6 +594,8 @@ impl RenderGraph {
             look: 0,
             clip_hi: false,
             clip_lo: false,
+            proof_space: 0,
+            proof_gamut: false,
             dcp_look,
             dcp_look_uniforms: mk_uniform(
                 std::mem::size_of::<DcpLookUniforms>() as u64,
