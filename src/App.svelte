@@ -81,13 +81,15 @@
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
-  class="relative flex h-full flex-col overflow-hidden bg-bg transition-colors duration-150"
+  class="relative grid h-full grid-rows-[48px_minmax(0,1fr)] overflow-hidden bg-bg transition-colors duration-150"
   class:classic-look={$classicLook}
   class:light-look={$lightMode}
   oncontextmenu={(e) => e.preventDefault()}
 >
-  <TitleBar />
-  <main class="relative min-h-0 min-w-0 flex-1 overflow-hidden">
+  <div class="relative z-30 min-h-0" data-tauri-drag-region>
+    <TitleBar />
+  </div>
+  <main class="relative z-0 min-h-0 min-w-0 overflow-hidden">
     <div class="route-stage">
       <Router {routes} />
     </div>

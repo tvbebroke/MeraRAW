@@ -6,10 +6,14 @@ import { isVideoPath } from "../lib/media";
 
 export type WorkspaceId = "photo" | "video";
 
+/** Video editor is built but not offered yet. Flip this to re-enable /clips and /grade. */
+export const VIDEO_WORKSPACE_ENABLED = false;
+
 const WS_KEY = "meraraw.workspace";
 const CHOSEN_KEY = "meraraw.workspaceChosen";
 
 function readWorkspace(): WorkspaceId {
+  if (!VIDEO_WORKSPACE_ENABLED) return "photo";
   try {
     const v = localStorage.getItem(WS_KEY);
     if (v === "video" || v === "photo") return v;
@@ -73,6 +77,7 @@ function go(mode: WorkspaceId) {
 
 /** User picked a workspace (chooser or title bar). */
 export function setWorkspace(mode: WorkspaceId, opts?: { navigate?: boolean }): void {
+  if (mode === "video" && !VIDEO_WORKSPACE_ENABLED) return;
   workspace.set(mode);
   workspaceChosen.set(true);
   persist(mode, true);
@@ -85,6 +90,12 @@ export function setWorkspace(mode: WorkspaceId, opts?: { navigate?: boolean }): 
 
 /** Route is the source of truth when the user lands on /grade or /library. */
 export function adoptWorkspaceFromRoute(loc: string): void {
+  if (!VIDEO_WORKSPACE_ENABLED && (loc === "/clips" || loc === "/grade")) {
+    workspace.set("photo");
+    persist("photo", workspaceChosen.get());
+    push("/library");
+    return;
+  }
   if (loc === "/clips" || loc === "/grade") {
     if (workspace.get() !== "video") {
       workspace.set("video");
@@ -100,6 +111,7 @@ export function adoptWorkspaceFromRoute(loc: string): void {
 
 /** Opening a file selects the matching product without discarding the other. */
 export function workspaceForOpenPath(path: string, kind?: string | null): WorkspaceId {
+  if (!VIDEO_WORKSPACE_ENABLED) return "photo";
   if (kind === "video" || isVideoPath(path)) return "video";
   return "photo";
 }

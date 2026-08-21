@@ -39,7 +39,7 @@ pub fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
             app,
             "open-video",
             "Open Video…",
-            true,
+            false,
             Some("CmdOrCtrl+Shift+V"),
         )?)
         .item(&MenuItem::with_id(
@@ -121,8 +121,8 @@ pub fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
         .item(&MenuItem::with_id(
             app,
             "video-workspace",
-            "Video Editor",
-            true,
+            "Video Editor (Coming Soon)",
+            false,
             None::<&str>,
         )?)
         .separator()

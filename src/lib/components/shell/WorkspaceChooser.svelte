@@ -26,11 +26,11 @@
             RAW stills, DCP, demosaic, crop, masks, retouch, and export. The stills editor is unchanged.
           </span>
         </button>
-        <button type="button" class="choice" onclick={() => setWorkspace("video")}>
+        <button type="button" class="choice is-soon" disabled title="Video editor coming soon">
           <span class="choice-kicker">Colorist</span>
-          <span class="choice-title">Video</span>
+          <span class="choice-title">Coming soon</span>
           <span class="choice-copy">
-            Grade clips frame-by-frame with Looks, wheels, scopes, and silent H.264 export. No timeline.
+            Video grading is not available in this build.
           </span>
         </button>
       </div>
@@ -98,6 +98,15 @@
   .choice:hover {
     border-color: var(--color-fg);
     background: var(--color-hover);
+  }
+  .choice.is-soon,
+  .choice:disabled {
+    opacity: 0.55;
+    cursor: default;
+  }
+  .choice.is-soon:hover {
+    border-color: var(--color-border-strong);
+    background: var(--color-sunken);
   }
   .choice-kicker {
     font-size: 10px;

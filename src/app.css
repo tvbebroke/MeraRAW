@@ -139,6 +139,7 @@ body,
 .route-stage {
   position: absolute;
   inset: 0;
+  z-index: 0;
   min-height: 0;
   min-width: 0;
   overflow: hidden;
@@ -850,7 +851,6 @@ html:not(.glass-look) *::after {
 .classic-look header {
   background-color: var(--color-bg) !important;
   border-bottom: 1px solid #121212 !important;
-  height: 44px !important;
 }
 
 /* Library Photo Grid & Cards */

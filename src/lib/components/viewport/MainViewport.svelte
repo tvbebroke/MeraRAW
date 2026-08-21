@@ -703,8 +703,7 @@
   {#if mediaMismatch}
     <div class="mismatch">
       {#if $imageMeta?.kind === "video"}
-        <span>This file is a clip.</span>
-        <button type="button" class="tb-btn" onclick={() => setWorkspace("video")}>Open in Video Editor</button>
+        <span>Video grading is coming soon.</span>
       {:else}
         <span>This file is a still.</span>
         <button type="button" class="tb-btn" onclick={() => setWorkspace("photo")}>Open in Photo Editor</button>

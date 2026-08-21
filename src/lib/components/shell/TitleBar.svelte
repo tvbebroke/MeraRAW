@@ -6,7 +6,6 @@
   import settingsIcon from "../../icons/settings.svg";
   import libraryIcon from "../../icons/library.svg";
   import helpIcon from "../../icons/help.svg";
-  import logoIcon from "../../icons/logo.png";
   import { isSettingsOpen, isExportOpen, isShortcutsOpen } from "../../../stores/ui";
   import JobsPill from "./JobsPill.svelte";
   import VersionsButton from "./VersionsButton.svelte";
@@ -79,20 +78,23 @@
   const fileName = $derived(
     $activePhoto?.filename || basename($imageMeta?.path) || basename($lastOpenedPath),
   );
+
+  function beginDrag(e: MouseEvent) {
+    if (e.button !== 0) return;
+    if (!(window as any).__TAURI_INTERNALS__) return;
+    const t = e.target as HTMLElement | null;
+    if (!t) return;
+    if (t.closest("[data-tauri-drag-region='false']")) return;
+    if (t.closest("button, input, a, select, textarea")) return;
+    void getCurrentWindow().startDragging();
+  }
 </script>
 
 <header
   data-tauri-drag-region
-  class="relative flex h-[42px] shrink-0 items-center pr-3 {isFullscreen ? 'pl-4' : 'pl-[76px]'} border-b border-border/80"
+  class="titlebar relative z-20 flex h-full min-h-0 items-center bg-bg pr-3 {isFullscreen ? 'pl-4' : 'pl-[100px]'} border-b border-border/80"
+  onmousedown={beginDrag}
 >
-  <img
-    src={logoIcon}
-    alt=""
-    class="size-[16px] select-none rounded-[3px]"
-    draggable="false"
-    data-tauri-drag-region
-  />
-  <span data-tauri-drag-region class="ml-[8px] text-[13px] font-medium text-fg">MeraRAW</span>
   <div class="ws-switch" data-tauri-drag-region="false" role="tablist" aria-label="Editor">
     <button
       type="button"
@@ -104,25 +106,26 @@
     >Photo</button>
     <button
       type="button"
-      role="tab"
-      class="ws-chip"
-      class:is-on={isVideo}
-      aria-selected={isVideo}
-      onclick={() => setWorkspace("video")}
-    >Video</button>
+      class="ws-chip is-soon"
+      disabled
+      aria-disabled="true"
+      title="Video editor coming soon"
+    >Coming soon</button>
   </div>
   {#if folderName || fileName}
-    <span class="crumb-sep" aria-hidden="true">/</span>
+    <span class="crumb-sep" data-tauri-drag-region aria-hidden="true">/</span>
     {#if folderName}
-      <span class="crumb-muted truncate max-w-[10rem]" title={$folder ?? ""}>{folderName}</span>
+      <span class="crumb-muted truncate max-w-[10rem]" data-tauri-drag-region title={$folder ?? ""}>{folderName}</span>
     {/if}
     {#if fileName}
-      <span class="crumb-sep" aria-hidden="true">/</span>
-      <span class="crumb-file truncate max-w-[16rem]" title={fileName}>{fileName}</span>
+      <span class="crumb-sep" data-tauri-drag-region aria-hidden="true">/</span>
+      <span class="crumb-file truncate max-w-[16rem]" data-tauri-drag-region title={fileName}>{fileName}</span>
     {/if}
   {/if}
 
-  <div class="ml-auto flex items-center gap-[4px]" data-tauri-drag-region="false">
+  <div class="titlebar-grip" data-tauri-drag-region></div>
+
+  <div class="flex items-center gap-[4px]" data-tauri-drag-region="false">
     <JobsPill />
     <VersionsButton />
     <button type="button" class="quiet-btn" onclick={() => void undo().then(reconcile).catch(() => {})} title="Undo ({shortcutLabels.undo})">Undo</button>
@@ -175,6 +178,22 @@
 </header>
 
 <style>
+  .titlebar {
+    -webkit-app-region: drag;
+    app-region: drag;
+  }
+  .titlebar :global(button),
+  .titlebar .ws-switch,
+  .titlebar [data-tauri-drag-region="false"] {
+    -webkit-app-region: no-drag;
+    app-region: no-drag;
+  }
+  .titlebar-grip {
+    flex: 1 1 auto;
+    align-self: stretch;
+    min-width: 48px;
+    min-height: 100%;
+  }
   .crumb-sep {
     margin: 0 7px;
     color: var(--color-subtle);
@@ -192,7 +211,6 @@
   .ws-switch {
     display: flex;
     gap: 2px;
-    margin-left: 12px;
     padding: 2px;
     border-radius: 8px;
     background: var(--color-sunken);
@@ -214,6 +232,12 @@
     background: var(--color-active);
     color: var(--color-fg);
     font-weight: 500;
+  }
+  .ws-chip.is-soon,
+  .ws-chip:disabled {
+    opacity: 0.5;
+    cursor: default;
+    color: var(--color-subtle);
   }
   .quiet-btn {
     height: 26px;

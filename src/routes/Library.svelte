@@ -551,16 +551,16 @@
               >
                 Clear filters
               </button>
-            {:else if $photos.length > 0}
+            {:else if $photos.length > 0 && isVideo}
               <p class="text-[11px] text-subtle">
-                This folder has {isVideo ? "photos" : "clips"}. Switch editors to see them.
+                This folder has photos. Switch editors to see them.
               </p>
               <button
                 type="button"
                 class="mt-1 rounded-[8px] border border-border px-3 py-[5px] text-[12px] text-fg"
-                onclick={() => setWorkspace(isVideo ? "photo" : "video")}
+                onclick={() => setWorkspace("photo")}
               >
-                Open {isVideo ? "Photo" : "Video"} Editor
+                Open Photo Editor
               </button>
             {/if}
           </div>

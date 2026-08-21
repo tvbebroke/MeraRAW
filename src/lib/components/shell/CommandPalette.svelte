@@ -39,7 +39,6 @@
     { id: "library", group: "View", label: "Go to Library", hint: shortcutLabels.library, run: () => push(libraryRoute()) },
     { id: "grade", group: "View", label: "Go to Editor", hint: shortcutLabels.edit, run: () => push(editorRoute()) },
     { id: "ws-photo", group: "View", label: "Switch to Photo Editor", keywords: "stills raw meraraw original", run: () => setWorkspace("photo") },
-    { id: "ws-video", group: "View", label: "Switch to Video Editor", keywords: "grade clip lut colorist", run: () => setWorkspace("video") },
     { id: "export", group: "File", label: "Export", hint: shortcutLabels.export, run: () => isExportOpen.set(true) },
     { id: "settings", group: "File", label: "Settings", hint: shortcutLabels.settings, run: () => isSettingsOpen.set(true) },
     { id: "shortcuts", group: "File", label: "Keyboard Shortcuts", run: () => isShortcutsOpen.set(true) },

@@ -25,7 +25,7 @@
   import { discoverMediaFolders } from "../../../ipc/commands";
   import FolderNode from "./FolderNode.svelte";
 
-  import { setWorkspace, workspace } from "../../../stores/workspace";
+  import { setWorkspace, workspace, VIDEO_WORKSPACE_ENABLED } from "../../../stores/workspace";
 
   let { class: cls = "" }: { class?: string } = $props();
   const isVideo = $derived($workspace === "video");
@@ -287,7 +287,7 @@
         </ul>
       {/if}
 
-      {#if videoFolders.length}
+      {#if VIDEO_WORKSPACE_ENABLED && videoFolders.length}
         <p class="eyebrow px-[10px] pt-[12px] pb-[4px]">Videos</p>
         <ul>
           {#each videoFolders as item (item.root)}

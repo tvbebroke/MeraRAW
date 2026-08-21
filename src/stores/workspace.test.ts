@@ -25,11 +25,10 @@ describe("photo vs video workspaces", () => {
     expect(isVideoRoute("/grade")).toBe(true);
   });
 
-  it("routes stills to photo and clips to video without mixing", () => {
+  it("does not enter the video workspace while it is gated", () => {
     expect(workspaceForOpenPath("/photos/DSC01234.ARW")).toBe("photo");
-    expect(workspaceForOpenPath("scan.jpeg")).toBe("photo");
-    expect(workspaceForOpenPath("/clips/A001.mov")).toBe("video");
-    expect(workspaceForOpenPath("n.mp4", "raw")).toBe("video");
-    expect(workspaceForOpenPath("still.tif", "video")).toBe("video");
+    expect(workspaceForOpenPath("/clips/A001.mov")).toBe("photo");
+    expect(workspaceForOpenPath("n.mp4", "raw")).toBe("photo");
+    expect(workspaceForOpenPath("still.tif", "video")).toBe("photo");
   });
 });
