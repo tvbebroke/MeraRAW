@@ -1,7 +1,7 @@
 //! Engine actor: dedicated thread + current-thread tokio runtime owning all
 //! heavy state (GPU, images, the canonical EditDoc). Single owner. Commands
 //! talk via mpsc + oneshot; decode runs on worker threads posting results
-//! back as internal messages; renders are debounced (op storms coalesce —
+//! back as internal messages; renders are throttled (op storms coalesce —
 //! latest doc wins) and sidecar writes happen on settle.
 
 use crate::doc::EditDoc;
@@ -32,10 +32,15 @@ mod retouch_ops;
 
 use doc_ops::{list_preset_catalog, list_presets, load_preset};
 
-// Small enough to feel immediate on a slider drag, large enough to still
-// coalesce op storms (the timer resets on each op, so a burst renders once).
-const RENDER_DEBOUNCE: Duration = Duration::from_millis(3);
+// Small enough to feel immediate on a slider drag, large enough to coalesce
+// op storms. Once scheduled, the deadline is not pushed back by later ops;
+// otherwise a continuous drag can starve rendering until the pointer stops.
+const RENDER_THROTTLE: Duration = Duration::from_millis(3);
 const SETTLE_DEBOUNCE: Duration = Duration::from_millis(600);
+
+fn next_render_deadline(current: Option<Instant>, now: Instant) -> Instant {
+    current.unwrap_or(now + RENDER_THROTTLE)
+}
 
 #[derive(Debug, thiserror::Error)]
 pub enum EngineError {
@@ -825,7 +830,7 @@ impl Engine {
     }
 
     pub(super) fn schedule_render(&mut self) {
-        self.render_at = Some(Instant::now() + RENDER_DEBOUNCE);
+        self.render_at = Some(next_render_deadline(self.render_at, Instant::now()));
     }
 
     pub(super) fn schedule_settle(&mut self) {
@@ -1455,5 +1460,22 @@ fn render_test_frame(width: u32, height: u32, version: u64) -> Frame {
         height: h,
         rgba,
         version,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn render_deadline_is_not_postponed_by_continuous_input() {
+        let now = Instant::now();
+        let first_deadline = next_render_deadline(None, now);
+
+        assert_eq!(first_deadline, now + RENDER_THROTTLE);
+        assert_eq!(
+            next_render_deadline(Some(first_deadline), now + Duration::from_millis(1)),
+            first_deadline
+        );
     }
 }
