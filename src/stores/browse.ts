@@ -12,7 +12,7 @@ import {
 import { onCatalogChanged, onImportDone } from "../ipc/events";
 import type { FolderItem, GridItem, GridQuery, MetaPatch } from "../ipc/types";
 import { customSchemeUrl } from "../lib/engine/customScheme";
-import { currentFolder, lastOpenedDocId, lastOpenedPath } from "./app";
+import { currentFolder, lastOpenedDocId, lastOpenedPath, openingPreviewUrl } from "./app";
 import { workspace } from "./workspace";
 import { isVideoPath } from "../lib/media";
 
@@ -352,12 +352,31 @@ export async function patchPhotoMeta(
 
 /** Open a catalog photo in the develop engine. */
 export async function openPhoto(item: GridItem): Promise<void> {
-  await openLibraryFile(item.path, item.docId);
+  const fastThumb = item.hasThumb ? thumbUrl(item.id, "t") : null;
+  const catalogPreview = item.hasThumb ? thumbUrl(item.id, "p") : null;
+  openingPreviewUrl.set(fastThumb);
+
+  // The filmstrip thumbnail is normally already in WebKit's cache, so it
+  // appears immediately. Upgrade it to the larger catalog preview in the
+  // background while the RAW decoder starts.
+  if (fastThumb && catalogPreview) {
+    const probe = new Image();
+    probe.onload = () => {
+      if (openingPreviewUrl.get() === fastThumb) openingPreviewUrl.set(catalogPreview);
+    };
+    probe.src = catalogPreview;
+  }
+
+  await openLibraryFile(item.path, item.docId, fastThumb);
 }
 
-export async function openLibraryFile(path: string, docId?: string | null): Promise<void> {
+export async function openLibraryFile(
+  path: string,
+  docId?: string | null,
+  previewUrl?: string | null,
+): Promise<void> {
   const { openPath } = await import("../lib/engine/boot");
-  await openPath(path, docId);
+  await openPath(path, docId, previewUrl);
 }
 
 /** Pin a discovered folder as a permanent sidebar shortcut and index it. */

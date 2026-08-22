@@ -212,7 +212,11 @@ impl Engine {
                     c.doc_dirty = true;
                 }
             } else {
-                sidecar::apply_grade_to_path(std::path::Path::new(path), &modules, lut_file.clone())?;
+                sidecar::apply_grade_to_path(
+                    std::path::Path::new(path),
+                    &modules,
+                    lut_file.clone(),
+                )?;
             }
             if let Ok(cat) = self.catalog_mut() {
                 let _ = cat.mark_has_edits(path, true);

@@ -96,7 +96,15 @@ fn build_registry() -> BTreeMap<&'static str, ParamSpec> {
     let mut specs = vec![
         // ---- slot 1–2 (P2 reference modules) ----
         f32_spec("exposure.stops", -5.0, 5.0, 0.0, "Exposure", 0.01, "Light"),
-        f32_spec("exposure.enabled", 0.0, 1.0, 1.0, "Exposure On", 1.0, "Light"),
+        f32_spec(
+            "exposure.enabled",
+            0.0,
+            1.0,
+            1.0,
+            "Exposure On",
+            1.0,
+            "Light",
+        ),
         f32_spec(
             "highlights.amount",
             0.0,
@@ -379,15 +387,7 @@ fn build_registry() -> BTreeMap<&'static str, ParamSpec> {
             1.0,
             "Detail",
         ),
-        f32_spec(
-            "detail.enabled",
-            0.0,
-            1.0,
-            1.0,
-            "Detail On",
-            1.0,
-            "Detail",
-        ),
+        f32_spec("detail.enabled", 0.0, 1.0, 1.0, "Detail On", 1.0, "Detail"),
         // ---- slot 5: color_grade (schema §3.5) ----
         // Grading model: 0=Perceptual (Oklab), 1=Classic (RGB offset),
         // 2=Light (LMS von Kries), 3=Color Board (ASC CDL slope/offset/power).
@@ -677,15 +677,7 @@ fn build_registry() -> BTreeMap<&'static str, ParamSpec> {
             1.0,
             "Effects",
         ),
-        f32_spec(
-            "hsl.enabled",
-            0.0,
-            1.0,
-            1.0,
-            "HSL On",
-            1.0,
-            "HSL",
-        ),
+        f32_spec("hsl.enabled", 0.0, 1.0, 1.0, "HSL On", 1.0, "HSL"),
     ];
     // tone curve point list (Curve type — UI widget later; ops/assistant now)
     specs.push(ParamSpec {

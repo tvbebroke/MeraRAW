@@ -14,6 +14,8 @@ export const imageMeta = atom<ImageMeta | null>(null);
 export const imageDims = atom<{ w: number; h: number } | null>(null);
 export type DecodeState = "idle" | "preview" | "ready" | "error";
 export const decodeState = atom<DecodeState>("idle");
+/** Cached catalog image shown instantly while the RAW engine opens a photo. */
+export const openingPreviewUrl = atom<string | null>(null);
 
 /** Latest engine frame version (bumped by frame-ready / image-ready). */
 export const frameVersion = atom(0);

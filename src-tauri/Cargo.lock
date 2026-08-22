@@ -743,6 +743,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "demosaic"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1c8e7c3f4e7042d592a58e82428b4f482680715f75dd0f774664973e8a88f72f"
+
+[[package]]
 name = "deranged"
 version = "0.5.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2672,6 +2678,7 @@ version = "0.1.8"
 dependencies = [
  "blake3",
  "bytemuck",
+ "demosaic",
  "half",
  "image",
  "jxl-oxide",

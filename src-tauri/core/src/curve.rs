@@ -106,6 +106,18 @@ fn region_w(t: f32, c: f32, w: f32) -> f32 {
     }
 }
 
+/// Convert the tone shader's compressed LUT coordinate back to a normalized
+/// scene-light coordinate for the parametric tonal regions. The shader looks
+/// up `t = x / (1 + x)`, so using `t` directly would put Highlights around
+/// scene value 7.0 instead of the visible 0.875 region.
+fn scene_region_t(t: f32) -> f32 {
+    if t >= 0.5 {
+        1.0
+    } else {
+        (t / (1.0 - t)).clamp(0.0, 1.0)
+    }
+}
+
 /// Contrast S-curve: blend toward a cosine ease (k>0) or its inverse (k<0).
 fn contrast_curve(v: f32, contrast: f32) -> f32 {
     let k = (contrast / 100.0).clamp(-1.0, 1.0);
@@ -228,14 +240,15 @@ pub fn build_lut(points: &[[f32; 2]], p: &ToneParams) -> Vec<f32> {
     const SCALE: f32 = 0.12 / 100.0;
     for i in 0..LUT_SIZE {
         let t = i as f32 / (LUT_SIZE - 1) as f32;
+        let region_t = scene_region_t(t);
         let mut v = match &base {
             Some(c) => c.eval(t).clamp(0.0, 1.0),
             None => t,
         };
-        v += p.shadows * SCALE * region_w(t, 0.125, 0.25)
-            + p.darks * SCALE * region_w(t, 0.30, 0.40)
-            + p.lights * SCALE * region_w(t, 0.70, 0.40)
-            + p.highlights * SCALE * region_w(t, 0.875, 0.25);
+        v += p.shadows * SCALE * region_w(region_t, 0.125, 0.25)
+            + p.darks * SCALE * region_w(region_t, 0.30, 0.40)
+            + p.lights * SCALE * region_w(region_t, 0.70, 0.40)
+            + p.highlights * SCALE * region_w(region_t, 0.875, 0.25);
         v = contrast_curve(v.clamp(0.0, 1.0), p.contrast);
         lut.push(v.clamp(0.0, 0.9995));
     }
@@ -313,6 +326,32 @@ mod tests {
         let at = |t: f32| lut[(t * (LUT_SIZE - 1) as f32) as usize];
         assert!(at(0.9) > 0.9 + 0.04, "highlights lifted");
         assert!((at(0.2) - 0.2).abs() < 1e-3, "shadows untouched");
+    }
+
+    #[test]
+    fn parametric_highlights_affect_visible_scene_values() {
+        fn apply_scene(lut: &[f32], x: f32) -> f32 {
+            let t = x / (1.0 + x);
+            let pos = t * (LUT_SIZE - 1) as f32;
+            let i = pos.floor() as usize;
+            let j = (i + 1).min(LUT_SIZE - 1);
+            let y = lut[i] + (lut[j] - lut[i]) * (pos - i as f32);
+            y / (1.0 - y).max(5e-4)
+        }
+
+        let lut = build_lut(
+            &[],
+            &ToneParams {
+                highlights: 100.0,
+                ..Default::default()
+            },
+        );
+
+        assert!(
+            apply_scene(&lut, 0.8) > 0.9,
+            "visible highlights should lift"
+        );
+        assert!((apply_scene(&lut, 0.2) - 0.2).abs() < 1e-3);
     }
 
     #[test]

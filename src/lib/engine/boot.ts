@@ -37,6 +37,7 @@ import {
   imageOpen,
   lastOpenedPath,
   lastOpenedDocId,
+  openingPreviewUrl,
   selectedMask,
   statusMessage,
 } from "../../stores/app";
@@ -53,16 +54,27 @@ declare global {
 }
 
 let autoOpened = false;
+let openSequence = 0;
 
-export async function openPath(path: string, docId?: string | null): Promise<void> {
+export async function openPath(
+  path: string,
+  docId?: string | null,
+  previewUrl?: string | null,
+): Promise<void> {
+  const sequence = ++openSequence;
   try {
     const name = path.split(/[/\\]/).pop() || path;
     statusMessage.set(`opening ${name}…`);
     decodeState.set("preview");
+    openingPreviewUrl.set(previewUrl ?? null);
+    imageMeta.set(null);
+    imageDims.set(null);
+    imageOpen.set(true);
     selectedMask.set(null);
     clearDoc();
     lastOpenedDocId.set(docId ?? null);
     const m = await openImage(path, docId);
+    if (sequence !== openSequence) return;
     imageMeta.set(m);
     imageDims.set({ w: m.width, h: m.height });
     imageOpen.set(true);
@@ -75,6 +87,8 @@ export async function openPath(path: string, docId?: string | null): Promise<voi
     }
     push(syncWorkspaceToOpenFile(path, m.kind));
   } catch (e) {
+    if (sequence !== openSequence) return;
+    openingPreviewUrl.set(null);
     decodeState.set("error");
     statusMessage.set(isAppError(e) ? `${e.kind}: ${e.message}` : String(e));
   }

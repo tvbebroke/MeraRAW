@@ -95,9 +95,8 @@ impl Engine {
         }
         let path = c.path.clone();
         let bundled = sidecar::bundle_copies(&c.docs);
-        let has_edits = !bundled.modules.is_empty()
-            || !bundled.masks.is_empty()
-            || !bundled.copies.is_empty();
+        let has_edits =
+            !bundled.modules.is_empty() || !bundled.masks.is_empty() || !bundled.copies.is_empty();
         match sidecar::write_sidecar(&path, &bundled) {
             Ok(p) => {
                 if let Some(c) = &mut self.current {
@@ -114,10 +113,7 @@ impl Engine {
 
     /// Clone the active (or on-disk primary) edit into a new virtual copy.
     /// Never deletes or rewrites the original image bytes.
-    pub(super) fn make_virtual_copy(
-        &mut self,
-        path: Option<String>,
-    ) -> Result<String, CoreError> {
+    pub(super) fn make_virtual_copy(&mut self, path: Option<String>) -> Result<String, CoreError> {
         let requested = path.filter(|p| !p.is_empty());
         let current_path = self
             .current
@@ -149,7 +145,9 @@ impl Engine {
         let switch_needed = {
             let c = self.current.as_mut().ok_or(CoreError::NoImage)?;
             if c.docs.len() <= 1 {
-                return Err(CoreError::InvalidOp("cannot delete the only version".into()));
+                return Err(CoreError::InvalidOp(
+                    "cannot delete the only version".into(),
+                ));
             }
             let idx = c
                 .docs

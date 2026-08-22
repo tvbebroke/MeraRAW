@@ -289,9 +289,11 @@ pub async fn virtual_copy(
     path: Option<String>,
 ) -> Result<String, AppError> {
     let path = match path {
-        Some(p) if !p.is_empty() => {
-            Some(crate::paths::validate_existing_path(&p)?.to_string_lossy().into_owned())
-        }
+        Some(p) if !p.is_empty() => Some(
+            crate::paths::validate_existing_path(&p)?
+                .to_string_lossy()
+                .into_owned(),
+        ),
         _ => None,
     };
     engine.virtual_copy(path).await?.map_err(AppError::from)

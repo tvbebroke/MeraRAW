@@ -9,8 +9,12 @@ use crate::color::{mat_vec, CameraCalibration, Mat3};
 use crate::error::CoreError;
 use crate::image::RgbF32Buf;
 use crate::profile::dcp::DcpProfile;
+use demosaic::{Algorithm as XtransAlgorithm, CfaPattern, Channel};
+use rawler::cfa::CFAColor;
 use rawler::decoders::RawDecodeParams;
 use rawler::imgop::develop::{Intermediate, ProcessingStep, RawDevelop};
+use rawler::imgop::{Point, Rect};
+use rawler::rawimage::RawPhotometricInterpretation;
 use rawler::rawsource::RawSource;
 use rawler::RawLoader;
 use std::path::Path;
@@ -19,6 +23,11 @@ pub struct RawlerDecoder {
     loader: RawLoader,
 }
 
+// rawler decodes Sony's older SR2/SRF containers through its ARW decoder, but
+// 0.7.2 does not expose those suffixes from `supported_extensions()`. Keep only
+// these verified aliases here; the canonical list remains owned by rawler.
+const RAWLER_EXTENSION_ALIASES: &[&str] = &["SR2", "SRF"];
+
 impl Default for RawlerDecoder {
     fn default() -> Self {
         Self {
@@ -26,11 +35,6 @@ impl Default for RawlerDecoder {
         }
     }
 }
-
-const RAW_EXTENSIONS: &[&str] = &[
-    "arw", "nef", "nrw", "cr2", "cr3", "crw", "dng", "raf", "orf", "rw2", "pef", "srw", "erf",
-    "kdc", "dcs", "dcr", "iiq", "3fr", "mef", "mos",
-];
 
 fn dec_err(e: impl std::fmt::Display) -> CoreError {
     let msg = e.to_string();
@@ -46,6 +50,22 @@ fn dec_err(e: impl std::fmt::Display) -> CoreError {
     } else {
         CoreError::Decode(msg)
     }
+}
+
+/// rawler explicitly prioritizes decoder diagnostics over panic-freedom. RAWs
+/// are untrusted input in a desktop app, so turn an upstream decoder panic into
+/// a normal per-file error instead of losing the import worker or application.
+fn guard_rawler<T>(
+    path: &Path,
+    operation: &str,
+    f: impl FnOnce() -> Result<T, CoreError>,
+) -> Result<T, CoreError> {
+    std::panic::catch_unwind(std::panic::AssertUnwindSafe(f)).unwrap_or_else(|_| {
+        Err(CoreError::Decode(format!(
+            "RAW decoder failed safely while {operation}: {}",
+            path.display()
+        )))
+    })
 }
 
 /// Some decoders leave RawImage.orientation at Normal even when the EXIF
@@ -135,20 +155,28 @@ impl RawlerDecoder {
 impl Decoder for RawlerDecoder {
     fn probe(&self, path: &Path) -> bool {
         path.extension()
-            .map(|e| RAW_EXTENSIONS.contains(&e.to_string_lossy().to_lowercase().as_str()))
+            .and_then(|e| e.to_str())
+            .map(|extension| {
+                rawler::decoders::supported_extensions()
+                    .iter()
+                    .chain(RAWLER_EXTENSION_ALIASES.iter())
+                    .any(|supported| extension.eq_ignore_ascii_case(supported))
+            })
             .unwrap_or(false)
     }
 
     fn metadata(&self, path: &Path) -> Result<ImageMeta, CoreError> {
-        let source = RawSource::new(path).map_err(dec_err)?;
-        let decoder = self.loader.get_decoder(&source).map_err(dec_err)?;
-        let params = RawDecodeParams::default();
-        let md = decoder.raw_metadata(&source, &params).map_err(dec_err)?;
-        // dims need the raw struct; decode dummy (no pixel work)
-        let raw = decoder.raw_image(&source, &params, true).map_err(dec_err)?;
-        let cal = CameraCalibration::from_raw(&raw);
-        let cct = Some(cal.estimate_cct(&raw.wb_coeffs));
-        Ok(self.meta_from(path, &raw, &md, raw.width as u32, raw.height as u32, cct))
+        guard_rawler(path, "reading metadata", || {
+            let source = RawSource::new(path).map_err(dec_err)?;
+            let decoder = self.loader.get_decoder(&source).map_err(dec_err)?;
+            let params = RawDecodeParams::default();
+            let md = decoder.raw_metadata(&source, &params).map_err(dec_err)?;
+            // dims need the raw struct; decode dummy (no pixel work)
+            let raw = decoder.raw_image(&source, &params, true).map_err(dec_err)?;
+            let cal = CameraCalibration::from_raw(&raw);
+            let cct = Some(cal.estimate_cct(&raw.wb_coeffs));
+            Ok(self.meta_from(path, &raw, &md, raw.width as u32, raw.height as u32, cct))
+        })
     }
 
     fn embedded_preview(
@@ -156,42 +184,44 @@ impl Decoder for RawlerDecoder {
         path: &Path,
         max_dim: u32,
     ) -> Result<Option<(Vec<u8>, u32, u32)>, CoreError> {
-        let source = RawSource::new(path).map_err(dec_err)?;
-        let decoder = self.loader.get_decoder(&source).map_err(dec_err)?;
-        let params = RawDecodeParams::default();
-        let img = match decoder.full_image(&source, &params) {
-            Ok(Some(img)) => Some(img),
-            _ => match decoder.preview_image(&source, &params) {
+        guard_rawler(path, "reading the embedded preview", || {
+            let source = RawSource::new(path).map_err(dec_err)?;
+            let decoder = self.loader.get_decoder(&source).map_err(dec_err)?;
+            let params = RawDecodeParams::default();
+            let img = match decoder.full_image(&source, &params) {
                 Ok(Some(img)) => Some(img),
-                _ => decoder.thumbnail_image(&source, &params).ok().flatten(),
-            },
-        };
-        let Some(img) = img else {
-            return Ok(None);
-        };
-        // camera previews carry the same EXIF orientation as the raw
-        let raw = decoder.raw_image(&source, &params, true).map_err(dec_err)?;
-        let md = decoder.raw_metadata(&source, &params).map_err(dec_err)?;
-        let img = match effective_orientation(&raw, &md) {
-            rawler::Orientation::Rotate90 => img.rotate90(),
-            rawler::Orientation::Rotate180 => img.rotate180(),
-            rawler::Orientation::Rotate270 => img.rotate270(),
-            rawler::Orientation::HorizontalFlip => img.fliph(),
-            rawler::Orientation::VerticalFlip => img.flipv(),
-            _ => img,
-        };
-        let img = if img.width().max(img.height()) > max_dim {
-            img.thumbnail(max_dim, max_dim)
-        } else {
-            img
-        };
-        let rgba = img.to_rgba8();
-        let (w, h) = (rgba.width(), rgba.height());
-        Ok(Some((rgba.into_raw(), w, h)))
+                _ => match decoder.preview_image(&source, &params) {
+                    Ok(Some(img)) => Some(img),
+                    _ => decoder.thumbnail_image(&source, &params).ok().flatten(),
+                },
+            };
+            let Some(img) = img else {
+                return Ok(None);
+            };
+            // camera previews carry the same EXIF orientation as the raw
+            let raw = decoder.raw_image(&source, &params, true).map_err(dec_err)?;
+            let md = decoder.raw_metadata(&source, &params).map_err(dec_err)?;
+            let img = match effective_orientation(&raw, &md) {
+                rawler::Orientation::Rotate90 => img.rotate90(),
+                rawler::Orientation::Rotate180 => img.rotate180(),
+                rawler::Orientation::Rotate270 => img.rotate270(),
+                rawler::Orientation::HorizontalFlip => img.fliph(),
+                rawler::Orientation::VerticalFlip => img.flipv(),
+                _ => img,
+            };
+            let img = if img.width().max(img.height()) > max_dim {
+                img.thumbnail(max_dim, max_dim)
+            } else {
+                img
+            };
+            let rgba = img.to_rgba8();
+            let (w, h) = (rgba.width(), rgba.height());
+            Ok(Some((rgba.into_raw(), w, h)))
+        })
     }
 
     fn decode(&self, path: &Path) -> Result<DecodedImage, CoreError> {
-        self.decode_impl(path, None, Demosaic::Rawler)
+        self.safe_decode_impl(path, None, Demosaic::Rawler)
     }
 
     fn decode_with_profile(
@@ -199,7 +229,7 @@ impl Decoder for RawlerDecoder {
         path: &Path,
         profile_path: Option<&Path>,
     ) -> Result<DecodedImage, CoreError> {
-        self.decode_impl(path, profile_path, Demosaic::Rawler)
+        self.safe_decode_impl(path, profile_path, Demosaic::Rawler)
     }
 
     fn decode_with_options(
@@ -208,7 +238,7 @@ impl Decoder for RawlerDecoder {
         profile_path: Option<&Path>,
         demosaic: Demosaic,
     ) -> Result<DecodedImage, CoreError> {
-        match self.decode_impl(path, profile_path, demosaic) {
+        match self.safe_decode_impl(path, profile_path, demosaic) {
             Ok(img) => Ok(img),
             Err(e) if demosaic != Demosaic::Rawler => {
                 tracing::warn!(
@@ -216,7 +246,7 @@ impl Decoder for RawlerDecoder {
                     error = %e,
                     "demosaic failed; retrying with rawler built-in"
                 );
-                self.decode_impl(path, profile_path, Demosaic::Rawler)
+                self.safe_decode_impl(path, profile_path, Demosaic::Rawler)
             }
             Err(e) => Err(e),
         }
@@ -224,6 +254,17 @@ impl Decoder for RawlerDecoder {
 }
 
 impl RawlerDecoder {
+    fn safe_decode_impl(
+        &self,
+        path: &Path,
+        profile_path: Option<&Path>,
+        demosaic: Demosaic,
+    ) -> Result<DecodedImage, CoreError> {
+        guard_rawler(path, "decoding pixels", || {
+            self.decode_impl(path, profile_path, demosaic)
+        })
+    }
+
     /// Shared decode: rawler unpack → produce camera-native RGB (rawler's
     /// built-in demosaic or the merawler engine) → as-shot WB → cam→Rec.2020.
     fn decode_impl(
@@ -451,17 +492,72 @@ fn zerawler_rgb(
     Ok((dec.image.data, dec.image.width, dec.image.height))
 }
 
-/// rawler's built-in path: rescale → demosaic → crops → camera-native RGB.
+/// rawler's built-in path: rescale → demosaic → validated crops → camera-native RGB.
 fn rawler_cam_rgb(raw: &rawler::RawImage) -> Result<(Vec<[f32; 3]>, usize, usize), CoreError> {
-    let dev = RawDevelop {
-        steps: vec![
-            ProcessingStep::Rescale,
-            ProcessingStep::Demosaic,
-            ProcessingStep::CropActiveArea,
-            ProcessingStep::CropDefault,
-        ],
+    // rawler 0.7.2's generic RawDevelop path always chooses its Bayer PPG
+    // demosaicer for three-colour CFAs, including Fujifilm's 6x6 X-Trans
+    // layout. That misreads X-Trans pixels as a 2x2 Bayer pattern and produces
+    // a strong green checkerboard. Use a dedicated pure-Rust X-Trans engine;
+    // keep the existing rawler path for Bayer and already-RGB files.
+    let intermediate = match &raw.photometric {
+        RawPhotometricInterpretation::Cfa(config)
+            if config.cfa.width == 6 && config.cfa.height == 6 =>
+        {
+            let dev = RawDevelop {
+                steps: vec![ProcessingStep::Rescale],
+            };
+            let Intermediate::Monochrome(px) = dev.develop_intermediate(raw).map_err(dec_err)?
+            else {
+                return Err(CoreError::Decode(
+                    "X-Trans RAW unexpectedly contained multiple channels".into(),
+                ));
+            };
+            let roi = raw.active_area.unwrap_or_else(|| px.rect());
+            let mosaic = px.into_crop(roi);
+            let pattern = std::array::from_fn(|i| {
+                let row = roi.p.y + i / 6;
+                let col = roi.p.x + i % 6;
+                let plane = config.cfa.color_at(row, col);
+                match config.colors.colors.get(plane).copied() {
+                    Some(CFAColor::RED) => Channel::Red,
+                    Some(CFAColor::GREEN) => Channel::Green,
+                    Some(CFAColor::BLUE) => Channel::Blue,
+                    _ => Channel::Green,
+                }
+            });
+            let cfa = CfaPattern::xtrans(pattern);
+            let mut interleaved = vec![0.0f32; mosaic.width * mosaic.height * 3];
+            demosaic::demosaic_interleaved(
+                &mosaic.data,
+                mosaic.width,
+                mosaic.height,
+                &cfa,
+                XtransAlgorithm::Markesteijn1,
+                &mut interleaved,
+            )
+            .map_err(dec_err)?;
+            let rgb = interleaved
+                .chunks_exact(3)
+                .map(|p| [p[0], p[1], p[2]])
+                .collect();
+            Intermediate::ThreeColor(rawler::pixarray::Color2D::new_with(
+                rgb,
+                mosaic.width,
+                mosaic.height,
+            ))
+        }
+        _ => {
+            let dev = RawDevelop {
+                steps: vec![
+                    ProcessingStep::Rescale,
+                    ProcessingStep::Demosaic,
+                    ProcessingStep::CropActiveArea,
+                ],
+            };
+            dev.develop_intermediate(raw).map_err(dec_err)?
+        }
     };
-    let intermediate = dev.develop_intermediate(raw).map_err(dec_err)?;
+    let intermediate = safe_default_crop(raw, intermediate);
     Ok(match intermediate {
         Intermediate::ThreeColor(px) => (px.data, px.width, px.height),
         Intermediate::FourColor(px) => (
@@ -478,6 +574,53 @@ fn rawler_cam_rgb(raw: &rawler::RawImage) -> Result<(Vec<[f32; 3]>, usize, usize
             px.height,
         ),
     })
+}
+
+/// Apply rawler's default crop only when it is actually contained by the
+/// already-applied active area. Some RAFs (including Fujifilm X-T2 files) have
+/// a wider default crop than their active-area record; rawler 0.7.2 asserts in
+/// `Rect::adapt` for that metadata combination. Treat the default crop as
+/// advisory and retain the valid active-area image when it is inconsistent.
+fn safe_default_crop(raw: &rawler::RawImage, intermediate: Intermediate) -> Intermediate {
+    let Some(crop) = raw.crop_area else {
+        return intermediate;
+    };
+    let master = raw
+        .active_area
+        .unwrap_or_else(|| Rect::new(Point::zero(), raw.dim()));
+
+    let crop_right = crop.p.x.checked_add(crop.d.w);
+    let crop_bottom = crop.p.y.checked_add(crop.d.h);
+    let master_right = master.p.x.checked_add(master.d.w);
+    let master_bottom = master.p.y.checked_add(master.d.h);
+    let contained = crop.p.x >= master.p.x
+        && crop.p.y >= master.p.y
+        && crop_right.is_some_and(|v| master_right.is_some_and(|m| v <= m))
+        && crop_bottom.is_some_and(|v| master_bottom.is_some_and(|m| v <= m));
+    if !contained {
+        tracing::warn!(?crop, ?master, "ignoring invalid RAW default crop");
+        return intermediate;
+    }
+
+    let mut local = Rect::new(
+        Point::new(crop.p.x - master.p.x, crop.p.y - master.p.y),
+        crop.d,
+    );
+    if intermediate.dim().w == master.d.w / 2 && intermediate.dim().h == master.d.h / 2 {
+        local.scale(0.5);
+    }
+    let dim = intermediate.dim();
+    let fits = local.p.x.checked_add(local.d.w).is_some_and(|v| v <= dim.w)
+        && local.p.y.checked_add(local.d.h).is_some_and(|v| v <= dim.h);
+    if !fits || (local.p == Point::zero() && local.d == dim) {
+        return intermediate;
+    }
+
+    match intermediate {
+        Intermediate::Monochrome(px) => Intermediate::Monochrome(px.into_crop(local)),
+        Intermediate::ThreeColor(px) => Intermediate::ThreeColor(px.crop(local)),
+        Intermediate::FourColor(px) => Intermediate::FourColor(px.crop(local)),
+    }
 }
 
 /// merawler path: rescale-only → normalized full-sensor mosaic → merawler
@@ -546,42 +689,49 @@ mod integration_tests {
     use super::*;
     use crate::raw::Demosaic;
 
+    #[test]
+    fn probe_tracks_rawler_supported_extensions() {
+        let decoder = RawlerDecoder::default();
+        for extension in rawler::decoders::supported_extensions() {
+            let upper = std::path::PathBuf::from(format!("sample.{extension}"));
+            let lower = std::path::PathBuf::from(format!("sample.{}", extension.to_lowercase()));
+            assert!(decoder.probe(&upper), "missing .{extension}");
+            assert!(
+                decoder.probe(&lower),
+                "missing case-insensitive .{extension}"
+            );
+        }
+        for extension in RAWLER_EXTENSION_ALIASES {
+            let path = std::path::PathBuf::from(format!("sample.{extension}"));
+            assert!(decoder.probe(&path), "missing alias .{extension}");
+        }
+        assert!(!decoder.probe(std::path::Path::new("notes.txt")));
+    }
+
     /// Decode every RAW in the sample corpus and print a per-file report.
     ///
-    /// Corpus = github.com/f-spot/raw-samples (CC-licensed), one body per
-    /// vendor container: ARW, CR2, DNG, NEF, PEF, RW2 and Leica's bare .RAW.
+    /// The corpus can be nested and is selected with `MERARAW_RAW_CORPUS`.
+    /// Ignored by default because RAW samples are intentionally not checked in.
     ///
-    /// All eight must decode, including `sample_canon_350d_broken.cr2`. That
-    /// corpus is TagLib#'s *metadata* test suite, so "broken" there means a
-    /// tag that tripped up TagLib#, not damaged sensor data — the frame itself
-    /// is intact and macOS reads its EXIF fine. Do not "fix" a failure here by
-    /// excusing that file; if it stops decoding, something regressed.
-    ///
-    /// Ignored by default: needs ~86MB of files that are not in the repo.
-    ///   cargo test -p meratech-core corpus_decodes -- --ignored --nocapture
+    ///   MERARAW_RAW_CORPUS=/path/to/files cargo test -p meratech-core \
+    ///     corpus_decodes -- --ignored --nocapture
     #[test]
     #[ignore]
     fn corpus_decodes_every_vendor_format() {
-        let Ok(home) = std::env::var("HOME") else {
-            return;
-        };
-        let dir = std::path::PathBuf::from(home).join("Desktop/test-claude-raw/raw-samples");
+        let dir = std::env::var_os("MERARAW_RAW_CORPUS")
+            .map(std::path::PathBuf::from)
+            .or_else(|| {
+                std::env::var_os("HOME").map(|home| {
+                    std::path::PathBuf::from(home).join("Desktop/test-claude-raw/raw-samples")
+                })
+            })
+            .expect("no corpus path available");
         if !dir.exists() {
             eprintln!("skip: corpus not present at {}", dir.display());
             return;
         }
 
-        let mut files: Vec<_> = std::fs::read_dir(&dir)
-            .expect("read corpus dir")
-            .filter_map(|e| e.ok().map(|e| e.path()))
-            .filter(|p| {
-                p.is_file()
-                    && !p
-                        .file_name()
-                        .is_some_and(|n| n.to_string_lossy().starts_with('.'))
-            })
-            .collect();
-        files.sort();
+        let files = crate::catalog::scan_folder(&dir);
         assert!(!files.is_empty(), "corpus dir is empty");
 
         let dec = RawlerDecoder::default();
@@ -601,8 +751,15 @@ mod integration_tests {
                 Ok(Ok(img)) => {
                     let m = &img.meta;
                     let finite = img.working.data.iter().all(|v| v.is_finite());
+                    let pixels = (img.working.data.len() / 3).max(1) as f64;
+                    let mut rgb_mean = [0.0f64; 3];
+                    for px in img.working.data.chunks_exact(3) {
+                        rgb_mean[0] += px[0] as f64 / pixels;
+                        rgb_mean[1] += px[1] as f64 / pixels;
+                        rgb_mean[2] += px[2] as f64 / pixels;
+                    }
                     println!(
-                        "  OK    {name:<32} {fmt:<5} {w}x{h} {depth}bit  {make} {model}  wb={wb:?} finite={finite}",
+                        "  OK    {name:<32} {fmt:<5} {w}x{h} {depth}bit  {make} {model}  wb={wb:?} mean={rgb_mean:?} finite={finite}",
                         fmt = m.format, w = m.width, h = m.height, depth = m.bit_depth,
                         make = m.camera_make, model = m.camera_model, wb = m.as_shot_wb,
                     );

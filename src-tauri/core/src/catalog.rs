@@ -728,9 +728,7 @@ impl Catalog {
                 },
             )
             .map_err(db_err)?;
-        Ok(expand_virtual_copies(
-            rows.filter_map(|r| r.ok()).collect(),
-        ))
+        Ok(expand_virtual_copies(rows.filter_map(|r| r.ok()).collect()))
     }
 
     pub fn asset_detail(&self, id: i64) -> Result<Option<AssetDetail>, CoreError> {
@@ -1605,7 +1603,10 @@ mod tests {
         std::fs::write(dir.join("day1").join("IMG_2.ARW"), b"raw").unwrap();
         let kids = super::list_folder_children(&dir).unwrap();
         std::fs::remove_dir_all(&dir).ok();
-        assert!(kids.iter().any(|c| c.is_dir && c.name == "day1"), "{kids:?}");
+        assert!(
+            kids.iter().any(|c| c.is_dir && c.name == "day1"),
+            "{kids:?}"
+        );
         assert!(
             kids.iter()
                 .any(|c| !c.is_dir && c.name == "IMG_1.ARW" && c.kind.as_deref() == Some("photo")),
@@ -2005,7 +2006,11 @@ mod tests {
         assert_eq!(items.len(), 2, "{items:?}");
         assert_eq!(items[0].path, items[1].path);
         assert_eq!(items[1].doc_id, "vc-1");
-        assert!(items[1].filename.contains("copy 1"), "{}", items[1].filename);
+        assert!(
+            items[1].filename.contains("copy 1"),
+            "{}",
+            items[1].filename
+        );
         std::fs::remove_dir_all(&dir).ok();
     }
 }

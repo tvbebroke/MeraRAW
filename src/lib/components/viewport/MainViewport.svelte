@@ -34,6 +34,7 @@
     imageMeta,
     imageOpen,
     lastOpenedPath,
+    openingPreviewUrl,
     previewBypass,
     sendViewCmd,
     selectedMask,
@@ -70,6 +71,7 @@
 
   let wrapEl = $state<HTMLDivElement | null>(null);
   let displaySrc = $state<string | null>(null);
+  const viewportSrc = $derived(displaySrc ?? $openingPreviewUrl);
   let error = $state<string | null>(null);
 
   let view: ViewState = { scale: null, centerX: 0.5, centerY: 0.5 };
@@ -176,6 +178,9 @@
   }
 
   function showFrame(version: number) {
+    // While open_image is still resolving metadata, a queued frame event can
+    // only belong to the outgoing photo. Keep the new catalog preview visible.
+    if (openingPreviewUrl.get() && imageMeta.get() === null) return;
     if (version <= shownVer) return;
     pendingVer = version;
     preloadFrame(version)
@@ -183,6 +188,7 @@
         if (pendingVer !== version) return;
         shownVer = version;
         displaySrc = url;
+        openingPreviewUrl.set(null);
         error = null;
         requestAnimationFrame(() => updateZoomLabel());
       })
@@ -593,6 +599,17 @@
     displaySrc = null;
   });
 
+  // Catalog selections have an already-generated preview. Clear the outgoing
+  // engine frame as soon as that preview is available so switching photos is
+  // immediate instead of waiting for RAW preview extraction.
+  $effect(() => {
+    const preview = $openingPreviewUrl;
+    if (!preview) return;
+    shownVer = 0;
+    pendingVer = 0;
+    displaySrc = null;
+  });
+
   // Crop tool toggles content space — reset to fit.
   $effect(() => {
     const _crop = $cropActive;
@@ -725,13 +742,13 @@
     ondblclick={onDoubleClick}
     oncontextmenu={handleContextMenu}
   >
-    {#if displaySrc}
+    {#if viewportSrc}
       <div class="absolute inset-0 flex items-center justify-center">
         <img
-          src={displaySrc}
+          src={viewportSrc}
           alt=""
           draggable={false}
-          class="viewport-frame block max-h-full max-w-full object-contain pointer-events-none"
+          class="viewport-frame block object-contain pointer-events-none {displaySrc ? 'max-h-full max-w-full' : 'h-full w-full'}"
           onerror={() => (error = "frame transport failed")}
         />
         {#if compareSplit && beforeSrc}

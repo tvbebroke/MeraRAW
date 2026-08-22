@@ -402,10 +402,7 @@ impl EngineHandle {
         self.request(|reply| EngineMsg::ListFolders { reply }).await
     }
 
-    pub async fn forget_folder(
-        &self,
-        root: String,
-    ) -> Result<Result<(), CoreError>, EngineError> {
+    pub async fn forget_folder(&self, root: String) -> Result<Result<(), CoreError>, EngineError> {
         self.request(|reply| EngineMsg::ForgetFolder { root, reply })
             .await
     }
@@ -1120,7 +1117,11 @@ impl Engine {
                 }
                 let _ = reply.send(());
             }
-            EngineMsg::SetProofTarget { space, gamut, reply } => {
+            EngineMsg::SetProofTarget {
+                space,
+                gamut,
+                reply,
+            } => {
                 let space = space.min(4);
                 if self.proof_space != space || self.proof_gamut != gamut {
                     self.proof_space = space;

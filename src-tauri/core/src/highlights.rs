@@ -35,7 +35,10 @@ mod tests {
     #[test]
     fn pulls_clipped_channel_toward_chromaticity() {
         let out = reconstruct_pixel([1.8, 0.4, 0.2], 1.0, 1.0);
-        assert!(out[0] <= 1.0 + 1e-5, "clipped channel should not stay above clip: {out:?}");
+        assert!(
+            out[0] <= 1.0 + 1e-5,
+            "clipped channel should not stay above clip: {out:?}"
+        );
         assert!(out[1] > 0.3 && out[2] > 0.1);
         // ratios of unclipped preserved
         let r01 = 0.4 / 0.4; // unclipped g/g

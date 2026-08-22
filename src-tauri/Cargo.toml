@@ -31,7 +31,10 @@ url = "2"
 lto = true
 opt-level = 3
 codegen-units = 1
-panic = "abort"
+# RAW files are untrusted input and some upstream decoders still contain
+# assertions. Keep unwinding enabled so the decoder boundary can turn those
+# panics into a per-file error instead of terminating the whole application.
+panic = "unwind"
 strip = true
 
 # heavy numeric deps (tract inference, rawler decode) stay fast in dev

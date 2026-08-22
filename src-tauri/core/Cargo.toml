@@ -14,6 +14,9 @@ tokio = { version = "1", features = ["sync", "rt", "macros", "time"] }
 tracing = "0.1"
 wgpu = "24"
 rawler = "0.7"
+# Pure-Rust X-Trans demosaic; rawler 0.7's generic develop path treats 6x6
+# Fujifilm mosaics as Bayer and its unfinished X-Trans module is not exported.
+demosaic = "0.3"
 # Custom demosaic engine (RCD/LMMSE/AMaZE/IGV/DDFAPD). Core only — we feed it a
 # CfaImage built from rawler's rescaled mosaic, so no merawler `decode` feature.
 # Vendored under repo `vendor/` so CI/Windows/Linux builds don't need sibling checkouts.

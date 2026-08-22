@@ -39,11 +39,7 @@ pub const GRADE_MODULES: &[&str] = &[
 ];
 
 /// Copy look modules onto `dest` without touching crop / masks / retouch / calibration / detail.
-pub fn merge_grade(
-    dest: &mut EditDoc,
-    src: &crate::doc::ModuleParams,
-    lut_file: Option<String>,
-) {
+pub fn merge_grade(dest: &mut EditDoc, src: &crate::doc::ModuleParams, lut_file: Option<String>) {
     for name in GRADE_MODULES {
         dest.modules.remove(*name);
         if let Some(m) = src.get(*name) {
@@ -98,10 +94,7 @@ pub fn split_copies(mut doc: EditDoc) -> Vec<EditDoc> {
 }
 
 pub fn bundle_copies(docs: &[EditDoc]) -> EditDoc {
-    let mut primary = docs
-        .first()
-        .cloned()
-        .unwrap_or_else(|| EditDoc::new(""));
+    let mut primary = docs.first().cloned().unwrap_or_else(|| EditDoc::new(""));
     primary.copies = docs
         .iter()
         .skip(1)
@@ -350,7 +343,11 @@ mod tests {
     fn merge_grade_drops_unsafe_lut_path() {
         let mut dest = EditDoc::new("/dest.ARW");
         dest.meta.lut_file = Some("/tmp/ok.cube".into());
-        merge_grade(&mut dest, &crate::doc::ModuleParams::new(), Some("/etc/passwd".into()));
+        merge_grade(
+            &mut dest,
+            &crate::doc::ModuleParams::new(),
+            Some("/etc/passwd".into()),
+        );
         assert!(dest.meta.lut_file.is_none());
     }
 
