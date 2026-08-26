@@ -31,8 +31,8 @@ fn f16_bytes(val: f32) -> Vec<u8> {
 /// (gain 1.15, contrast 0.12, sat 1.0). sRGB OETF. Pinned with the shader.
 fn expected_byte(linear: f32) -> u8 {
     let l = linear; // neutral: luma == channel value
-    let lw = 4.0f32;
     let (gain, contrast) = (1.15f32, 0.12f32);
+    let lw = gain; // white point == gain (present.wgsl::view_look)
     let x = l * gain;
     let r = x * (1.0 + x / (lw * lw)) / (1.0 + x);
     let s = 0.5 - 0.5 * (r.clamp(0.0, 1.0) * std::f32::consts::PI).cos();

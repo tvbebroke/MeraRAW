@@ -452,6 +452,34 @@ impl CameraCalibration {
         }
         mat_inverse(&rgb2cam)
     }
+
+    /// Daylight white-balance multipliers implied by the camera matrix alone
+    /// (dcraw's `pre_mul`): the reciprocal row sums of rgb2cam are exactly the
+    /// gains that take a D65 neutral to equal camera channels.
+    ///
+    /// Only a fallback. Several older cameras — Canon CRW, Kodak DCR/KDC,
+    /// Mamiya MEF, Sony SRF — carry no as-shot multipliers that rawler can
+    /// read, and developing those at unity WB leaves a heavy green cast
+    /// because a raw sensor is far more sensitive to green than to red or
+    /// blue. A fixed daylight balance is wrong for tungsten scenes but is
+    /// vastly closer than no balance at all, and the user can still correct
+    /// it with the temperature slider.
+    pub fn daylight_wb(&self) -> Option<[f32; 3]> {
+        let xyz2cam = self.xyz_to_cam_at(6504.0)?;
+        let rgb2cam = mat_mul(&xyz2cam, &REC2020_TO_XYZ);
+        let mut wb = [0.0f32; 3];
+        for (c, row) in rgb2cam.iter().enumerate() {
+            let sum: f32 = row.iter().sum();
+            if sum.abs() < 1e-6 {
+                return None;
+            }
+            wb[c] = 1.0 / sum;
+        }
+        if wb.iter().any(|v| !v.is_finite() || *v <= 0.0) {
+            return None;
+        }
+        Some(wb)
+    }
 }
 
 #[cfg(test)]

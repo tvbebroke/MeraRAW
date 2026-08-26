@@ -189,28 +189,58 @@ fn oetf(target: TargetSpace, v: f32) -> f32 {
     }
 }
 
+/// Scene luminance where the Camera look starts crossfading from the
+/// luminance-mapped result to the per-channel one. Mirrors present.wgsl.
+const HL_PC_LO: f32 = 0.5;
+
+/// Reinhard-extended shoulder + gentle S-curve. White point == gain, so scene
+/// luminance 1.0 (sensor saturation) lands on display white.
+fn tone_curve(v: f32, g: f32, contrast: f32) -> f32 {
+    let x = v * g;
+    let r = x * (1.0 + x / (g * g)) / (1.0 + x);
+    let s = 0.5 - 0.5 * (r.clamp(0.0, 1.0) * std::f32::consts::PI).cos();
+    (r + (s - r) * contrast).clamp(0.0, 1.0)
+}
+
 /// Display look — MIRRORS present.wgsl `view_look` so export == preview.
-/// Reinhard shoulder + gentle S-curve on luminance + saturation.
 fn view_look(rgb: [f32; 3], camera: bool) -> [f32; 3] {
-    let (gain, contrast, sat) = if camera {
-        (1.6f32, 0.34f32, 1.22f32)
+    let (gain, contrast, sat, baseline_ev, hl_pc) = if camera {
+        (1.6f32, 0.62f32, 1.22f32, 0.75f32, 1.0f32)
     } else {
-        (1.15f32, 0.12f32, 1.0f32)
+        // Neutral stays colorimetric — no baseline lift, no highlight blend.
+        (1.15f32, 0.12f32, 1.0f32, 0.0f32, 0.0f32)
     };
-    let lw = 4.0f32;
-    let l = 0.2126 * rgb[0].max(0.0) + 0.7152 * rgb[1].max(0.0) + 0.0722 * rgb[2].max(0.0);
+    // Baseline exposure rides on the gain; the white point tracks it, so scene
+    // luminance 1.0 still lands on display white. See present.wgsl::view_look.
+    let g = gain * baseline_ev.exp2();
+    let rgb = [rgb[0].max(0.0), rgb[1].max(0.0), rgb[2].max(0.0)];
+    let l = 0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2];
     if l <= 1e-8 {
         return [0.0; 3];
     }
-    let x = l * gain;
-    let r = x * (1.0 + x / (lw * lw)) / (1.0 + x);
-    let s = 0.5 - 0.5 * (r.clamp(0.0, 1.0) * std::f32::consts::PI).cos();
-    let ld = (r + (s - r) * contrast).clamp(0.0, 1.0);
+    let ld = tone_curve(l, g, contrast);
     let k = ld / l;
     let mut out = [rgb[0] * k, rgb[1] * k, rgb[2] * k];
     let l2 = 0.2126 * out[0].max(0.0) + 0.7152 * out[1].max(0.0) + 0.0722 * out[2].max(0.0);
     for c in out.iter_mut() {
         *c = (l2 + (*c - l2) * sat).max(0.0);
+    }
+    // Crossfade into a per-channel curve near white so highlights desaturate
+    // instead of carrying the illuminant's cast to display white.
+    if hl_pc > 0.0 {
+        let u = ((ld - HL_PC_LO) / (1.0 - HL_PC_LO)).clamp(0.0, 1.0);
+        let w = u * u * (3.0 - 2.0 * u) * hl_pc;
+        for (c, &s) in out.iter_mut().zip(rgb.iter()) {
+            *c += (tone_curve(s, g, contrast) - *c) * w;
+        }
+    }
+    let mx = out[0].max(out[1]).max(out[2]);
+    if mx > 1.0 {
+        let l3 = 0.2126 * out[0] + 0.7152 * out[1] + 0.0722 * out[2];
+        let w = ((mx - 1.0) / mx).clamp(0.0, 1.0);
+        for c in out.iter_mut() {
+            *c = (*c + (l3 - *c) * w).max(0.0);
+        }
     }
     out
 }
@@ -243,6 +273,16 @@ pub fn output_transform(
     camera_look: bool,
 ) -> EncodedImage {
     let m = target_from_rec2020(target);
+    // present.wgsl converts Rec.2020 → sRGB *before* running the look, so the
+    // look must run in linear sRGB here too or export drifts from the preview.
+    // The operator is not colour-space agnostic: it weights luminance with
+    // Rec.709 coefficients and scales saturation about it, so feeding it
+    // Rec.2020 primaries shifts both. Re-encode to the requested target after.
+    let to_srgb = target_from_rec2020(TargetSpace::Srgb);
+    let srgb_to_target = mat_mul(
+        &m,
+        &color::mat_inverse(&to_srgb).expect("srgb matrix invertible"),
+    );
     let px = (width * height) as usize;
     let mut rgb8 = if want16 {
         Vec::new()
@@ -255,9 +295,13 @@ pub fn output_transform(
         Vec::new()
     };
     for i in 0..px {
-        let lin = [linear[i * 3], linear[i * 3 + 1], linear[i * 3 + 2]];
-        let looked = view_look(lin, camera_look);
-        let target_lin = gamut_compress(mat_vec(&m, looked));
+        let lin = [
+            linear[i * 3].max(0.0),
+            linear[i * 3 + 1].max(0.0),
+            linear[i * 3 + 2].max(0.0),
+        ];
+        let looked = view_look(mat_vec(&to_srgb, lin).map(|c| c.max(0.0)), camera_look);
+        let target_lin = gamut_compress(mat_vec(&srgb_to_target, looked));
         for c in target_lin {
             let e = oetf(target, c);
             if want16 {
@@ -1003,11 +1047,104 @@ mod tests {
         }
     }
 
+    /// The shoulder must compress toward white rather than clip early: scene
+    /// luminance 1.0 is sensor saturation and belongs at display white, but
+    /// everything below it has to stay off the ceiling, and the response has
+    /// to flatten as it approaches white instead of running straight into it.
     #[test]
-    fn highlights_roll_not_clip() {
-        let e = output_transform(&[2.0, 2.0, 2.0], 1, 1, TargetSpace::Srgb, false, false);
-        assert!(e.rgb8[0] < 255, "got {}", e.rgb8[0]);
-        assert!(e.rgb8[0] > 200);
+    fn highlights_roll_off_into_white() {
+        let enc = |v: f32| {
+            output_transform(&[v, v, v], 1, 1, TargetSpace::Srgb, false, false).rgb8[0] as i32
+        };
+        assert_eq!(enc(1.0), 255, "sensor saturation must reach display white");
+        assert!(enc(0.7) < 255, "premature clip at 0.7: {}", enc(0.7));
+        assert!(enc(0.5) < enc(0.7), "not monotone");
+        // concave shoulder: the same linear step buys less near white
+        assert!(
+            enc(0.7) - enc(0.5) < enc(0.3) - enc(0.1),
+            "no compression near white: {} vs {}",
+            enc(0.7) - enc(0.5),
+            enc(0.3) - enc(0.1)
+        );
+    }
+
+    /// Camera look carries a baseline exposure, so a mid-gray renders well
+    /// above the colorimetric Neutral look — without burning the top end,
+    /// because the shoulder's white point rides the same gain.
+    #[test]
+    fn camera_look_lifts_midtones_without_burning_white() {
+        let enc = |v: f32, camera: bool| {
+            output_transform(&[v, v, v], 1, 1, TargetSpace::Srgb, false, camera).rgb8[0] as i32
+        };
+        let (mid_cam, mid_neu) = (enc(0.1655, true), enc(0.1655, false));
+        assert!(
+            mid_cam > mid_neu + 20,
+            "no baseline lift: camera {mid_cam} vs neutral {mid_neu}"
+        );
+        assert_eq!(enc(1.0, true), 255, "sensor saturation must reach white");
+        assert!(enc(0.75, true) < 255, "burnt at 0.75: {}", enc(0.75, true));
+        assert!(enc(0.5, true) < enc(0.75, true), "not monotone");
+    }
+
+    /// A cast that survives to display white leaves highlights tinted instead
+    /// of white. The per-channel crossfade must pull a bright off-neutral back
+    /// toward neutral while leaving the same chromaticity alone in the mids.
+    #[test]
+    fn camera_highlights_converge_toward_neutral() {
+        let spread = |v: f32| {
+            let e = output_transform(
+                &[v * 0.80, v * 0.90, v],
+                1,
+                1,
+                TargetSpace::Srgb,
+                false,
+                true,
+            );
+            e.rgb8[2] as i32 - e.rgb8[0] as i32
+        };
+        assert!(
+            spread(0.98) < spread(0.45),
+            "cast not neutralised near white: {} at 0.98 vs {} at 0.45",
+            spread(0.98),
+            spread(0.45)
+        );
+    }
+
+    /// present.wgsl converts Rec.2020 → sRGB and *then* runs the look. sRGB
+    /// export has to agree pixel-for-pixel or the preview is lying.
+    #[test]
+    fn srgb_export_matches_preview_ordering() {
+        // transcribed from present.wgsl (row-major); rounded literals there
+        // put the two matrices ~1e-4 apart, hence the ±1 byte tolerance.
+        const PRESENT_REC2020_TO_SRGB: Mat3 = [
+            [1.6605, -0.5876, -0.0728],
+            [-0.1246, 1.1329, -0.0083],
+            [-0.0182, -0.1006, 1.1187],
+        ];
+        for rec in [
+            [0.05f32, 0.30, 0.02],
+            [0.40, 0.50, 0.60],
+            [0.90, 0.20, 0.10],
+            [0.02, 0.02, 0.02],
+            [0.75, 0.80, 0.30],
+        ] {
+            for camera in [false, true] {
+                let c = mat_vec(&PRESENT_REC2020_TO_SRGB, rec).map(|v| v.max(0.0));
+                let preview = view_look(c, camera)
+                    .map(|v| (oetf(TargetSpace::Srgb, v.clamp(0.0, 1.0)) * 255.0).round() as i32);
+                let got = output_transform(&rec, 1, 1, TargetSpace::Srgb, false, camera);
+                for ch in 0..3 {
+                    let d = (preview[ch] - got.rgb8[ch] as i32).abs();
+                    assert!(
+                        d <= 1,
+                        "preview/export split on {rec:?} camera={camera} ch{ch}: \
+                         preview {} vs export {}",
+                        preview[ch],
+                        got.rgb8[ch]
+                    );
+                }
+            }
+        }
     }
 
     #[test]

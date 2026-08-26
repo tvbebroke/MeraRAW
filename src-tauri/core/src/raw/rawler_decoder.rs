@@ -367,7 +367,8 @@ impl RawlerDecoder {
             // Our colorimetric landing: as-shot WB → cam→Rec.2020 (dual-illum).
             PixelState::CameraNative { .. } => {
                 let cam2rec = resolve_cam2rec(&cal, &raw, &md, profile_path)?;
-                camera_landing(&cam_rgb, wb_normalize(raw.wb_coeffs), &cam2rec, &mut data);
+                let wbn = wb_normalize(raw.wb_coeffs, &cal);
+                camera_landing(&cam_rgb, wbn, &cam2rec, &mut data);
             }
         }
 
@@ -400,12 +401,25 @@ impl RawlerDecoder {
     }
 }
 
-/// Green-normalized as-shot WB multipliers `[r/g, 1, b/g]` (NaN/degenerate → unity).
-fn wb_normalize(mut wb: [f32; 4]) -> [f32; 3] {
-    if wb[0].is_nan() || wb[1] <= 0.0 {
-        wb = [1.0, 1.0, 1.0, 1.0];
-    }
+/// Green-normalized as-shot WB multipliers `[r/g, 1, b/g]`.
+///
+/// Exactly-equal multipliers mean the file carried no usable as-shot balance
+/// (no real sensor is neutral), so fall back to the camera matrix's implied
+/// daylight balance rather than developing at unity.
+fn wb_normalize(wb: [f32; 4], cal: &CameraCalibration) -> [f32; 3] {
+    let usable = wb[..3].iter().all(|v| v.is_finite() && *v > 0.0) && wb[0] != wb[1];
+    let wb = if usable {
+        [wb[0], wb[1], wb[2]]
+    } else {
+        match cal.daylight_wb() {
+            Some(d) => d,
+            None => return [1.0, 1.0, 1.0],
+        }
+    };
     let g = wb[1];
+    if g <= 0.0 {
+        return [1.0, 1.0, 1.0];
+    }
     [wb[0] / g, 1.0, wb[2] / g]
 }
 
@@ -446,12 +460,80 @@ fn resolve_cam2rec(
     })
 }
 
-/// The camera landing: WB multipliers → cam→Rec.2020 matrix per pixel, into
-/// an interleaved buffer. Headroom kept; only negatives clamped.
+/// Width of the highlight-reconstruction band, as a fraction of a channel's
+/// saturation level. Demosaic interpolation smears the clip edge across
+/// neighbouring pixels, so the band opens just below saturation.
+const CLIP_BAND: f32 = 0.03;
+
+/// Below this a channel is taken to have never approached saturation, so no
+/// reconstruction runs on it. Recorded white levels are wrong by up to ~50%
+/// on the high side but never leave a real clip this far below nominal, so it
+/// cleanly separates "clipped" from "this scene was simply never that bright".
+const CLIP_FLOOR: f32 = 0.9;
+
+/// Per-channel saturation level of the demosaiced camera RGB.
+///
+/// `Rescale` is meant to put sensor saturation at exactly 1.0, but recorded
+/// white levels are routinely off — across a 30-camera corpus the real ceiling
+/// lands anywhere from 0.92 to 1.51. Assuming 1.0 either misses the clip
+/// entirely (magenta survives) or reconstructs valid data (highlights
+/// over-desaturate), so read the ceiling back off the pixels. A high
+/// percentile rather than the maximum keeps a stuck pixel from pushing the
+/// ceiling above the clipped plateau and disabling reconstruction.
+fn saturation_levels(cam_rgb: &[[f32; 3]]) -> [f32; 3] {
+    const BINS: usize = 1024;
+    const TOP: f32 = 4.0;
+    let mut hist = vec![[0u32; 3]; BINS];
+    for px in cam_rgb {
+        for c in 0..3 {
+            let b = ((px[c] / TOP) * BINS as f32) as usize;
+            hist[b.min(BINS - 1)][c] += 1;
+        }
+    }
+    // 0.01% of pixels may sit above the ceiling (hot pixels, demosaic
+    // overshoot); everything below that is real signal.
+    let budget = (cam_rgb.len() / 10_000) as u32;
+    std::array::from_fn(|c| {
+        let mut seen = 0u32;
+        for b in (0..BINS).rev() {
+            seen += hist[b][c];
+            if seen > budget {
+                return (((b + 1) as f32 / BINS as f32) * TOP).max(CLIP_FLOOR);
+            }
+        }
+        CLIP_FLOOR
+    })
+}
+
+/// Pull channels that reached sensor saturation up to the pixel's brightest
+/// WB-multiplied channel.
+///
+/// The as-shot multipliers are never equal and green always carries the
+/// smallest one, so on a scene-neutral highlight green saturates first. Past
+/// that point a blown pixel lands on `wbn` itself (typically ~[2.0, 1.0, 1.8])
+/// — strongly magenta, which is what shows up as pink blown skies and
+/// specular highlights. A saturated channel carries no colour information, so
+/// the brightest WB'd channel is the better estimate for it: a fully blown
+/// pixel comes out neutral and stays the brightest thing in the frame, while
+/// anything below the band keeps its measured colour exactly, so genuinely
+/// saturated highlights are not desaturated.
+fn reconstruct_clipped(px: [f32; 3], wbn: [f32; 3], sat: [f32; 3]) -> [f32; 3] {
+    let wbd = [px[0] * wbn[0], px[1] * wbn[1], px[2] * wbn[2]];
+    let m = wbd[0].max(wbd[1]).max(wbd[2]);
+    std::array::from_fn(|c| {
+        let lo = sat[c] * (1.0 - CLIP_BAND);
+        let t = ((px[c] - lo) / (sat[c] - lo).max(1e-6)).clamp(0.0, 1.0);
+        wbd[c] + (m - wbd[c]) * t
+    })
+}
+
+/// The camera landing: WB multipliers → clipped-highlight reconstruction →
+/// cam→Rec.2020 matrix per pixel, into an interleaved buffer. Headroom kept;
+/// only negatives clamped.
 fn camera_landing(cam_rgb: &[[f32; 3]], wbn: [f32; 3], cam2rec: &Mat3, data: &mut [f32]) {
+    let sat = saturation_levels(cam_rgb);
     for (i, px) in cam_rgb.iter().enumerate() {
-        let wbd = [px[0] * wbn[0], px[1], px[2] * wbn[2]];
-        let rgb = mat_vec(cam2rec, wbd);
+        let rgb = mat_vec(cam2rec, reconstruct_clipped(*px, wbn, sat));
         let o = i * 3;
         data[o] = rgb[0].max(0.0);
         data[o + 1] = rgb[1].max(0.0);
@@ -685,9 +767,175 @@ fn crop_to_output(
 }
 
 #[cfg(test)]
+mod clip_tests {
+    use super::*;
+
+    /// A scene-neutral patch produces *unequal* raw values — green is the
+    /// largest, which is why green saturates first. Once it does, the
+    /// unclipped red and blue must reconstruct it back to neutral.
+    #[test]
+    fn neutral_highlight_stays_neutral_past_green_clip() {
+        let wbn = [1.8f32, 1.0, 1.9];
+        // Scene-neutral ramp: raw is k/wbn per channel, clamped at saturation.
+        for k in [1.0f32, 1.3, 1.6, 1.9, 2.4] {
+            let px = std::array::from_fn(|c| (k / wbn[c]).min(1.0));
+            let out = reconstruct_clipped(px, wbn, [1.0; 3]);
+            let mx = out[0].max(out[1]).max(out[2]);
+            let mn = out[0].min(out[1]).min(out[2]);
+            assert!(
+                mx - mn < 0.02 * mx,
+                "k={k}: neutral highlight landed non-neutral: {out:?}"
+            );
+        }
+    }
+
+    /// Without reconstruction a blown pixel lands on `wbn` itself, which is
+    /// strongly magenta. It must come out neutral instead.
+    #[test]
+    fn fully_blown_pixel_is_neutral_and_keeps_brightness() {
+        let wbn = [2.2f32, 1.0, 1.76];
+        let out = reconstruct_clipped([1.0, 1.0, 1.0], wbn, [1.0; 3]);
+        assert!(
+            (out[0] - out[1]).abs() < 1e-4 && (out[1] - out[2]).abs() < 1e-4,
+            "blown pixel not neutral: {out:?}"
+        );
+        // brightest channel is preserved, so blown areas stay the brightest
+        assert!((out[1] - 2.2).abs() < 1e-4, "{out:?}");
+    }
+
+    /// A saturated colour below the clip band must survive bit-for-bit —
+    /// reconstruction is not allowed to desaturate real highlight colour.
+    #[test]
+    fn unclipped_saturated_colour_is_untouched() {
+        let wbn = [2.0f32, 1.0, 1.5];
+        let px = [0.9f32, 0.45, 0.3];
+        let out = reconstruct_clipped(px, wbn, [1.0; 3]);
+        assert_eq!(out, [0.9 * 2.0, 0.45, 0.3 * 1.5]);
+    }
+
+    /// A single clipped channel that is already the brightest keeps its hue:
+    /// a blown red stays red rather than washing to white.
+    #[test]
+    fn clipped_red_only_stays_red() {
+        let wbn = [2.0f32, 1.0, 1.5];
+        let out = reconstruct_clipped([1.0, 0.3, 0.2], wbn, [1.0; 3]);
+        assert_eq!(out, [2.0, 0.3, 0.3]);
+    }
+
+    /// The clip point is read off the data, so a camera whose recorded white
+    /// level is 20% low still gets its real ceiling found.
+    #[test]
+    fn saturation_level_tracks_a_shifted_ceiling() {
+        for ceiling in [0.95f32, 1.0, 1.21, 1.5] {
+            let mut px = vec![[0.2f32, 0.2, 0.2]; 10_000];
+            for p in px.iter_mut().take(500) {
+                *p = [ceiling; 3];
+            }
+            let sat = saturation_levels(&px);
+            for c in 0..3 {
+                assert!(
+                    (sat[c] - ceiling).abs() < 0.02,
+                    "ceiling {ceiling}: found {}",
+                    sat[c]
+                );
+            }
+        }
+    }
+
+    /// A handful of stuck pixels above the clipped plateau must not push the
+    /// ceiling up and silently switch reconstruction off.
+    #[test]
+    fn saturation_level_ignores_hot_pixels() {
+        let mut px = vec![[0.2f32, 0.2, 0.2]; 100_000];
+        for p in px.iter_mut().take(5_000) {
+            *p = [1.0; 3];
+        }
+        px[0] = [3.9; 3]; // stuck pixel far above the plateau
+        let sat = saturation_levels(&px);
+        assert!(sat.iter().all(|v| (*v - 1.0).abs() < 0.02), "{sat:?}");
+    }
+
+    /// A scene that never got bright must not have its brightest pixels
+    /// treated as clipped.
+    #[test]
+    fn saturation_level_floors_on_a_dark_scene() {
+        let px = vec![[0.3f32, 0.4, 0.25]; 10_000];
+        assert_eq!(saturation_levels(&px), [CLIP_FLOOR; 3]);
+    }
+
+    /// Reconstruction only ever raises a channel — it can never darken a
+    /// pixel, so it cannot carve halos around blown regions.
+    #[test]
+    fn reconstruction_is_monotone_non_darkening() {
+        let wbn = [1.9f32, 1.0, 1.7];
+        for r in 0..=10 {
+            for g in 0..=10 {
+                for b in 0..=10 {
+                    let px = [r as f32 / 10.0, g as f32 / 10.0, b as f32 / 10.0];
+                    let out = reconstruct_clipped(px, wbn, [1.0; 3]);
+                    for c in 0..3 {
+                        assert!(
+                            out[c] >= px[c] * wbn[c] - 1e-6,
+                            "{px:?} channel {c} darkened: {out:?}"
+                        );
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[cfg(test)]
 mod integration_tests {
     use super::*;
     use crate::raw::Demosaic;
+
+    /// Diagnostic: report where each camera's demosaiced channels actually top
+    /// out, relative to the 1.0 that `Rescale` is supposed to normalize
+    /// saturation to. A channel maximum well under 1.0 means the recorded
+    /// white level is optimistic and clipped pixels never enter the
+    /// reconstruction band; well over 1.0 means it is conservative.
+    ///
+    ///   MERARAW_RAW_CORPUS=/path/to/files cargo test -p meratech-core \
+    ///     clip_ceiling_report -- --ignored --nocapture
+    #[test]
+    #[ignore]
+    fn clip_ceiling_report() {
+        let Some(dir) = std::env::var_os("MERARAW_RAW_CORPUS").map(std::path::PathBuf::from) else {
+            eprintln!("skip: set MERARAW_RAW_CORPUS");
+            return;
+        };
+        let loader = RawLoader::new();
+        println!(
+            "{:<34} {:>18} {:>26} {:>8}",
+            "file", "wb (r,g,b)", "pre-WB channel max", "clipped%"
+        );
+        for path in crate::catalog::scan_folder(&dir) {
+            let name = path.file_name().unwrap().to_string_lossy().to_string();
+            let res = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| -> Option<_> {
+                let source = RawSource::new(&path).ok()?;
+                let decoder = loader.get_decoder(&source).ok()?;
+                let raw = decoder
+                    .raw_image(&source, &RawDecodeParams::default(), false)
+                    .ok()?;
+                let (cam, _, _) = rawler_cam_rgb(&raw).ok()?;
+                let wbn = wb_normalize(raw.wb_coeffs, &CameraCalibration::from_raw(&raw));
+                let sat = saturation_levels(&cam);
+                let clipped = cam
+                    .iter()
+                    .filter(|px| (0..3).any(|c| px[c] >= sat[c] * (1.0 - CLIP_BAND)))
+                    .count();
+                Some((wbn, sat, 100.0 * clipped as f32 / cam.len().max(1) as f32))
+            }));
+            match res {
+                Ok(Some((wbn, sat, pct))) => println!(
+                    "{name:<34} {:>5.2},{:>5.2},{:>5.2}   {:>7.3},{:>7.3},{:>7.3} {pct:>7.2}",
+                    wbn[0], wbn[1], wbn[2], sat[0], sat[1], sat[2]
+                ),
+                _ => println!("{name:<34} (no pixels)"),
+            }
+        }
+    }
 
     #[test]
     fn probe_tracks_rawler_supported_extensions() {

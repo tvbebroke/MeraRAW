@@ -1,6 +1,6 @@
 // Terminal display-transform node (contract F2 screen side), 1:1 over the
 // chain output: gamut Rec2020→sRGB → pinned neutral view transform
-// (Reinhard-extended Lw=4) → clamp → sRGB OETF. alpha 0 → letterbox bg.
+// (Reinhard-extended, Lw == gain) → clamp → sRGB OETF. alpha 0 → letterbox bg.
 // Constants mirror gpu/display.wgsl; golden tests pin them.
 
 struct PresentUniforms {
@@ -31,32 +31,76 @@ const REC2020_TO_SRGB = mat3x3<f32>(
   vec3<f32>(-0.0728, -0.0083,  1.1187),
 );
 
-const VIEW_LW: f32 = 4.0;
 const LUMA = vec3<f32>(0.2126, 0.7152, 0.0722);
 
+// Scene luminance where the Camera look starts crossfading from the
+// luminance-mapped result to the per-channel one. See view_look.
+const HL_PC_LO: f32 = 0.5;
+
+// Reinhard-extended shoulder + a gentle S-curve. The shoulder's white point is
+// the gain itself, which puts display white at scene luminance 1.0 — sensor
+// saturation, the brightest neutral a RAW can hold. The old fixed 4.0 placed it
+// near 3.5, reserving most of a stop and a half of display range for headroom
+// that RAW data does not contain, so every image rendered flat and diffuse
+// white never reached white.
+fn tone_curve(v: f32, g: f32, contrast: f32) -> f32 {
+  let x = v * g;
+  let r = x * (1.0 + x / (g * g)) / (1.0 + x);
+  let s = 0.5 - 0.5 * cos(clamp(r, 0.0, 1.0) * 3.14159265);
+  return clamp(mix(r, s, contrast), 0.0, 1.0);
+}
+
 // shared look operator — MIRRORED in export.rs::view_look (WYSIWYG).
-// Reinhard-extended shoulder (headroom-safe) + a gentle S-curve, all on
-// luminance so hue is preserved; then a saturation scale.
 fn view_look(c: vec3<f32>, look: u32) -> vec3<f32> {
   var gain = 1.15;     // Neutral: a touch of lift so the base isn't dark
   var contrast = 0.12;
   var sat = 1.0;
+  var baseline_ev = 0.0; // Neutral stays colorimetric — no baseline lift
+  var hl_pc = 0.0;
   if (look == 1u) {    // Camera fallback when no DCP is loaded
     gain = 1.6;
-    contrast = 0.34;
+    contrast = 0.62;
     sat = 1.22;
+    baseline_ev = 0.75;
+    hl_pc = 1.0;
   }
-  let l = dot(max(c, vec3<f32>(0.0)), LUMA);
+  // Baseline exposure rides on the gain. Because the white point tracks the
+  // gain, scene luminance 1.0 still lands exactly on display white for any
+  // lift: this opens the midtones without burning highlights. Cameras expose
+  // RAW to protect the highlights, so a purely colorimetric render sits about
+  // a stop under what every other converter shows — the same correction Adobe
+  // ships as the DCP BaselineExposure tag, which we only get when a profile is
+  // loaded. The contrast bump keeps the lifted blacks off the floor.
+  let g = gain * exp2(baseline_ev);
+  let cc = max(c, vec3<f32>(0.0));
+  let l = dot(cc, LUMA);
   if (l <= 1e-8) {
     return vec3<f32>(0.0);
   }
-  let x = l * gain;
-  let r = x * (1.0 + x / (VIEW_LW * VIEW_LW)) / (1.0 + x);
-  let s = 0.5 - 0.5 * cos(clamp(r, 0.0, 1.0) * 3.14159265);
-  let ld = clamp(mix(r, s, contrast), 0.0, 1.0);
-  var outc = c * (ld / l);
+  let ld = tone_curve(l, g, contrast);
+  var outc = cc * (ld / l);
   let l2 = dot(max(outc, vec3<f32>(0.0)), LUMA);
-  outc = mix(vec3<f32>(l2), outc, sat);
+  outc = max(mix(vec3<f32>(l2), outc, sat), vec3<f32>(0.0));
+  // Mapping luminance alone holds the scene's chromaticity all the way up, so
+  // a coloured illuminant keeps its cast at display white and bright neutrals
+  // never go neutral. Crossfade into a per-channel curve near white: each
+  // channel then rolls into its own shoulder and converges, which is what
+  // makes highlights desaturate. Gated on luminance rather than applied
+  // throughout so saturated midtones keep their chroma.
+  if (hl_pc > 0.0) {
+    let pc = vec3<f32>(tone_curve(cc.r, g, contrast),
+                       tone_curve(cc.g, g, contrast),
+                       tone_curve(cc.b, g, contrast));
+    outc = mix(outc, pc, smoothstep(HL_PC_LO, 1.0, ld) * hl_pc);
+  }
+  // A luminance-only shoulder can still leave a single channel above display
+  // white. Fade such a pixel toward its own luminance so the final clamp cuts
+  // brightness rather than hue.
+  let mx = max(outc.r, max(outc.g, outc.b));
+  if (mx > 1.0) {
+    let l3 = dot(outc, LUMA);
+    outc = mix(outc, vec3<f32>(l3), clamp((mx - 1.0) / mx, 0.0, 1.0));
+  }
   return max(outc, vec3<f32>(0.0));
 }
 
