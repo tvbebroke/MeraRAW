@@ -284,10 +284,10 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
   } else {
     let warmth = clamp((r0 - b0) / max(peak, 1e-6), 0.0, 1.0);
     let sat_keep = warmth * clamp((chroma - 0.20) / 0.25, 0.0, 1.0);
-    let blend_start = 0.78 + 0.18 * sat_keep;
+    let blend_start = 0.72 + 0.12 * sat_keep;
     let t = clamp((peak - blend_start) / max(1.05 - blend_start, 0.05), 0.0, 1.0);
     var w = t * t * (3.0 - 2.0 * t);
-    w = w * (1.0 - sat_keep * 0.72);
+    w = w * (1.0 - sat_keep * 0.45);
     rec = mix(per, luma, w);
   }
 

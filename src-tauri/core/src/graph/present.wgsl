@@ -121,13 +121,20 @@ fn view_look_dcp_grade(c: vec3<f32>, gain: f32, luma_contrast: f32, chroma: f32)
   outc = outc * (ld / l);
   let l2 = dot(max(outc, vec3<f32>(0.0)), LUMA);
   outc = mix(vec3<f32>(l2), outc, chroma);
-  // Warm highlight depth (SR2 poppies) — MIRRORED in dcp.rs refine_display_hue.
-  if (outc.r > outc.g && l2 > 0.20) {
+  // Warm highlight orange (SR2 poppies) — MIRRORED in dcp.rs refine_display_hue.
+  if (outc.r > outc.g && l2 > 0.35) {
     let warm = clamp((outc.r - outc.b) / max(outc.r, 1e-6), 0.0, 1.0);
-    let hi = clamp((l2 - 0.20) / 0.50, 0.0, 1.0);
-    outc.r = outc.r + warm * hi * 0.18 * outc.r;
-    outc.g = outc.g * (1.0 - warm * hi * 0.07);
-    outc.b = outc.b * (1.0 - warm * hi * 0.09);
+    let hi = clamp((l2 - 0.35) / 0.45, 0.0, 1.0);
+    let t = warm * hi;
+    let target_gr = 0.73;
+    let gr = outc.g / max(outc.r, 1e-6);
+    if (gr < target_gr) {
+      outc.g = outc.g + (target_gr * outc.r - outc.g) * t * 0.40;
+    }
+    if (l2 > 0.72) {
+      let cap = l2 * 1.04 + 0.06;
+      outc.r = min(outc.r, cap);
+    }
   }
   return max(outc, vec3<f32>(0.0));
 }

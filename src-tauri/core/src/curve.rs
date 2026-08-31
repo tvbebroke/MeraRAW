@@ -215,11 +215,11 @@ impl ProfileToneCurve {
             0.0
         };
         let sat_keep = warmth * ((chroma - 0.20) / 0.25).clamp(0.0, 1.0);
-        let blend_start = 0.78 + 0.18 * sat_keep;
+        let blend_start = 0.72 + 0.12 * sat_keep;
         let t = ((peak - blend_start) / (1.05 - blend_start).max(0.05)).clamp(0.0, 1.0);
         // Smoothstep
         let mut w = t * t * (3.0 - 2.0 * t);
-        w *= 1.0 - sat_keep * 0.72;
+        w *= 1.0 - sat_keep * 0.45;
         [
             per[0] + (luma[0] - per[0]) * w,
             per[1] + (luma[1] - per[1]) * w,

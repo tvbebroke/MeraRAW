@@ -630,13 +630,20 @@ impl DcpProfile {
     }
 
     fn refine_display_hue(mut rgb: [f32; 3], luma: f32) -> [f32; 3] {
-        // Warm highlights: keep red separation in poppy petals (SR2 depth).
-        if rgb[0] > rgb[1] && luma > 0.20 {
+        // Warm highlights: preserve orange (Affinity SR2 poppies), not R-only clip.
+        if rgb[0] > rgb[1] && luma > 0.35 {
             let warm = ((rgb[0] - rgb[2]) / rgb[0].max(1e-6)).clamp(0.0, 1.0);
-            let hi = ((luma - 0.20) / 0.50).clamp(0.0, 1.0);
-            rgb[0] += warm * hi * 0.18 * rgb[0];
-            rgb[1] *= 1.0 - warm * hi * 0.07;
-            rgb[2] *= 1.0 - warm * hi * 0.09;
+            let hi = ((luma - 0.35) / 0.45).clamp(0.0, 1.0);
+            let t = warm * hi;
+            let target_gr = 0.73;
+            let gr = rgb[1] / rgb[0].max(1e-6);
+            if gr < target_gr {
+                rgb[1] += (target_gr * rgb[0] - rgb[1]) * t * 0.40;
+            }
+            if luma > 0.72 {
+                let cap = luma * 1.04 + 0.06;
+                rgb[0] = rgb[0].min(cap);
+            }
         }
         rgb
     }
