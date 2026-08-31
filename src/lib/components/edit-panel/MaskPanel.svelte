@@ -1,8 +1,10 @@
 <script lang="ts">
+  import { onMount } from "svelte";
   import { fade } from "svelte/transition";
   import { doc } from "../../../stores/doc";
   import { selectedMask } from "../../../stores/app";
-  import { maskDisplayName } from "../../../stores/mask";
+  import { clearMaskPending, maskDisplayName, maskPendingIds } from "../../../stores/mask";
+  import { onMaskReady } from "../../../ipc/events";
   import MaskSettings from "./MaskSettings.svelte";
   import LightSettings from "./LightSettings.svelte";
   import ColorSettings from "./ColorSettings.svelte";
@@ -17,6 +19,15 @@
   const activeIndex = $derived(
     active ? masks.findIndex((m) => m.id === active.id) : -1,
   );
+  const activePending = $derived(active ? $maskPendingIds.has(active.id) : false);
+
+  onMount(() => {
+    let unlisten: (() => void) | undefined;
+    void onMaskReady((id) => clearMaskPending(id)).then((fn) => {
+      unlisten = fn;
+    });
+    return () => unlisten?.();
+  });
 </script>
 
 <div class="mask-panel custom-scrollbar">
@@ -27,6 +38,9 @@
       <p class="adjust-title">
         Adjust · {maskDisplayName(active.kind, activeIndex >= 0 ? activeIndex : 0)}
       </p>
+      {#if activePending}
+        <p class="adjust-pending">Detecting {active.kind === "sky" ? "sky" : "selection"}…</p>
+      {/if}
       <p class="adjust-hint">Sliders below affect only the masked area.</p>
     </div>
     <LightSettings />
@@ -63,6 +77,21 @@
     margin: var(--space-1) 0 var(--space-2);
     font-size: 11px;
     color: var(--color-subtle);
+  }
+  .adjust-pending {
+    margin: 0 0 var(--space-1);
+    font-size: 11px;
+    color: var(--color-accent, #7eb8ff);
+    animation: pulse 1.4s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    0%,
+    100% {
+      opacity: 0.55;
+    }
+    50% {
+      opacity: 1;
+    }
   }
   .pick-hint {
     padding: var(--space-3);

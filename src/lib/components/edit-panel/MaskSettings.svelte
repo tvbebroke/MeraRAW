@@ -8,11 +8,13 @@
   import {
     brushFlow,
     brushHardness,
+    markMaskPending,
     maskDisplayName,
     maskOverlayVisible,
     maskRefineMode,
     maskToolGroup,
     syncMaskOverlay,
+    syncViewportToolForMask,
     type MaskRefineMode,
   } from "../../../stores/mask";
   import { showMaskPanel } from "../../editor/focus";
@@ -71,7 +73,9 @@
         selectedRetouch.set(null);
         selectedMask.set(delta.newMaskId);
         maskToolGroup.set(null);
-        viewportTool.set(kind === "brush" ? "brush" : "pan");
+        const newMask = delta.doc.masks?.find((m) => m.id === delta.newMaskId);
+        syncViewportToolForMask(newMask ?? null);
+        if (source.type === "segmented") markMaskPending(delta.newMaskId);
         maskOverlayVisible.set(true);
         showMaskPanel();
         syncMaskOverlay();
@@ -96,7 +100,8 @@
           source,
         }),
       );
-      viewportTool.set(kind === "brush" ? "brush" : "pan");
+      syncViewportToolForMask(active);
+      if (source.type === "segmented") markMaskPending(active.id);
       showMaskPanel();
       syncMaskOverlay();
     } catch {
@@ -120,7 +125,7 @@
     selectedRetouch.set(null);
     selectedMask.set(id);
     const m = masks.find((x) => x.id === id);
-    viewportTool.set(m?.kind === "brush" ? "brush" : "pan");
+    syncViewportToolForMask(m ?? null);
     maskOverlayVisible.set(true);
     showMaskPanel();
     syncMaskOverlay();

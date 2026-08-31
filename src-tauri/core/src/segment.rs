@@ -2,12 +2,13 @@
 //! from local models, never the cloud (the conductor split, spec 4.2).
 //!
 //! Primary: tract-onnx (pure Rust — no FFI/runtime download; the `ort`
-//! CoreML path is a contained swap behind this trait). Subject model:
-//! bundled u2netp. Sky: spectral heuristic (model upgrade slots in here).
+//! CoreML path is a contained swap behind this trait).
+//! Subject: bundled u2netp. Sky: bundled U²-Net skyseg (MIT, xiongzhu666).
 //! Object-by-point: color-similarity region grow seeded at the point.
 
 use crate::error::CoreError;
 use crate::image::RgbF32Buf;
+use std::path::PathBuf;
 use std::sync::OnceLock;
 use tract_onnx::prelude::*;
 
@@ -29,28 +30,59 @@ type TractModel = std::sync::Arc<TypedSimplePlan>;
 pub struct TractSegmenter;
 
 static U2NETP: OnceLock<Result<TractModel, String>> = OnceLock::new();
+static SKYSEG: OnceLock<Result<TractModel, String>> = OnceLock::new();
 
-const MODEL_BYTES: &[u8] = include_bytes!("../models/u2netp.onnx");
+const SUBJECT_MODEL_BYTES: &[u8] = include_bytes!("../models/u2netp.onnx");
 const NET_SIZE: usize = 320;
 
-fn model() -> Result<&'static TractModel, CoreError> {
-    U2NETP
-        .get_or_init(|| {
-            let mut cursor = std::io::Cursor::new(MODEL_BYTES);
-            tract_onnx::onnx()
-                .model_for_read(&mut cursor)
-                .and_then(|m| {
-                    m.with_input_fact(
-                        0,
-                        InferenceFact::dt_shape(f32::datum_type(), tvec!(1, 3, NET_SIZE, NET_SIZE)),
-                    )
-                })
-                .and_then(|m| m.into_optimized())
-                .and_then(|m| m.into_runnable())
-                .map_err(|e| e.to_string())
+fn compile_u2net(bytes: &[u8]) -> Result<TractModel, String> {
+    let mut cursor = std::io::Cursor::new(bytes);
+    tract_onnx::onnx()
+        .model_for_read(&mut cursor)
+        .and_then(|m| {
+            m.with_input_fact(
+                0,
+                InferenceFact::dt_shape(f32::datum_type(), tvec!(1, 3, NET_SIZE, NET_SIZE)),
+            )
         })
+        .and_then(|m| m.into_optimized())
+        .and_then(|m| m.into_runnable())
+        .map_err(|e| e.to_string())
+}
+
+fn subject_model() -> Result<&'static TractModel, CoreError> {
+    U2NETP
+        .get_or_init(|| compile_u2net(SUBJECT_MODEL_BYTES))
         .as_ref()
         .map_err(|e| CoreError::Engine(format!("u2netp load: {e}")))
+}
+
+fn sky_model_path() -> Option<PathBuf> {
+    if let Ok(p) = std::env::var("MERATECH_SKY_MODEL") {
+        let path = PathBuf::from(p);
+        if path.is_file() {
+            return Some(path);
+        }
+    }
+    let bundled = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("models/skyseg.onnx");
+    if bundled.is_file() {
+        return Some(bundled);
+    }
+    None
+}
+
+fn sky_model() -> Result<&'static TractModel, CoreError> {
+    SKYSEG
+        .get_or_init(|| {
+            let path = sky_model_path().ok_or_else(|| {
+                "skyseg.onnx missing — run scripts/download-sky-model.sh".to_string()
+            })?;
+            std::fs::read(&path)
+                .map_err(|e| format!("read {}: {e}", path.display()))
+                .and_then(|bytes| compile_u2net(&bytes))
+        })
+        .as_ref()
+        .map_err(|e| CoreError::Engine(format!("skyseg load: {e}")))
 }
 
 /// Display-ish gamma for model input (models train on encoded images).
@@ -58,99 +90,53 @@ fn enc(v: f32) -> f32 {
     v.clamp(0.0, 1.0).powf(1.0 / 2.2)
 }
 
+fn run_u2net(plan: &TractModel, img: &RgbF32Buf) -> Result<Mask01, CoreError> {
+    let mean = [0.485f32, 0.456, 0.406];
+    let std = [0.229f32, 0.224, 0.225];
+    let mut input = vec![0.0f32; 3 * NET_SIZE * NET_SIZE];
+    for y in 0..NET_SIZE {
+        let sy = (y * img.height / NET_SIZE).min(img.height.saturating_sub(1));
+        for x in 0..NET_SIZE {
+            let sx = (x * img.width / NET_SIZE).min(img.width.saturating_sub(1));
+            let i = (sy * img.width + sx) * 3;
+            for c in 0..3 {
+                input[c * NET_SIZE * NET_SIZE + y * NET_SIZE + x] =
+                    (enc(img.data[i + c]) - mean[c]) / std[c];
+            }
+        }
+    }
+    let tensor = Tensor::from_shape(&[1, 3, NET_SIZE, NET_SIZE], &input).map_err(tr_err)?;
+    let result = plan.run(tvec!(tensor.into())).map_err(tr_err)?;
+    let view = result[0].view();
+    let raw: Vec<f32> = view.as_slice::<f32>().map_err(tr_err)?.to_vec();
+    let (mut lo, mut hi) = (f32::MAX, f32::MIN);
+    for v in &raw {
+        lo = lo.min(*v);
+        hi = hi.max(*v);
+    }
+    let range = (hi - lo).max(1e-6);
+    Ok(Mask01 {
+        width: NET_SIZE,
+        height: NET_SIZE,
+        data: raw.iter().map(|v| (v - lo) / range).collect(),
+    })
+}
+
 impl Segmenter for TractSegmenter {
     fn subject(&self, img: &RgbF32Buf) -> Result<Mask01, CoreError> {
-        let plan = model()?;
-        // letterbox-free squash resize to 320² (u2net convention)
-        let mean = [0.485f32, 0.456, 0.406];
-        let std = [0.229f32, 0.224, 0.225];
-        let mut input = vec![0.0f32; 3 * NET_SIZE * NET_SIZE];
-        for y in 0..NET_SIZE {
-            let sy = (y * img.height / NET_SIZE).min(img.height - 1);
-            for x in 0..NET_SIZE {
-                let sx = (x * img.width / NET_SIZE).min(img.width - 1);
-                let i = (sy * img.width + sx) * 3;
-                for c in 0..3 {
-                    input[c * NET_SIZE * NET_SIZE + y * NET_SIZE + x] =
-                        (enc(img.data[i + c]) - mean[c]) / std[c];
-                }
-            }
-        }
-        let tensor = Tensor::from_shape(&[1, 3, NET_SIZE, NET_SIZE], &input).map_err(tr_err)?;
-        let result = plan.run(tvec!(tensor.into())).map_err(tr_err)?;
-        let view = result[0].view();
-        let raw: Vec<f32> = view.as_slice::<f32>().map_err(tr_err)?.to_vec();
-        // min-max normalize (rembg post-processing)
-        let (mut lo, mut hi) = (f32::MAX, f32::MIN);
-        for v in &raw {
-            lo = lo.min(*v);
-            hi = hi.max(*v);
-        }
-        let range = (hi - lo).max(1e-6);
-        Ok(Mask01 {
-            width: NET_SIZE,
-            height: NET_SIZE,
-            data: raw.iter().map(|v| (v - lo) / range).collect(),
-        })
+        run_u2net(subject_model()?, img)
     }
 
-    /// Sky heuristic: bright + blue-ish + connected to the top edge.
-    /// (A dedicated sky model slots in behind this trait later.)
+    /// Sky via dedicated U²-Net weights (MIT — xiongzhu666 Sky-Segmentation).
     fn sky(&self, img: &RgbF32Buf) -> Result<Mask01, CoreError> {
-        let (w, h) = (img.width, img.height);
-        let mut score = vec![0.0f32; w * h];
-        for i in 0..w * h {
-            let r = img.data[i * 3];
-            let g = img.data[i * 3 + 1];
-            let b = img.data[i * 3 + 2];
-            let luma = 0.2627 * r + 0.678 * g + 0.0593 * b;
-            let blueness = (b - r).max(0.0) / (luma + 0.05);
-            let bright = (luma / 0.5).clamp(0.0, 1.0);
-            score[i] = ((blueness * 2.0).clamp(0.0, 1.0) * 0.6 + bright * 0.4).clamp(0.0, 1.0);
-        }
-        // connectivity: flood from top rows over high-score pixels
-        let mut mask = vec![0.0f32; w * h];
-        let mut stack: Vec<usize> = (0..w)
-            .chain(w..2 * w.min(w * h))
-            .filter(|i| score[*i] > 0.55)
-            .collect();
-        while let Some(i) = stack.pop() {
-            if mask[i] > 0.0 {
-                continue;
-            }
-            mask[i] = 1.0;
-            let (x, y) = (i % w, i / w);
-            for (nx, ny) in [
-                (x.wrapping_sub(1), y),
-                (x + 1, y),
-                (x, y.wrapping_sub(1)),
-                (x, y + 1),
-            ] {
-                if nx < w && ny < h {
-                    let j = ny * w + nx;
-                    if mask[j] == 0.0 && score[j] > 0.45 {
-                        stack.push(j);
-                    }
-                }
-            }
-        }
-        // soften by score so edges aren't binary
-        for i in 0..w * h {
-            mask[i] *= 0.5 + 0.5 * score[i];
-        }
-        Ok(Mask01 {
-            width: w,
-            height: h,
-            data: mask,
-        })
+        run_u2net(sky_model()?, img)
     }
 
     /// Object-by-point: color-similarity region grow seeded at the point.
-    /// (Promptable SAM-style model slots in behind this trait later.)
     fn object(&self, img: &RgbF32Buf, point: (f32, f32)) -> Result<Mask01, CoreError> {
         let (w, h) = (img.width, img.height);
-        let cx = ((point.0.clamp(0.0, 1.0) * w as f32) as usize).min(w - 1);
-        let cy = ((point.1.clamp(0.0, 1.0) * h as f32) as usize).min(h - 1);
+        let cx = ((point.0.clamp(0.0, 1.0) * w as f32) as usize).min(w.saturating_sub(1));
+        let cy = ((point.1.clamp(0.0, 1.0) * h as f32) as usize).min(h.saturating_sub(1));
         let seed_i = cy * w + cx;
         let seed = [
             img.data[seed_i * 3],
@@ -179,7 +165,7 @@ impl Segmenter for TractSegmenter {
             mask[i] = (1.0 - d / thresh).clamp(0.3, 1.0);
             visited += 1;
             if visited > w * h / 2 {
-                break; // runaway grow guard
+                break;
             }
             let (x, y) = (i % w, i / w);
             for (nx, ny) in [
@@ -213,7 +199,6 @@ mod tests {
     use super::*;
 
     fn synthetic_scene() -> RgbF32Buf {
-        // 64×64: blue bright top half (sky), dark red blob bottom-center
         let (w, h) = (64usize, 64usize);
         let mut data = vec![0.0f32; w * h * 3];
         for y in 0..h {
@@ -228,7 +213,6 @@ mod tests {
                     data[i + 1] = 0.05;
                     data[i + 2] = 0.05;
                 }
-                // red blob
                 let (dx, dy) = (x as i32 - 32, y as i32 - 48);
                 if dx * dx + dy * dy < 80 {
                     data[i] = 0.5;
@@ -244,13 +228,43 @@ mod tests {
         }
     }
 
+    /// Blue top band (sky) + blue bottom band (ocean) — heuristic confuses these.
+    fn sky_ocean_scene() -> RgbF32Buf {
+        let (w, h) = (128usize, 128usize);
+        let mut data = vec![0.0f32; w * h * 3];
+        for y in 0..h {
+            for x in 0..w {
+                let i = (y * w + x) * 3;
+                if y < h / 2 {
+                    // pale sky
+                    data[i] = 0.55;
+                    data[i + 1] = 0.72;
+                    data[i + 2] = 0.95;
+                } else {
+                    // deep ocean — similar hue, lower in frame
+                    data[i] = 0.02;
+                    data[i + 1] = 0.18;
+                    data[i + 2] = 0.42;
+                }
+            }
+        }
+        RgbF32Buf {
+            width: w,
+            height: h,
+            data,
+        }
+    }
+
     #[test]
-    fn sky_heuristic_finds_top_blue() {
-        let img = synthetic_scene();
+    #[ignore = "loads the ~84MB sky model; run with --ignored"]
+    fn sky_model_prefers_top_over_ocean() {
+        let img = sky_ocean_scene();
         let m = TractSegmenter.sky(&img).unwrap();
         let at = |x: usize, y: usize| m.data[y * m.width + x];
-        assert!(at(32, 8) > 0.5, "sky top: {}", at(32, 8));
-        assert!(at(32, 60) < 0.1, "ground must not be sky: {}", at(32, 60));
+        let sky = at(m.width / 2, m.height / 8);
+        let ocean = at(m.width / 2, m.height * 7 / 8);
+        assert!(sky > 0.45, "sky band: {sky}");
+        assert!(ocean < sky * 0.55, "ocean {ocean} should be below sky {sky}");
     }
 
     #[test]
@@ -269,7 +283,6 @@ mod tests {
         let m = TractSegmenter.subject(&img).unwrap();
         assert_eq!((m.width, m.height), (NET_SIZE, NET_SIZE));
         assert!(m.data.iter().all(|v| (0.0..=1.0).contains(v)));
-        // normalized output must span the range
         let hi = m.data.iter().cloned().fold(0.0f32, f32::max);
         assert!(hi > 0.9);
     }

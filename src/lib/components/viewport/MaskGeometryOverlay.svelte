@@ -23,6 +23,20 @@
 
   let dragging = $state<{ kind: HandleKind } | null>(null);
 
+  $effect(() => {
+    if (!dragging) return;
+    const move = (e: PointerEvent) => onPointerMove(e);
+    const up = () => onPointerUp();
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+    window.addEventListener("pointercancel", up);
+    return () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      window.removeEventListener("pointercancel", up);
+    };
+  });
+
   function sourceOf(m: NonNullable<typeof active>): Record<string, unknown> {
     if (m.source?.type === "composite") {
       const comps = m.source.components as { source?: Record<string, unknown> }[] | undefined;
@@ -99,7 +113,6 @@
     e.preventDefault();
     dragging = { kind };
     beginMaskAdjust();
-    (e.currentTarget as Element).setPointerCapture(e.pointerId);
   }
 
   function onPointerMove(e: PointerEvent) {
@@ -196,46 +209,34 @@
         <circle
           cx={c.x}
           cy={c.y}
-          r="7"
+          r="10"
           class="handle center"
           role="presentation"
           onpointerdown={(e) => onPointerDown(e, "center")}
-          onpointermove={onPointerMove}
-          onpointerup={onPointerUp}
-          onpointercancel={onPointerUp}
         />
         <circle
           cx={ex.x}
           cy={ex.y}
-          r="7"
+          r="10"
           class="handle edge"
           role="presentation"
           onpointerdown={(e) => onPointerDown(e, "edgeX")}
-          onpointermove={onPointerMove}
-          onpointerup={onPointerUp}
-          onpointercancel={onPointerUp}
         />
         <circle
           cx={ey.x}
           cy={ey.y}
-          r="7"
+          r="10"
           class="handle edge"
           role="presentation"
           onpointerdown={(e) => onPointerDown(e, "edgeY")}
-          onpointermove={onPointerMove}
-          onpointerup={onPointerUp}
-          onpointercancel={onPointerUp}
         />
         <circle
           cx={rot.x}
           cy={rot.y}
-          r="7"
+          r="10"
           class="handle rotate"
           role="presentation"
           onpointerdown={(e) => onPointerDown(e, "rotate")}
-          onpointermove={onPointerMove}
-          onpointerup={onPointerUp}
-          onpointercancel={onPointerUp}
         />
       </svg>
     {/if}
@@ -249,24 +250,18 @@
         <circle
           cx={a.x}
           cy={a.y}
-          r="7"
+          r="10"
           class="handle"
           role="presentation"
           onpointerdown={(e) => onPointerDown(e, "start")}
-          onpointermove={onPointerMove}
-          onpointerup={onPointerUp}
-          onpointercancel={onPointerUp}
         />
         <circle
           cx={b.x}
           cy={b.y}
-          r="7"
+          r="10"
           class="handle"
           role="presentation"
           onpointerdown={(e) => onPointerDown(e, "end")}
-          onpointermove={onPointerMove}
-          onpointerup={onPointerUp}
-          onpointercancel={onPointerUp}
         />
       </svg>
     {/if}
@@ -296,6 +291,7 @@
   }
   .handle {
     fill: white;
+    fill-opacity: 0.92;
     stroke: rgba(255, 80, 80, 0.95);
     stroke-width: 2;
     pointer-events: auto;

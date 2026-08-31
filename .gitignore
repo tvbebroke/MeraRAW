@@ -22,3 +22,5 @@ dist-release/
 src-tauri/rust_out
 .self-eval-scores.jsonl
 RELEASE-HANDOFF.md
+# Large ONNX — fetch via scripts/download-sky-model.sh before release builds
+src-tauri/core/models/skyseg.onnx

@@ -6,6 +6,7 @@ import { getRegistry, setParam } from "../../ipc/commands";
 import type { EditDocMirror, ImageMeta, ParamSpec } from "../../ipc/types";
 import { docParam, reconcile } from "../../stores/doc";
 import { selectedMask } from "../../stores/app";
+import { beginMaskAdjust, endMaskAdjust } from "../../stores/mask";
 
 export const registry = atom<ParamSpec[]>([]);
 
@@ -104,6 +105,7 @@ function pumpLive(path: string): void {
 
 /** Live (mid-drag) update — coalesced into one undo step engine-side. */
 export function setParamLive(path: string, v: number): void {
+  if (selectedMask.get()) beginMaskAdjust();
   const s = stateFor(path);
   s.pendingLive = v;
   pumpLive(path);
@@ -113,5 +115,8 @@ export function setParamLive(path: string, v: number): void {
 export function commitParam(path: string, v: number): Promise<void> {
   const s = stateFor(path);
   s.pendingLive = null;
-  return send(path, v, false);
+  if (selectedMask.get()) beginMaskAdjust();
+  return send(path, v, false).finally(() => {
+    if (selectedMask.get()) endMaskAdjust();
+  });
 }

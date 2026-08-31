@@ -19,6 +19,11 @@ BUNDLE_DIR="src-tauri/target/release/bundle/macos"
 echo "→ Installing frontend dependencies…"
 if [[ -f package-lock.json ]]; then npm ci; else npm install; fi
 
+if [[ ! -f src-tauri/core/models/skyseg.onnx ]]; then
+  echo "→ Sky model missing — downloading…"
+  bash scripts/download-sky-model.sh
+fi
+
 if [[ -z "${APPLE_SIGNING_IDENTITY:-}" ]]; then
   export APPLE_SIGNING_IDENTITY="-"
   echo "→ Using ad-hoc signing (APPLE_SIGNING_IDENTITY=-)"

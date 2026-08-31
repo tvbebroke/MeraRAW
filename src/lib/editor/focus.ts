@@ -6,7 +6,7 @@ import {
   viewportTool,
 } from "../../stores/app";
 import { doc } from "../../stores/doc";
-import { syncMaskOverlay } from "../../stores/mask";
+import { syncMaskOverlay, syncViewportToolForMask } from "../../stores/mask";
 import {
   activeTool,
   editFocus,
@@ -28,7 +28,7 @@ export function applyTool(id: Tool) {
     selectedRetouch.set(null);
     const mid = selectedMask.get();
     const m = mid ? doc.get()?.masks?.find((x) => x.id === mid) : null;
-    viewportTool.set(m?.kind === "brush" ? "brush" : "pan");
+    syncViewportToolForMask(m ?? null);
     syncMaskOverlay();
   } else if (id === "ai") {
     selectedMask.set(null);

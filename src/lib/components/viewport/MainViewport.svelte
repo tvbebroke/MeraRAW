@@ -45,7 +45,7 @@
     zoomLabel,
     brushRadius,
   } from "../../../stores/app";
-  import { brushFlow, brushHardness, beginMaskAdjust, endMaskAdjust, maskRefineMode } from "../../../stores/mask";
+  import { brushFlow, brushHardness, beginMaskAdjust, endMaskAdjust, maskAdjusting, maskRefineMode } from "../../../stores/mask";
   import MaskGeometryOverlay from "./MaskGeometryOverlay.svelte";
   import { doc, reconcile } from "../../../stores/doc";
   import { setWorkspace, workspace } from "../../../stores/workspace";
@@ -75,6 +75,9 @@
   ];
 
   let wrapEl = $state<HTMLDivElement | null>(null);
+  let imgBox = $state<{ left: number; top: number; width: number; height: number } | null>(
+    null,
+  );
   let displaySrc = $state<string | null>(null);
   const viewportSrc = $derived(displaySrc ?? $openingPreviewUrl);
   let error = $state<string | null>(null);
@@ -152,25 +155,76 @@
     return { w, h };
   }
 
+  function measureImageBox(wrap: HTMLElement) {
+    const img = wrap.querySelector("img.viewport-frame");
+    if (!img) {
+      imgBox = null;
+      return;
+    }
+    const wr = wrap.getBoundingClientRect();
+    const ir = img.getBoundingClientRect();
+    imgBox = {
+      left: ir.left - wr.left,
+      top: ir.top - wr.top,
+      width: ir.width,
+      height: ir.height,
+    };
+  }
+
+  $effect(() => {
+    const wrap = wrapEl;
+    const src = viewportSrc;
+    if (!wrap || !src) {
+      imgBox = null;
+      return;
+    }
+    measureImageBox(wrap);
+    const obs = new ResizeObserver(() => measureImageBox(wrap));
+    obs.observe(wrap);
+    const img = wrap.querySelector("img.viewport-frame");
+    if (img) obs.observe(img);
+    return () => obs.disconnect();
+  });
+
   function screenToOriginalNorm(
     clientX: number,
     clientY: number,
     wrap: HTMLElement,
     scale: number,
     v: ViewState,
+    clampToImage = true,
   ): [number, number] | null {
     const dims = imageDims.get();
-    if (!dims) return null;
+    if (!dims || !imgBox || imgBox.width < 4 || imgBox.height < 4) return null;
     const crop = readCropFromDoc(doc.get()?.modules);
     const mode = cropModeFor(crop, cropActive.get());
     const [cw, ch] = contentDims(crop, dims.w, dims.h, mode);
     const rect = wrap.getBoundingClientRect();
     const dpr = window.devicePixelRatio;
-    const px = (clientX - rect.left) * dpr;
-    const py = (clientY - rect.top) * dpr;
-    const nx = (v.centerX * cw + (px - (rect.width * dpr) / 2) / scale) / cw;
-    const ny = (v.centerY * ch + (py - (rect.height * dpr) / 2) / scale) / ch;
-    return contentNormToImageNorm(nx, ny, crop, dims.w, dims.h, mode);
+    const localX = clientX - rect.left;
+    const localY = clientY - rect.top;
+    if (
+      clampToImage &&
+      (localX < imgBox.left ||
+        localY < imgBox.top ||
+        localX > imgBox.left + imgBox.width ||
+        localY > imgBox.top + imgBox.height)
+    ) {
+      return null;
+    }
+    const fu = (localX - imgBox.left) / imgBox.width;
+    const fv = (localY - imgBox.top) / imgBox.height;
+    const nx = v.centerX + ((fu - 0.5) * imgBox.width * dpr) / (scale * cw);
+    const ny = v.centerY + ((fv - 0.5) * imgBox.height * dpr) / (scale * ch);
+    if (mode === 0) return [nx, ny];
+    const mapped = contentNormToImageNorm(nx, ny, crop, dims.w, dims.h, mode);
+    return mapped ?? (clampToImage ? null : [nx, ny]);
+  }
+
+  /** Mask geometry: map screen → image norm, extrapolating outside the image bounds. */
+  function imageNormFromScreen(clientX: number, clientY: number): [number, number] | null {
+    if (!wrapEl) return null;
+    return screenToOriginalNorm(clientX, clientY, wrapEl, effScale, view, false);
   }
 
   function updateZoomLabel() {
@@ -248,19 +302,16 @@
   /** Image-normalized coords (mask space) → CSS position inside viewport wrap. */
   function imageNormToLocal(ix: number, iy: number): { x: number; y: number } | null {
     const dims = imageDims.get();
-    const wrap = wrapEl;
-    if (!dims || !wrap) return null;
+    if (!dims || !imgBox || imgBox.width < 4 || imgBox.height < 4) return null;
     const crop = readCropFromDoc(doc.get()?.modules);
     const mode = cropModeFor(crop, cropActive.get());
     const [cw, ch] = contentDims(crop, dims.w, dims.h, mode);
-    const rect = wrap.getBoundingClientRect();
     const dpr = window.devicePixelRatio;
-    // Inverse of screenToOriginalNorm (mode 0: image norm = content norm).
     const nx = ix;
     const ny = iy;
     return {
-      x: (rect.width / 2) + ((nx - view.centerX) * cw * effScale) / dpr,
-      y: (rect.height / 2) + ((ny - view.centerY) * ch * effScale) / dpr,
+      x: imgBox.left + imgBox.width / 2 + ((nx - view.centerX) * cw * effScale) / dpr,
+      y: imgBox.top + imgBox.height / 2 + ((ny - view.centerY) * ch * effScale) / dpr,
     };
   }
 
@@ -432,7 +483,12 @@
       onSplitPointerDown(e);
       return;
     }
+    if (maskAdjusting.get()) return;
     const tool = viewportTool.get();
+    if (tool === "mask-geo") {
+      // Radial/linear handles live in MaskGeometryOverlay; pan with middle button only.
+      if (e.button !== 1) return;
+    }
     if (tool === "brush" && (selectedMask.get() || selectedRetouch.get())) {
       const p = toImageCoords(e);
       if (p) {
@@ -473,6 +529,7 @@
       moveSplit(e);
       return;
     }
+    if (maskAdjusting.get()) return;
     if (loupeOn) {
       paintLoupe(e.clientX, e.clientY);
       return;
@@ -812,7 +869,7 @@
     bind:this={wrapEl}
     role="img"
     aria-label="Develop preview"
-    class="viewport-surround relative flex min-h-0 min-w-0 flex-1 items-center justify-center overflow-hidden select-none {$cropActive ? 'cursor-default' : 'cursor-grab active:cursor-grabbing'}"
+    class="viewport-surround relative flex min-h-0 min-w-0 flex-1 items-center justify-center select-none {$viewportTool === 'mask-geo' ? 'overflow-visible cursor-default' : $cropActive ? 'cursor-default overflow-hidden' : 'cursor-grab active:cursor-grabbing overflow-hidden'}"
     onwheel={onWheel}
     onpointerdown={onPointerDown}
     onpointermove={onPointerMove}
@@ -875,7 +932,7 @@
       <MaskGeometryOverlay
         {wrapEl}
         {imgAspect}
-        toImageCoords={(x, y) => toImageCoords({ clientX: x, clientY: y })}
+        toImageCoords={imageNormFromScreen}
         {imageNormToLocal}
       />
     {/if}

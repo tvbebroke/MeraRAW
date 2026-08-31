@@ -61,7 +61,7 @@ Sidecar priority: `<name>.mrt.json` (canonical) → Adobe `<name>.xmp` (basic Li
 
 - Decoder = pure-Rust **rawler** (LibRaw licensing/FFI risk R1); `Decoder` trait keeps the swap contained. EXIF-orientation fallback added.
 - Perceptual space = **Oklab**, not Yrg/JzAzBz (reference §9 forbids from-memory constants; same constant-hue class, constants verified).
-- Sky segmentation = spectral heuristic; object-by-point = region-grow (placeholders behind the `Segmenter` trait; u2netp subject is the real model).
+- Sky segmentation = on-device U²-Net skyseg (MIT, xiongzhu666); object-by-point = region-grow.
 - Undo via doc snapshots (docs ~KB) instead of op inverses.
 - Catalog search = indexed LIKE (FTS5 swap-in ready); collections deferred.
 - ICC embed implemented for JPEG (system ColorSync profiles); PNG/TIFF written in-space without embedded profile.

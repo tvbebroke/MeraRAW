@@ -507,6 +507,18 @@ fn main() {
                 }
             }
 
+            if std::env::var("MERATECH_SKY_MODEL").is_err() {
+                if let Ok(res) = app.path().resolve(
+                    "core/models/skyseg.onnx",
+                    tauri::path::BaseDirectory::Resource,
+                ) {
+                    if res.is_file() {
+                        std::env::set_var("MERATECH_SKY_MODEL", &res);
+                        tracing::info!(path = %res.display(), "sky segmentation model");
+                    }
+                }
+            }
+
             // Window-state restore can leave the frame oversized / hanging off
             // the right edge (common when moving from a large display to a
             // 13" MacBook). Clamp into the current monitor work area.

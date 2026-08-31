@@ -75,8 +75,8 @@ export const selectedMask = atom<string | null>(null);
 /** Selected object-removal / heal spot (phase 10). */
 export const selectedRetouch = atom<string | null>(null);
 
-/** Viewport tool (pan / white-balance eyedropper / brush / crop). */
-export type ViewportTool = "pan" | "wb" | "brush" | "crop";
+/** Viewport tool (pan / white-balance eyedropper / brush / crop / mask geometry). */
+export type ViewportTool = "pan" | "wb" | "brush" | "crop" | "mask-geo";
 export const viewportTool = atom<ViewportTool>("pan");
 export const brushRadius = atom(0.05);
 export const cropActive = atom(false);

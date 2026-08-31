@@ -1,6 +1,8 @@
 <script lang="ts">
   import { curveChannel, type CurveChannel } from "../../../stores/editor";
   import { doc, reconcile } from "../../../stores/doc";
+  import { selectedMask } from "../../../stores/app";
+  import { beginMaskAdjust, endMaskAdjust } from "../../../stores/mask";
   import { setParam } from "../../../ipc/commands";
   import CollapsibleSection from "./CollapsibleSection.svelte";
 
@@ -98,6 +100,7 @@
 
   function startDrag(e: PointerEvent, index: number) {
     e.preventDefault();
+    if ($selectedMask) beginMaskAdjust();
     draggedIndex = index;
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
   }
@@ -131,6 +134,7 @@
       }
       draggedIndex = null;
       commit();
+      if ($selectedMask) endMaskAdjust();
     }
   }
 
@@ -145,6 +149,7 @@
     const updated = [...activePoints];
     updated.splice(insertIdx, 0, { x, y });
     pointsByChannel[$curveChannel] = updated;
+    if ($selectedMask) beginMaskAdjust();
     draggedIndex = insertIdx;
     svgElement.setPointerCapture(e.pointerId);
   }
