@@ -38,6 +38,12 @@ pub enum Op {
         id: String,
         source: serde_json::Value,
     },
+    /// Add a component to a mask (Lightroom-style add/subtract/intersect).
+    AddMaskComponent {
+        id: String,
+        mode: String,
+        source: serde_json::Value,
+    },
     /// Object removal: new heal spot (brush source).
     AddRetouchSpot {
         source: serde_json::Value,
@@ -74,6 +80,7 @@ impl Op {
             Op::RemoveMask { .. } => "remove mask".into(),
             Op::RefineMask { .. } => "refine mask".into(),
             Op::SetMaskSource { .. } => "edit mask shape".into(),
+            Op::AddMaskComponent { mode, .. } => format!("{mode} to mask"),
             Op::AddRetouchSpot { .. } => "add heal spot".into(),
             Op::RemoveRetouchSpot { .. } => "remove heal spot".into(),
             Op::SetRetouchSource { .. } => "edit heal brush".into(),
@@ -99,7 +106,8 @@ impl Op {
             Op::AddMask { .. }
             | Op::RemoveMask { .. }
             | Op::RefineMask { .. }
-            | Op::SetMaskSource { .. } => Some("masks".into()),
+            | Op::SetMaskSource { .. }
+            | Op::AddMaskComponent { .. } => Some("masks".into()),
             Op::AddRetouchSpot { .. }
             | Op::RemoveRetouchSpot { .. }
             | Op::SetRetouchSource { .. }
@@ -338,6 +346,43 @@ pub fn apply_op(doc: &mut EditDoc, op: &Op) -> Result<Option<String>, CoreError>
                 .mask_mut(id)
                 .ok_or_else(|| CoreError::InvalidOp(format!("mask not found: {id}")))?;
             mask.source = source.clone();
+            doc.touch();
+            Ok(None)
+        }
+        Op::AddMaskComponent { id, mode, source } => {
+            let mode = mode.to_lowercase();
+            if !matches!(mode.as_str(), "add" | "subtract" | "intersect") {
+                return Err(CoreError::InvalidOp(format!("unknown mask mode: {mode}")));
+            }
+            check_mask_source(source)?;
+            let mask = doc
+                .mask_mut(id)
+                .ok_or_else(|| CoreError::InvalidOp(format!("mask not found: {id}")))?;
+            let component = serde_json::json!({ "op": mode, "source": source });
+            let new_source = if mask
+                .source
+                .get("type")
+                .and_then(|t| t.as_str())
+                == Some("composite")
+            {
+                let mut comps = mask
+                    .source
+                    .get("components")
+                    .and_then(|c| c.as_array())
+                    .cloned()
+                    .unwrap_or_default();
+                comps.push(component);
+                serde_json::json!({ "type": "composite", "components": comps })
+            } else {
+                serde_json::json!({
+                    "type": "composite",
+                    "components": [
+                        { "op": "add", "source": mask.source.clone() },
+                        component
+                    ]
+                })
+            };
+            mask.source = new_source;
             doc.touch();
             Ok(None)
         }

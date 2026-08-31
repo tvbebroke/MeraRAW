@@ -45,11 +45,16 @@
     zoomLabel,
     brushRadius,
   } from "../../../stores/app";
+  import { brushFlow, brushHardness, beginMaskAdjust, endMaskAdjust, maskRefineMode } from "../../../stores/mask";
+  import MaskGeometryOverlay from "./MaskGeometryOverlay.svelte";
   import { doc, reconcile } from "../../../stores/doc";
   import { setWorkspace, workspace } from "../../../stores/workspace";
 
   let { minimal = false }: { minimal?: boolean } = $props();
   const isVideoWs = $derived($workspace === "video");
+  const imgAspect = $derived(
+    $imageDims && $imageDims.h > 0 ? $imageDims.w / $imageDims.h : 1,
+  );
   const mediaMismatch = $derived(
     $imageOpen &&
       ((isVideoWs && $imageMeta?.kind !== "video") ||
@@ -240,6 +245,25 @@
     return screenToOriginalNorm(e.clientX, e.clientY, wrapEl, effScale, view);
   }
 
+  /** Image-normalized coords (mask space) → CSS position inside viewport wrap. */
+  function imageNormToLocal(ix: number, iy: number): { x: number; y: number } | null {
+    const dims = imageDims.get();
+    const wrap = wrapEl;
+    if (!dims || !wrap) return null;
+    const crop = readCropFromDoc(doc.get()?.modules);
+    const mode = cropModeFor(crop, cropActive.get());
+    const [cw, ch] = contentDims(crop, dims.w, dims.h, mode);
+    const rect = wrap.getBoundingClientRect();
+    const dpr = window.devicePixelRatio;
+    // Inverse of screenToOriginalNorm (mode 0: image norm = content norm).
+    const nx = ix;
+    const ny = iy;
+    return {
+      x: (rect.width / 2) + ((nx - view.centerX) * cw * effScale) / dpr,
+      y: (rect.height / 2) + ((ny - view.centerY) * ch * effScale) / dpr,
+    };
+  }
+
   function pickLook(value: number) {
     displayLook.set(value);
     void setDisplayLook(value).catch(() => {});
@@ -411,7 +435,10 @@
     const tool = viewportTool.get();
     if (tool === "brush" && (selectedMask.get() || selectedRetouch.get())) {
       const p = toImageCoords(e);
-      if (p) brushPoints = [p];
+      if (p) {
+        brushPoints = [p];
+        if (selectedMask.get()) beginMaskAdjust();
+      }
       (e.currentTarget as Element).setPointerCapture(e.pointerId);
       return;
     }
@@ -483,8 +510,8 @@
     const stroke = {
       points: pts,
       radius: brushRadius.get(),
-      hardness: 0.6,
-      mode: "add",
+      hardness: brushHardness.get(),
+      mode: maskRefineMode.get(),
     };
 
     const retouchId = selectedRetouch.get();
@@ -509,7 +536,9 @@
     const maskId = selectedMask.get();
     if (!maskId) return;
     const mask = d?.masks?.find((m) => m.id === maskId);
-    if (mask && mask.source.type === "brush") {
+    if (!mask) return;
+
+    if (mask.source.type === "brush") {
       const strokes = Array.isArray(mask.source.strokes)
         ? [...(mask.source.strokes as unknown[])]
         : [];
@@ -520,8 +549,58 @@
         source: { type: "brush", strokes },
       })
         .then((delta) => reconcile(delta))
-        .catch(() => {});
+        .catch(() => {})
+        .finally(() => endMaskAdjust());
+      return;
     }
+
+    if (mask.source.type === "composite") {
+      const comps = [...(mask.source.components as Record<string, unknown>[])];
+      const last = comps[comps.length - 1];
+      if (
+        last?.source &&
+        (last.source as { type?: string }).type === "brush" &&
+        last.op === maskRefineMode.get()
+      ) {
+        const src = last.source as { strokes?: unknown[] };
+        const strokes = Array.isArray(src.strokes) ? [...src.strokes] : [];
+        strokes.push(stroke);
+        comps[comps.length - 1] = {
+          ...last,
+          source: { type: "brush", strokes },
+        };
+        applyOp({
+          op: "set_mask_source",
+          id: mask.id,
+          source: { type: "composite", components: comps },
+        })
+          .then((delta) => reconcile(delta))
+          .catch(() => {})
+          .finally(() => endMaskAdjust());
+      } else {
+        applyOp({
+          op: "add_mask_component",
+          id: mask.id,
+          mode: maskRefineMode.get(),
+          source: { type: "brush", strokes: [stroke] },
+        })
+          .then((delta) => reconcile(delta))
+          .catch(() => {})
+          .finally(() => endMaskAdjust());
+      }
+      return;
+    }
+
+    // Refine AI / gradient masks with brush add/subtract.
+    applyOp({
+      op: "add_mask_component",
+      id: mask.id,
+      mode: maskRefineMode.get(),
+      source: { type: "brush", strokes: [stroke] },
+    })
+      .then((delta) => reconcile(delta))
+      .catch(() => {})
+      .finally(() => endMaskAdjust());
   }
 
   function onDoubleClick() {
@@ -790,6 +869,15 @@
 
     {#if $cropActive && displaySrc && !isVideoWs}
       <CropOverlay {wrapEl} />
+    {/if}
+
+    {#if displaySrc && $selectedMask && !isVideoWs}
+      <MaskGeometryOverlay
+        {wrapEl}
+        {imgAspect}
+        toImageCoords={(x, y) => toImageCoords({ clientX: x, clientY: y })}
+        {imageNormToLocal}
+      />
     {/if}
 
     {#if loupeOn}

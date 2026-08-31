@@ -32,6 +32,8 @@ pub struct RenderGraph {
     lut_pipe: PassResources,
     mask_geom: PassResources,
     mask_sample: PassResources,
+    mask_combine: PassResources,
+    mask_finalize: PassResources,
     blend: PassResources,
     sampler: wgpu::Sampler,
     extract_uniforms: wgpu::Buffer,
@@ -50,6 +52,7 @@ pub struct RenderGraph {
     mask_tex: HashMap<String, wgpu::Texture>,
     scratch: Vec<wgpu::Texture>,   // 2× local-stack ping-pong
     composite: Vec<wgpu::Texture>, // 2× composite ping-pong
+    mask_scratch: Vec<wgpu::Texture>, // 2× R32 mask ping-pong (composite)
     out_tex: Option<wgpu::Texture>,
     cache_size: Option<(u32, u32)>,
     last_view_key: Option<[u32; 5]>,

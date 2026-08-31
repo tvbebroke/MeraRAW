@@ -152,6 +152,7 @@ export type Op =
       blend?: string;
     }
   | { op: "set_mask_source"; id: string; source: unknown }
+  | { op: "add_mask_component"; id: string; mode: string; source: unknown }
   | { op: "add_retouch_spot"; source: unknown }
   | { op: "remove_retouch_spot"; id: string }
   | { op: "set_retouch_source"; id: string; source: unknown }

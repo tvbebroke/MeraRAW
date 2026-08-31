@@ -1,9 +1,9 @@
 import { push, router } from "svelte-spa-router";
 import { leftRailCollapsed, isZenMode, imageBrowserCollapsed, photoDetailsCollapsed, commandPaletteOpen } from "../stores/editor";
 import { isSettingsOpen, isExportOpen, isBugReportOpen, classicLook, isShortcutsOpen } from "../stores/ui";
-import { applyEditFocus, showAiPanel } from "./editor/focus";
+import { applyEditFocus, showAiPanel, showMaskPanel } from "./editor/focus";
 import { activePhoto, libraryItems, openPhoto, gridKey } from "../stores/browse";
-import { imageMeta } from "../stores/app";
+import { imageMeta, viewportTool } from "../stores/app";
 import { editorRoute, isEditorRoute, isLibraryRoute, libraryRoute, workspace } from "../stores/workspace";
 import { copyGrade, pasteGrade } from "./grade";
 
@@ -256,6 +256,12 @@ export function handleGlobalShortcut(e: KeyboardEvent): void {
   if (key === "3") {
     if (workspace.get() === "video") return;
     applyEditFocus("mask");
+    return;
+  }
+  if (key === "k") {
+    if (workspace.get() === "video") return;
+    showMaskPanel();
+    viewportTool.set("brush");
     return;
   }
   if (key === "4") {

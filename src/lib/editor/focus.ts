@@ -5,6 +5,8 @@ import {
   selectedRetouch,
   viewportTool,
 } from "../../stores/app";
+import { doc } from "../../stores/doc";
+import { syncMaskOverlay } from "../../stores/mask";
 import {
   activeTool,
   editFocus,
@@ -24,15 +26,17 @@ export function applyTool(id: Tool) {
     void setMaskOverlay(null);
   } else if (id === "mask") {
     selectedRetouch.set(null);
-    viewportTool.set("brush");
     const mid = selectedMask.get();
-    void setMaskOverlay(mid);
+    const m = mid ? doc.get()?.masks?.find((x) => x.id === mid) : null;
+    viewportTool.set(m?.kind === "brush" ? "brush" : "pan");
+    syncMaskOverlay();
   } else if (id === "ai") {
     selectedMask.set(null);
     void setMaskOverlay(null);
     viewportTool.set(selectedRetouch.get() ? "brush" : "pan");
   } else {
     selectedRetouch.set(null);
+    selectedMask.set(null);
     viewportTool.set("pan");
     void setMaskOverlay(null);
   }
@@ -53,25 +57,42 @@ const FOCUS_TO_SECTION: Record<Exclude<EditFocus, null>, SectionId> = {
 
 export function applyEditFocus(focus: EditFocus) {
   editFocus.set(focus);
-  rightPanelMode.set("edit");
-  if (focus === "crop") applyTool("crop");
-  else if (focus === "mask") applyTool("mask");
-  else if (focus === "retouch") applyTool("ai");
-  else if (focus === "presets") applyTool("presets");
-  else applyTool("edit");
+  if (focus === "mask") {
+    showMaskPanel();
+  } else if (focus === "crop") {
+    rightPanelMode.set("edit");
+    applyTool("crop");
+  } else if (focus === "retouch") {
+    rightPanelMode.set("edit");
+    applyTool("ai");
+  } else if (focus === "presets") {
+    rightPanelMode.set("edit");
+    applyTool("presets");
+  } else {
+    rightPanelMode.set("edit");
+    applyTool("edit");
+  }
 
   if (!focus) return;
   const id = FOCUS_TO_SECTION[focus];
   openSections.setKey(id, true);
-  queueMicrotask(() => {
-    document
-      .querySelector(`[data-section="${id}"]`)
-      ?.scrollIntoView({ behavior: "smooth", block: "nearest" });
-  });
+  if (focus !== "mask") {
+    queueMicrotask(() => {
+      document
+        .querySelector(`[data-section="${id}"]`)
+        ?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    });
+  }
 }
 
 export function showAiPanel() {
   rightPanelMode.set("ai");
   applyTool("edit");
   window.dispatchEvent(new CustomEvent("meraraw:focus-agent"));
+}
+
+/** Lightroom-style masking rail: tools + scoped adjustments. */
+export function showMaskPanel() {
+  rightPanelMode.set("mask");
+  applyTool("mask");
 }

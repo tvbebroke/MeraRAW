@@ -2,18 +2,19 @@
   import { fade, fly } from "svelte/transition";
   import { cubicOut } from "svelte/easing";
   import { histogramOpen, rightPanelMode } from "../../../stores/editor";
-  import { imageOpen } from "../../../stores/app";
-  import { showAiPanel } from "../../editor/focus";
+  import { imageOpen, selectedMask } from "../../../stores/app";
+  import { showAiPanel, showMaskPanel } from "../../editor/focus";
+  import { setMaskOverlay } from "../../../ipc/commands";
   import LightSettings from "./LightSettings.svelte";
   import ColorSettings from "./ColorSettings.svelte";
   import ToneCurve from "./ToneCurve.svelte";
   import DetailSettings from "./DetailSettings.svelte";
   import GradingSettings from "./GradingSettings.svelte";
   import CropSettings from "./CropSettings.svelte";
-  import MaskSettings from "./MaskSettings.svelte";
   import RetouchSettings from "./RetouchSettings.svelte";
   import CameraSettings from "./CameraSettings.svelte";
   import PresetSettings from "./PresetSettings.svelte";
+  import MaskPanel from "./MaskPanel.svelte";
   import Histogram from "../histogram/Histogram.svelte";
   import AgentPanel from "../shell/AgentPanel.svelte";
   import { workspace } from "../../../stores/workspace";
@@ -21,8 +22,16 @@
   const isVideo = $derived($workspace === "video");
 
   $effect(() => {
-    if (isVideo && $rightPanelMode === "ai") rightPanelMode.set("edit");
+    if (isVideo && ($rightPanelMode === "ai" || $rightPanelMode === "mask")) {
+      rightPanelMode.set("edit");
+    }
   });
+
+  function openEditTab() {
+    selectedMask.set(null);
+    void setMaskOverlay(null);
+    rightPanelMode.set("edit");
+  }
 </script>
 
 <div class="edit-rail">
@@ -33,11 +42,21 @@
       aria-selected={$rightPanelMode === "edit"}
       class="edit-tab"
       class:is-active={$rightPanelMode === "edit"}
-      onclick={() => rightPanelMode.set("edit")}
+      onclick={openEditTab}
     >
       {isVideo ? "Grade" : "Edit"}
     </button>
     {#if !isVideo}
+      <button
+        type="button"
+        role="tab"
+        aria-selected={$rightPanelMode === "mask"}
+        class="edit-tab"
+        class:is-active={$rightPanelMode === "mask"}
+        onclick={() => showMaskPanel()}
+      >
+        Mask
+      </button>
       <button
         type="button"
         role="tab"
@@ -54,6 +73,14 @@
   {#if $rightPanelMode === "ai"}
     <div class="edit-body" in:fade={{ duration: 160 }}>
       <AgentPanel embedded />
+    </div>
+  {:else if $rightPanelMode === "mask"}
+    <div class="edit-body" in:fade={{ duration: 160 }}>
+      {#if !$imageOpen}
+        <p class="rail-empty empty">Open a photo to start masking.</p>
+      {:else}
+        <MaskPanel />
+      {/if}
     </div>
   {:else}
     <div class="edit-body">
@@ -76,7 +103,6 @@
             <DetailSettings />
             <GradingSettings />
             <CropSettings />
-            <MaskSettings />
             <RetouchSettings />
             <CameraSettings mode="photo" />
             <PresetSettings />

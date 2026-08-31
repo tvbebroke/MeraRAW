@@ -141,6 +141,25 @@ pub(super) struct BlendUniforms {
     pub _p1: u32,
 }
 
+#[repr(C)]
+#[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
+pub(super) struct MaskCombineUniforms {
+    pub width: u32,
+    pub height: u32,
+    pub op: u32,
+    pub _pad: u32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
+pub(super) struct MaskFinalizeUniforms {
+    pub width: u32,
+    pub height: u32,
+    pub opacity: f32,
+    pub invert: u32,
+    pub _pad: u32,
+}
+
 /// Per-render uniform for the DCP look pass — field order matches `struct U`
 /// in dcp_look.wgsl exactly (20 scalars, 80 bytes).
 #[repr(C)]
@@ -497,6 +516,27 @@ impl RenderGraph {
                 bgl_uniform(4),
             ],
         );
+        let mask_combine = make_pass(
+            gpu,
+            "mask-combine",
+            include_str!("mask_combine.wgsl"),
+            &[
+                bgl_tex(0, false),
+                bgl_tex(1, false),
+                bgl_storage_tex(2, wgpu::TextureFormat::R32Float),
+                bgl_uniform(3),
+            ],
+        );
+        let mask_finalize = make_pass(
+            gpu,
+            "mask-finalize",
+            include_str!("mask_finalize.wgsl"),
+            &[
+                bgl_tex(0, false),
+                bgl_storage_tex(1, wgpu::TextureFormat::R32Float),
+                bgl_uniform(2),
+            ],
+        );
         let blend = make_pass(
             gpu,
             "blend",
@@ -562,6 +602,8 @@ impl RenderGraph {
             lut_pipe,
             mask_geom,
             mask_sample,
+            mask_combine,
+            mask_finalize,
             blend,
             sampler,
             extract_uniforms: mk_uniform(
@@ -584,6 +626,7 @@ impl RenderGraph {
             mask_tex: HashMap::new(),
             scratch: Vec::new(),
             composite: Vec::new(),
+            mask_scratch: Vec::new(),
             out_tex: None,
             cache_size: None,
             last_view_key: None,

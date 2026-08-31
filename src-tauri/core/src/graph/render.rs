@@ -4,7 +4,8 @@ use super::config::{mask_node_configs, node_configs, NodeConfig};
 use super::mask_stage_index;
 use super::resources::{
     make_chain_tex, make_mask_tex, make_tex, BlendUniforms, CropUniform, DcpLookUniforms, DcpMeta,
-    ExtractUniforms, MaskGeomUniforms, MaskSampleUniforms, PassResources, PipeKind,
+    ExtractUniforms, MaskCombineUniforms, MaskFinalizeUniforms, MaskGeomUniforms,
+    MaskSampleUniforms, PassResources, PipeKind,
     PresentUniforms, MAX_STROKE_POINTS, NODE_PIPES,
 };
 use super::{FinalTag, RenderGraph, NODES};
@@ -280,6 +281,20 @@ impl RenderGraph {
                     make_chain_tex(gpu, out_w, out_h, if i == 0 { "comp-a" } else { "comp-b" })
                 })
                 .collect();
+            self.mask_scratch = (0..2)
+                .map(|i| {
+                    make_mask_tex(
+                        gpu,
+                        out_w,
+                        out_h,
+                        if i == 0 {
+                            "msk-scratch-a"
+                        } else {
+                            "msk-scratch-b"
+                        },
+                    )
+                })
+                .collect();
             self.mask_tex.clear();
             self.out_tex = Some(make_tex(
                 gpu,
@@ -322,7 +337,7 @@ impl RenderGraph {
             });
 
         // ---- extract ----
-        let extract_tex = self.extract_tex.as_ref().unwrap();
+        // Avoid `let extract_tex = …` — a long-lived ref blocks `&mut self` in composite masks.
         // Extract + dcp_look depend ONLY on the view (their inputs are the
         // working master + view params, never the doc). So they re-run on a
         // view change — which `invalidate_all` also forces via last_view_key =
@@ -360,7 +375,7 @@ impl RenderGraph {
                     wgpu::BindGroupEntry {
                         binding: 2,
                         resource: wgpu::BindingResource::TextureView(
-                            &extract_tex.create_view(&Default::default()),
+                            &self.extract_tex.as_ref().unwrap().create_view(&Default::default()),
                         ),
                     },
                     wgpu::BindGroupEntry {
@@ -413,7 +428,7 @@ impl RenderGraph {
                     wgpu::BindGroupEntry {
                         binding: 0,
                         resource: wgpu::BindingResource::TextureView(
-                            &extract_tex.create_view(&Default::default()),
+                            &self.extract_tex.as_ref().unwrap().create_view(&Default::default()),
                         ),
                     },
                     wgpu::BindGroupEntry {
@@ -453,7 +468,7 @@ impl RenderGraph {
         let mut upstream: &wgpu::Texture = if dcp_active {
             self.look_tex.as_ref().unwrap()
         } else {
-            extract_tex
+            self.extract_tex.as_ref().unwrap()
         };
         let mut final_tag = FinalTag::Extract;
         for (i, cfg) in configs.iter().enumerate() {
@@ -502,6 +517,7 @@ impl RenderGraph {
             let mut lut_i = 0usize;
             let mut strokes_i = 0usize;
             let mut comp_flip = 0usize;
+            let extract_view = self.extract_tex.as_ref().unwrap().create_view(&Default::default());
             for mask in &doc.masks {
                 let mtex = &self.mask_tex[&mask.id];
                 let opacity = (mask.opacity / 100.0).clamp(0.0, 1.0);
@@ -596,7 +612,7 @@ impl RenderGraph {
                             );
                             gpu.queue.write_buffer(ub, 0, bytemuck::bytes_of(&u));
                             let mview = mtex.create_view(&Default::default());
-                            let eview = extract_tex.create_view(&Default::default());
+                            let eview = self.extract_tex.as_ref().unwrap().create_view(&Default::default());
                             let bind = gpu.device.create_bind_group(&wgpu::BindGroupDescriptor {
                                 label: Some("mask-sample-bind"),
                                 layout: &self.mask_sample.layout,
@@ -656,7 +672,7 @@ impl RenderGraph {
                         );
                         gpu.queue.write_buffer(ub, 0, bytemuck::bytes_of(&u));
                         let mview = mtex.create_view(&Default::default());
-                        let eview = extract_tex.create_view(&Default::default());
+                        let eview = self.extract_tex.as_ref().unwrap().create_view(&Default::default());
                         let bind = gpu.device.create_bind_group(&wgpu::BindGroupDescriptor {
                             label: Some("mask-param-bind"),
                             layout: &self.mask_sample.layout,
@@ -694,6 +710,33 @@ impl RenderGraph {
                         self.last_passes_run.push(format!("mask:{}", mask.kind));
                         true
                     }
+                    "composite" => produce_composite_mask(
+                        gpu,
+                        &mut encoder,
+                        &self.mask_geom,
+                        &self.mask_sample,
+                        &self.mask_combine,
+                        &self.mask_finalize,
+                        &self.sampler,
+                        &mut self.pool,
+                        &mut self.strokes_pool,
+                        &self.mask_scratch,
+                        &mut self.last_passes_run,
+                        mask,
+                        mtex,
+                        &extract_view,
+                        &seg_masks,
+                        out_w,
+                        out_h,
+                        img_w,
+                        img_h,
+                        scale,
+                        view,
+                        feather,
+                        crop_u,
+                        &mut pool_i,
+                        &mut strokes_i,
+                    ),
                     _ => false,
                 };
                 if !produced {
@@ -821,7 +864,10 @@ impl RenderGraph {
                 width: out_w,
                 height: out_h,
                 overlay: if overlay_mask.is_some() { 0.55 } else { 0.0 },
-                look: DcpProfile::present_look(self.look, dcp_active),
+                look: DcpProfile::present_look(
+                    self.look,
+                    dcp_profile.filter(|_| dcp_active),
+                ),
                 clip_hi: u32::from(self.clip_hi),
                 clip_lo: u32::from(self.clip_lo),
                 _p0: millis,
@@ -1016,8 +1062,22 @@ fn parse_geometry(source: &serde_json::Value) -> (u32, [f32; 2], [f32; 2], f32, 
     };
     match source.get("type").and_then(|t| t.as_str()) {
         Some("radial") => {
-            let center = get2("center", [0.5, 0.5]);
-            let radii = get2("radii", [0.25, 0.25]);
+            let center = if let (Some(cx), Some(cy)) = (
+                source.get("cx").and_then(|v| v.as_f64()),
+                source.get("cy").and_then(|v| v.as_f64()),
+            ) {
+                [cx as f32, cy as f32]
+            } else {
+                get2("center", [0.5, 0.5])
+            };
+            let radii = if let (Some(rx), Some(ry)) = (
+                source.get("rx").and_then(|v| v.as_f64()),
+                source.get("ry").and_then(|v| v.as_f64()),
+            ) {
+                [rx as f32, ry as f32]
+            } else {
+                get2("radii", [0.25, 0.25])
+            };
             let rotation = source
                 .get("rotation")
                 .and_then(|v| v.as_f64())
@@ -1025,8 +1085,34 @@ fn parse_geometry(source: &serde_json::Value) -> (u32, [f32; 2], [f32; 2], f32, 
             (0, center, radii, rotation, vec![])
         }
         Some("linear") => {
-            let start = get2("start", [0.5, 0.0]);
-            let end = get2("end", [0.5, 1.0]);
+            let start = if source.get("x0").is_some() {
+                [
+                    source
+                        .get("x0")
+                        .and_then(|v| v.as_f64())
+                        .unwrap_or(0.5) as f32,
+                    source
+                        .get("y0")
+                        .and_then(|v| v.as_f64())
+                        .unwrap_or(0.2) as f32,
+                ]
+            } else {
+                get2("start", [0.5, 0.0])
+            };
+            let end = if source.get("x1").is_some() {
+                [
+                    source
+                        .get("x1")
+                        .and_then(|v| v.as_f64())
+                        .unwrap_or(0.5) as f32,
+                    source
+                        .get("y1")
+                        .and_then(|v| v.as_f64())
+                        .unwrap_or(0.8) as f32,
+                ]
+            } else {
+                get2("end", [0.5, 1.0])
+            };
             (1, start, end, 0.0, vec![])
         }
         Some("brush") => {
@@ -1063,6 +1149,345 @@ fn parse_geometry(source: &serde_json::Value) -> (u32, [f32; 2], [f32; 2], f32, 
         }
         _ => (0, [0.5, 0.5], [0.0, 0.0], 0.0, vec![]),
     }
+}
+
+fn combine_op_id(op: &str) -> u32 {
+    match op {
+        "subtract" => 2,
+        "intersect" => 3,
+        _ => 1,
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn produce_composite_mask(
+    gpu: &GpuContext,
+    encoder: &mut wgpu::CommandEncoder,
+    mask_geom: &PassResources,
+    mask_sample: &PassResources,
+    mask_combine: &PassResources,
+    mask_finalize: &PassResources,
+    sampler: &wgpu::Sampler,
+    pool: &mut Vec<wgpu::Buffer>,
+    strokes_pool: &mut Vec<wgpu::Buffer>,
+    mask_scratch: &[wgpu::Texture],
+    last_passes_run: &mut Vec<String>,
+    mask: &crate::doc::Mask,
+    mtex: &wgpu::Texture,
+    extract_view: &wgpu::TextureView,
+    seg_masks: &HashMap<String, wgpu::TextureView>,
+    out_w: u32,
+    out_h: u32,
+    img_w: u32,
+    img_h: u32,
+    scale: f32,
+    view: &ViewParams,
+    feather: f32,
+    crop_u: CropUniform,
+    pool_i: &mut usize,
+    strokes_i: &mut usize,
+) -> bool {
+    let Some(comps) = mask
+        .source
+        .get("components")
+        .and_then(|c| c.as_array())
+    else {
+        return false;
+    };
+    if comps.is_empty() || mask_scratch.len() < 2 {
+        return false;
+    }
+    let scratch_a = &mask_scratch[0];
+    let scratch_b = &mask_scratch[1];
+    let mut acc_in_a = true;
+    let mut any = false;
+
+    for (i, comp) in comps.iter().enumerate() {
+        let op = comp.get("op").and_then(|o| o.as_str()).unwrap_or("add");
+        let src = comp.get("source").cloned().unwrap_or_else(|| comp.clone());
+        let src_type = src.get("type").and_then(|t| t.as_str()).unwrap_or("");
+        let comp_tex = scratch_b;
+        let produced = match src_type {
+            "radial" | "linear" | "brush" => {
+                let (kind, pa, pb, rotation, strokes) = parse_geometry(&src);
+                let ub = &pool[*pool_i];
+                *pool_i += 1;
+                let sb = &strokes_pool[*strokes_i];
+                *strokes_i += 1;
+                let u = MaskGeomUniforms {
+                    out_w,
+                    out_h,
+                    img_w: img_w as f32,
+                    img_h: img_h as f32,
+                    scale,
+                    center_x: view.center_x,
+                    center_y: view.center_y,
+                    kind,
+                    pa,
+                    pb,
+                    rotation,
+                    feather,
+                    opacity: 1.0,
+                    invert: 0,
+                    stroke_count: strokes.len() as u32,
+                    crop: crop_u,
+                    _p0: 0,
+                    _p1: 0,
+                    _p2: 0,
+                    _p3: 0,
+                };
+                gpu.queue.write_buffer(ub, 0, bytemuck::bytes_of(&u));
+                if !strokes.is_empty() {
+                    gpu.queue.write_buffer(sb, 0, bytemuck::cast_slice(&strokes));
+                }
+                let mview = comp_tex.create_view(&Default::default());
+                let bind = gpu.device.create_bind_group(&wgpu::BindGroupDescriptor {
+                    label: Some("mask-composite-geom"),
+                    layout: &mask_geom.layout,
+                    entries: &[
+                        wgpu::BindGroupEntry {
+                            binding: 0,
+                            resource: wgpu::BindingResource::TextureView(&mview),
+                        },
+                        wgpu::BindGroupEntry {
+                            binding: 1,
+                            resource: ub.as_entire_binding(),
+                        },
+                        wgpu::BindGroupEntry {
+                            binding: 2,
+                            resource: sb.as_entire_binding(),
+                        },
+                    ],
+                });
+                let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
+                    label: Some("mask-composite-geom"),
+                    timestamp_writes: None,
+                });
+                pass.set_pipeline(&mask_geom.pipeline);
+                pass.set_bind_group(0, &bind, &[]);
+                pass.dispatch_workgroups(out_w.div_ceil(16), out_h.div_ceil(16), 1);
+                true
+            }
+            "segmented" => {
+                if let Some(small_view) = seg_masks.get(&mask.id) {
+                    let ub = &pool[*pool_i];
+                    *pool_i += 1;
+                    let invert = (mask.kind == "background") as u32;
+                    let u = mask_sample_uniforms(
+                        &src,
+                        out_w,
+                        out_h,
+                        img_w as f32,
+                        img_h as f32,
+                        scale,
+                        view,
+                        feather,
+                        1.0,
+                        invert,
+                        crop_u,
+                        0,
+                    );
+                    gpu.queue.write_buffer(ub, 0, bytemuck::bytes_of(&u));
+                    let mview = comp_tex.create_view(&Default::default());
+                    let bind = gpu.device.create_bind_group(&wgpu::BindGroupDescriptor {
+                        label: Some("mask-composite-seg"),
+                        layout: &mask_sample.layout,
+                        entries: &[
+                            wgpu::BindGroupEntry {
+                                binding: 0,
+                                resource: wgpu::BindingResource::TextureView(small_view),
+                            },
+                            wgpu::BindGroupEntry {
+                                binding: 1,
+                                resource: wgpu::BindingResource::Sampler(sampler),
+                            },
+                            wgpu::BindGroupEntry {
+                                binding: 2,
+                                resource: wgpu::BindingResource::TextureView(extract_view),
+                            },
+                            wgpu::BindGroupEntry {
+                                binding: 3,
+                                resource: wgpu::BindingResource::TextureView(&mview),
+                            },
+                            wgpu::BindGroupEntry {
+                                binding: 4,
+                                resource: ub.as_entire_binding(),
+                            },
+                        ],
+                    });
+                    let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
+                        label: Some("mask-composite-seg"),
+                        timestamp_writes: None,
+                    });
+                    pass.set_pipeline(&mask_sample.pipeline);
+                    pass.set_bind_group(0, &bind, &[]);
+                    pass.dispatch_workgroups(out_w.div_ceil(16), out_h.div_ceil(16), 1);
+                    true
+                } else {
+                    false
+                }
+            }
+            "parametric" => {
+                let ub = &pool[*pool_i];
+                *pool_i += 1;
+                let u = mask_sample_uniforms(
+                    &src,
+                    out_w,
+                    out_h,
+                    img_w as f32,
+                    img_h as f32,
+                    scale,
+                    view,
+                    feather,
+                    1.0,
+                    0,
+                    crop_u,
+                    1,
+                );
+                gpu.queue.write_buffer(ub, 0, bytemuck::bytes_of(&u));
+                let mview = comp_tex.create_view(&Default::default());
+                let bind = gpu.device.create_bind_group(&wgpu::BindGroupDescriptor {
+                    label: Some("mask-composite-param"),
+                    layout: &mask_sample.layout,
+                    entries: &[
+                        wgpu::BindGroupEntry {
+                            binding: 0,
+                            resource: wgpu::BindingResource::TextureView(extract_view),
+                        },
+                        wgpu::BindGroupEntry {
+                            binding: 1,
+                            resource: wgpu::BindingResource::Sampler(sampler),
+                        },
+                        wgpu::BindGroupEntry {
+                            binding: 2,
+                            resource: wgpu::BindingResource::TextureView(extract_view),
+                        },
+                        wgpu::BindGroupEntry {
+                            binding: 3,
+                            resource: wgpu::BindingResource::TextureView(&mview),
+                        },
+                        wgpu::BindGroupEntry {
+                            binding: 4,
+                            resource: ub.as_entire_binding(),
+                        },
+                    ],
+                });
+                let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
+                    label: Some("mask-composite-param"),
+                    timestamp_writes: None,
+                });
+                pass.set_pipeline(&mask_sample.pipeline);
+                pass.set_bind_group(0, &bind, &[]);
+                pass.dispatch_workgroups(out_w.div_ceil(16), out_h.div_ceil(16), 1);
+                true
+            }
+            _ => false,
+        };
+        if !produced {
+            continue;
+        }
+        any = true;
+        let combine_op = if i == 0 { 0 } else { combine_op_id(op) };
+        let acc_tex = if acc_in_a { scratch_a } else { scratch_b };
+        let dst_tex = if i == 0 {
+            scratch_a
+        } else if acc_in_a {
+            scratch_b
+        } else {
+            scratch_a
+        };
+        let acc_view = acc_tex.create_view(&Default::default());
+        let src_view = comp_tex.create_view(&Default::default());
+        let dst_view = dst_tex.create_view(&Default::default());
+        let ub = &pool[*pool_i];
+        *pool_i += 1;
+        let cu = MaskCombineUniforms {
+            width: out_w,
+            height: out_h,
+            op: combine_op,
+            _pad: 0,
+        };
+        gpu.queue.write_buffer(ub, 0, bytemuck::bytes_of(&cu));
+        let bind = gpu.device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("mask-combine"),
+            layout: &mask_combine.layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: wgpu::BindingResource::TextureView(&acc_view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::TextureView(&src_view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 2,
+                    resource: wgpu::BindingResource::TextureView(&dst_view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 3,
+                    resource: ub.as_entire_binding(),
+                },
+            ],
+        });
+        let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
+            label: Some("mask-combine"),
+            timestamp_writes: None,
+        });
+        pass.set_pipeline(&mask_combine.pipeline);
+        pass.set_bind_group(0, &bind, &[]);
+        pass.dispatch_workgroups(out_w.div_ceil(16), out_h.div_ceil(16), 1);
+        if i > 0 {
+            acc_in_a = !acc_in_a;
+        } else {
+            acc_in_a = true;
+        }
+    }
+
+    if !any {
+        return false;
+    }
+
+    let acc_tex = if acc_in_a { scratch_a } else { scratch_b };
+    let acc_view = acc_tex.create_view(&Default::default());
+    let out_view = mtex.create_view(&Default::default());
+    let ub = &pool[*pool_i];
+    *pool_i += 1;
+    let fu = MaskFinalizeUniforms {
+        width: out_w,
+        height: out_h,
+        opacity: (mask.opacity / 100.0).clamp(0.0, 1.0),
+        invert: mask.invert as u32,
+        _pad: 0,
+    };
+    gpu.queue.write_buffer(ub, 0, bytemuck::bytes_of(&fu));
+    let bind = gpu.device.create_bind_group(&wgpu::BindGroupDescriptor {
+        label: Some("mask-finalize"),
+        layout: &mask_finalize.layout,
+        entries: &[
+            wgpu::BindGroupEntry {
+                binding: 0,
+                resource: wgpu::BindingResource::TextureView(&acc_view),
+            },
+            wgpu::BindGroupEntry {
+                binding: 1,
+                resource: wgpu::BindingResource::TextureView(&out_view),
+            },
+            wgpu::BindGroupEntry {
+                binding: 2,
+                resource: ub.as_entire_binding(),
+            },
+        ],
+    });
+    let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
+        label: Some("mask-finalize"),
+        timestamp_writes: None,
+    });
+    pass.set_pipeline(&mask_finalize.pipeline);
+    pass.set_bind_group(0, &bind, &[]);
+    pass.dispatch_workgroups(out_w.div_ceil(16), out_h.div_ceil(16), 1);
+    last_passes_run.push("mask:composite".into());
+    true
 }
 
 #[cfg(test)]
