@@ -175,6 +175,7 @@
           enabled: !maskEnabled(m),
         }),
       );
+      syncMaskOverlay();
     } catch {
       /* ignore */
     }

@@ -94,6 +94,11 @@
       ((isVideoWs && $imageMeta?.kind !== "video") ||
         (!isVideoWs && $imageMeta?.kind === "video")),
   );
+  const selectedMaskEnabled = $derived.by(() => {
+    if (!$selectedMask) return false;
+    const m = $doc?.masks?.find((x) => x.id === $selectedMask);
+    return m?.enabled !== false;
+  });
 
   interface ViewState {
     scale: number | null;
@@ -994,7 +999,7 @@
       <CropOverlay {wrapEl} />
     {/if}
 
-    {#if displaySrc && $selectedMask && !isVideoWs}
+    {#if displaySrc && $selectedMask && selectedMaskEnabled && !isVideoWs}
       <MaskGeometryOverlay
         {wrapEl}
         {imgAspect}
