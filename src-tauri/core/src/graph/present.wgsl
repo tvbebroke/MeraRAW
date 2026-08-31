@@ -1,6 +1,6 @@
 // Terminal display-transform node (contract F2 screen side), 1:1 over the
 // chain output: gamut Rec2020→sRGB → pinned neutral view transform
-// (Reinhard-extended, Lw == gain) → clamp → sRGB OETF. alpha 0 → letterbox bg.
+// (Reinhard-extended Lw=4) → clamp → sRGB OETF. alpha 0 → letterbox bg.
 // Constants mirror gpu/display.wgsl; golden tests pin them.
 
 struct PresentUniforms {
@@ -31,76 +31,147 @@ const REC2020_TO_SRGB = mat3x3<f32>(
   vec3<f32>(-0.0728, -0.0083,  1.1187),
 );
 
+const VIEW_LW: f32 = 4.0;
 const LUMA = vec3<f32>(0.2126, 0.7152, 0.0722);
 
-// Scene luminance where the Camera look starts crossfading from the
-// luminance-mapped result to the per-channel one. See view_look.
-const HL_PC_LO: f32 = 0.5;
+// After Rec.2020→sRGB, Fuji cyans/blues often land with R≤0 (clipped to neon).
+// Affinity keeps real red + lower sat. Operates in *linear* sRGB (pre-OETF).
+fn fix_srgb_cyan(c: vec3<f32>) -> vec3<f32> {
+  let r = c.x;
+  let g = c.y;
+  let b = c.z;
+  // B must dominate; allow slightly negative R from the gamut matrix.
+  if (b < 0.02 || b < g) {
+    return c;
+  }
+  let mx = max(r, max(g, b));
+  let mn = min(r, min(g, b));
+  let chroma = (mx - mn) / max(mx, 1e-6);
+  // Near-neutral / near-white: leave alone (RW2 water + coot shield → magenta).
+  if (chroma < 0.18 || (mx > 0.55 && chroma < 0.28)) {
+    return c;
+  }
+  let rb = r / max(b, 1e-6);
+  let gb = g / max(b, 1e-6);
+  // Already has enough red (Affinity sky ~0.20–0.35 linear R/B).
+  if (rb > 0.38) {
+    return c;
+  }
+  // Skip near-neutrals and pure deep blue with healthy channel balance.
+  if (gb < 0.12 && rb > 0.15) {
+    return c;
+  }
+  let luma = dot(max(c, vec3<f32>(0.0)), LUMA);
+  let crush = clamp((0.38 - rb) / 0.38, 0.0, 1.0);
+  // Stronger on cyan (high G/B) and mid blues (G/B ~0.2–0.6).
+  let cyan = clamp(gb / 0.85, 0.0, 1.0);
+  let strength = crush * max(cyan, 0.45);
+  if (strength < 0.08) {
+    return c;
+  }
+  var out = mix(c, vec3<f32>(luma), 0.50 * strength);
+  // Restore Affinity-like R/B (~0.22 for sky, higher for bluish-green).
+  let want_rb = select(0.22, 0.45, gb > 0.55);
+  out.x = max(out.x, want_rb * b * strength);
+  out.y = out.y * (1.0 - 0.18 * strength * clamp(gb / 0.6, 0.0, 1.0));
+  return out;
+}
 
-// Reinhard-extended shoulder + a gentle S-curve. The shoulder's white point is
-// the gain itself, which puts display white at scene luminance 1.0 — sensor
-// saturation, the brightest neutral a RAW can hold. The old fixed 4.0 placed it
-// near 3.5, reserving most of a stop and a half of display range for headroom
-// that RAW data does not contain, so every image rendered flat and diffuse
-// white never reached white.
-fn tone_curve(v: f32, g: f32, contrast: f32) -> f32 {
-  let x = v * g;
-  let r = x * (1.0 + x / (g * g)) / (1.0 + x);
-  let s = 0.5 - 0.5 * cos(clamp(r, 0.0, 1.0) * 3.14159265);
-  return clamp(mix(r, s, contrast), 0.0, 1.0);
+// Clipped-green magenta highlights (Panasonic RW2 water / coot shield): when R≈B
+// both sit well above G in brights, lift G. Must NOT touch real blues (B≫R) or
+// warm hues (R≫B) — that washed Nikon/Sony skies toward grey-magenta.
+fn fix_magenta_highlights(c: vec3<f32>) -> vec3<f32> {
+  let r = c.x;
+  var g = c.y;
+  let b = c.z;
+  let mx = max(r, max(g, b));
+  if (mx < 0.40) {
+    return c;
+  }
+  // Strong hue → leave alone (sky blue, orange, etc.).
+  if (abs(r - b) > 0.08 * mx) {
+    return c;
+  }
+  // Both R and B must beat G (true magenta / clipped-green white).
+  let rb_min = min(r, b);
+  if (rb_min < g + 0.02) {
+    return c;
+  }
+  let rb = 0.5 * (r + b);
+  let lag = rb - g;
+  if (lag < 0.02) {
+    return c;
+  }
+  let hi = clamp((mx - 0.40) / 0.40, 0.0, 1.0);
+  let t = clamp(lag / max(rb, 1e-6), 0.0, 1.0) * hi;
+  g = mix(g, rb, t * 0.90);
+  return vec3<f32>(r, g, b);
+}
+
+// Post-DCP Camera display — MIRRORED in profile/dcp.rs `view_look_display`.
+// Look 5: ACR-default curve (Affinity-matched darken). Look 6: embedded curve.
+fn view_look_dcp_grade(c: vec3<f32>, gain: f32, luma_contrast: f32, chroma: f32) -> vec3<f32> {
+  var outc = max(c, vec3<f32>(0.0)) * gain;
+  let l = dot(outc, LUMA);
+  if (l <= 1e-8) {
+    return vec3<f32>(0.0);
+  }
+  let s = 0.5 - 0.5 * cos(min(l, 1.0) * 3.14159265);
+  let ld = l + luma_contrast * (s - l);
+  outc = outc * (ld / l);
+  let l2 = dot(max(outc, vec3<f32>(0.0)), LUMA);
+  outc = mix(vec3<f32>(l2), outc, chroma);
+  // Warm highlight depth (SR2 poppies) — MIRRORED in dcp.rs refine_display_hue.
+  if (outc.r > outc.g && l2 > 0.20) {
+    let warm = clamp((outc.r - outc.b) / max(outc.r, 1e-6), 0.0, 1.0);
+    let hi = clamp((l2 - 0.20) / 0.50, 0.0, 1.0);
+    outc.r = outc.r + warm * hi * 0.18 * outc.r;
+    outc.g = outc.g * (1.0 - warm * hi * 0.07);
+    outc.b = outc.b * (1.0 - warm * hi * 0.09);
+  }
+  return max(outc, vec3<f32>(0.0));
+}
+
+fn view_look_dcp(c: vec3<f32>) -> vec3<f32> {
+  // ACR-default on-disk — Affinity PNG (_DSC1477.SR2 / PEF / ORF).
+  return view_look_dcp_grade(c, 0.82, 0.11, 1.02);
+}
+
+fn view_look_dcp_embedded(c: vec3<f32>) -> vec3<f32> {
+  // Embedded ProfileToneCurve fallback (RT only when no Adobe Standard).
+  return view_look_dcp_grade(c, 1.10, 0.08, 1.05);
+}
+
+fn view_look_dcp_builtin(c: vec3<f32>) -> vec3<f32> {
+  let l = dot(c, vec3<f32>(0.2126, 0.7152, 0.0722));
+  let t = clamp((l - 0.08) / 0.38, 0.0, 1.0);
+  let gain = 0.58 + 0.28 * t;
+  return view_look_dcp_grade(c, gain, 0.14, 0.96);
 }
 
 // shared look operator — MIRRORED in export.rs::view_look (WYSIWYG).
+// Reinhard-extended shoulder (headroom-safe) + a gentle S-curve, all on
+// luminance so hue is preserved; then a saturation scale.
 fn view_look(c: vec3<f32>, look: u32) -> vec3<f32> {
   var gain = 1.15;     // Neutral: a touch of lift so the base isn't dark
   var contrast = 0.12;
   var sat = 1.0;
-  var baseline_ev = 0.0; // Neutral stays colorimetric — no baseline lift
-  var hl_pc = 0.0;
-  if (look == 1u) {    // Camera fallback when no DCP is loaded
-    gain = 1.6;
-    contrast = 0.62;
-    sat = 1.22;
-    baseline_ev = 0.75;
-    hl_pc = 1.0;
+  if (look == 1u) {    // Camera fallback when no DCP — Affinity PNG (S2 / iPhone)
+    gain = 1.08;
+    contrast = 0.16;
+    sat = 1.02;
   }
-  // Baseline exposure rides on the gain. Because the white point tracks the
-  // gain, scene luminance 1.0 still lands exactly on display white for any
-  // lift: this opens the midtones without burning highlights. Cameras expose
-  // RAW to protect the highlights, so a purely colorimetric render sits about
-  // a stop under what every other converter shows — the same correction Adobe
-  // ships as the DCP BaselineExposure tag, which we only get when a profile is
-  // loaded. The contrast bump keeps the lifted blacks off the floor.
-  let g = gain * exp2(baseline_ev);
-  let cc = max(c, vec3<f32>(0.0));
-  let l = dot(cc, LUMA);
+  let l = dot(max(c, vec3<f32>(0.0)), LUMA);
   if (l <= 1e-8) {
     return vec3<f32>(0.0);
   }
-  let ld = tone_curve(l, g, contrast);
-  var outc = cc * (ld / l);
+  let x = l * gain;
+  let r = x * (1.0 + x / (VIEW_LW * VIEW_LW)) / (1.0 + x);
+  let s = 0.5 - 0.5 * cos(clamp(r, 0.0, 1.0) * 3.14159265);
+  let ld = clamp(mix(r, s, contrast), 0.0, 1.0);
+  var outc = c * (ld / l);
   let l2 = dot(max(outc, vec3<f32>(0.0)), LUMA);
-  outc = max(mix(vec3<f32>(l2), outc, sat), vec3<f32>(0.0));
-  // Mapping luminance alone holds the scene's chromaticity all the way up, so
-  // a coloured illuminant keeps its cast at display white and bright neutrals
-  // never go neutral. Crossfade into a per-channel curve near white: each
-  // channel then rolls into its own shoulder and converges, which is what
-  // makes highlights desaturate. Gated on luminance rather than applied
-  // throughout so saturated midtones keep their chroma.
-  if (hl_pc > 0.0) {
-    let pc = vec3<f32>(tone_curve(cc.r, g, contrast),
-                       tone_curve(cc.g, g, contrast),
-                       tone_curve(cc.b, g, contrast));
-    outc = mix(outc, pc, smoothstep(HL_PC_LO, 1.0, ld) * hl_pc);
-  }
-  // A luminance-only shoulder can still leave a single channel above display
-  // white. Fade such a pixel toward its own luminance so the final clamp cuts
-  // brightness rather than hue.
-  let mx = max(outc.r, max(outc.g, outc.b));
-  if (mx > 1.0) {
-    let l3 = dot(outc, LUMA);
-    outc = mix(outc, vec3<f32>(l3), clamp((mx - 1.0) / mx, 0.0, 1.0));
-  }
+  outc = mix(vec3<f32>(l2), outc, sat);
   return max(outc, vec3<f32>(0.0));
 }
 
@@ -159,6 +230,8 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
     let space = u._p1 & 7u;
     if (space == 0u) {
       c = REC2020_TO_SRGB * max(p.rgb, vec3<f32>(0.0));
+      c = fix_magenta_highlights(c);
+      c = fix_srgb_cyan(c);
     } else {
       let M = mat3x3<f32>(u.m0.xyz, u.m1.xyz, u.m2.xyz);
       let N = mat3x3<f32>(u.n0.xyz, u.n1.xyz, u.n2.xyz);
@@ -167,12 +240,23 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
         paint_gamut = true;
       }
       c = N * max(t, vec3<f32>(0.0));
+      c = fix_magenta_highlights(c);
+      c = fix_srgb_cyan(c);
     }
     if (paint_gamut) {
       encoded = vec3<f32>(1.0, 0.0, 1.0);
     } else if (u.look == 2u) {
       // AgX already outputs display-encoded sRGB — no second OETF.
       encoded = agx(max(c, vec3<f32>(0.0)));
+    } else if (u.look == 5u) {
+      // Post-DCP Camera (ACR default curve): Affinity-matched grade + OETF.
+      encoded = oetf_srgb(clamp(view_look_dcp(max(c, vec3<f32>(0.0))), vec3<f32>(0.0), vec3<f32>(1.0)));
+    } else if (u.look == 6u) {
+      // Post-DCP Camera (embedded ProfileToneCurve): mild grade + OETF.
+      encoded = oetf_srgb(clamp(view_look_dcp_embedded(max(c, vec3<f32>(0.0))), vec3<f32>(0.0), vec3<f32>(1.0)));
+    } else if (u.look == 7u) {
+      // Built-in ACR curve only (no on-disk DCP HueSatMap).
+      encoded = oetf_srgb(clamp(view_look_dcp_builtin(max(c, vec3<f32>(0.0))), vec3<f32>(0.0), vec3<f32>(1.0)));
     } else if (u.look == 3u || u.look == 4u) {
       // 3 = raster zero-edit (JPEG/PNG already display-referred).
       // 4 = Original RAW (demosaic only). Rec.2020→sRGB + OETF, no view look.

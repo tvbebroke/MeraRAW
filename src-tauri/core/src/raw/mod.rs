@@ -200,6 +200,29 @@ impl Demosaic {
         s.and_then(Self::from_name).unwrap_or_default()
     }
 
+    /// Camera-aware default when the sidecar does not specify demosaic.
+    /// Fujifilm X-Trans → LibRaw DHT (darktable/LibRaw default for X-Trans);
+    /// everything else → RCD (darktable default for Bayer).
+    pub fn default_for_camera(make: &str, model: &str) -> Self {
+        let _ = model;
+        let make_u = make.trim().to_uppercase();
+        if make_u == "FUJIFILM" || make_u == "FUJI" {
+            let avail = Self::available();
+            if avail.iter().any(|n| n == "dht") {
+                return Demosaic::Dht;
+            }
+        }
+        Self::default()
+    }
+
+    /// Effective demosaic: sidecar override, else camera default.
+    pub fn for_open(make: &str, model: &str, sidecar: Option<&str>) -> Self {
+        match sidecar.map(str::trim).filter(|s| !s.is_empty()) {
+            Some(name) => Self::parse_or_default(Some(name)),
+            None => Self::default_for_camera(make, model),
+        }
+    }
+
     /// All variants, in UI order.
     pub fn all() -> &'static [Demosaic] {
         &[

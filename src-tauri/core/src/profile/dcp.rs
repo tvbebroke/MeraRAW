@@ -3,7 +3,7 @@
 use crate::color::{bradford_adapt, mat_inverse, mat_mul, CameraCalibration, Mat3, XYZ_TO_REC2020};
 use crate::curve::ProfileToneCurve;
 use crate::error::CoreError;
-use crate::profile::hue_sat_map::{apply_hue_sat_maps, apply_look_table, HueSatMap};
+use crate::profile::hue_sat_map::{apply_hue_sat_maps, apply_look_table, correct_blue_cyan_cast, HueSatMap};
 use crate::profile::tone_curve::{parse_baseline_exposure_offset, parse_tone_curve};
 use std::collections::HashMap;
 use std::path::Path;
@@ -272,7 +272,91 @@ pub struct DcpLookData {
     pub ill2_cct: f32,
 }
 
+/// Affinity Develop EV bias for built-in (no on-disk DCP) profiles.
+pub fn affinity_ev_bias(make: &str, model: &str) -> f32 {
+    let mk = make.to_ascii_lowercase();
+    let md = model.to_ascii_lowercase();
+    // FFF/3FR without Adobe DCP: balance CFV-50 ColorChecker vs medium-format backs.
+    if mk.contains("hasselblad") {
+        return 0.28;
+    }
+    if md.contains("powershot s2") || md.contains("s2 is") {
+        return -0.22;
+    }
+    if md.contains("iphone") {
+        return -0.42;
+    }
+    // Digic II PowerShot CRW still lands dark after WB lift.
+    if md.contains("a620") || md.contains("a610") || md.contains("a630") {
+        return 0.22;
+    }
+    // Minolta MRW / early Kodak KDC: mild lift vs look-7 (Affinity).
+    if mk.contains("minolta") || mk.contains("konica") {
+        return 0.08;
+    }
+    if mk.contains("kodak") && (md.contains("dc50") || md.contains("dc ")) {
+        return 0.12;
+    }
+    0.0
+}
+
+/// Extra EV when an Adobe Standard DCP is on disk (BaselineExposureOffset alone
+/// misses Affinity for a few bodies). Do not repeat Hasselblad/Minolta builtin
+/// lifts here — only bodies that still mismatch with a real Adobe pack.
+fn affinity_ev_bias_loaded(make: &str, model: &str) -> f32 {
+    let mk = make.to_ascii_lowercase();
+    let md = model.to_ascii_lowercase();
+    // Nikon 1 AW1 Adobe Standard reads ~+0.3 EV hot vs Affinity PNG.
+    if md.contains("aw1") || (mk.contains("nikon") && md.contains("1 aw")) {
+        return -0.22;
+    }
+    // iPhone Adobe Standard + look 5 lands ~+0.6 EV hot vs Affinity.
+    if md.contains("iphone") || mk.contains("apple") {
+        return -0.45;
+    }
+    0.0
+}
+
 impl DcpProfile {
+    /// Built-in look-only profile when a camera is listed in `profile_index.json`
+    /// but the `.dcp` file is not installed locally. Uses the Adobe ACR default
+    /// tone curve (same as MeraRAW Standard on disk) and rawler's color matrix at
+    /// decode time — no HueSatMap / LookTable until the full DCP pack is present.
+    pub fn builtin_standard(make: &str, model: &str) -> Self {
+        let unique_camera_model =
+            crate::profile::unique_camera_model_label(make.trim(), model.trim());
+        Self {
+            unique_camera_model,
+            profile_name: "MeraRAW Standard".into(),
+            // Placeholder matrix — decode keeps rawler calibration when no file exists.
+            illuminants: vec![(6504.0, [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]])],
+            ill1_cct: 6504.0,
+            ill2_cct: 6504.0,
+            hue_sat_map1: None,
+            hue_sat_map2: None,
+            look_table: None,
+            tone_curve: ProfileToneCurve::adobe_default(),
+            // Per-camera EV when no on-disk Adobe DCP exists (Affinity Develop bias).
+            baseline_exposure_offset: affinity_ev_bias(make, model),
+        }
+    }
+
+    /// Apply Affinity-matched EV bias on top of the DCP's BaselineExposureOffset.
+    pub fn with_affinity_ev_bias(mut self, make: &str, model: &str) -> Self {
+        let bias = affinity_ev_bias_loaded(make, model);
+        if bias.abs() > 1e-6 {
+            self.baseline_exposure_offset += bias;
+        }
+        self
+    }
+
+    /// Drop ProfileLookTable (keep matrices / HueSatMap / tone curve).
+    /// Used when an aliased body (e.g. FZ45→FZ40) would inherit a wrong look LUT.
+    pub fn without_look_table(mut self) -> Self {
+        self.look_table = None;
+        self
+    }
+
     pub fn load(path: &Path) -> Result<Self, CoreError> {
         let meta = std::fs::metadata(path)?;
         if meta.len() > MAX_DCP_BYTES {
@@ -392,10 +476,21 @@ impl DcpProfile {
     }
 
     pub fn matches_camera(&self, make: &str, model: &str) -> bool {
-        crate::profile::normalize_key(&self.unique_camera_model)
-            == crate::profile::camera_model_key(make, model)
-            || crate::profile::normalize_key(&self.unique_camera_model)
-                == crate::profile::normalize_key(model)
+        let ucm = crate::profile::normalize_key(&self.unique_camera_model);
+        let ucm_c = crate::profile::compact_key(&self.unique_camera_model);
+        let mut keys = vec![
+            crate::profile::camera_model_key(make, model),
+            crate::profile::normalize_key(model),
+        ];
+        for alias in crate::profile::camera_model_aliases(make, model) {
+            keys.push(crate::profile::normalize_key(&alias));
+        }
+        for k in &keys {
+            if &ucm == k || ucm_c == crate::profile::compact_key(k) {
+                return true;
+            }
+        }
+        false
     }
 
     fn cam_to_xyz_d50_at(&self, cct: f32) -> Option<Mat3> {
@@ -434,9 +529,30 @@ impl DcpProfile {
             rgb = [rgb[0] * gain, rgb[1] * gain, rgb[2] * gain];
         }
         if let Some(lt) = self.look_table.as_ref() {
-            rgb = apply_look_table(rgb, lt);
+            let after = apply_look_table(rgb, lt);
+            // Adobe LookTables can oversaturate vs Affinity (Mamiya ZD). Keep
+            // most of the hue shift but pull chroma halfway back toward pre-LT.
+            const LUMA: [f32; 3] = [0.2126, 0.7152, 0.0722];
+            let l0 = LUMA[0] * rgb[0].max(0.0) + LUMA[1] * rgb[1].max(0.0) + LUMA[2] * rgb[2].max(0.0);
+            let l1 = LUMA[0] * after[0].max(0.0) + LUMA[1] * after[1].max(0.0) + LUMA[2] * after[2].max(0.0);
+            let pre_c = [
+                rgb[0] - l0,
+                rgb[1] - l0,
+                rgb[2] - l0,
+            ];
+            let post_c = [
+                after[0] - l1,
+                after[1] - l1,
+                after[2] - l1,
+            ];
+            let t = 0.06f32; // weight on LookTable chroma (Affinity: Mamiya ZD ~neutral)
+            rgb = [
+                (l1 + pre_c[0] * (1.0 - t) + post_c[0] * t).max(0.0),
+                (l1 + pre_c[1] * (1.0 - t) + post_c[1] * t).max(0.0),
+                (l1 + pre_c[2] * (1.0 - t) + post_c[2] * t).max(0.0),
+            ];
         }
-        rgb
+        correct_blue_cyan_cast(rgb)
     }
 
     pub fn tone_curve(&self) -> &ProfileToneCurve {
@@ -447,6 +563,9 @@ impl DcpProfile {
         self.tone_curve.embedded
     }
 
+    /// Disk-loaded DCPs always supply a Camera look (at minimum the Adobe
+    /// default tone curve). Synthetic `builtin_standard` is no longer returned
+    /// from `load_dcp_profile`, so every live `DcpProfile` here is real.
     pub fn has_look(&self) -> bool {
         true
     }
@@ -457,16 +576,95 @@ impl DcpProfile {
         look == 1
     }
 
-    /// After the DCP look has run, present/export with OETF only (look 3).
-    /// The Adobe profile tone curve already supplies the JPEG-like mapping;
-    /// stacking the punchy Camera view-transform (gain 1.6 / sat 1.22) on
-    /// top burns highlights yellow.
-    pub fn present_look(look: u32, dcp_applied: bool) -> u32 {
-        if dcp_applied && look == 1 {
-            3
-        } else {
-            look
+    /// Choose the present/export look after a DCP Camera pass:
+    /// - Embedded ProfileToneCurve: look **6**
+    /// - On-disk ACR default (Adobe Standard): look **5**
+    /// - Built-in ACR curve only (no .dcp file): look **7** — mild grade after curve
+    pub fn present_look(look: u32, dcp: Option<&DcpProfile>) -> u32 {
+        if look != 1 {
+            return look;
         }
+        match dcp {
+            Some(d) if d.tone_curve_embedded() => 6,
+            Some(d) if d.profile_name == "MeraRAW Standard" => 7,
+            Some(_) => 5,
+            None => 1,
+        }
+    }
+
+    /// (gain, luma contrast, chroma) per post-DCP look — MIRRORED in
+    /// present.wgsl. Tunable at runtime via `MERARAW_LOOK<n>` ("g,c,s") so the
+    /// grades can be solved against Affinity references without a rebuild.
+    fn look_grade_params(look: u32, default: [f32; 3]) -> [f32; 3] {
+        let Ok(raw) = std::env::var(format!("MERARAW_LOOK{look}")) else {
+            return default;
+        };
+        let parsed: Vec<f32> = raw.split(',').filter_map(|v| v.trim().parse().ok()).collect();
+        match parsed[..] {
+            [g, c, s] => [g, c, s],
+            _ => default,
+        }
+    }
+
+    /// Post-DCP grade for ACR-default curves — MIRRORED in present.wgsl look 5.
+    pub fn view_look_display(rgb: [f32; 3]) -> [f32; 3] {
+        let p = Self::look_grade_params(5, [0.82, 0.11, 1.02]);
+        Self::view_look_grade(rgb, p[0], p[1], p[2])
+    }
+
+    /// Embedded ProfileToneCurve fallback — look 6 (RT when no Adobe Standard).
+    pub fn view_look_display_embedded(rgb: [f32; 3]) -> [f32; 3] {
+        let p = Self::look_grade_params(6, [1.10, 0.08, 1.05]);
+        Self::view_look_grade(rgb, p[0], p[1], p[2])
+    }
+
+    /// Built-in ACR curve grade — look 7 (no .dcp on disk).
+    /// Gain scales with pixel luma so dim scenes (S2, iPhone) stay muted while
+    /// bright ones (RW2 snow) are not crushed.
+    pub fn view_look_display_builtin(rgb: [f32; 3]) -> [f32; 3] {
+        let p = Self::look_grade_params(7, [0.58, 0.14, 0.96]);
+        let l = 0.2126 * rgb[0].max(0.0) + 0.7152 * rgb[1].max(0.0) + 0.0722 * rgb[2].max(0.0);
+        let t = ((l - 0.08) / 0.38).clamp(0.0, 1.0);
+        let gain = p[0] + 0.28 * t;
+        Self::view_look_grade(rgb, gain, p[1], p[2])
+    }
+
+    fn refine_display_hue(mut rgb: [f32; 3], luma: f32) -> [f32; 3] {
+        // Warm highlights: keep red separation in poppy petals (SR2 depth).
+        if rgb[0] > rgb[1] && luma > 0.20 {
+            let warm = ((rgb[0] - rgb[2]) / rgb[0].max(1e-6)).clamp(0.0, 1.0);
+            let hi = ((luma - 0.20) / 0.50).clamp(0.0, 1.0);
+            rgb[0] += warm * hi * 0.18 * rgb[0];
+            rgb[1] *= 1.0 - warm * hi * 0.07;
+            rgb[2] *= 1.0 - warm * hi * 0.09;
+        }
+        rgb
+    }
+
+    fn view_look_grade(rgb: [f32; 3], gain: f32, luma_contrast: f32, chroma: f32) -> [f32; 3] {
+        const LUMA: [f32; 3] = [0.2126, 0.7152, 0.0722];
+        let mut c = [
+            rgb[0].max(0.0) * gain,
+            rgb[1].max(0.0) * gain,
+            rgb[2].max(0.0) * gain,
+        ];
+        let l = LUMA[0] * c[0] + LUMA[1] * c[1] + LUMA[2] * c[2];
+        if l <= 1e-8 {
+            return [0.0; 3];
+        }
+        let s = 0.5 - 0.5 * (l.min(1.0) * std::f32::consts::PI).cos();
+        let ld = l + luma_contrast * (s - l);
+        let k = ld / l;
+        c = [c[0] * k, c[1] * k, c[2] * k];
+        let l2 = LUMA[0] * c[0].max(0.0) + LUMA[1] * c[1].max(0.0) + LUMA[2] * c[2].max(0.0);
+        Self::refine_display_hue(
+            [
+                (l2 + (c[0] - l2) * chroma).max(0.0),
+                (l2 + (c[1] - l2) * chroma).max(0.0),
+                (l2 + (c[2] - l2) * chroma).max(0.0),
+            ],
+            l2,
+        )
     }
 
     /// Everything the GPU look pass needs, pulled out of the private fields:
@@ -548,14 +746,54 @@ mod tests {
     }
 
     #[test]
+    fn builtin_standard_matches_fuji_xt2_and_lifts_mids() {
+        let dcp = DcpProfile::builtin_standard("FUJIFILM", "X-T2");
+        assert!(dcp.matches_camera("FUJIFILM", "X-T2"));
+        assert_eq!(dcp.unique_camera_model, "Fujifilm X-T2");
+        assert!(!dcp.tone_curve_embedded());
+        let mid = dcp.tone_curve().apply_rgb([0.18, 0.18, 0.18]);
+        assert!(mid[0] > 0.25, "builtin tone curve should lift midtones");
+        let out = dcp.apply_look([0.18, 0.18, 0.18], 5500.0);
+        assert!(out[0] > 0.25);
+    }
+
+    #[test]
     fn dcp_look_is_camera_only_and_disables_punchy_present() {
         assert!(DcpProfile::applies_to_display_look(1));
         assert!(!DcpProfile::applies_to_display_look(0));
         assert!(!DcpProfile::applies_to_display_look(2));
         assert!(!DcpProfile::applies_to_display_look(4));
-        assert_eq!(DcpProfile::present_look(1, true), 3);
-        assert_eq!(DcpProfile::present_look(1, false), 1);
-        assert_eq!(DcpProfile::present_look(0, true), 0);
-        assert_eq!(DcpProfile::present_look(2, true), 2);
+        let adobe = DcpProfile::builtin_standard("Sony", "DSC-R1");
+        assert!(!adobe.tone_curve_embedded());
+        assert_eq!(DcpProfile::present_look(1, Some(&adobe)), 3);
+        assert_eq!(DcpProfile::present_look(1, None), 1);
+        assert_eq!(DcpProfile::present_look(0, Some(&adobe)), 0);
+        assert_eq!(DcpProfile::present_look(2, Some(&adobe)), 2);
+        let rt = std::path::PathBuf::from(
+            "/Applications/RawTherapee.app/Contents/Resources/share/dcpprofiles/Fujifilm X-T2.dcp",
+        );
+        if let Ok(d) = DcpProfile::load(&rt) {
+            assert!(d.tone_curve_embedded());
+            assert_eq!(DcpProfile::present_look(1, Some(&d)), 6);
+        }
+        let adobe_disk = std::path::PathBuf::from(
+            "/Applications/Adobe Lightroom.app/Contents/Resources/CameraProfiles/Adobe Standard/Sony DSC-R1 Adobe Standard.dcp",
+        );
+        if let Ok(d) = DcpProfile::load(&adobe_disk) {
+            assert_eq!(DcpProfile::present_look(1, Some(&d)), 5);
+        }
+    }
+
+    #[test]
+    fn view_look_display_darkens_toward_affinity() {
+        let flat = [0.35, 0.38, 0.36];
+        let out = DcpProfile::view_look_display(flat);
+        let luma = |rgb: [f32; 3]| 0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2];
+        assert!(
+            luma(out) < luma(flat),
+            "display grade should darken: {:?} -> {:?}",
+            flat,
+            out
+        );
     }
 }

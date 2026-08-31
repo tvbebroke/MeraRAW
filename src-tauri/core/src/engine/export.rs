@@ -1093,18 +1093,11 @@ fn prepare_batch_image(path: &Path, skip_edits: bool) -> Result<BatchPrepared, C
     };
     let index = crate::profile::ProfileIndex::embedded();
     let chosen = crate::profile::choose_profile(&meta, &index, doc.meta.profile_file.as_deref());
-    let profile_path = chosen
-        .as_ref()
-        .map(|p| crate::profile::profile_path(&p.file));
+    let profile_path = crate::profile::decode_profile_path(chosen.as_ref());
     let dcp = if skip_edits {
         None
     } else {
-        profile_path.as_ref().and_then(|p| {
-            DcpProfile::load(p)
-                .ok()
-                .filter(|d| d.matches_camera(&meta.camera_make, &meta.camera_model))
-                .map(Arc::new)
-        })
+        crate::profile::load_dcp_profile(&meta, chosen.as_ref()).map(Arc::new)
     };
     let lut = if skip_edits {
         None

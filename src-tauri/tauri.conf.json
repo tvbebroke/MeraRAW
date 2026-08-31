@@ -28,14 +28,19 @@
         "transparent": true,
         "hiddenTitle": true,
         "titleBarStyle": "Overlay",
-        "trafficLightPosition": { "x": 16, "y": 16 },
+        "trafficLightPosition": {
+          "x": 16,
+          "y": 16
+        },
         "backgroundColor": "#272727",
         "dragDropEnabled": true
       }
     ],
     "security": {
       "freezePrototype": true,
-      "capabilities": ["main-capability"],
+      "capabilities": [
+        "main-capability"
+      ],
       "csp": {
         "default-src": "'self' customprotocol: asset:",
         "script-src": "'self'",
@@ -57,7 +62,14 @@
   },
   "bundle": {
     "active": true,
-    "targets": ["app", "dmg", "nsis", "deb", "appimage", "rpm"],
+    "targets": [
+      "app",
+      "dmg",
+      "nsis",
+      "deb",
+      "appimage",
+      "rpm"
+    ],
     "category": "Photography",
     "icon": [
       "icons/32x32.png",
@@ -83,10 +95,14 @@
     },
     "linux": {
       "rpm": {
-        "depends": ["webkit2gtk4.1"]
+        "depends": [
+          "webkit2gtk4.1"
+        ]
       },
       "deb": {
-        "depends": ["libwebkit2gtk-4.1-0"]
+        "depends": [
+          "libwebkit2gtk-4.1-0"
+        ]
       }
     },
     "resources": [

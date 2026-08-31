@@ -42,9 +42,9 @@ impl Engine {
                 crate::raw::Demosaic::parse_or_default(cur.doc().meta.demosaic.as_deref());
             let profile_file = cur.doc().meta.profile_file.clone();
             let index = crate::profile::ProfileIndex::embedded();
-            let profile_path =
-                crate::profile::choose_profile(&cur.meta, &index, profile_file.as_deref())
-                    .map(|p| crate::profile::profile_path(&p.file));
+            let profile_path = crate::profile::decode_profile_path(
+                crate::profile::choose_profile(&cur.meta, &index, profile_file.as_deref()).as_ref(),
+            );
             (hash, settings, cur.path.clone(), profile_path, demosaic)
         };
 
@@ -167,9 +167,9 @@ impl Engine {
                 crate::raw::Demosaic::parse_or_default(cur.doc().meta.demosaic.as_deref());
             let profile_file = cur.doc().meta.profile_file.clone();
             let index = crate::profile::ProfileIndex::embedded();
-            let profile_path =
-                crate::profile::choose_profile(&cur.meta, &index, profile_file.as_deref())
-                    .map(|p| crate::profile::profile_path(&p.file));
+            let profile_path = crate::profile::decode_profile_path(
+                crate::profile::choose_profile(&cur.meta, &index, profile_file.as_deref()).as_ref(),
+            );
             (cur.path.clone(), profile_path, demosaic)
         };
         self.spawn_full_decode(path, profile_path, demosaic, self.generation);

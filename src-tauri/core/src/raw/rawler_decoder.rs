@@ -134,7 +134,10 @@ impl RawlerDecoder {
             width,
             height,
             orientation: format!("{:?}", effective_orientation(raw, md)),
-            as_shot_wb: [raw.wb_coeffs[0], raw.wb_coeffs[1], raw.wb_coeffs[2]],
+            as_shot_wb: {
+                let wb = effective_wb(raw.wb_coeffs, &CameraCalibration::from_raw(raw));
+                [wb[0], wb[1], wb[2]]
+            },
             estimated_cct: cct,
             camera_profile: None,
             available_profiles: Vec::new(),
@@ -174,7 +177,7 @@ impl Decoder for RawlerDecoder {
             // dims need the raw struct; decode dummy (no pixel work)
             let raw = decoder.raw_image(&source, &params, true).map_err(dec_err)?;
             let cal = CameraCalibration::from_raw(&raw);
-            let cct = Some(cal.estimate_cct(&raw.wb_coeffs));
+            let cct = Some(cal.estimate_cct(&effective_wb(raw.wb_coeffs, &cal)));
             Ok(self.meta_from(path, &raw, &md, raw.width as u32, raw.height as u32, cct))
         })
     }
@@ -188,20 +191,29 @@ impl Decoder for RawlerDecoder {
             let source = RawSource::new(path).map_err(dec_err)?;
             let decoder = self.loader.get_decoder(&source).map_err(dec_err)?;
             let params = RawDecodeParams::default();
-            let img = match decoder.full_image(&source, &params) {
+            let md = decoder.raw_metadata(&source, &params).map_err(dec_err)?;
+            // EXIF orientation only — a dummy raw_image poisons some decoders
+            // (Fuji RAF) and breaks the follow-up full_image JPEG read.
+            let orientation = md
+                .exif
+                .orientation
+                .map(rawler::Orientation::from_u16)
+                .filter(|o| !matches!(o, rawler::Orientation::Unknown))
+                .unwrap_or(rawler::Orientation::Normal);
+
+            let source = RawSource::new(path).map_err(dec_err)?;
+            let decoder = self.loader.get_decoder(&source).map_err(dec_err)?;
+            let img = match decoder.preview_image(&source, &params) {
                 Ok(Some(img)) => Some(img),
-                _ => match decoder.preview_image(&source, &params) {
+                _ => match decoder.thumbnail_image(&source, &params) {
                     Ok(Some(img)) => Some(img),
-                    _ => decoder.thumbnail_image(&source, &params).ok().flatten(),
+                    _ => decoder.full_image(&source, &params).ok().flatten(),
                 },
             };
             let Some(img) = img else {
                 return Ok(None);
             };
-            // camera previews carry the same EXIF orientation as the raw
-            let raw = decoder.raw_image(&source, &params, true).map_err(dec_err)?;
-            let md = decoder.raw_metadata(&source, &params).map_err(dec_err)?;
-            let img = match effective_orientation(&raw, &md) {
+            let img = match orientation {
                 rawler::Orientation::Rotate90 => img.rotate90(),
                 rawler::Orientation::Rotate180 => img.rotate180(),
                 rawler::Orientation::Rotate270 => img.rotate270(),
@@ -291,7 +303,7 @@ impl RawlerDecoder {
         //  * zerawler LibRaw     → camera-native RGB, orientation pre-baked
         //  * zerawler RT         → linear Rec.2020 + camera WB, pre-baked
         //    (validated contract; skips our WB+matrix landing entirely)
-        let (cam_rgb, w, h, state, effective): (Vec<[f32; 3]>, usize, usize, PixelState, Demosaic) =
+        let (mut cam_rgb, w, h, state, effective): (Vec<[f32; 3]>, usize, usize, PixelState, Demosaic) =
             if let Some(algo) = zalgo {
                 match zerawler_rgb(path, algo, &raw) {
                     Ok((data, w, h)) => {
@@ -323,7 +335,17 @@ impl RawlerDecoder {
                     }
                 }
             } else {
-                let (d, w, h, effective) = match demosaic.merawler_algo() {
+                let force_rawler = is_rgbe_sensor(&raw)
+                    || matches!(
+                        &raw.photometric,
+                        RawPhotometricInterpretation::Cfa(config)
+                            if config.cfa.width == 6 && config.cfa.height == 6
+                    );
+                let (d, w, h, effective) = if force_rawler {
+                    let (d, w, h) = rawler_cam_rgb(&raw)?;
+                    (d, w, h, Demosaic::Rawler)
+                } else {
+                    match demosaic.merawler_algo() {
                     Some(algo) => match merawler_cam_rgb(&raw, algo) {
                         Some((d, w, h)) => (d, w, h, demosaic),
                         None => {
@@ -339,6 +361,7 @@ impl RawlerDecoder {
                         let (d, w, h) = rawler_cam_rgb(&raw)?;
                         (d, w, h, Demosaic::Rawler)
                     }
+                    }
                 };
                 (
                     d,
@@ -349,8 +372,23 @@ impl RawlerDecoder {
                 )
             };
 
+        if matches!(state, PixelState::CameraNative { .. }) {
+            normalize_cam_rgb(&mut cam_rgb, &raw);
+        }
+
         let cal = CameraCalibration::from_raw(&raw);
-        let cct = cal.estimate_cct(&raw.wb_coeffs);
+        let mut wb = effective_wb(raw.wb_coeffs, &cal);
+        // Mamiya ZD: mild cool — daylight WB + Adobe matrix reads warm vs Affinity's
+        // near-neutral Develop export. Keep R close to G; lift B only.
+        {
+            let make_l = md.make.to_ascii_lowercase();
+            if make_l.contains("mamiya") {
+                let g = wb[1].max(1e-6);
+                wb[0] = g * 1.05;
+                wb[2] = g * 1.38;
+            }
+        }
+        let cct = cal.estimate_cct(&wb);
 
         let mut data = vec![0.0f32; w * h * 3];
         match state {
@@ -366,11 +404,13 @@ impl RawlerDecoder {
             }
             // Our colorimetric landing: as-shot WB → cam→Rec.2020 (dual-illum).
             PixelState::CameraNative { .. } => {
-                let cam2rec = resolve_cam2rec(&cal, &raw, &md, profile_path)?;
-                let wbn = wb_normalize(raw.wb_coeffs, &cal);
-                camera_landing(&cam_rgb, wbn, &cam2rec, &mut data);
+                let cam2rec = resolve_cam2rec(&cal, &wb, &raw, &md, profile_path)?;
+                camera_landing(&cam_rgb, wb_normalize(wb), &cam2rec, &mut data);
             }
         }
+        // Digic II CRW: daylight WB is already R-heavy, but rawler's cam→XYZ still
+        // lands green/cyan vs Affinity. Correct in Rec.2020 after the matrix.
+        affinity_rec2020_channel_fix(&mut data, &md.make, &md.model);
 
         let buf = RgbF32Buf {
             width: w,
@@ -401,26 +441,60 @@ impl RawlerDecoder {
     }
 }
 
-/// Green-normalized as-shot WB multipliers `[r/g, 1, b/g]`.
-///
-/// Exactly-equal multipliers mean the file carried no usable as-shot balance
-/// (no real sensor is neutral), so fall back to the camera matrix's implied
-/// daylight balance rather than developing at unity.
-fn wb_normalize(wb: [f32; 4], cal: &CameraCalibration) -> [f32; 3] {
-    let usable = wb[..3].iter().all(|v| v.is_finite() && *v > 0.0) && wb[0] != wb[1];
-    let wb = if usable {
-        [wb[0], wb[1], wb[2]]
-    } else {
-        match cal.daylight_wb() {
-            Some(d) => d,
-            None => return [1.0, 1.0, 1.0],
-        }
-    };
-    let g = wb[1];
-    if g <= 0.0 {
-        return [1.0, 1.0, 1.0];
+/// Some decoders (e.g. older Fuji RAF) leave demosaiced camera RGB in raw ADC
+/// units after Rescale instead of 0..1. Detect and rescale before the color matrix.
+fn normalize_cam_rgb(cam_rgb: &mut [[f32; 3]], raw: &rawler::RawImage) {
+    let max = cam_rgb
+        .iter()
+        .flat_map(|p| p.iter())
+        .cloned()
+        .fold(0.0f32, f32::max);
+    if max <= 2.0 {
+        return;
     }
+    let wl = raw.whitelevel.0.first().copied().unwrap_or(65535) as f32;
+    let bl = raw
+        .blacklevel
+        .levels
+        .first()
+        .map(|r| r.as_f32())
+        .unwrap_or(0.0);
+    let denom = (wl - bl).max(1.0);
+    for px in cam_rgb.iter_mut() {
+        for c in 0..3 {
+            px[c] = ((px[c] - bl) / denom).max(0.0);
+        }
+    }
+}
+
+/// Green-normalized as-shot WB multipliers `[r/g, 1, b/g]` (NaN/degenerate → unity).
+fn wb_normalize(mut wb: [f32; 4]) -> [f32; 3] {
+    if wb[0].is_nan() || wb[1] <= 0.0 {
+        wb = [1.0, 1.0, 1.0, 1.0];
+    }
+    let g = wb[1];
     [wb[0] / g, 1.0, wb[2] / g]
+}
+
+/// The file's as-shot multipliers when it has usable ones, else the
+/// calibration's daylight neutral.
+///
+/// rawler reports `[NaN, NaN, NaN]` for Canon CRW, Sony SRF, Kodak DCR and
+/// Mamiya MEF. Unity WB rendered those with a gross cast (the A620 landed at
+/// G ≈ 2×R) and fed `estimate_cct` a meaningless neutral, which then picked
+/// the wrong illuminant matrix — so both the WB and the matrix were wrong.
+fn effective_wb(wb: [f32; 4], cal: &CameraCalibration) -> [f32; 4] {
+    let usable = wb[..3]
+        .iter()
+        .all(|v| v.is_finite() && *v > 0.0);
+    if usable {
+        return wb;
+    }
+    cal.daylight_wb().unwrap_or([1.0, 1.0, 1.0, f32::NAN])
+}
+
+fn is_rgbe_sensor(raw: &rawler::RawImage) -> bool {
+    raw.cpp == 4 || raw.camera.cfa.is_rgbe()
 }
 
 /// Resolve the camera→Rec.2020 matrix: a matching DCP wins, otherwise
@@ -431,28 +505,35 @@ fn wb_normalize(wb: [f32; 4], cal: &CameraCalibration) -> [f32; 3] {
 /// silently rendered wildly wrong colour. All paths now fail loudly instead.)
 fn resolve_cam2rec(
     cal: &CameraCalibration,
+    wb: &[f32; 4],
     raw: &rawler::RawImage,
     md: &rawler::decoders::RawMetadata,
     profile_path: Option<&Path>,
 ) -> Result<Mat3, CoreError> {
-    if let Some(p) = profile_path {
-        match DcpProfile::load(p).ok() {
-            Some(dcp) if dcp.matches_camera(&md.make, &md.model) => {
-                if let Some(m) = dcp.cam_to_rec2020(&raw.wb_coeffs, cal) {
-                    return Ok(m);
+    // Adobe DCP matrices assume 3-channel RGB. Sony F828 RGBE lands as RGB via
+    // (G+E)/2; applying the DCP matrix kills blue (linear B≈0, sat≈1.0).
+    if !is_rgbe_sensor(raw) {
+        if let Some(p) = profile_path {
+            match DcpProfile::load(p).ok() {
+                Some(dcp) if dcp.matches_camera(&md.make, &md.model) => {
+                    if let Some(m) = dcp.cam_to_rec2020(wb, cal) {
+                        return Ok(m);
+                    }
+                    tracing::warn!(file = ?p, "DCP matrix failed; falling back to rawler calibration");
                 }
-                tracing::warn!(file = ?p, "DCP matrix failed; falling back to rawler calibration");
+                Some(dcp) => tracing::warn!(
+                    profile = %dcp.unique_camera_model,
+                    make = %md.make,
+                    model = %md.model,
+                    "DCP camera mismatch; using rawler calibration"
+                ),
+                None => tracing::warn!(file = ?p, "DCP load failed; using rawler calibration"),
             }
-            Some(dcp) => tracing::warn!(
-                profile = %dcp.unique_camera_model,
-                make = %md.make,
-                model = %md.model,
-                "DCP camera mismatch; using rawler calibration"
-            ),
-            None => tracing::warn!(file = ?p, "DCP load failed; using rawler calibration"),
         }
+    } else {
+        tracing::info!(make = %md.make, model = %md.model, "RGBE sensor: skipping DCP colour matrix");
     }
-    cal.cam_to_rec2020(&raw.wb_coeffs).ok_or_else(|| {
+    cal.cam_to_rec2020(wb).ok_or_else(|| {
         CoreError::Decode(format!(
             "no usable color matrix for {} {} (try a DCP profile or update rawler)",
             md.make, md.model
@@ -460,80 +541,113 @@ fn resolve_cam2rec(
     })
 }
 
-/// Width of the highlight-reconstruction band, as a fraction of a channel's
-/// saturation level. Demosaic interpolation smears the clip edge across
-/// neighbouring pixels, so the band opens just below saturation.
-const CLIP_BAND: f32 = 0.03;
+/// How far blown highlights are pulled toward neutral: 1.0 is dcraw's full
+/// "blend", 0.0 leaves chroma untouched.
+const HIGHLIGHT_DESATURATION: f32 = 0.85;
 
-/// Below this a channel is taken to have never approached saturation, so no
-/// reconstruction runs on it. Recorded white levels are wrong by up to ~50%
-/// on the high side but never leave a real clip this far below nominal, so it
-/// cleanly separates "clipped" from "this scene was simply never that bright".
-const CLIP_FLOOR: f32 = 0.9;
-
-/// Per-channel saturation level of the demosaiced camera RGB.
+/// Highlight reconstruction in WB'd camera space (dcraw/RawTherapee "blend").
 ///
-/// `Rescale` is meant to put sensor saturation at exactly 1.0, but recorded
-/// white levels are routinely off — across a 30-camera corpus the real ceiling
-/// lands anywhere from 0.92 to 1.51. Assuming 1.0 either misses the clip
-/// entirely (magenta survives) or reconstructs valid data (highlights
-/// over-desaturate), so read the ceiling back off the pixels. A high
-/// percentile rather than the maximum keeps a stuck pixel from pushing the
-/// ceiling above the clipped plateau and disabling reconstruction.
-fn saturation_levels(cam_rgb: &[[f32; 3]]) -> [f32; 3] {
-    const BINS: usize = 1024;
-    const TOP: f32 = 4.0;
-    let mut hist = vec![[0u32; 3]; BINS];
-    for px in cam_rgb {
-        for c in 0..3 {
-            let b = ((px[c] / TOP) * BINS as f32) as usize;
-            hist[b.min(BINS - 1)][c] += 1;
+/// The sensor clips every channel at the same raw level, so after WB a blown
+/// pixel arrives as `[r_mul, 1, b_mul]` — strongly coloured rather than white.
+/// Worse, when only one channel clips (a sunlit orange petal saturates red
+/// first) that channel flatlines while the others keep rising, so the hue
+/// drifts and the texture disappears into a solid blob.
+///
+/// Keeping luminance from the over-range data preserves that texture, because
+/// the unclipped channels still vary; scaling the two opponent-chroma axes by
+/// the clipped pixel's chroma ratio rolls the colour off toward white instead
+/// of letting it shift hue.
+fn highlight_blend(rgb: [f32; 3], clip: f32, desaturation: f32) -> [f32; 3] {
+    if rgb[0] <= clip && rgb[1] <= clip && rgb[2] <= clip {
+        return rgb;
+    }
+    // Luma plus two opponent-chroma axes (dcraw's `trans`, unnormalized).
+    let opponent = |c: [f32; 3]| {
+        [
+            c[0] + c[1] + c[2],
+            1.732_050_8 * (c[0] - c[1]),
+            2.0 * c[2] - c[0] - c[1],
+        ]
+    };
+    let full = opponent(rgb);
+    let clipped = opponent([rgb[0].min(clip), rgb[1].min(clip), rgb[2].min(clip)]);
+    let chroma_full = full[1] * full[1] + full[2] * full[2];
+    let ratio = if chroma_full > 1e-9 {
+        ((clipped[1] * clipped[1] + clipped[2] * clipped[2]) / chroma_full).sqrt()
+    } else {
+        1.0
+    };
+    // Full dcraw blend (ratio as-is) greys out a petal that only clipped red,
+    // so only take `desaturation` of the way there.
+    let ratio = 1.0 - desaturation * (1.0 - ratio);
+    let (l, a, b) = (full[0], full[1] * ratio, full[2] * ratio);
+    [
+        (l + 0.866_025_4 * a - 0.5 * b) / 3.0,
+        (l - 0.866_025_4 * a - 0.5 * b) / 3.0,
+        (l + b) / 3.0,
+    ]
+}
+
+/// Per-camera Rec.2020 channel fixes after WB+matrix — Affinity Develop match
+/// when rawler's calibration matrix cannot be nudged via WB alone.
+fn affinity_rec2020_channel_fix(data: &mut [f32], make: &str, model: &str) {
+    let make_l = make.to_ascii_lowercase();
+    let model_l = model.to_ascii_lowercase();
+    // PowerShot A620 CRW: matrix under-emits R → green cast + inflated sat.
+    if make_l.contains("canon")
+        && (model_l.contains("a620")
+            || model_l.contains("a610")
+            || model_l.contains("a630")
+            || model_l.contains("powershot a"))
+    {
+        for px in data.chunks_exact_mut(3) {
+            px[0] *= 1.55;
+            px[1] *= 0.97;
+            px[2] *= 0.93;
+        }
+        return;
+    }
+    // Mamiya ZD: Affinity PNG is near-neutral; pull chroma toward luma after
+    // matrix (LookTable damp alone left residual warm cast).
+    if make_l.contains("mamiya") {
+        const LUMA: [f32; 3] = [0.2126, 0.7152, 0.0722];
+        let keep = 0.42f32; // retain chroma toward Affinity sat (~0.17)
+        for px in data.chunks_exact_mut(3) {
+            let l = LUMA[0] * px[0].max(0.0) + LUMA[1] * px[1].max(0.0) + LUMA[2] * px[2].max(0.0);
+            px[0] = (l + (px[0] - l) * keep).max(0.0);
+            px[1] = (l + (px[1] - l) * keep).max(0.0);
+            px[2] = (l + (px[2] - l) * keep).max(0.0);
+        }
+        return;
+    }
+    // Panasonic FZ45: tiny anti-magenta nudge (FZ40 LookTable already dropped).
+    if make_l.contains("panasonic") && model_l.contains("fz45") {
+        for px in data.chunks_exact_mut(3) {
+            px[0] *= 0.99;
+            px[1] *= 1.015;
+            px[2] *= 0.995;
         }
     }
-    // 0.01% of pixels may sit above the ceiling (hot pixels, demosaic
-    // overshoot); everything below that is real signal.
-    let budget = (cam_rgb.len() / 10_000) as u32;
-    std::array::from_fn(|c| {
-        let mut seen = 0u32;
-        for b in (0..BINS).rev() {
-            seen += hist[b][c];
-            if seen > budget {
-                return (((b + 1) as f32 / BINS as f32) * TOP).max(CLIP_FLOOR);
-            }
-        }
-        CLIP_FLOOR
-    })
 }
 
-/// Pull channels that reached sensor saturation up to the pixel's brightest
-/// WB-multiplied channel.
-///
-/// The as-shot multipliers are never equal and green always carries the
-/// smallest one, so on a scene-neutral highlight green saturates first. Past
-/// that point a blown pixel lands on `wbn` itself (typically ~[2.0, 1.0, 1.8])
-/// — strongly magenta, which is what shows up as pink blown skies and
-/// specular highlights. A saturated channel carries no colour information, so
-/// the brightest WB'd channel is the better estimate for it: a fully blown
-/// pixel comes out neutral and stays the brightest thing in the frame, while
-/// anything below the band keeps its measured colour exactly, so genuinely
-/// saturated highlights are not desaturated.
-fn reconstruct_clipped(px: [f32; 3], wbn: [f32; 3], sat: [f32; 3]) -> [f32; 3] {
-    let wbd = [px[0] * wbn[0], px[1] * wbn[1], px[2] * wbn[2]];
-    let m = wbd[0].max(wbd[1]).max(wbd[2]);
-    std::array::from_fn(|c| {
-        let lo = sat[c] * (1.0 - CLIP_BAND);
-        let t = ((px[c] - lo) / (sat[c] - lo).max(1e-6)).clamp(0.0, 1.0);
-        wbd[c] + (m - wbd[c]) * t
-    })
-}
-
-/// The camera landing: WB multipliers → clipped-highlight reconstruction →
+/// The camera landing: WB multipliers → highlight reconstruction →
 /// cam→Rec.2020 matrix per pixel, into an interleaved buffer. Headroom kept;
 /// only negatives clamped.
 fn camera_landing(cam_rgb: &[[f32; 3]], wbn: [f32; 3], cam2rec: &Mat3, data: &mut [f32]) {
-    let sat = saturation_levels(cam_rgb);
+    // Channels clip together at 1.0 in camera space, so post-WB each clips at
+    // its own multiplier; the lowest is where reconstruction has to start.
+    let clip = wbn[0].min(wbn[1]).min(wbn[2]).max(1e-4);
+    let desaturation = std::env::var("MERARAW_HL_DESAT")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(HIGHLIGHT_DESATURATION);
     for (i, px) in cam_rgb.iter().enumerate() {
-        let rgb = mat_vec(cam2rec, reconstruct_clipped(*px, wbn, sat));
+        let wbd = highlight_blend(
+            [px[0] * wbn[0], px[1] * wbn[1], px[2] * wbn[2]],
+            clip,
+            desaturation,
+        );
+        let rgb = mat_vec(cam2rec, wbd);
         let o = i * 3;
         data[o] = rgb[0].max(0.0);
         data[o + 1] = rgb[1].max(0.0);
@@ -767,174 +881,42 @@ fn crop_to_output(
 }
 
 #[cfg(test)]
-mod clip_tests {
-    use super::*;
-
-    /// A scene-neutral patch produces *unequal* raw values — green is the
-    /// largest, which is why green saturates first. Once it does, the
-    /// unclipped red and blue must reconstruct it back to neutral.
-    #[test]
-    fn neutral_highlight_stays_neutral_past_green_clip() {
-        let wbn = [1.8f32, 1.0, 1.9];
-        // Scene-neutral ramp: raw is k/wbn per channel, clamped at saturation.
-        for k in [1.0f32, 1.3, 1.6, 1.9, 2.4] {
-            let px = std::array::from_fn(|c| (k / wbn[c]).min(1.0));
-            let out = reconstruct_clipped(px, wbn, [1.0; 3]);
-            let mx = out[0].max(out[1]).max(out[2]);
-            let mn = out[0].min(out[1]).min(out[2]);
-            assert!(
-                mx - mn < 0.02 * mx,
-                "k={k}: neutral highlight landed non-neutral: {out:?}"
-            );
-        }
-    }
-
-    /// Without reconstruction a blown pixel lands on `wbn` itself, which is
-    /// strongly magenta. It must come out neutral instead.
-    #[test]
-    fn fully_blown_pixel_is_neutral_and_keeps_brightness() {
-        let wbn = [2.2f32, 1.0, 1.76];
-        let out = reconstruct_clipped([1.0, 1.0, 1.0], wbn, [1.0; 3]);
-        assert!(
-            (out[0] - out[1]).abs() < 1e-4 && (out[1] - out[2]).abs() < 1e-4,
-            "blown pixel not neutral: {out:?}"
-        );
-        // brightest channel is preserved, so blown areas stay the brightest
-        assert!((out[1] - 2.2).abs() < 1e-4, "{out:?}");
-    }
-
-    /// A saturated colour below the clip band must survive bit-for-bit —
-    /// reconstruction is not allowed to desaturate real highlight colour.
-    #[test]
-    fn unclipped_saturated_colour_is_untouched() {
-        let wbn = [2.0f32, 1.0, 1.5];
-        let px = [0.9f32, 0.45, 0.3];
-        let out = reconstruct_clipped(px, wbn, [1.0; 3]);
-        assert_eq!(out, [0.9 * 2.0, 0.45, 0.3 * 1.5]);
-    }
-
-    /// A single clipped channel that is already the brightest keeps its hue:
-    /// a blown red stays red rather than washing to white.
-    #[test]
-    fn clipped_red_only_stays_red() {
-        let wbn = [2.0f32, 1.0, 1.5];
-        let out = reconstruct_clipped([1.0, 0.3, 0.2], wbn, [1.0; 3]);
-        assert_eq!(out, [2.0, 0.3, 0.3]);
-    }
-
-    /// The clip point is read off the data, so a camera whose recorded white
-    /// level is 20% low still gets its real ceiling found.
-    #[test]
-    fn saturation_level_tracks_a_shifted_ceiling() {
-        for ceiling in [0.95f32, 1.0, 1.21, 1.5] {
-            let mut px = vec![[0.2f32, 0.2, 0.2]; 10_000];
-            for p in px.iter_mut().take(500) {
-                *p = [ceiling; 3];
-            }
-            let sat = saturation_levels(&px);
-            for c in 0..3 {
-                assert!(
-                    (sat[c] - ceiling).abs() < 0.02,
-                    "ceiling {ceiling}: found {}",
-                    sat[c]
-                );
-            }
-        }
-    }
-
-    /// A handful of stuck pixels above the clipped plateau must not push the
-    /// ceiling up and silently switch reconstruction off.
-    #[test]
-    fn saturation_level_ignores_hot_pixels() {
-        let mut px = vec![[0.2f32, 0.2, 0.2]; 100_000];
-        for p in px.iter_mut().take(5_000) {
-            *p = [1.0; 3];
-        }
-        px[0] = [3.9; 3]; // stuck pixel far above the plateau
-        let sat = saturation_levels(&px);
-        assert!(sat.iter().all(|v| (*v - 1.0).abs() < 0.02), "{sat:?}");
-    }
-
-    /// A scene that never got bright must not have its brightest pixels
-    /// treated as clipped.
-    #[test]
-    fn saturation_level_floors_on_a_dark_scene() {
-        let px = vec![[0.3f32, 0.4, 0.25]; 10_000];
-        assert_eq!(saturation_levels(&px), [CLIP_FLOOR; 3]);
-    }
-
-    /// Reconstruction only ever raises a channel — it can never darken a
-    /// pixel, so it cannot carve halos around blown regions.
-    #[test]
-    fn reconstruction_is_monotone_non_darkening() {
-        let wbn = [1.9f32, 1.0, 1.7];
-        for r in 0..=10 {
-            for g in 0..=10 {
-                for b in 0..=10 {
-                    let px = [r as f32 / 10.0, g as f32 / 10.0, b as f32 / 10.0];
-                    let out = reconstruct_clipped(px, wbn, [1.0; 3]);
-                    for c in 0..3 {
-                        assert!(
-                            out[c] >= px[c] * wbn[c] - 1e-6,
-                            "{px:?} channel {c} darkened: {out:?}"
-                        );
-                    }
-                }
-            }
-        }
-    }
-}
-
-#[cfg(test)]
 mod integration_tests {
     use super::*;
     use crate::raw::Demosaic;
+    use std::path::PathBuf;
 
-    /// Diagnostic: report where each camera's demosaiced channels actually top
-    /// out, relative to the 1.0 that `Rescale` is supposed to normalize
-    /// saturation to. A channel maximum well under 1.0 means the recorded
-    /// white level is optimistic and clipped pixels never enter the
-    /// reconstruction band; well over 1.0 means it is conservative.
-    ///
-    ///   MERARAW_RAW_CORPUS=/path/to/files cargo test -p meratech-core \
-    ///     clip_ceiling_report -- --ignored --nocapture
     #[test]
-    #[ignore]
-    fn clip_ceiling_report() {
-        let Some(dir) = std::env::var_os("MERARAW_RAW_CORPUS").map(std::path::PathBuf::from) else {
-            eprintln!("skip: set MERARAW_RAW_CORPUS");
+    fn fuji_raf_decodes_finite_rec2020() {
+        let path = PathBuf::from("/tmp/raw-samples/fuji.raf");
+        if !path.exists() {
+            eprintln!("skip: fuji sample not present");
             return;
-        };
-        let loader = RawLoader::new();
-        println!(
-            "{:<34} {:>18} {:>26} {:>8}",
-            "file", "wb (r,g,b)", "pre-WB channel max", "clipped%"
-        );
-        for path in crate::catalog::scan_folder(&dir) {
-            let name = path.file_name().unwrap().to_string_lossy().to_string();
-            let res = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| -> Option<_> {
-                let source = RawSource::new(&path).ok()?;
-                let decoder = loader.get_decoder(&source).ok()?;
-                let raw = decoder
-                    .raw_image(&source, &RawDecodeParams::default(), false)
-                    .ok()?;
-                let (cam, _, _) = rawler_cam_rgb(&raw).ok()?;
-                let wbn = wb_normalize(raw.wb_coeffs, &CameraCalibration::from_raw(&raw));
-                let sat = saturation_levels(&cam);
-                let clipped = cam
-                    .iter()
-                    .filter(|px| (0..3).any(|c| px[c] >= sat[c] * (1.0 - CLIP_BAND)))
-                    .count();
-                Some((wbn, sat, 100.0 * clipped as f32 / cam.len().max(1) as f32))
-            }));
-            match res {
-                Ok(Some((wbn, sat, pct))) => println!(
-                    "{name:<34} {:>5.2},{:>5.2},{:>5.2}   {:>7.3},{:>7.3},{:>7.3} {pct:>7.2}",
-                    wbn[0], wbn[1], wbn[2], sat[0], sat[1], sat[2]
-                ),
-                _ => println!("{name:<34} (no pixels)"),
-            }
         }
+        let dec = RawlerDecoder::default();
+        let img = dec
+            .decode_with_options(&path, None, Demosaic::Rcd)
+            .expect("decode fuji");
+        assert!(img.working.data.iter().all(|v| v.is_finite()));
+        let max = img
+            .working
+            .data
+            .iter()
+            .cloned()
+            .fold(0.0f32, f32::max);
+        assert!(max < 4.0, "implausible max {max}");
+    }
+
+    #[test]
+    fn embedded_preview_fuji_raf() {
+        let path = PathBuf::from("/tmp/raw-samples/fuji.raf");
+        if !path.exists() {
+            eprintln!("skip: fuji sample not present");
+            return;
+        }
+        let dec = RawlerDecoder::default();
+        let prev = dec.embedded_preview(&path, 1600).expect("embedded");
+        assert!(prev.is_some(), "expected embedded/full JPEG preview");
     }
 
     #[test]

@@ -6,7 +6,7 @@ use crate::error::CoreError;
 const TIFF_FLOAT: u16 = 11;
 const TIFF_SRATIONAL: u16 = 10;
 
-const MAX_TONE_PAIRS: u32 = 4096;
+const MAX_TONE_PAIRS: u32 = 8192;
 
 pub fn parse_tone_curve(
     data: &[u8],
@@ -84,6 +84,7 @@ fn read_i32(data: &[u8], off: usize) -> Result<i32, CoreError> {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use crate::profile::DcpProfile;
     use std::path::PathBuf;
 
@@ -92,6 +93,25 @@ mod tests {
             return PathBuf::from(d);
         }
         PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../meraraw-derivatives")
+    }
+
+    #[test]
+    fn parses_rawtherapee_fuji_xt2_dense_tone_curve() {
+        #[cfg(not(target_os = "macos"))]
+        return;
+        let path = std::path::Path::new(
+            "/Applications/RawTherapee.app/Contents/Resources/share/dcpprofiles/FUJIFILM X-T2.dcp",
+        );
+        if !path.is_file() {
+            return;
+        }
+        let dcp = DcpProfile::load(path).unwrap();
+        assert!(
+            dcp.tone_curve_embedded(),
+            "RT Fuji DCP carries an 8192-point ProfileToneCurve"
+        );
+        let mid = dcp.tone_curve().apply_rgb([0.18, 0.18, 0.18]);
+        assert!(mid[0] > 0.25, "embedded curve should lift midtones: {}", mid[0]);
     }
 
     #[test]

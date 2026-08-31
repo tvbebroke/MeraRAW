@@ -122,8 +122,9 @@ impl HueSatMap {
         let [dh, ss, vs] = self.sample(hsv[0], hsv[1], hsv[2]);
         let mut h = hsv[0] + dh / 360.0;
         h -= h.floor();
-        let s = (hsv[1] * ss).min(1.0);
-        let v = (hsv[2] * vs).min(1.0);
+        let s = (hsv[1] * ss).clamp(0.0, 1.0);
+        // Keep V unclamped so highlight headroom survives (matches GPU path).
+        let v = (hsv[2] * vs).max(0.0);
         hsv_to_rgb([h, s, v])
     }
 }
@@ -210,8 +211,8 @@ pub fn apply_hue_sat_maps(
         let vs = w * d1[2] + (1.0 - w) * d2[2];
         let mut h = hsv[0] + dh / 360.0;
         h -= h.floor();
-        let s = (hsv[1] * ss).min(1.0);
-        let v = (hsv[2] * vs).min(1.0);
+        let s = (hsv[1] * ss).clamp(0.0, 1.0);
+        let v = (hsv[2] * vs).max(0.0);
         hsv_to_rgb([h, s, v])
     } else {
         map1.apply_prophoto(pro)
@@ -227,6 +228,72 @@ pub fn apply_look_table(rec2020: [f32; 3], table: &HueSatMap) -> [f32; 3] {
     let pro = mat_vec(&REC2020_TO_PROPHOTO, rec2020);
     let pro = table.apply_prophoto(pro);
     mat_vec(&PROPHOTO_TO_REC2020, pro)
+}
+
+/// Pull Fuji DCP cyan-leaning blues toward Affinity/LR.
+///
+/// Root issue: HueSatMap leaves B-dominant cyans at sat≈1 with R≈0; after
+/// Rec.2020→sRGB they stay neon cyan. Affinity's bluish-green is ~hue 192°
+/// at sat ~0.25 with real red; blue sky is ~227° at sat ~0.75.
+pub fn correct_blue_cyan_cast(rgb: [f32; 3]) -> [f32; 3] {
+    let b = rgb[2];
+    if b <= 1e-6 || b < rgb[0] || b < rgb[1] * 0.98 {
+        return rgb;
+    }
+    let hsv = rgb_to_hsv(rgb);
+    let h = hsv[0] * 360.0;
+    let s = hsv[1];
+    let v = hsv[2];
+    if s < 0.20 || v < 0.02 || !(175.0..=225.0).contains(&h) {
+        return rgb;
+    }
+
+    let gb = rgb[1] / b;
+    let rb = rgb[0] / b;
+    let luma = 0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2];
+
+    if gb > 0.70 {
+        // Bluish-green / cyan — Affinity keeps hue ~190–205° but much lower sat.
+        let crush = ((0.35 - rb).max(0.0) / 0.35).clamp(0.0, 1.0);
+        let strength = crush * ((s - 0.25) / 0.75).clamp(0.0, 1.0);
+        if strength < 0.05 {
+            return rgb;
+        }
+        let target_h = 198.0f32;
+        let nh = (h + (target_h - h) * strength * 0.35).rem_euclid(360.0);
+        // Pull sat down hard so R survives sRGB gamut map (Affinity ~0.25).
+        let ns = (s * (1.0 - 0.70 * strength)).clamp(0.15, 1.0);
+        let mut out = hsv_to_rgb([nh / 360.0, ns, v]);
+        // Soft mix toward luma for gamut headroom, then nudge blue.
+        let desat = 0.35 * strength;
+        out = [
+            out[0] * (1.0 - desat) + luma * desat,
+            out[1] * (1.0 - desat) + luma * desat,
+            out[2] * (1.0 - desat) + luma * desat,
+        ];
+        out[0] = out[0].max(luma * 0.55 * strength);
+        out[2] = (out[2] + 0.04 * strength * b).max(out[0]);
+        return [out[0].max(0.0), out[1].max(0.0), out[2].max(0.0)];
+    }
+
+    // Blue sky / primary blue — Affinity ~227°, R/B ≈ 0.22, sat moderated.
+    // Keep this mild: aggressive G crush washed Nikon AW1 / Sony A7III blues.
+    let hue_pull = ((225.0 - h) / 45.0).clamp(0.0, 1.0);
+    let red_pull = ((0.18 - rb).max(0.0) / 0.18).clamp(0.0, 1.0);
+    let strength = (hue_pull * 0.25 + red_pull * 0.45).clamp(0.0, 0.55);
+    if strength < 0.06 {
+        return rgb;
+    }
+    let target_h = 227.0f32;
+    let nh = (h + (target_h - h) * strength * 0.65).rem_euclid(360.0);
+    let ns = (s * (1.0 - 0.10 * strength)).clamp(0.0, 1.0);
+    let mut out = hsv_to_rgb([nh / 360.0, ns, v]);
+    let want_r = b * 0.20;
+    if out[0] < want_r {
+        out[0] += (want_r - out[0]) * strength * 0.7;
+    }
+    out[1] *= 1.0 - 0.08 * strength;
+    [out[0].max(0.0), out[1].max(0.0), out[2].max(0.0)]
 }
 
 pub fn cct_weight(cct: f32, t1: f32, t2: f32) -> f32 {
@@ -253,5 +320,20 @@ mod tests {
         let rgb = [0.4, 0.2, 0.1];
         let out = map.apply_prophoto(rgb);
         assert!((out[0] - rgb[0]).abs() < 0.02);
+    }
+
+    #[test]
+    fn fixes_fuji_cyan_patch() {
+        // High-G/B cyan (bluish-green) — restore red, stay cyan-green.
+        let cyan = [0.0, 0.42, 0.48];
+        let out = correct_blue_cyan_cast(cyan);
+        assert!(out[0] > cyan[0], "red should lift on cyan patch");
+
+        // Blue-sky style: low R, mid G — Affinity lands ~227°.
+        let sky = [0.0, 0.18, 0.55];
+        let out = correct_blue_cyan_cast(sky);
+        let h = rgb_to_hsv(out)[0] * 360.0;
+        assert!(h > 215.0, "sky hue {h} still cyan");
+        assert!(out[0] > sky[0], "sky red should lift");
     }
 }

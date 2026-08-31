@@ -67,20 +67,16 @@ impl Engine {
 
         let chosen =
             crate::profile::choose_profile(&meta, &index, doc.meta.profile_file.as_deref());
-        let profile_path = chosen.as_ref().map(|p| {
+        if let Some(p) = chosen.as_ref() {
             meta.camera_profile = Some(crate::profile::profile_display_name(
                 &p.file,
                 camera_key.as_deref().unwrap_or(""),
             ));
-            crate::profile::profile_path(&p.file)
-        });
-
-        let dcp_profile = profile_path.as_ref().and_then(|p| {
-            DcpProfile::load(p)
-                .ok()
-                .filter(|d| d.matches_camera(&meta.camera_make, &meta.camera_model))
-                .map(std::sync::Arc::new)
-        });
+        }
+        // Decoder matrix only when a real .dcp exists (Adobe/RT fallbacks OK).
+        let profile_path = crate::profile::decode_profile_path(chosen.as_ref());
+        let dcp_profile = crate::profile::load_dcp_profile(&meta, chosen.as_ref())
+            .map(std::sync::Arc::new);
 
         // Restore a previously-applied look LUT from the sidecar path, if any.
         // Re-check path safety here (defense in depth vs. older sidecars).
@@ -96,10 +92,9 @@ impl Engine {
                 }
             });
 
-        // Demosaic algorithm from the doc (None = engine default). Surfaced on
-        // meta so the UI picker shows the effective algorithm. Reset to an
-        // in-process default when a sidecar algo isn't available on this OS.
-        let mut demosaic = crate::raw::Demosaic::parse_or_default(doc.meta.demosaic.as_deref());
+        // Demosaic: sidecar override, else camera-aware default (Fuji → dht).
+        let mut demosaic =
+            Demosaic::for_open(&meta.camera_make, &meta.camera_model, doc.meta.demosaic.as_deref());
         let available = crate::raw::Demosaic::available();
         if !available.iter().any(|n| n == demosaic.name()) {
             tracing::warn!(
@@ -354,11 +349,7 @@ impl Engine {
                     ))));
                     return;
                 };
-                let path = crate::profile::profile_path(&chosen.file);
-                let dcp = DcpProfile::load(&path)
-                    .ok()
-                    .filter(|d| d.matches_camera(&cur.meta.camera_make, &cur.meta.camera_model));
-                let Some(dcp) = dcp else {
+                let Some(dcp) = crate::profile::load_dcp_profile(&cur.meta, Some(chosen)) else {
                     let _ = reply.send(Err(CoreError::InvalidOp(format!(
                         "profile failed to load: {}",
                         chosen.file
@@ -591,9 +582,9 @@ impl Engine {
             cur.meta.available_demosaic = available;
             let profile_file = cur.doc().meta.profile_file.clone();
             let index = crate::profile::ProfileIndex::embedded();
-            let profile_path =
-                crate::profile::choose_profile(&cur.meta, &index, profile_file.as_deref())
-                    .map(|p| crate::profile::profile_path(&p.file));
+            let profile_path = crate::profile::decode_profile_path(
+                crate::profile::choose_profile(&cur.meta, &index, profile_file.as_deref()).as_ref(),
+            );
             (cur.path.clone(), profile_path, cur.meta.clone())
         };
         // Re-decode with the same generation so DecodeDone isn't discarded as

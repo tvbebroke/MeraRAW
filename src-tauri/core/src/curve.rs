@@ -176,8 +176,55 @@ impl ProfileToneCurve {
         self.spline.eval(x).max(0.0)
     }
 
+    /// Apply the profile tone curve the way Adobe Camera Raw does in the
+    /// midtones (per-channel — that is what gives Camera look its saturation),
+    /// then soft-blend toward a luminance-preserving remap as channels approach
+    /// clip. Pure per-channel on speculars is the Fujifilm magenta/green failure
+    /// mode; pure luminance remap looks muted next to Lightroom / Affinity.
     pub fn apply_rgb(&self, rgb: [f32; 3]) -> [f32; 3] {
-        [self.eval(rgb[0]), self.eval(rgb[1]), self.eval(rgb[2])]
+        let r = rgb[0].max(0.0);
+        let g = rgb[1].max(0.0);
+        let b = rgb[2].max(0.0);
+        let per = [self.eval(r), self.eval(g), self.eval(b)];
+
+        let y = 0.2627 * r + 0.6780 * g + 0.0593 * b;
+        let luma = if y <= 1e-8 {
+            let v = self.eval(y);
+            [v, v, v]
+        } else {
+            let s = self.eval(y) / y;
+            [r * s, g * s, b * s]
+        };
+
+        // Per-channel midtones; luminance blend near clip. Warm orange petals
+        // keep per-channel further into highlights; near-neutrals always use the
+        // luma curve (cool sat_keep previously magenta'd RW2 water/whites).
+        let peak = r.max(g).max(b);
+        let chroma = if peak > 1e-6 {
+            (peak - r.min(g).min(b)) / peak
+        } else {
+            0.0
+        };
+        // Near-white / grey: Affinity stays neutral — never per-channel here.
+        if chroma < 0.20 {
+            return luma;
+        }
+        let warmth = if peak > 1e-6 {
+            ((r - b).max(0.0) / peak).clamp(0.0, 1.0)
+        } else {
+            0.0
+        };
+        let sat_keep = warmth * ((chroma - 0.20) / 0.25).clamp(0.0, 1.0);
+        let blend_start = 0.78 + 0.18 * sat_keep;
+        let t = ((peak - blend_start) / (1.05 - blend_start).max(0.05)).clamp(0.0, 1.0);
+        // Smoothstep
+        let mut w = t * t * (3.0 - 2.0 * t);
+        w *= 1.0 - sat_keep * 0.72;
+        [
+            per[0] + (luma[0] - per[0]) * w,
+            per[1] + (luma[1] - per[1]) * w,
+            per[2] + (luma[2] - per[2]) * w,
+        ]
     }
 }
 
