@@ -53,6 +53,8 @@ pub struct SourceRef {
 pub struct Mask {
     pub id: String,
     pub kind: String, // subject|sky|background|object|radial|linear|brush
+    #[serde(default = "default_true")]
+    pub enabled: bool,
     #[serde(default = "default_opacity")]
     pub opacity: f32,
     #[serde(default)]
@@ -70,6 +72,10 @@ pub struct Mask {
 
 fn default_opacity() -> f32 {
     100.0
+}
+
+fn default_true() -> bool {
+    true
 }
 
 fn default_blend() -> String {

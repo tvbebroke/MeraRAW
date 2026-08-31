@@ -1,9 +1,10 @@
 import { push, router } from "svelte-spa-router";
-import { leftRailCollapsed, isZenMode, imageBrowserCollapsed, photoDetailsCollapsed, commandPaletteOpen } from "../stores/editor";
+import { leftRailCollapsed, isZenMode, imageBrowserCollapsed, photoDetailsCollapsed, commandPaletteOpen, rightPanelMode } from "../stores/editor";
 import { isSettingsOpen, isExportOpen, isBugReportOpen, classicLook, isShortcutsOpen } from "../stores/ui";
 import { applyEditFocus, showAiPanel, showMaskPanel } from "./editor/focus";
 import { activePhoto, libraryItems, openPhoto, gridKey } from "../stores/browse";
-import { imageMeta, viewportTool } from "../stores/app";
+import { imageMeta, selectedMask, viewportTool, brushRadius } from "../stores/app";
+import { deselectMask } from "../stores/mask";
 import { editorRoute, isEditorRoute, isLibraryRoute, libraryRoute, workspace } from "../stores/workspace";
 import { copyGrade, pasteGrade } from "./grade";
 
@@ -142,6 +143,10 @@ export function handleGlobalShortcut(e: KeyboardEvent): void {
     if (isBugReportOpen.get()) { isBugReportOpen.set(false); return; }
     if (isShortcutsOpen.get()) { isShortcutsOpen.set(false); return; }
     if (commandPaletteOpen.get()) { commandPaletteOpen.set(false); return; }
+    if (selectedMask.get() && rightPanelMode.get() === "mask") {
+      deselectMask();
+      return;
+    }
     return;
   }
 
@@ -207,11 +212,21 @@ export function handleGlobalShortcut(e: KeyboardEvent): void {
     return;
   }
 
-  if (key === "[" ) {
+  if (key === "[") {
+    if (rightPanelMode.get() === "mask" && selectedMask.get() && !isEditVideo()) {
+      e.preventDefault();
+      brushRadius.set(Math.max(0.01, brushRadius.get() - 0.005));
+      return;
+    }
     window.dispatchEvent(new CustomEvent("meraraw:look-prev"));
     return;
   }
   if (key === "]") {
+    if (rightPanelMode.get() === "mask" && selectedMask.get() && !isEditVideo()) {
+      e.preventDefault();
+      brushRadius.set(Math.min(0.25, brushRadius.get() + 0.005));
+      return;
+    }
     window.dispatchEvent(new CustomEvent("meraraw:look-next"));
     return;
   }

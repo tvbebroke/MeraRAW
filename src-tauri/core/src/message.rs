@@ -121,6 +121,11 @@ pub enum EngineEvent {
     MaskReady {
         id: String,
     },
+    /// Segmentation failed for a mask (model missing, inference error, …).
+    MaskError {
+        id: String,
+        message: String,
+    },
     ImportProgress {
         done: u64,
         total: u64,

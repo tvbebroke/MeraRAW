@@ -12,6 +12,7 @@ export const EVENTS = {
   decodeError: "decode-error",
   docUpdated: "doc-updated",
   maskReady: "mask-ready",
+  maskError: "mask-error",
   importProgress: "import-progress",
   importDone: "import-done",
   catalogChanged: "catalog-changed",
@@ -69,6 +70,14 @@ export function onRetouchError(cb: (message: string) => void): Promise<UnlistenF
 
 export function onMaskReady(cb: (id: string) => void): Promise<UnlistenFn> {
   return listen<string>(EVENTS.maskReady, (e) => cb(e.payload));
+}
+
+export function onMaskError(
+  cb: (p: { id: string; message: string }) => void,
+): Promise<UnlistenFn> {
+  return listen<{ id: string; message: string }>(EVENTS.maskError, (e) =>
+    cb(e.payload),
+  );
 }
 
 export function onImportProgress(

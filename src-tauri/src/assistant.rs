@@ -283,6 +283,7 @@ async fn execute_tool(
                     feather: input["feather"].as_f64().map(|v| v as f32),
                     invert: input["invert"].as_bool(),
                     blend: input["blend"].as_str().map(|s| s.to_string()),
+                    enabled: input["enabled"].as_bool(),
                 })
                 .await;
             (op_result(r), None)

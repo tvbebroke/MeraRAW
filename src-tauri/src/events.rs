@@ -14,6 +14,7 @@ pub const FRAME_READY: &str = "frame-ready";
 pub const DECODE_ERROR: &str = "decode-error";
 pub const DOC_UPDATED: &str = "doc-updated";
 pub const MASK_READY: &str = "mask-ready";
+pub const MASK_ERROR: &str = "mask-error";
 pub const IMPORT_PROGRESS: &str = "import-progress";
 pub const IMPORT_DONE: &str = "import-done";
 pub const CATALOG_CHANGED: &str = "catalog-changed";
@@ -43,6 +44,10 @@ pub fn forward_engine_event(app: &AppHandle, ev: meratech_core::message::EngineE
         E::DecodeError { message } => app.emit(DECODE_ERROR, message.clone()),
         E::DocUpdated { delta } => app.emit(DOC_UPDATED, delta.clone()),
         E::MaskReady { id } => app.emit(MASK_READY, id.clone()),
+        E::MaskError { id, message } => app.emit(
+            MASK_ERROR,
+            serde_json::json!({"id": id, "message": message}),
+        ),
         E::ImportProgress { done, total } => app.emit(
             IMPORT_PROGRESS,
             serde_json::json!({"done": done, "total": total}),

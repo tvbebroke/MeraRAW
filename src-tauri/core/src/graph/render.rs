@@ -519,6 +519,9 @@ impl RenderGraph {
             let mut comp_flip = 0usize;
             let extract_view = self.extract_tex.as_ref().unwrap().create_view(&Default::default());
             for mask in &doc.masks {
+                if !mask.enabled {
+                    continue;
+                }
                 let mtex = &self.mask_tex[&mask.id];
                 let opacity = (mask.opacity / 100.0).clamp(0.0, 1.0);
                 let feather = (mask.feather / 100.0).clamp(0.0, 1.0);
@@ -1272,6 +1275,7 @@ fn produce_composite_mask(
                 if let Some(small_view) = seg_masks.get(&mask.id) {
                     let ub = &pool[*pool_i];
                     *pool_i += 1;
+                    // background kind inverts subject model; mask.invert applied in finalize
                     let invert = (mask.kind == "background") as u32;
                     let u = mask_sample_uniforms(
                         &src,

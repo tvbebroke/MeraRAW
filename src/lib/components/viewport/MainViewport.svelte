@@ -45,12 +45,46 @@
     zoomLabel,
     brushRadius,
   } from "../../../stores/app";
-  import { brushFlow, brushHardness, beginMaskAdjust, endMaskAdjust, maskAdjusting, maskRefineMode } from "../../../stores/mask";
+  import { brushFlow, brushHardness, beginMaskAdjust, deselectMask, endMaskAdjust, markMaskPending, maskAdjusting, maskRefineMode, objectPickActive, syncMaskOverlay, syncViewportToolForMask } from "../../../stores/mask";
+  import { rightPanelMode } from "../../../stores/editor";
   import MaskGeometryOverlay from "./MaskGeometryOverlay.svelte";
   import { doc, reconcile } from "../../../stores/doc";
   import { setWorkspace, workspace } from "../../../stores/workspace";
 
   let { minimal = false }: { minimal?: boolean } = $props();
+
+  let maskTapStart: { x: number; y: number } | null = null;
+  const MASK_TAP_PX = 6;
+
+  function maskPanelClickOffEnabled(): boolean {
+    return (
+      rightPanelMode.get() === "mask" &&
+      !!selectedMask.get() &&
+      !objectPickActive.get()
+    );
+  }
+
+  async function createObjectMask(x: number, y: number) {
+    const source = {
+      type: "segmented",
+      model: "object_v1",
+      hint: { point: [x, y] },
+    };
+    try {
+      const delta = await applyOp({ op: "add_mask", kind: "object", source });
+      reconcile(delta);
+      if (delta.newMaskId) {
+        selectedRetouch.set(null);
+        selectedMask.set(delta.newMaskId);
+        const m = delta.doc.masks?.find((entry) => entry.id === delta.newMaskId);
+        syncViewportToolForMask(m ?? null);
+        markMaskPending(delta.newMaskId);
+        syncMaskOverlay();
+      }
+    } catch {
+      /* ignore */
+    }
+  }
   const isVideoWs = $derived($workspace === "video");
   const imgAspect = $derived(
     $imageDims && $imageDims.h > 0 ? $imageDims.w / $imageDims.h : 1,
@@ -485,10 +519,7 @@
     }
     if (maskAdjusting.get()) return;
     const tool = viewportTool.get();
-    if (tool === "mask-geo") {
-      // Radial/linear handles live in MaskGeometryOverlay; pan with middle button only.
-      if (e.button !== 1) return;
-    }
+    if (tool === "mask-geo" && e.button !== 1 && e.button !== 0) return;
     if (tool === "brush" && (selectedMask.get() || selectedRetouch.get())) {
       const p = toImageCoords(e);
       if (p) {
@@ -520,6 +551,17 @@
       viewportTool.set("pan");
       return;
     }
+    if (objectPickActive.get() && e.button === 0) {
+      maskTapStart = { x: e.clientX, y: e.clientY };
+      (e.currentTarget as Element).setPointerCapture(e.pointerId);
+      return;
+    }
+    if (maskPanelClickOffEnabled() && e.button === 0) {
+      maskTapStart = { x: e.clientX, y: e.clientY };
+      (e.currentTarget as Element).setPointerCapture(e.pointerId);
+      return;
+    }
+    if (tool === "mask-geo" && e.button !== 1) return;
     dragging = { x: e.clientX, y: e.clientY };
     (e.currentTarget as Element).setPointerCapture(e.pointerId);
   }
@@ -528,6 +570,16 @@
     if (splitDragging) {
       moveSplit(e);
       return;
+    }
+    if (maskTapStart && !dragging) {
+      const dx = e.clientX - maskTapStart.x;
+      const dy = e.clientY - maskTapStart.y;
+      if (dx * dx + dy * dy > MASK_TAP_PX * MASK_TAP_PX) {
+        dragging = { x: maskTapStart.x, y: maskTapStart.y };
+        maskTapStart = null;
+      } else {
+        return;
+      }
     }
     if (maskAdjusting.get()) return;
     if (loupeOn) {
@@ -556,7 +608,21 @@
     void refresh();
   }
 
-  function onPointerUp() {
+  function onPointerUp(e: PointerEvent) {
+    if (maskTapStart) {
+      const dx = e.clientX - maskTapStart.x;
+      const dy = e.clientY - maskTapStart.y;
+      if (dx * dx + dy * dy <= MASK_TAP_PX * MASK_TAP_PX) {
+        if (objectPickActive.get()) {
+          const p = toImageCoords(e);
+          if (p) void createObjectMask(p[0], p[1]);
+          objectPickActive.set(false);
+        } else {
+          deselectMask();
+        }
+      }
+      maskTapStart = null;
+    }
     dragging = null;
     endSplitDrag();
     const tool = viewportTool.get();
@@ -869,7 +935,7 @@
     bind:this={wrapEl}
     role="img"
     aria-label="Develop preview"
-    class="viewport-surround relative flex min-h-0 min-w-0 flex-1 items-center justify-center select-none {$viewportTool === 'mask-geo' ? 'overflow-visible cursor-default' : $cropActive ? 'cursor-default overflow-hidden' : 'cursor-grab active:cursor-grabbing overflow-hidden'}"
+    class="viewport-surround relative flex min-h-0 min-w-0 flex-1 items-center justify-center select-none {$objectPickActive ? 'cursor-crosshair overflow-hidden' : $viewportTool === 'mask-geo' ? 'overflow-visible cursor-default' : $cropActive ? 'cursor-default overflow-hidden' : 'cursor-grab active:cursor-grabbing overflow-hidden'}"
     onwheel={onWheel}
     onpointerdown={onPointerDown}
     onpointermove={onPointerMove}

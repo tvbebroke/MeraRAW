@@ -1420,6 +1420,10 @@ impl Engine {
                     }
                     Err(e) => {
                         tracing::error!(error = %e, mask_id, "segmentation failed");
+                        self.emit(EngineEvent::MaskError {
+                            id: mask_id,
+                            message: e.to_string(),
+                        });
                     }
                 }
             }

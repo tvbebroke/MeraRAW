@@ -259,19 +259,11 @@ impl Engine {
             return;
         };
         let generation = self.generation;
-        // collect work first (avoid holding doc borrow while mutating)
-        let jobs: Vec<(String, String, u64, serde_json::Value)> = cur.docs[cur.active_doc]
-            .masks
-            .iter()
-            .filter(|m| m.source.get("type").and_then(|t| t.as_str()) == Some("segmented"))
-            .map(|m| {
-                use std::hash::{Hash, Hasher};
-                let mut h = std::collections::hash_map::DefaultHasher::new();
-                m.kind.hash(&mut h);
-                m.source.to_string().hash(&mut h);
-                (m.id.clone(), m.kind.clone(), h.finish(), m.source.clone())
-            })
-            .collect();
+        let masks = cur.docs[cur.active_doc].masks.clone();
+        let mut jobs: Vec<(String, String, u64, serde_json::Value)> = Vec::new();
+        for m in &masks {
+            collect_segment_jobs(m, &mut jobs);
+        }
         for (id, kind, hash, source) in jobs {
             let cached = cur.masks_gpu.get(&id).map(|(h, _)| *h) == Some(hash);
             if cached || cur.pending_segments.contains(&id) {
@@ -321,6 +313,33 @@ impl Engine {
                 })
                 .expect("spawn segment worker");
         }
+    }
+}
+
+fn collect_segment_jobs(
+    m: &crate::doc::Mask,
+    jobs: &mut Vec<(String, String, u64, serde_json::Value)>,
+) {
+    use std::hash::{Hash, Hasher};
+    let mut push = |kind: &str, source: &serde_json::Value| {
+        let mut h = std::collections::hash_map::DefaultHasher::new();
+        kind.hash(&mut h);
+        source.to_string().hash(&mut h);
+        jobs.push((m.id.clone(), kind.to_string(), h.finish(), source.clone()));
+    };
+    match m.source.get("type").and_then(|t| t.as_str()) {
+        Some("segmented") => push(&m.kind, &m.source),
+        Some("composite") => {
+            if let Some(comps) = m.source.get("components").and_then(|c| c.as_array()) {
+                for comp in comps {
+                    let src = comp.get("source").cloned().unwrap_or_else(|| comp.clone());
+                    if src.get("type").and_then(|t| t.as_str()) == Some("segmented") {
+                        push(&m.kind, &src);
+                    }
+                }
+            }
+        }
+        _ => {}
     }
 }
 

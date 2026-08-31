@@ -10,9 +10,13 @@
     brushHardness,
     markMaskPending,
     maskDisplayName,
+    maskErrors,
     maskOverlayVisible,
+    maskPendingIds,
     maskRefineMode,
     maskToolGroup,
+    objectPickActive,
+    deselectMask,
     syncMaskOverlay,
     syncViewportToolForMask,
     type MaskRefineMode,
@@ -36,7 +40,23 @@
     | "subject"
     | "sky"
     | "background"
+    | "object"
     | "parametric";
+
+  const KIND_ICON: Record<string, string> = {
+    subject: "◎",
+    sky: "☁",
+    background: "◫",
+    object: "◉",
+    brush: "◔",
+    linear: "▥",
+    radial: "◯",
+    parametric: "◐",
+  };
+
+  function maskEnabled(m: (typeof masks)[number]): boolean {
+    return m.enabled !== false;
+  }
 
   function defaultSource(kind: MaskKind): Record<string, unknown> {
     switch (kind) {
@@ -59,6 +79,12 @@
         };
       case "sky":
         return { type: "segmented", model: "sky_v1", hint: null };
+      case "object":
+        return {
+          type: "segmented",
+          model: "object_v1",
+          hint: { point: [0.5, 0.5] },
+        };
       default:
         return { type: "segmented", model: "subject_v1", hint: null };
     }
@@ -121,7 +147,50 @@
     }
   }
 
+  async function duplicateMask(id: string) {
+    try {
+      const delta = await applyOp({ op: "duplicate_mask", id });
+      reconcile(delta);
+      if (delta.newMaskId) {
+        selectedRetouch.set(null);
+        selectedMask.set(delta.newMaskId);
+        const dup = delta.doc.masks?.find((m) => m.id === delta.newMaskId);
+        syncViewportToolForMask(dup ?? null);
+        if (dup?.source?.type === "segmented") markMaskPending(delta.newMaskId);
+        maskOverlayVisible.set(true);
+        showMaskPanel();
+        syncMaskOverlay();
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+
+  async function toggleMaskEnabled(m: (typeof masks)[number]) {
+    try {
+      reconcile(
+        await applyOp({
+          op: "refine_mask",
+          id: m.id,
+          enabled: !maskEnabled(m),
+        }),
+      );
+    } catch {
+      /* ignore */
+    }
+  }
+
+  function startObjectPick() {
+    objectPickActive.set(true);
+    showMaskPanel();
+  }
+
   function select(id: string) {
+    objectPickActive.set(false);
+    if ($selectedMask === id) {
+      deselectMask();
+      return;
+    }
     selectedRetouch.set(null);
     selectedMask.set(id);
     const m = masks.find((x) => x.id === id);
@@ -211,7 +280,7 @@
   {#if active}
     <div class="refine-bar">
       <span class="group-label">Refine mask</span>
-      <div class="seg">
+      <div class="seg seg-3">
         <button
           type="button"
           class="seg-btn"
@@ -224,8 +293,18 @@
           class:on={$maskRefineMode === "subtract"}
           onclick={() => setRefineMode("subtract")}
         >Subtract</button>
+        <button
+          type="button"
+          class="seg-btn"
+          class:on={$maskRefineMode === "intersect"}
+          onclick={() => setRefineMode("intersect")}
+        >Intersect</button>
       </div>
     </div>
+  {/if}
+
+  {#if $objectPickActive}
+    <p class="pick-banner">Click the subject on the image to create an object mask.</p>
   {/if}
 
   <p class="group-label">Add new mask</p>
@@ -249,6 +328,9 @@
         </button>
         <button type="button" class="tool-btn" onclick={() => void addMask("background")}>
           <span class="ico">◫</span> Background
+        </button>
+        <button type="button" class="tool-btn" onclick={startObjectPick}>
+          <span class="ico">◉</span> Object · click image
         </button>
       </div>
     {/if}
@@ -407,6 +489,47 @@
         oninput={(v) => void setParametric("softness", v, true)}
         onchange={(v) => void setParametric("softness", v, false)}
       />
+      <p class="group-label">Color range</p>
+      <ParamRow
+        label="Chroma min"
+        min={0}
+        max={1}
+        step={0.01}
+        value={num(ps, "chroma_lo", 0)}
+        resetValue={0}
+        oninput={(v) => void setParametric("chroma_lo", v, true)}
+        onchange={(v) => void setParametric("chroma_lo", v, false)}
+      />
+      <ParamRow
+        label="Chroma max"
+        min={0}
+        max={1}
+        step={0.01}
+        value={num(ps, "chroma_hi", 1)}
+        resetValue={1}
+        oninput={(v) => void setParametric("chroma_hi", v, true)}
+        onchange={(v) => void setParametric("chroma_hi", v, false)}
+      />
+      <ParamRow
+        label="Hue min"
+        min={0}
+        max={360}
+        step={1}
+        value={num(ps, "hue_lo", 0)}
+        resetValue={0}
+        oninput={(v) => void setParametric("hue_lo", v, true)}
+        onchange={(v) => void setParametric("hue_lo", v, false)}
+      />
+      <ParamRow
+        label="Hue max"
+        min={0}
+        max={360}
+        step={1}
+        value={num(ps, "hue_hi", 360)}
+        resetValue={360}
+        oninput={(v) => void setParametric("hue_hi", v, true)}
+        onchange={(v) => void setParametric("hue_hi", v, false)}
+      />
     {/if}
   {/if}
 
@@ -415,11 +538,42 @@
     <p class="rail-empty">Select a tool above to create a mask.</p>
   {:else}
     {#each masks as m, i (m.id)}
-      <div class="mask-row" class:on={$selectedMask === m.id}>
-        <button type="button" class="mask-pick" onclick={() => select(m.id)}>
-          <span class="mask-name">{maskDisplayName(m.kind, i)}</span>
-          <span class="mask-id">{m.id.slice(0, 6)}</span>
+      {@const pending = $maskPendingIds.has(m.id)}
+      {@const err = $maskErrors.get(m.id)}
+      {@const on = $selectedMask === m.id}
+      <div class="mask-row" class:on class:disabled={!maskEnabled(m)}>
+        <button
+          type="button"
+          class="mask-enable"
+          aria-label={maskEnabled(m) ? "Disable mask" : "Enable mask"}
+          onclick={() => void toggleMaskEnabled(m)}
+        >
+          <span class="enable-dot" class:off={!maskEnabled(m)}></span>
         </button>
+        <button type="button" class="mask-pick" onclick={() => select(m.id)}>
+          <span class="mask-name">
+            <span class="kind-ico">{KIND_ICON[m.kind] ?? "◆"}</span>
+            {maskDisplayName(m.kind, i)}
+          </span>
+          <span class="mask-meta">
+            {#if pending}
+              <span class="meta-pending">Detecting…</span>
+            {:else if err}
+              <span class="meta-error">Failed</span>
+            {:else if !maskEnabled(m)}
+              <span class="meta-off">Disabled</span>
+            {:else}
+              {Math.round(m.opacity)}% · {m.feather > 0 ? `feather ${Math.round(m.feather)}` : "sharp"}
+            {/if}
+          </span>
+        </button>
+        <button
+          type="button"
+          class="mask-act"
+          title="Duplicate"
+          aria-label="Duplicate mask"
+          onclick={() => void duplicateMask(m.id)}
+        >⧉</button>
         <button type="button" class="mask-del" aria-label="Delete mask" onclick={() => void removeMask(m.id)}>×</button>
       </div>
     {/each}
@@ -467,6 +621,19 @@
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: var(--space-1);
+  }
+  .seg.seg-3 {
+    grid-template-columns: 1fr 1fr 1fr;
+  }
+  .pick-banner {
+    margin: 0 0 var(--space-2);
+    padding: var(--space-2);
+    border-radius: 8px;
+    border: 1px solid var(--color-accent);
+    background: var(--color-accent-soft);
+    color: var(--color-fg);
+    font-size: 11px;
+    text-align: center;
   }
   .seg-btn {
     height: 28px;
@@ -566,26 +733,81 @@
     border-color: var(--color-accent);
     background: var(--color-accent-soft);
   }
+  .mask-row.disabled {
+    opacity: 0.55;
+  }
+  .mask-enable {
+    border: 0;
+    background: none;
+    cursor: pointer;
+    padding: 0 var(--space-1);
+    display: flex;
+    align-items: center;
+  }
+  .enable-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--color-accent);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-accent) 35%, transparent);
+  }
+  .enable-dot.off {
+    background: var(--color-subtle);
+    box-shadow: none;
+  }
   .mask-pick {
     flex: 1;
     display: flex;
     flex-direction: column;
     align-items: flex-start;
-    gap: 1px;
+    gap: 2px;
     border: 0;
     background: none;
     color: var(--color-fg);
     font-size: var(--text-ui);
     cursor: pointer;
-    padding: var(--space-1) var(--space-2);
+    padding: var(--space-1) var(--space-1);
     text-align: left;
+    min-width: 0;
   }
   .mask-name {
     font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 6px;
   }
-  .mask-id {
+  .kind-ico {
+    opacity: 0.75;
+    font-size: 12px;
+  }
+  .mask-meta {
     color: var(--color-subtle);
-    font-size: 11px;
+    font-size: 10px;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .meta-pending {
+    color: var(--color-accent, #7eb8ff);
+  }
+  .meta-error {
+    color: #f87171;
+  }
+  .meta-off {
+    color: var(--color-subtle);
+  }
+  .mask-act {
+    border: 0;
+    background: none;
+    color: var(--color-subtle);
+    font-size: 14px;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0 var(--space-1);
+  }
+  .mask-act:hover {
+    color: var(--color-fg);
   }
   .mask-del {
     border: 0;

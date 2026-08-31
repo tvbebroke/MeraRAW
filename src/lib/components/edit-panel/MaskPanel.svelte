@@ -3,8 +3,8 @@
   import { fade } from "svelte/transition";
   import { doc } from "../../../stores/doc";
   import { selectedMask } from "../../../stores/app";
-  import { clearMaskPending, maskDisplayName, maskPendingIds } from "../../../stores/mask";
-  import { onMaskReady } from "../../../ipc/events";
+  import { clearMaskPending, clearMaskError, maskDisplayName, maskErrors, maskPendingIds, setMaskError } from "../../../stores/mask";
+  import { onMaskReady, onMaskError } from "../../../ipc/events";
   import MaskSettings from "./MaskSettings.svelte";
   import LightSettings from "./LightSettings.svelte";
   import ColorSettings from "./ColorSettings.svelte";
@@ -20,13 +20,27 @@
     active ? masks.findIndex((m) => m.id === active.id) : -1,
   );
   const activePending = $derived(active ? $maskPendingIds.has(active.id) : false);
+  const activeError = $derived(active ? ($maskErrors.get(active.id) ?? null) : null);
 
   onMount(() => {
-    let unlisten: (() => void) | undefined;
-    void onMaskReady((id) => clearMaskPending(id)).then((fn) => {
-      unlisten = fn;
+    let unlistenReady: (() => void) | undefined;
+    let unlistenErr: (() => void) | undefined;
+    void onMaskReady((id) => {
+      clearMaskPending(id);
+      clearMaskError(id);
+    }).then((fn) => {
+      unlistenReady = fn;
     });
-    return () => unlisten?.();
+    void onMaskError(({ id, message }) => {
+      clearMaskPending(id);
+      setMaskError(id, message);
+    }).then((fn) => {
+      unlistenErr = fn;
+    });
+    return () => {
+      unlistenReady?.();
+      unlistenErr?.();
+    };
   });
 </script>
 
@@ -40,6 +54,8 @@
       </p>
       {#if activePending}
         <p class="adjust-pending">Detecting {active.kind === "sky" ? "sky" : "selection"}…</p>
+      {:else if activeError}
+        <p class="adjust-error">{activeError}</p>
       {/if}
       <p class="adjust-hint">Sliders below affect only the masked area.</p>
     </div>
@@ -49,7 +65,9 @@
     <DetailSettings />
     <GradingSettings />
   {:else if masks.length > 0}
-    <p class="rail-empty pick-hint">Select a mask above to edit its area.</p>
+    <p class="rail-empty pick-hint">
+      All masks are active. Click a mask above or the image to show its overlay.
+    </p>
   {:else}
     <p class="rail-empty pick-hint">Create a mask with the tools above.</p>
   {/if}
@@ -77,6 +95,11 @@
     margin: var(--space-1) 0 var(--space-2);
     font-size: 11px;
     color: var(--color-subtle);
+  }
+  .adjust-error {
+    margin: 0 0 var(--space-1);
+    font-size: 11px;
+    color: #f87171;
   }
   .adjust-pending {
     margin: 0 0 var(--space-1);

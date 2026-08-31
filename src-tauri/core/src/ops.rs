@@ -32,6 +32,11 @@ pub enum Op {
         invert: Option<bool>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         blend: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        enabled: Option<bool>,
+    },
+    DuplicateMask {
+        id: String,
     },
     /// Replace mask geometry/source (move a radial, re-stroke a brush…).
     SetMaskSource {
@@ -79,6 +84,7 @@ impl Op {
             Op::AddMask { kind, .. } => format!("add {kind} mask"),
             Op::RemoveMask { .. } => "remove mask".into(),
             Op::RefineMask { .. } => "refine mask".into(),
+            Op::DuplicateMask { .. } => "duplicate mask".into(),
             Op::SetMaskSource { .. } => "edit mask shape".into(),
             Op::AddMaskComponent { mode, .. } => format!("{mode} to mask"),
             Op::AddRetouchSpot { .. } => "add heal spot".into(),
@@ -104,8 +110,9 @@ impl Op {
                 }
             }
             Op::AddMask { .. }
-            | Op::RemoveMask { .. }
+            |             Op::RemoveMask { .. }
             | Op::RefineMask { .. }
+            | Op::DuplicateMask { .. }
             | Op::SetMaskSource { .. }
             | Op::AddMaskComponent { .. } => Some("masks".into()),
             Op::AddRetouchSpot { .. }
@@ -286,6 +293,7 @@ pub fn apply_op(doc: &mut EditDoc, op: &Op) -> Result<Option<String>, CoreError>
             doc.masks.push(Mask {
                 id: id.clone(),
                 kind: kind.clone(),
+                enabled: true,
                 opacity: 100.0,
                 invert: false,
                 feather: 0.0,
@@ -311,6 +319,7 @@ pub fn apply_op(doc: &mut EditDoc, op: &Op) -> Result<Option<String>, CoreError>
             feather,
             invert,
             blend,
+            enabled,
         } => {
             let mask = doc
                 .mask_mut(id)
@@ -330,6 +339,9 @@ pub fn apply_op(doc: &mut EditDoc, op: &Op) -> Result<Option<String>, CoreError>
             if let Some(i) = invert {
                 mask.invert = *i;
             }
+            if let Some(e) = enabled {
+                mask.enabled = *e;
+            }
             if let Some(b) = blend {
                 let b = b.to_lowercase();
                 if !matches!(b.as_str(), "normal" | "multiply" | "screen") {
@@ -339,6 +351,28 @@ pub fn apply_op(doc: &mut EditDoc, op: &Op) -> Result<Option<String>, CoreError>
             }
             doc.touch();
             Ok(None)
+        }
+        Op::DuplicateMask { id } => {
+            let src = doc
+                .masks
+                .iter()
+                .find(|m| m.id == *id)
+                .ok_or_else(|| CoreError::InvalidOp(format!("mask not found: {id}")))?
+                .clone();
+            let new_id = new_mask_id();
+            doc.masks.push(Mask {
+                id: new_id.clone(),
+                kind: src.kind,
+                enabled: src.enabled,
+                opacity: src.opacity,
+                invert: src.invert,
+                feather: src.feather,
+                source: src.source,
+                blend: src.blend,
+                modules: src.modules.clone(),
+            });
+            doc.touch();
+            Ok(Some(new_id))
         }
         Op::SetMaskSource { id, source } => {
             check_mask_source(source)?;

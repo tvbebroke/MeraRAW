@@ -28,7 +28,6 @@
   });
 
   function openEditTab() {
-    selectedMask.set(null);
     void setMaskOverlay(null);
     rightPanelMode.set("edit");
   }

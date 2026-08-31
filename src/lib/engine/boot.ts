@@ -42,6 +42,7 @@ import {
   statusMessage,
 } from "../../stores/app";
 import { clearDoc, reconcile, setDoc } from "../../stores/doc";
+import { deselectMask } from "../../stores/mask";
 import { isExportOpen, isSettingsOpen } from "../../stores/ui";
 import { libraryRoute, setWorkspace, syncWorkspaceToOpenFile } from "../../stores/workspace";
 import { licenseStatus } from "../../stores/session";
@@ -70,7 +71,7 @@ export async function openPath(
     imageMeta.set(null);
     imageDims.set(null);
     imageOpen.set(true);
-    selectedMask.set(null);
+    deselectMask();
     clearDoc();
     lastOpenedDocId.set(docId ?? null);
     const m = await openImage(path, docId);

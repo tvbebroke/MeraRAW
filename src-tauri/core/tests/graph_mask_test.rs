@@ -138,6 +138,7 @@ async fn radial_mask_scopes_exposure_to_center() {
             feather: None,
             invert: Some(true),
             blend: None,
+            enabled: None,
         },
     )
     .unwrap();
@@ -177,6 +178,7 @@ async fn radial_mask_scopes_exposure_to_center() {
             feather: None,
             invert: None,
             blend: None,
+            enabled: None,
         },
     )
     .unwrap();

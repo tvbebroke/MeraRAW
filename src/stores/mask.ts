@@ -1,10 +1,11 @@
 import { atom } from "nanostores";
 import { setMaskOverlay } from "../ipc/commands";
 import { selectedMask, type ViewportTool, viewportTool } from "./app";
+import { doc } from "./doc";
 import type { MaskMirror } from "../ipc/types";
 
-/** Add / subtract when refining an existing mask (Lightroom-style). */
-export type MaskRefineMode = "add" | "subtract";
+/** Add / subtract / intersect when refining an existing mask (Lightroom-style). */
+export type MaskRefineMode = "add" | "subtract" | "intersect";
 
 export const maskRefineMode = atom<MaskRefineMode>("add");
 export const brushHardness = atom(0.6);
@@ -18,10 +19,29 @@ export const maskAdjusting = atom(false);
 /** Segmented mask ids waiting for on-device inference. */
 export const maskPendingIds = atom<Set<string>>(new Set());
 
+/** Last segmentation error per mask id. */
+export const maskErrors = atom<Map<string, string>>(new Map());
+
+/** Click-to-select object mode: next viewport tap creates an object mask. */
+export const objectPickActive = atom(false);
+
+export function clearMaskError(id: string): void {
+  const next = new Map(maskErrors.get());
+  next.delete(id);
+  maskErrors.set(next);
+}
+
+export function setMaskError(id: string, message: string): void {
+  const next = new Map(maskErrors.get());
+  next.set(id, message);
+  maskErrors.set(next);
+}
+
 export function markMaskPending(id: string): void {
   const next = new Set(maskPendingIds.get());
   next.add(id);
   maskPendingIds.set(next);
+  clearMaskError(id);
 }
 
 export function clearMaskPending(id: string): void {
@@ -61,10 +81,19 @@ export function syncViewportToolForMask(m: MaskMirror | null | undefined): void 
 export type MaskToolGroup = "ai" | "manual" | "range" | null;
 export const maskToolGroup = atom<MaskToolGroup>(null);
 
-/** Apply overlay visibility: hidden while adjusting so edits are visible. */
+export function maskIsEnabled(m: MaskMirror | null | undefined): boolean {
+  return m?.enabled !== false;
+}
+
+/** Apply overlay visibility: hidden while adjusting or when mask is disabled. */
 export function syncMaskOverlay(): void {
   const id = selectedMask.get();
-  const show = maskOverlayVisible.get() && !maskAdjusting.get() && !!id;
+  const m = id ? doc.get()?.masks?.find((x) => x.id === id) : null;
+  const show =
+    maskOverlayVisible.get() &&
+    !maskAdjusting.get() &&
+    !!id &&
+    maskIsEnabled(m);
   void setMaskOverlay(show ? id : null);
 }
 export function beginMaskAdjust(): void {
@@ -79,6 +108,15 @@ export function endMaskAdjust(): void {
     maskAdjusting.set(false);
     syncMaskOverlay();
   }
+}
+
+/** Click off / Escape: hide overlay and handles; mask edits stay in the render. */
+export function deselectMask(): void {
+  if (!selectedMask.get()) return;
+  selectedMask.set(null);
+  maskAdjusting.set(false);
+  syncViewportToolForMask(null);
+  void setMaskOverlay(null);
 }
 
 export function maskDisplayName(kind: string, index: number): string {

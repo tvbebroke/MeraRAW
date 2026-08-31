@@ -103,6 +103,7 @@ export interface ParamSpec {
 export interface MaskMirror {
   id: string;
   kind: string;
+  enabled?: boolean;
   opacity: number;
   invert: boolean;
   feather: number;
@@ -150,7 +151,9 @@ export type Op =
       feather?: number;
       invert?: boolean;
       blend?: string;
+      enabled?: boolean;
     }
+  | { op: "duplicate_mask"; id: string }
   | { op: "set_mask_source"; id: string; source: unknown }
   | { op: "add_mask_component"; id: string; mode: string; source: unknown }
   | { op: "add_retouch_spot"; source: unknown }

@@ -122,9 +122,146 @@ fn run_u2net(plan: &TractModel, img: &RgbF32Buf) -> Result<Mask01, CoreError> {
     })
 }
 
+fn tr_err(e: impl std::fmt::Display) -> CoreError {
+    CoreError::Engine(format!("segmentation: {e}"))
+}
+
+fn box_blur_3x3(src: &[f32], w: usize, h: usize) -> Vec<f32> {
+    let mut out = vec![0.0f32; w * h];
+    for y in 0..h {
+        for x in 0..w {
+            let mut sum = 0.0f32;
+            let mut n = 0u32;
+            for dy in -1i32..=1 {
+                for dx in -1i32..=1 {
+                    let nx = x as i32 + dx;
+                    let ny = y as i32 + dy;
+                    if nx >= 0 && ny >= 0 && (nx as usize) < w && (ny as usize) < h {
+                        sum += src[ny as usize * w + nx as usize];
+                        n += 1;
+                    }
+                }
+            }
+            out[y * w + x] = sum / n as f32;
+        }
+    }
+    out
+}
+
+/// Post-process u2net saliency: sharper edges, less speckle, small hole fill.
+fn refine_saliency_mask(data: &mut [f32], w: usize, h: usize) {
+    for v in data.iter_mut() {
+        *v = ((*v - 0.5) * 1.4 + 0.5).clamp(0.0, 1.0);
+    }
+    let blurred = box_blur_3x3(data, w, h);
+    for (i, b) in blurred.iter().enumerate() {
+        data[i] = data[i] * 0.7 + b * 0.3;
+    }
+    let tmp = data.to_vec();
+    for y in 1..h.saturating_sub(1) {
+        for x in 1..w.saturating_sub(1) {
+            let i = y * w + x;
+            if tmp[i] >= 0.12 {
+                continue;
+            }
+            let mut strong = 0u32;
+            for (dx, dy) in [(-1, 0), (1, 0), (0, -1), (0, 1)] {
+                let j = (y as i32 + dy) as usize * w + (x as i32 + dx) as usize;
+                if tmp[j] > 0.55 {
+                    strong += 1;
+                }
+            }
+            if strong < 2 {
+                data[i] = 0.0;
+            }
+        }
+    }
+    let tmp = data.to_vec();
+    for y in 1..h.saturating_sub(1) {
+        for x in 1..w.saturating_sub(1) {
+            let i = y * w + x;
+            if tmp[i] > 0.45 {
+                continue;
+            }
+            let mut strong = 0u32;
+            for (dx, dy) in [
+                (-1, 0),
+                (1, 0),
+                (0, -1),
+                (0, 1),
+                (-1, -1),
+                (1, -1),
+                (-1, 1),
+                (1, 1),
+            ] {
+                let nx = x as i32 + dx;
+                let ny = y as i32 + dy;
+                if nx >= 0 && ny >= 0 {
+                    let j = ny as usize * w + nx as usize;
+                    if tmp[j] > 0.65 {
+                        strong += 1;
+                    }
+                }
+            }
+            if strong >= 6 {
+                data[i] = 0.55;
+            }
+        }
+    }
+}
+
+/// Edge-aware refinement using color similarity at mask boundaries.
+fn refine_saliency_with_image(data: &mut [f32], w: usize, h: usize, img: &RgbF32Buf) {
+    refine_saliency_mask(data, w, h);
+    if w < 3 || h < 3 {
+        return;
+    }
+    let sx = img.width as f32 / w as f32;
+    let sy = img.height as f32 / h as f32;
+    let tmp = data.to_vec();
+    for y in 1..h - 1 {
+        for x in 1..w - 1 {
+            let i = y * w + x;
+            let v = tmp[i];
+            if v < 0.08 || v > 0.92 {
+                continue;
+            }
+            let ix = ((x as f32 + 0.5) * sx) as usize;
+            let iy = ((y as f32 + 0.5) * sy) as usize;
+            let ii = (iy.min(img.height.saturating_sub(1)) * img.width
+                + ix.min(img.width.saturating_sub(1)))
+                * 3;
+            let (cr, cg, cb) = (img.data[ii], img.data[ii + 1], img.data[ii + 2]);
+            let mut wsum = 0.0f32;
+            let mut vsum = 0.0f32;
+            for (dx, dy) in [(-1, 0), (1, 0), (0, -1), (0, 1)] {
+                let nx = (x as i32 + dx) as usize;
+                let ny = (y as i32 + dy) as usize;
+                let j = ny * w + nx;
+                let jx = ((nx as f32 + 0.5) * sx) as usize;
+                let jy = ((ny as f32 + 0.5) * sy) as usize;
+                let ji = (jy.min(img.height.saturating_sub(1)) * img.width
+                    + jx.min(img.width.saturating_sub(1)))
+                    * 3;
+                let dr = img.data[ji] - cr;
+                let dg = img.data[ji + 1] - cg;
+                let db = img.data[ji + 2] - cb;
+                let wgt = (-(dr * dr + dg * dg + db * db).sqrt() * 14.0).exp();
+                wsum += wgt;
+                vsum += tmp[j] * wgt;
+            }
+            if wsum > 0.0 {
+                data[i] = (v * 0.5 + (vsum / wsum) * 0.5).clamp(0.0, 1.0);
+            }
+        }
+    }
+}
+
 impl Segmenter for TractSegmenter {
     fn subject(&self, img: &RgbF32Buf) -> Result<Mask01, CoreError> {
-        run_u2net(subject_model()?, img)
+        let mut mask = run_u2net(subject_model()?, img)?;
+        refine_saliency_with_image(&mut mask.data, mask.width, mask.height, img);
+        Ok(mask)
     }
 
     /// Sky via dedicated U²-Net weights (MIT — xiongzhu666 Sky-Segmentation).
@@ -188,10 +325,6 @@ impl Segmenter for TractSegmenter {
             data: mask,
         })
     }
-}
-
-fn tr_err(e: impl std::fmt::Display) -> CoreError {
-    CoreError::Engine(format!("segmentation: {e}"))
 }
 
 #[cfg(test)]
