@@ -491,7 +491,7 @@ impl Engine {
         }
 
         let mut job = self.export_job.take().unwrap();
-        let look = DcpProfile::present_look(job.look, job.dcp.is_some());
+        let look = DcpProfile::present_look(job.look, job.dcp.as_deref());
         tracing::info!(
             w = job.w,
             h = job.h,
@@ -981,7 +981,7 @@ impl Engine {
         self.emit_batch_progress(index, &path, "encode", 0, 1);
         let enc_look = {
             let effective = crate::raw::effective_display_look(meta.kind, look);
-            DcpProfile::present_look(effective, dcp.is_some())
+            DcpProfile::present_look(effective, dcp.as_deref())
         };
         let tx_chan = self.self_tx.clone();
         std::thread::Builder::new()

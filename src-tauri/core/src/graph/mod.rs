@@ -67,6 +67,10 @@ pub struct RenderGraph {
     /// Highlight / shadow clipping overlays (viewport only).
     clip_hi: bool,
     clip_lo: bool,
+    /// Mask overlay tint strength (0 = off when no mask id).
+    overlay_strength: f32,
+    /// 0 red, 1 white, 2 black, 3 color-on-B&W.
+    overlay_mode: u32,
     /// Soft-proof target: 0 off, 1 sRGB, 2 P3, 3 Adobe RGB, 4 ProPhoto.
     proof_space: u32,
     proof_gamut: bool,

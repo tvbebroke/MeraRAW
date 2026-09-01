@@ -490,7 +490,10 @@ fn effective_wb(wb: [f32; 4], cal: &CameraCalibration) -> [f32; 4] {
     if usable {
         return wb;
     }
-    cal.daylight_wb().unwrap_or([1.0, 1.0, 1.0, f32::NAN])
+    match cal.daylight_wb() {
+        Some([r, g, b]) => [r, g, b, f32::NAN],
+        None => [1.0, 1.0, 1.0, f32::NAN],
+    }
 }
 
 fn is_rgbe_sensor(raw: &rawler::RawImage) -> bool {

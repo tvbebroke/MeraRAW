@@ -19,6 +19,17 @@ pub struct Mask01 {
     pub data: Vec<f32>,
 }
 
+/// Clickable object/subject candidate for the object-pick UI.
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ObjectProposal {
+    pub id: u32,
+    /// Closed polyline in normalized image coords (0..1).
+    pub path: Vec<[f32; 2]>,
+    pub centroid: [f32; 2],
+    pub area: f32,
+}
+
 pub trait Segmenter: Send + Sync {
     fn subject(&self, img: &RgbF32Buf) -> Result<Mask01, CoreError>;
     fn sky(&self, img: &RgbF32Buf) -> Result<Mask01, CoreError>;
@@ -255,6 +266,462 @@ fn refine_saliency_with_image(data: &mut [f32], w: usize, h: usize, img: &RgbF32
             }
         }
     }
+    suppress_reflections_and_islands(data, w, h);
+}
+
+struct BlobStats {
+    area: u32,
+    sum: f32,
+    sum_x: f32,
+    sum_y: f32,
+    min_y: usize,
+    max_y: usize,
+}
+
+/// Drop weak detached blobs and water/glass reflections under the primary subject.
+pub fn suppress_reflections_and_islands(data: &mut [f32], w: usize, h: usize) {
+    if w * h == 0 {
+        return;
+    }
+    const T: f32 = 0.32;
+    let mut labels = vec![0u32; w * h];
+    let mut blobs: Vec<BlobStats> = Vec::new();
+    let mut stack = Vec::new();
+
+    for y in 0..h {
+        for x in 0..w {
+            let i = y * w + x;
+            if data[i] < T || labels[i] != 0 {
+                continue;
+            }
+            let id = (blobs.len() + 1) as u32;
+            let mut st = BlobStats {
+                area: 0,
+                sum: 0.0,
+                sum_x: 0.0,
+                sum_y: 0.0,
+                min_y: y,
+                max_y: y,
+            };
+            stack.clear();
+            stack.push(i);
+            labels[i] = id;
+            while let Some(j) = stack.pop() {
+                let jx = j % w;
+                let jy = j / w;
+                let v = data[j];
+                st.area += 1;
+                st.sum += v;
+                st.sum_x += jx as f32;
+                st.sum_y += jy as f32;
+                st.min_y = st.min_y.min(jy);
+                st.max_y = st.max_y.max(jy);
+                for (dx, dy) in [(-1i32, 0), (1, 0), (0, -1), (0, 1)] {
+                    let nx = jx as i32 + dx;
+                    let ny = jy as i32 + dy;
+                    if nx < 0 || ny < 0 || nx as usize >= w || ny as usize >= h {
+                        continue;
+                    }
+                    let k = ny as usize * w + nx as usize;
+                    if labels[k] == 0 && data[k] >= T {
+                        labels[k] = id;
+                        stack.push(k);
+                    }
+                }
+            }
+            blobs.push(st);
+        }
+    }
+    if blobs.is_empty() {
+        return;
+    }
+
+    let primary = blobs
+        .iter()
+        .enumerate()
+        .max_by(|(_, a), (_, b)| {
+            let sa = a.sum * (a.area as f32).sqrt();
+            let sb = b.sum * (b.area as f32).sqrt();
+            sa.partial_cmp(&sb).unwrap_or(std::cmp::Ordering::Equal)
+        })
+        .map(|(i, _)| i)
+        .unwrap_or(0);
+    let p = &blobs[primary];
+    let p_mean = p.sum / p.area.max(1) as f32;
+    let p_cy = p.sum_y / p.area.max(1) as f32;
+    let p_bottom = p.max_y as f32;
+    let min_keep = ((p.area as f32) * 0.08).max(12.0) as u32;
+
+    let mut keep = vec![false; blobs.len()];
+    keep[primary] = true;
+    for (i, b) in blobs.iter().enumerate() {
+        if i == primary {
+            continue;
+        }
+        let mean = b.sum / b.area.max(1) as f32;
+        let cy = b.sum_y / b.area.max(1) as f32;
+        // Tiny islands
+        if b.area < min_keep {
+            continue;
+        }
+        // Reflection heuristic: below the primary subject, weaker confidence,
+        // and largely under the primary's bottom edge (water / glossy floor).
+        let below = cy > p_cy + (h as f32) * 0.04 && b.min_y as f32 >= p_bottom - (h as f32) * 0.02;
+        let weaker = mean < p_mean * 0.92;
+        if below && weaker {
+            continue;
+        }
+        // Detached mid-strength blobs far from primary centroid
+        let dx = b.sum_x / b.area.max(1) as f32 - p.sum_x / p.area.max(1) as f32;
+        let dy = cy - p_cy;
+        let dist = (dx * dx + dy * dy).sqrt() / (w.max(h) as f32);
+        if dist > 0.28 && mean < p_mean * 0.85 {
+            continue;
+        }
+        keep[i] = true;
+    }
+
+    for (i, v) in data.iter_mut().enumerate() {
+        let lab = labels[i];
+        if lab == 0 {
+            if *v < T {
+                *v = 0.0;
+            }
+            continue;
+        }
+        let bi = (lab - 1) as usize;
+        if !keep[bi] {
+            *v = 0.0;
+        } else if *v < T {
+            // Soft fringe outside hard threshold on kept blobs: keep a little.
+            *v *= 0.35;
+        }
+    }
+}
+
+fn sample_enc_rgb(img: &RgbF32Buf, mx: usize, my: usize, mw: usize, mh: usize) -> [f32; 3] {
+    let sx = ((mx as f32 + 0.5) * img.width as f32 / mw as f32) as usize;
+    let sy = ((my as f32 + 0.5) * img.height as f32 / mh as f32) as usize;
+    let i = (sy.min(img.height.saturating_sub(1)) * img.width + sx.min(img.width.saturating_sub(1)))
+        * 3;
+    [enc(img.data[i]), enc(img.data[i + 1]), enc(img.data[i + 2])]
+}
+
+fn is_skin_rgb(r: f32, g: f32, b: f32) -> f32 {
+    // Classic encoded-RGB skin gate — tuned for portrait subjects.
+    if r < 0.12 || g < 0.06 || b < 0.04 {
+        return 0.0;
+    }
+    if !(r > g && g > b * 0.85) {
+        return 0.0;
+    }
+    let rg = r - g;
+    if rg < 0.015 || rg > 0.42 {
+        return 0.0;
+    }
+    let mx = r.max(g).max(b);
+    let mn = r.min(g).min(b);
+    let chroma = mx - mn;
+    if chroma < 0.04 || chroma > 0.55 {
+        return 0.0;
+    }
+    let luma = 0.299 * r + 0.587 * g + 0.114 * b;
+    if !(0.12..=0.92).contains(&luma) {
+        return 0.0;
+    }
+    ((rg - 0.015) / 0.25).clamp(0.0, 1.0) * ((0.55 - chroma) / 0.4).clamp(0.2, 1.0)
+}
+
+fn is_hair_rgb(r: f32, g: f32, b: f32, y_norm: f32) -> f32 {
+    let luma = 0.299 * r + 0.587 * g + 0.114 * b;
+    let mx = r.max(g).max(b);
+    let mn = r.min(g).min(b);
+    let chroma = mx - mn;
+    // Prefer darker, lower-chroma pixels in the upper part of the subject.
+    let dark = (1.0 - (luma / 0.45).clamp(0.0, 1.0)).clamp(0.0, 1.0);
+    let low_c = (1.0 - (chroma / 0.35).clamp(0.0, 1.0)).clamp(0.0, 1.0);
+    let upper = (1.0 - y_norm * 1.35).clamp(0.0, 1.0);
+    dark * low_c * upper
+}
+
+/// Restrict a subject mask to skin-tone pixels.
+pub fn extract_skin_mask(subject: &Mask01, img: &RgbF32Buf) -> Mask01 {
+    let (w, h) = (subject.width, subject.height);
+    let mut data = vec![0.0f32; w * h];
+    for y in 0..h {
+        for x in 0..w {
+            let i = y * w + x;
+            let s = subject.data[i];
+            if s < 0.12 {
+                continue;
+            }
+            let [r, g, b] = sample_enc_rgb(img, x, y, w, h);
+            data[i] = (s * is_skin_rgb(r, g, b)).clamp(0.0, 1.0);
+        }
+    }
+    suppress_reflections_and_islands(&mut data, w, h);
+    Mask01 {
+        width: w,
+        height: h,
+        data,
+    }
+}
+
+/// Restrict a subject mask to likely hair regions (upper / darker).
+pub fn extract_hair_mask(subject: &Mask01, img: &RgbF32Buf) -> Mask01 {
+    let (w, h) = (subject.width, subject.height);
+    // Subject vertical extent for relative Y.
+    let mut y0 = h;
+    let mut y1 = 0usize;
+    for y in 0..h {
+        for x in 0..w {
+            if subject.data[y * w + x] > 0.25 {
+                y0 = y0.min(y);
+                y1 = y1.max(y);
+            }
+        }
+    }
+    let span = (y1.saturating_sub(y0)).max(1) as f32;
+    let mut data = vec![0.0f32; w * h];
+    for y in 0..h {
+        for x in 0..w {
+            let i = y * w + x;
+            let s = subject.data[i];
+            if s < 0.15 {
+                continue;
+            }
+            let y_norm = (y.saturating_sub(y0) as f32) / span;
+            let [r, g, b] = sample_enc_rgb(img, x, y, w, h);
+            // Hair should not also score strongly as skin.
+            let skin = is_skin_rgb(r, g, b);
+            let hair = is_hair_rgb(r, g, b, y_norm) * (1.0 - skin * 0.85);
+            data[i] = (s * hair).clamp(0.0, 1.0);
+        }
+    }
+    suppress_reflections_and_islands(&mut data, w, h);
+    Mask01 {
+        width: w,
+        height: h,
+        data,
+    }
+}
+
+/// Propose clickable object/subject outlines from saliency (keeps multiple blobs).
+pub fn propose_objects(img: &RgbF32Buf) -> Result<Vec<ObjectProposal>, CoreError> {
+    let mut mask = run_u2net(subject_model()?, img)?;
+    // Soft refine without killing secondary subjects — proposals want plural blobs.
+    refine_saliency_mask(&mut mask.data, mask.width, mask.height);
+    Ok(proposals_from_saliency(&mask.data, mask.width, mask.height))
+}
+
+fn proposals_from_saliency(data: &[f32], w: usize, h: usize) -> Vec<ObjectProposal> {
+    const T: f32 = 0.28;
+    let mut labels = vec![0u32; w * h];
+    let mut stats: Vec<(u32, f32, f32, f32)> = Vec::new(); // area, sum, sum_x, sum_y
+    let mut stack = Vec::new();
+
+    for y in 0..h {
+        for x in 0..w {
+            let i = y * w + x;
+            if data[i] < T || labels[i] != 0 {
+                continue;
+            }
+            let id = (stats.len() + 1) as u32;
+            let mut area = 0u32;
+            let mut sum = 0.0f32;
+            let mut sx = 0.0f32;
+            let mut sy = 0.0f32;
+            stack.clear();
+            stack.push(i);
+            labels[i] = id;
+            while let Some(j) = stack.pop() {
+                let jx = j % w;
+                let jy = j / w;
+                area += 1;
+                sum += data[j];
+                sx += jx as f32;
+                sy += jy as f32;
+                for (dx, dy) in [(-1i32, 0), (1, 0), (0, -1), (0, 1)] {
+                    let nx = jx as i32 + dx;
+                    let ny = jy as i32 + dy;
+                    if nx < 0 || ny < 0 || nx as usize >= w || ny as usize >= h {
+                        continue;
+                    }
+                    let k = ny as usize * w + nx as usize;
+                    if labels[k] == 0 && data[k] >= T {
+                        labels[k] = id;
+                        stack.push(k);
+                    }
+                }
+            }
+            stats.push((area, sum, sx, sy));
+        }
+    }
+
+    let img_area = (w * h) as f32;
+    let min_area = (img_area * 0.012).max(24.0) as u32;
+    let mut ranked: Vec<(usize, f32)> = stats
+        .iter()
+        .enumerate()
+        .filter(|(_, (a, ..))| *a >= min_area)
+        .map(|(i, (a, s, ..))| (i, *s * (*a as f32).sqrt()))
+        .collect();
+    ranked.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+    ranked.truncate(8);
+
+    let mut out = Vec::new();
+    for (rank, (bi, _)) in ranked.into_iter().enumerate() {
+        let lab = (bi + 1) as u32;
+        let (area, _sum, sx, sy) = stats[bi];
+        let mut path = trace_contour(&labels, w, h, lab);
+        if path.len() < 4 {
+            continue;
+        }
+        path = simplify_path(&path, 1.35);
+        if path.len() < 3 {
+            continue;
+        }
+        // Close the path for SVG.
+        if let Some(first) = path.first().copied() {
+            if path.last() != Some(&first) {
+                path.push(first);
+            }
+        }
+        let path_n: Vec<[f32; 2]> = path
+            .iter()
+            .map(|&(x, y)| {
+                [
+                    (x as f32 + 0.5) / w as f32,
+                    (y as f32 + 0.5) / h as f32,
+                ]
+            })
+            .collect();
+        out.push(ObjectProposal {
+            id: rank as u32,
+            path: path_n,
+            centroid: [sx / area as f32 / w as f32, sy / area as f32 / h as f32],
+            area: area as f32 / img_area,
+        });
+    }
+    out
+}
+
+/// Moore neighborhood contour trace → pixel centers of the outer boundary.
+fn trace_contour(labels: &[u32], w: usize, h: usize, lab: u32) -> Vec<(i32, i32)> {
+    // Find leftmost topmost pixel of the component.
+    let mut start = None;
+    'outer: for y in 0..h {
+        for x in 0..w {
+            if labels[y * w + x] == lab {
+                start = Some((x as i32, y as i32));
+                break 'outer;
+            }
+        }
+    }
+    let Some((sx, sy)) = start else {
+        return Vec::new();
+    };
+
+    // Directions: E, SE, S, SW, W, NW, N, NE
+    const DIRS: [(i32, i32); 8] = [
+        (1, 0),
+        (1, 1),
+        (0, 1),
+        (-1, 1),
+        (-1, 0),
+        (-1, -1),
+        (0, -1),
+        (1, -1),
+    ];
+    let inside = |x: i32, y: i32| -> bool {
+        x >= 0
+            && y >= 0
+            && (x as usize) < w
+            && (y as usize) < h
+            && labels[y as usize * w + x as usize] == lab
+    };
+
+    let mut path = Vec::new();
+    let mut x = sx;
+    let mut y = sy;
+    let mut dir = 4usize; // come from west so first search starts north-ish
+    let max_steps = (w * h).saturating_mul(2).max(64);
+    for _ in 0..max_steps {
+        path.push((x, y));
+        let mut found = false;
+        // Start searching from dir-2 (right-hand rule).
+        for k in 0..8 {
+            let nd = (dir + 6 + k) % 8;
+            let (dx, dy) = DIRS[nd];
+            let nx = x + dx;
+            let ny = y + dy;
+            if inside(nx, ny) {
+                x = nx;
+                y = ny;
+                dir = nd;
+                found = true;
+                break;
+            }
+        }
+        if !found {
+            break;
+        }
+        if x == sx && y == sy && path.len() > 2 {
+            break;
+        }
+    }
+    path
+}
+
+fn simplify_path(pts: &[(i32, i32)], eps: f32) -> Vec<(i32, i32)> {
+    if pts.len() < 3 {
+        return pts.to_vec();
+    }
+    let mut keep = vec![false; pts.len()];
+    keep[0] = true;
+    keep[pts.len() - 1] = true;
+    rdp(pts, 0, pts.len() - 1, eps, &mut keep);
+    pts.iter()
+        .enumerate()
+        .filter(|(i, _)| keep[*i])
+        .map(|(_, p)| *p)
+        .collect()
+}
+
+fn rdp(pts: &[(i32, i32)], a: usize, b: usize, eps: f32, keep: &mut [bool]) {
+    if b <= a + 1 {
+        return;
+    }
+    let (ax, ay) = (pts[a].0 as f32, pts[a].1 as f32);
+    let (bx, by) = (pts[b].0 as f32, pts[b].1 as f32);
+    let mut max_d = 0.0f32;
+    let mut max_i = a;
+    for i in a + 1..b {
+        let (px, py) = (pts[i].0 as f32, pts[i].1 as f32);
+        let d = point_line_dist(px, py, ax, ay, bx, by);
+        if d > max_d {
+            max_d = d;
+            max_i = i;
+        }
+    }
+    if max_d > eps {
+        keep[max_i] = true;
+        rdp(pts, a, max_i, eps, keep);
+        rdp(pts, max_i, b, eps, keep);
+    }
+}
+
+fn point_line_dist(px: f32, py: f32, ax: f32, ay: f32, bx: f32, by: f32) -> f32 {
+    let dx = bx - ax;
+    let dy = by - ay;
+    let len2 = dx * dx + dy * dy;
+    if len2 < 1e-6 {
+        return ((px - ax).hypot(py - ay));
+    }
+    let t = ((px - ax) * dx + (py - ay) * dy) / len2;
+    let qx = ax + t * dx;
+    let qy = ay + t * dy;
+    (px - qx).hypot(py - qy)
 }
 
 impl Segmenter for TractSegmenter {
@@ -398,6 +865,39 @@ mod tests {
         let ocean = at(m.width / 2, m.height * 7 / 8);
         assert!(sky > 0.45, "sky band: {sky}");
         assert!(ocean < sky * 0.55, "ocean {ocean} should be below sky {sky}");
+    }
+
+    #[test]
+    fn reflection_blob_below_primary_is_cleared() {
+        let (w, h) = (64usize, 64usize);
+        let mut data = vec![0.0f32; w * h];
+        // Strong primary subject in upper half
+        for y in 8..28 {
+            for x in 20..44 {
+                data[y * w + x] = 0.9;
+            }
+        }
+        // Weaker reflection in lower half
+        for y in 40..56 {
+            for x in 22..42 {
+                data[y * w + x] = 0.55;
+            }
+        }
+        suppress_reflections_and_islands(&mut data, w, h);
+        let mut upper = 0.0f32;
+        for y in 8..28 {
+            for x in 20..44 {
+                upper += data[y * w + x];
+            }
+        }
+        let mut lower = 0.0f32;
+        for y in 40..56 {
+            for x in 22..42 {
+                lower += data[y * w + x];
+            }
+        }
+        assert!(upper > 100.0, "primary kept: {upper}");
+        assert!(lower < 5.0, "reflection cleared: {lower}");
     }
 
     #[test]

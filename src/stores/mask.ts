@@ -11,6 +11,11 @@ export const maskRefineMode = atom<MaskRefineMode>("add");
 export const brushHardness = atom(0.6);
 export const brushFlow = atom(1.0);
 export const maskOverlayVisible = atom(true);
+/** 0 red · 1 white · 2 black · 3 color-on-B&W */
+export type MaskOverlayMode = 0 | 1 | 2 | 3;
+export const maskOverlayMode = atom<MaskOverlayMode>(0);
+/** Tint strength 0..1 */
+export const maskOverlayStrength = atom(0.55);
 export const maskPanelExpanded = atom(true);
 
 /** True while dragging mask handles, painting, or editing scoped sliders. */
@@ -24,6 +29,9 @@ export const maskErrors = atom<Map<string, string>>(new Map());
 
 /** Click-to-select object mode: next viewport tap creates an object mask. */
 export const objectPickActive = atom(false);
+
+/** Color-range eyedropper: next tap samples into the selected parametric mask. */
+export const colorPickActive = atom(false);
 
 export function clearMaskError(id: string): void {
   const next = new Map(maskErrors.get());
@@ -94,7 +102,10 @@ export function syncMaskOverlay(): void {
     !maskAdjusting.get() &&
     !!id &&
     maskIsEnabled(m);
-  void setMaskOverlay(show ? id : null);
+  void setMaskOverlay(show ? id : null, {
+    strength: maskOverlayStrength.get(),
+    mode: maskOverlayMode.get(),
+  });
 }
 export function beginMaskAdjust(): void {
   if (!maskAdjusting.get()) {
@@ -119,12 +130,16 @@ export function deselectMask(): void {
   void setMaskOverlay(null);
 }
 
-export function maskDisplayName(kind: string, index: number): string {
+export function maskDisplayName(kind: string, index: number, name?: string | null): string {
+  if (name && name.trim()) return name.trim();
   const labels: Record<string, string> = {
     subject: "Subject",
     sky: "Sky",
     background: "Background",
     object: "Object",
+    people: "People",
+    skin: "Skin",
+    hair: "Hair",
     brush: "Brush",
     linear: "Linear Gradient",
     radial: "Radial Gradient",

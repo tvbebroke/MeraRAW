@@ -3,6 +3,7 @@ use super::*;
 use crate::export::{output_transform, TargetSpace};
 use crate::image::RgbF32Buf;
 use crate::message::Frame;
+use crate::raw::Demosaic;
 
 impl Engine {
     pub(super) fn open_image(

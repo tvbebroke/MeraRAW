@@ -637,6 +637,8 @@ impl RenderGraph {
             look: 0,
             clip_hi: false,
             clip_lo: false,
+            overlay_strength: 0.55,
+            overlay_mode: 0,
             proof_space: 0,
             proof_gamut: false,
             dcp_look,

@@ -34,6 +34,8 @@ pub enum Op {
         blend: Option<String>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         enabled: Option<bool>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        name: Option<String>,
     },
     DuplicateMask {
         id: String,
@@ -242,6 +244,9 @@ const MASK_KINDS: &[&str] = &[
     "sky",
     "background",
     "object",
+    "people",
+    "skin",
+    "hair",
     "radial",
     "linear",
     "brush",
@@ -293,6 +298,7 @@ pub fn apply_op(doc: &mut EditDoc, op: &Op) -> Result<Option<String>, CoreError>
             doc.masks.push(Mask {
                 id: id.clone(),
                 kind: kind.clone(),
+                name: None,
                 enabled: true,
                 opacity: 100.0,
                 invert: false,
@@ -320,6 +326,7 @@ pub fn apply_op(doc: &mut EditDoc, op: &Op) -> Result<Option<String>, CoreError>
             invert,
             blend,
             enabled,
+            name,
         } => {
             let mask = doc
                 .mask_mut(id)
@@ -342,6 +349,14 @@ pub fn apply_op(doc: &mut EditDoc, op: &Op) -> Result<Option<String>, CoreError>
             if let Some(e) = enabled {
                 mask.enabled = *e;
             }
+            if let Some(n) = name {
+                let trimmed = n.trim().to_string();
+                mask.name = if trimmed.is_empty() {
+                    None
+                } else {
+                    Some(trimmed.chars().take(48).collect())
+                };
+            }
             if let Some(b) = blend {
                 let b = b.to_lowercase();
                 if !matches!(b.as_str(), "normal" | "multiply" | "screen") {
@@ -360,9 +375,15 @@ pub fn apply_op(doc: &mut EditDoc, op: &Op) -> Result<Option<String>, CoreError>
                 .ok_or_else(|| CoreError::InvalidOp(format!("mask not found: {id}")))?
                 .clone();
             let new_id = new_mask_id();
+            let dup_name = src
+                .name
+                .as_ref()
+                .map(|n| format!("{n} copy"))
+                .or_else(|| Some(format!("{} copy", src.kind)));
             doc.masks.push(Mask {
                 id: new_id.clone(),
                 kind: src.kind,
+                name: dup_name,
                 enabled: src.enabled,
                 opacity: src.opacity,
                 invert: src.invert,

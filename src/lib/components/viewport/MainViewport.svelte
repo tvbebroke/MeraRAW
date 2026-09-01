@@ -45,11 +45,13 @@
     zoomLabel,
     brushRadius,
   } from "../../../stores/app";
-  import { brushFlow, brushHardness, beginMaskAdjust, deselectMask, endMaskAdjust, markMaskPending, maskAdjusting, maskRefineMode, objectPickActive, syncMaskOverlay, syncViewportToolForMask } from "../../../stores/mask";
+  import { brushFlow, brushHardness, beginMaskAdjust, deselectMask, endMaskAdjust, markMaskPending, maskAdjusting, maskRefineMode, objectPickActive, colorPickActive, syncMaskOverlay, syncViewportToolForMask } from "../../../stores/mask";
   import { rightPanelMode } from "../../../stores/editor";
   import MaskGeometryOverlay from "./MaskGeometryOverlay.svelte";
+  import ObjectPickOverlay from "./ObjectPickOverlay.svelte";
   import { doc, reconcile } from "../../../stores/doc";
   import { setWorkspace, workspace } from "../../../stores/workspace";
+  import { sampleColor } from "../../../ipc/commands";
 
   let { minimal = false }: { minimal?: boolean } = $props();
 
@@ -60,8 +62,75 @@
     return (
       rightPanelMode.get() === "mask" &&
       !!selectedMask.get() &&
-      !objectPickActive.get()
+      !objectPickActive.get() &&
+      !colorPickActive.get()
     );
+  }
+
+  function rgbToRange(r: number, g: number, b: number) {
+    const mx = Math.max(r, g, b);
+    const mn = Math.min(r, g, b);
+    const chroma = mx - mn;
+    let hue = 0;
+    if (chroma > 1e-5) {
+      if (mx === r) hue = (g - b) / chroma;
+      else if (mx === g) hue = 2 + (b - r) / chroma;
+      else hue = 4 + (r - g) / chroma;
+      hue *= 60;
+      if (hue < 0) hue += 360;
+    }
+    const luma = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    return { hue, chroma, luma };
+  }
+
+  async function applyColorSample(x: number, y: number) {
+    try {
+      let mask = doc.get()?.masks?.find((m) => m.id === selectedMask.get());
+      if (!mask || mask.kind !== "parametric") {
+        const delta = await applyOp({
+          op: "add_mask",
+          kind: "parametric",
+          source: {
+            type: "parametric",
+            luma_lo: 0,
+            luma_hi: 1,
+            chroma_lo: 0,
+            chroma_hi: 1,
+            hue_lo: 0,
+            hue_hi: 360,
+            softness: 0.08,
+          },
+        });
+        reconcile(delta);
+        if (delta.newMaskId) {
+          selectedMask.set(delta.newMaskId);
+          mask = delta.doc.masks?.find((m) => m.id === delta.newMaskId);
+        }
+      }
+      if (!mask) return;
+      const c = await sampleColor(x, y);
+      const [dr, dg, db] = c.display.map((v) => v / 255);
+      const { hue, chroma, luma } = rgbToRange(dr, dg, db);
+      const source = {
+        type: "parametric",
+        luma_lo: Math.max(0, luma - 0.12),
+        luma_hi: Math.min(1, luma + 0.12),
+        chroma_lo: Math.max(0, chroma - 0.08),
+        chroma_hi: Math.min(1, chroma + 0.2),
+        hue_lo: (hue - 18 + 360) % 360,
+        hue_hi: (hue + 18) % 360,
+        softness: 0.06,
+      };
+      // hue wrap: if band crosses 0, use lo < hi spanning (shader only supports lo < hi)
+      if (source.hue_hi < source.hue_lo) {
+        source.hue_lo = 0;
+        source.hue_hi = 360;
+      }
+      reconcile(await applyOp({ op: "set_mask_source", id: mask.id, source }));
+      syncMaskOverlay();
+    } catch {
+      /* ignore */
+    }
   }
 
   async function createObjectMask(x: number, y: number) {
@@ -556,7 +625,7 @@
       viewportTool.set("pan");
       return;
     }
-    if (objectPickActive.get() && e.button === 0) {
+    if ((objectPickActive.get() || colorPickActive.get()) && e.button === 0) {
       maskTapStart = { x: e.clientX, y: e.clientY };
       (e.currentTarget as Element).setPointerCapture(e.pointerId);
       return;
@@ -622,6 +691,10 @@
           const p = toImageCoords(e);
           if (p) void createObjectMask(p[0], p[1]);
           objectPickActive.set(false);
+        } else if (colorPickActive.get()) {
+          const p = toImageCoords(e);
+          if (p) void applyColorSample(p[0], p[1]);
+          colorPickActive.set(false);
         } else {
           deselectMask();
         }
@@ -940,7 +1013,7 @@
     bind:this={wrapEl}
     role="img"
     aria-label="Develop preview"
-    class="viewport-surround relative flex min-h-0 min-w-0 flex-1 items-center justify-center select-none {$objectPickActive ? 'cursor-crosshair overflow-hidden' : $viewportTool === 'mask-geo' ? 'overflow-visible cursor-default' : $cropActive ? 'cursor-default overflow-hidden' : 'cursor-grab active:cursor-grabbing overflow-hidden'}"
+    class="viewport-surround relative flex min-h-0 min-w-0 flex-1 items-center justify-center select-none {$objectPickActive || $colorPickActive ? 'cursor-crosshair overflow-hidden' : $viewportTool === 'mask-geo' ? 'overflow-visible cursor-default' : $cropActive ? 'cursor-default overflow-hidden' : 'cursor-grab active:cursor-grabbing overflow-hidden'}"
     onwheel={onWheel}
     onpointerdown={onPointerDown}
     onpointermove={onPointerMove}
@@ -1005,6 +1078,17 @@
         {imgAspect}
         toImageCoords={imageNormFromScreen}
         {imageNormToLocal}
+      />
+    {/if}
+
+    {#if displaySrc && $objectPickActive && !isVideoWs}
+      <ObjectPickOverlay
+        {imgBox}
+        {imageNormToLocal}
+        onPick={(centroid) => {
+          void createObjectMask(centroid[0], centroid[1]);
+          objectPickActive.set(false);
+        }}
       />
     {/if}
 

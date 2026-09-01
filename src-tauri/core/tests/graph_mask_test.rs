@@ -139,6 +139,7 @@ async fn radial_mask_scopes_exposure_to_center() {
             invert: Some(true),
             blend: None,
             enabled: None,
+            name: None,
         },
     )
     .unwrap();
@@ -179,6 +180,7 @@ async fn radial_mask_scopes_exposure_to_center() {
             invert: None,
             blend: None,
             enabled: None,
+            name: None,
         },
     )
     .unwrap();

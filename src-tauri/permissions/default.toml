@@ -46,6 +46,8 @@ commands.allow = [
   "wb_from_point",
   "auto_level",
   "set_mask_overlay",
+  "sample_color",
+  "propose_object_masks",
   "set_preview_bypass",
   "set_display_look",
   "set_clip_warnings",

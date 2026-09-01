@@ -273,8 +273,21 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
       encoded = oetf_srgb(clamp(looked, vec3<f32>(0.0), vec3<f32>(1.0)));
     }
     if (u.overlay > 0.0) {
-      let m = textureLoad(overlay_mask, vec2<i32>(gid.xy), 0).r;
-      encoded = mix(encoded, vec3<f32>(1.0, 0.15, 0.15), clamp(m, 0.0, 1.0) * u.overlay);
+      let m = clamp(textureLoad(overlay_mask, vec2<i32>(gid.xy), 0).r, 0.0, 1.0);
+      let mode = (u._p1 >> 8u) & 0xfu;
+      var tint = vec3<f32>(1.0, 0.15, 0.15);
+      if (mode == 1u) {
+        tint = vec3<f32>(1.0, 1.0, 1.0);
+      } else if (mode == 2u) {
+        tint = vec3<f32>(0.0, 0.0, 0.0);
+      }
+      if (mode == 3u) {
+        let gray = dot(encoded, LUMA);
+        let base = vec3<f32>(gray, gray, gray);
+        encoded = mix(base, vec3<f32>(1.0, 0.15, 0.15), m * u.overlay);
+      } else {
+        encoded = mix(encoded, tint, m * u.overlay);
+      }
     }
     // Clipping blinkies on display-encoded output (matches histogram clip %).
     // Pulse via _p0 = millis so warnings flash while frames keep updating.

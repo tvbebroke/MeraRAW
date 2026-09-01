@@ -184,6 +184,7 @@ impl Engine {
             let g = self.graph.as_mut().unwrap();
             g.set_look(display_look);
             g.set_clip_warnings(self.clip_hi, self.clip_lo);
+            g.set_mask_overlay_style(self.overlay_strength, self.overlay_mode);
             g.set_proof(self.proof_space, self.proof_gamut);
         }
         let (w, h) = (*w, *h);
@@ -299,6 +300,7 @@ impl Engine {
         let display_look =
             crate::lut::present_look_for(cur.meta.kind, self.display_look, cur.doc());
         graph.set_look(display_look);
+        graph.set_mask_overlay_style(self.overlay_strength, self.overlay_mode);
         graph.invalidate_all();
         let dcp = if cur.meta.kind.allows_raw_only_stages()
             && crate::profile::DcpProfile::applies_to_display_look(self.display_look)

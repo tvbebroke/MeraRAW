@@ -306,9 +306,35 @@ export function rebuildIndex(confirm = true): Promise<number> {
   return invoke<number>("rebuild_index", { confirm });
 }
 
-/** Toggle viewport mask overlay (null = off). */
-export function setMaskOverlay(id: string | null): Promise<void> {
-  return invoke<void>("set_mask_overlay", { id });
+/** Toggle viewport mask overlay (null = off). Optional strength 0..1 and mode 0..3. */
+export function setMaskOverlay(
+  id: string | null,
+  opts?: { strength?: number; mode?: number },
+): Promise<void> {
+  return invoke<void>("set_mask_overlay", {
+    id,
+    strength: opts?.strength ?? null,
+    mode: opts?.mode ?? null,
+  });
+}
+
+export function sampleColor(
+  x: number,
+  y: number,
+): Promise<{ working: [number, number, number]; display: [number, number, number] }> {
+  return invoke("sample_color", { x, y });
+}
+
+export interface ObjectProposal {
+  id: number;
+  path: [number, number][];
+  centroid: [number, number];
+  area: number;
+}
+
+/** Saliency contours for object-pick UI (dotted outlines). */
+export function proposeObjectMasks(): Promise<ObjectProposal[]> {
+  return invoke<ObjectProposal[]>("propose_object_masks");
 }
 
 /** Before/after: render the un-edited base while on. */

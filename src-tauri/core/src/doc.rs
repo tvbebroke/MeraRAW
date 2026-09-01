@@ -53,6 +53,8 @@ pub struct SourceRef {
 pub struct Mask {
     pub id: String,
     pub kind: String, // subject|sky|background|object|radial|linear|brush
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
     #[serde(default = "default_true")]
     pub enabled: bool,
     #[serde(default = "default_opacity")]
@@ -440,6 +442,8 @@ mod tests {
             masks: vec![Mask {
                 id: "m-radial".into(),
                 kind: "radial".into(),
+                name: None,
+                enabled: true,
                 opacity: 80.0,
                 invert: false,
                 feather: 12.0,

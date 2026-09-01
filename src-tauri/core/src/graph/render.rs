@@ -165,6 +165,11 @@ impl RenderGraph {
         self.clip_lo = lo;
     }
 
+    pub fn set_mask_overlay_style(&mut self, strength: f32, mode: u32) {
+        self.overlay_strength = strength.clamp(0.0, 1.0);
+        self.overlay_mode = mode.min(3);
+    }
+
     pub fn set_proof(&mut self, space: u32, gamut: bool) {
         self.proof_space = space.min(4);
         self.proof_gamut = gamut && space > 0;
@@ -866,7 +871,11 @@ impl RenderGraph {
             let u = PresentUniforms {
                 width: out_w,
                 height: out_h,
-                overlay: if overlay_mask.is_some() { 0.55 } else { 0.0 },
+                overlay: if overlay_mask.is_some() {
+                    self.overlay_strength
+                } else {
+                    0.0
+                },
                 look: DcpProfile::present_look(
                     self.look,
                     dcp_profile.filter(|_| dcp_active),
@@ -874,7 +883,9 @@ impl RenderGraph {
                 clip_hi: u32::from(self.clip_hi),
                 clip_lo: u32::from(self.clip_lo),
                 _p0: millis,
-                _p1: space | if self.proof_gamut { 16 } else { 0 },
+                _p1: space
+                    | if self.proof_gamut { 16 } else { 0 }
+                    | ((self.overlay_mode & 0xf) << 8),
                 m0: m[0],
                 m1: m[1],
                 m2: m[2],

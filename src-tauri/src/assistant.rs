@@ -284,6 +284,7 @@ async fn execute_tool(
                     invert: input["invert"].as_bool(),
                     blend: input["blend"].as_str().map(|s| s.to_string()),
                     enabled: input["enabled"].as_bool(),
+                    name: input["name"].as_str().map(|s| s.to_string()),
                 })
                 .await;
             (op_result(r), None)

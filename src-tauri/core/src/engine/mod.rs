@@ -241,9 +241,19 @@ impl EngineHandle {
             .await
     }
 
-    pub async fn set_mask_overlay(&self, id: Option<String>) -> Result<(), EngineError> {
-        self.request(|reply| EngineMsg::SetMaskOverlay { id, reply })
-            .await
+    pub async fn set_mask_overlay(
+        &self,
+        id: Option<String>,
+        strength: Option<f32>,
+        mode: Option<u32>,
+    ) -> Result<(), EngineError> {
+        self.request(|reply| EngineMsg::SetMaskOverlay {
+            id,
+            strength,
+            mode,
+            reply,
+        })
+        .await
     }
 
     pub async fn set_preview_bypass(&self, on: bool) -> Result<(), EngineError> {
@@ -449,6 +459,13 @@ impl EngineHandle {
             .await
     }
 
+    pub async fn propose_object_masks(
+        &self,
+    ) -> Result<Result<Vec<crate::segment::ObjectProposal>, CoreError>, EngineError> {
+        self.request(|reply| EngineMsg::ProposeObjectMasks { reply })
+            .await
+    }
+
     pub async fn auto_level(&self) -> Result<Result<f32, CoreError>, EngineError> {
         self.request(|reply| EngineMsg::AutoLevel { reply }).await
     }
@@ -640,6 +657,10 @@ struct Engine {
     render_at: Option<Instant>,
     settle_at: Option<Instant>,
     overlay_mask: Option<String>,
+    /// Overlay tint strength (0..1), default 0.55.
+    overlay_strength: f32,
+    /// 0 red, 1 white, 2 black, 3 color-on-B&W.
+    overlay_mode: u32,
     catalog: Option<crate::catalog::Catalog>,
     import_state: Option<ImportState>,
     /// Before/after: when true, render the un-edited base.
@@ -747,6 +768,8 @@ async fn run(
         render_at: None,
         settle_at: None,
         overlay_mask: None,
+        overlay_strength: 0.55,
+        overlay_mode: 0,
         catalog: None,
         import_state: None,
         preview_bypass: false,
@@ -1071,8 +1094,19 @@ impl Engine {
             EngineMsg::GetStats { reply } => {
                 let _ = reply.send(self.compute_stats());
             }
-            EngineMsg::SetMaskOverlay { id, reply } => {
+            EngineMsg::SetMaskOverlay {
+                id,
+                strength,
+                mode,
+                reply,
+            } => {
                 self.overlay_mask = id;
+                if let Some(s) = strength {
+                    self.overlay_strength = s.clamp(0.0, 1.0);
+                }
+                if let Some(m) = mode {
+                    self.overlay_mode = m.min(3);
+                }
                 if let Some(g) = &mut self.graph {
                     g.invalidate_from_module("masks");
                 }
@@ -1387,6 +1421,15 @@ impl Engine {
             }
             EngineMsg::SampleColor { x, y, reply } => {
                 let _ = reply.send(self.sample_color(x, y));
+            }
+            EngineMsg::ProposeObjectMasks { reply } => {
+                let result = (|| {
+                    let cur = self.current.as_ref().ok_or(CoreError::NoImage)?;
+                    let small = cur.small_cpu.as_ref().ok_or(CoreError::NoImage)?;
+                    let input = small.downscale_to(768);
+                    crate::segment::propose_objects(&input)
+                })();
+                let _ = reply.send(result);
             }
             EngineMsg::AutoLevel { reply } => {
                 let _ = reply.send(self.auto_level());

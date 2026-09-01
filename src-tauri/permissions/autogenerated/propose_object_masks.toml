@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-propose-object-masks"
+description = "Enables the propose_object_masks command without any pre-configured scope."
+commands.allow = ["propose_object_masks"]
+
+[[permission]]
+identifier = "deny-propose-object-masks"
+description = "Denies the propose_object_masks command without any pre-configured scope."
+commands.deny = ["propose_object_masks"]

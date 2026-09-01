@@ -281,7 +281,13 @@ impl Engine {
                     // segmentation runs on a further-downscaled copy
                     let input = img.downscale_to(768);
                     let result = match kind.as_str() {
-                        "subject" | "background" => seg.subject(&input),
+                        "subject" | "background" | "people" => seg.subject(&input),
+                        "skin" => seg.subject(&input).map(|m| {
+                            crate::segment::extract_skin_mask(&m, &input)
+                        }),
+                        "hair" => seg.subject(&input).map(|m| {
+                            crate::segment::extract_hair_mask(&m, &input)
+                        }),
                         "sky" => seg.sky(&input),
                         "object" => {
                             let p = source
@@ -292,7 +298,26 @@ impl Engine {
                                     Some((a.first()?.as_f64()? as f32, a.get(1)?.as_f64()? as f32))
                                 })
                                 .unwrap_or((0.5, 0.5));
-                            seg.object(&input, p)
+                            // Prefer subject-guided object: grow from click, then
+                            // boost with subject saliency near the seed.
+                            match (seg.object(&input, p), seg.subject(&input)) {
+                                (Ok(mut obj), Ok(subj)) => {
+                                    let n = obj.data.len().min(subj.data.len());
+                                    for i in 0..n {
+                                        if subj.data[i] > 0.35 {
+                                            obj.data[i] = obj.data[i].max(subj.data[i] * 0.55);
+                                        }
+                                    }
+                                    crate::segment::suppress_reflections_and_islands(
+                                        &mut obj.data,
+                                        obj.width,
+                                        obj.height,
+                                    );
+                                    Ok(obj)
+                                }
+                                (Ok(obj), Err(_)) => Ok(obj),
+                                (Err(e), _) => Err(e),
+                            }
                         }
                         other => Err(CoreError::InvalidOp(format!(
                             "kind {other} is not segmented"

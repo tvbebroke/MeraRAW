@@ -318,6 +318,8 @@ mod tests {
         dest.masks.push(crate::doc::Mask {
             id: "keep".into(),
             kind: "radial".into(),
+            name: None,
+            enabled: true,
             opacity: 80.0,
             invert: false,
             feather: 10.0,

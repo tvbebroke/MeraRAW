@@ -802,8 +802,31 @@ pub async fn rebuild_index(
 pub async fn set_mask_overlay(
     engine: State<'_, EngineHandle>,
     id: Option<String>,
+    strength: Option<f32>,
+    mode: Option<u32>,
 ) -> Result<(), AppError> {
-    Ok(engine.set_mask_overlay(id).await?)
+    Ok(engine.set_mask_overlay(id, strength, mode).await?)
+}
+
+#[tauri::command]
+pub async fn sample_color(
+    engine: State<'_, EngineHandle>,
+    x: f32,
+    y: f32,
+) -> Result<serde_json::Value, AppError> {
+    let c = engine.sample_color(x, y).await??;
+    Ok(serde_json::json!({
+        "working": c.working,
+        "display": c.display,
+    }))
+}
+
+#[tauri::command]
+pub async fn propose_object_masks(
+    engine: State<'_, EngineHandle>,
+) -> Result<serde_json::Value, AppError> {
+    let props = engine.propose_object_masks().await??;
+    Ok(serde_json::to_value(props).unwrap_or_default())
 }
 
 /// Before/after: render the un-edited base while `on`.

@@ -11,14 +11,18 @@
     markMaskPending,
     maskDisplayName,
     maskErrors,
+    maskOverlayMode,
+    maskOverlayStrength,
     maskOverlayVisible,
     maskPendingIds,
     maskRefineMode,
     maskToolGroup,
     objectPickActive,
+    colorPickActive,
     deselectMask,
     syncMaskOverlay,
     syncViewportToolForMask,
+    type MaskOverlayMode,
     type MaskRefineMode,
   } from "../../../stores/mask";
   import { showMaskPanel } from "../../editor/focus";
@@ -41,6 +45,9 @@
     | "sky"
     | "background"
     | "object"
+    | "people"
+    | "skin"
+    | "hair"
     | "parametric";
 
   const KIND_ICON: Record<string, string> = {
@@ -48,6 +55,9 @@
     sky: "☁",
     background: "◫",
     object: "◉",
+    people: "☺",
+    skin: "◌",
+    hair: "∿",
     brush: "◔",
     linear: "▥",
     radial: "◯",
@@ -85,6 +95,12 @@
           model: "object_v1",
           hint: { point: [0.5, 0.5] },
         };
+      case "people":
+        return { type: "segmented", model: "people_v1", hint: null };
+      case "skin":
+        return { type: "segmented", model: "skin_v1", hint: null };
+      case "hair":
+        return { type: "segmented", model: "hair_v1", hint: null };
       default:
         return { type: "segmented", model: "subject_v1", hint: null };
     }
@@ -181,13 +197,9 @@
     }
   }
 
-  function startObjectPick() {
-    objectPickActive.set(true);
-    showMaskPanel();
-  }
-
   function select(id: string) {
     objectPickActive.set(false);
+    colorPickActive.set(false);
     if ($selectedMask === id) {
       deselectMask();
       return;
@@ -202,15 +214,46 @@
   }
 
   async function refine(
-    partial: { opacity?: number; feather?: number; invert?: boolean; blend?: string },
+    partial: {
+      opacity?: number;
+      feather?: number;
+      invert?: boolean;
+      blend?: string;
+      enabled?: boolean;
+      name?: string;
+    },
     live = false,
   ) {
     if (!$selectedMask) return;
     try {
       reconcile(await applyOp({ op: "refine_mask", id: $selectedMask, ...partial }, live));
+      if (partial.enabled !== undefined || partial.name !== undefined) syncMaskOverlay();
     } catch {
       /* ignore */
     }
+  }
+
+  function startObjectPick() {
+    colorPickActive.set(false);
+    objectPickActive.set(true);
+    showMaskPanel();
+  }
+
+  function startColorPick() {
+    objectPickActive.set(false);
+    colorPickActive.set(true);
+    showMaskPanel();
+  }
+
+  function setOverlayMode(mode: MaskOverlayMode) {
+    maskOverlayMode.set(mode);
+    maskOverlayVisible.set(true);
+    syncMaskOverlay();
+  }
+
+  function setOverlayStrength(v: number) {
+    maskOverlayStrength.set(v);
+    syncMaskOverlay();
   }
 
   async function setParametric(key: string, value: number, live = false) {
@@ -277,6 +320,26 @@
       Overlay
     </button>
   </div>
+  {#if $maskOverlayVisible}
+    <div class="overlay-opts">
+      <div class="seg seg-4">
+        <button type="button" class="seg-btn" class:on={$maskOverlayMode === 0} onclick={() => setOverlayMode(0)}>Red</button>
+        <button type="button" class="seg-btn" class:on={$maskOverlayMode === 1} onclick={() => setOverlayMode(1)}>White</button>
+        <button type="button" class="seg-btn" class:on={$maskOverlayMode === 2} onclick={() => setOverlayMode(2)}>Black</button>
+        <button type="button" class="seg-btn" class:on={$maskOverlayMode === 3} onclick={() => setOverlayMode(3)}>B&amp;W</button>
+      </div>
+      <ParamRow
+        label="Overlay strength"
+        min={0.15}
+        max={0.9}
+        step={0.05}
+        value={$maskOverlayStrength}
+        resetValue={0.55}
+        oninput={(v) => setOverlayStrength(v)}
+        onchange={(v) => setOverlayStrength(v)}
+      />
+    </div>
+  {/if}
 
   {#if active}
     <div class="refine-bar">
@@ -305,7 +368,10 @@
   {/if}
 
   {#if $objectPickActive}
-    <p class="pick-banner">Click the subject on the image to create an object mask.</p>
+    <p class="pick-banner">Click a dotted outline on the image to mask that object.</p>
+  {/if}
+  {#if $colorPickActive}
+    <p class="pick-banner">Click the image to sample a color range.</p>
   {/if}
 
   <p class="group-label">Add new mask</p>
@@ -331,7 +397,16 @@
           <span class="ico">◫</span> Background
         </button>
         <button type="button" class="tool-btn" onclick={startObjectPick}>
-          <span class="ico">◉</span> Object · click image
+          <span class="ico">◉</span> Object · click outline
+        </button>
+        <button type="button" class="tool-btn" onclick={() => void addMask("people")}>
+          <span class="ico">☺</span> People
+        </button>
+        <button type="button" class="tool-btn" onclick={() => void addMask("skin")}>
+          <span class="ico">◌</span> Skin
+        </button>
+        <button type="button" class="tool-btn" onclick={() => void addMask("hair")}>
+          <span class="ico">∿</span> Hair
         </button>
       </div>
     {/if}
@@ -391,6 +466,14 @@
         >
           <span class="ico">◐</span> Luminance / Color Range
         </button>
+        <button
+          type="button"
+          class="tool-btn wide"
+          class:on={$colorPickActive}
+          onclick={startColorPick}
+        >
+          <span class="ico">◎</span> Sample color from image
+        </button>
       </div>
     {/if}
   </div>
@@ -428,6 +511,17 @@
     />
 
     <p class="group-label">Selected mask</p>
+    <label class="name-row">
+      <span class="name-label">Name</span>
+      <input
+        class="name-input"
+        type="text"
+        maxlength="48"
+        value={active.name ?? ""}
+        placeholder={maskDisplayName(active.kind, activeIndex >= 0 ? activeIndex : 0)}
+        onchange={(e) => void refine({ name: (e.currentTarget as HTMLInputElement).value })}
+      />
+    </label>
     <ParamRow
       label="Opacity"
       min={0}
@@ -554,7 +648,7 @@
         <button type="button" class="mask-pick" onclick={() => select(m.id)}>
           <span class="mask-name">
             <span class="kind-ico">{KIND_ICON[m.kind] ?? "◆"}</span>
-            {maskDisplayName(m.kind, i)}
+            {maskDisplayName(m.kind, i, m.name)}
           </span>
           <span class="mask-meta">
             {#if pending}
@@ -625,6 +719,43 @@
   }
   .seg.seg-3 {
     grid-template-columns: 1fr 1fr 1fr;
+  }
+  .seg.seg-4 {
+    grid-template-columns: 1fr 1fr 1fr 1fr;
+  }
+  .overlay-opts {
+    padding: 0 var(--space-1) var(--space-2);
+  }
+  .name-row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    margin: 0 0 var(--space-2);
+    padding: 0 var(--space-1);
+  }
+  .name-label {
+    font-size: var(--text-ui);
+    color: var(--color-subtle);
+    min-width: 3.2em;
+  }
+  .name-input {
+    flex: 1;
+    min-width: 0;
+    height: 28px;
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    background: var(--color-sidebar);
+    color: var(--color-fg);
+    padding: 0 var(--space-2);
+    font-size: var(--text-ui);
+  }
+  .name-input:focus {
+    outline: none;
+    border-color: var(--color-accent);
+  }
+  .tool-btn.on {
+    border-color: var(--color-accent);
+    background: var(--color-accent-soft);
   }
   .pick-banner {
     margin: 0 0 var(--space-2);

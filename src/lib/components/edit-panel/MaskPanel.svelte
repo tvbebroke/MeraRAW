@@ -50,7 +50,7 @@
   {#if active}
     <div class="adjust-header" in:fade={{ duration: 120 }}>
       <p class="adjust-title">
-        Adjust · {maskDisplayName(active.kind, activeIndex >= 0 ? activeIndex : 0)}
+        Adjust · {maskDisplayName(active.kind, activeIndex >= 0 ? activeIndex : 0, active.name)}
       </p>
       {#if activePending}
         <p class="adjust-pending">Detecting {active.kind === "sky" ? "sky" : "selection"}…</p>

@@ -436,6 +436,8 @@ fn main() {
             commands::wb_from_point,
             commands::auto_level,
             commands::set_mask_overlay,
+            commands::sample_color,
+            commands::propose_object_masks,
             commands::set_preview_bypass,
             commands::set_display_look,
             commands::set_clip_warnings,

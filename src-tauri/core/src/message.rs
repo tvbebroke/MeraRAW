@@ -293,6 +293,10 @@ pub enum EngineMsg {
     /// Toggle the viewport mask overlay (None = off).
     SetMaskOverlay {
         id: Option<String>,
+        /// Tint strength 0..1; None keeps previous strength.
+        strength: Option<f32>,
+        /// 0 red, 1 white, 2 black, 3 color-on-B&W; None keeps previous.
+        mode: Option<u32>,
         reply: oneshot::Sender<()>,
     },
     /// Before/after: render the un-edited base (edit chain bypassed) while on.
@@ -413,6 +417,10 @@ pub enum EngineMsg {
         x: f32,
         y: f32,
         reply: oneshot::Sender<Result<SampledColor, CoreError>>,
+    },
+    /// Object-pick UI: saliency contours the user can click to mask.
+    ProposeObjectMasks {
+        reply: oneshot::Sender<Result<Vec<crate::segment::ObjectProposal>, CoreError>>,
     },
     /// Crop-tool auto-level: dominant near-horizontal/vertical edge deviation
     /// (degrees, ORIGINAL image space, mod-90 folded into [-45, 45)).
