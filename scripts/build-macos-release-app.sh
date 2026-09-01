@@ -14,7 +14,8 @@ cd "$(dirname "$0")/.."
 VERSION="$(node -p "require('./src-tauri/tauri.conf.json').version")"
 PRODUCT="$(node -p "require('./src-tauri/tauri.conf.json').productName")"
 OUT_DIR="release-app"
-BUNDLE_DIR="src-tauri/target/release/bundle/macos"
+TARGET_DIR="${CARGO_TARGET_DIR:-src-tauri/target}"
+BUNDLE_DIR="${TARGET_DIR}/release/bundle/macos"
 
 echo "→ Installing frontend dependencies…"
 if [[ -f package-lock.json ]]; then npm ci; else npm install; fi
