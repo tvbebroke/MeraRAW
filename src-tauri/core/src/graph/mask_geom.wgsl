@@ -94,8 +94,10 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
       var d = p - s.xy;
       d.x *= aspect;
       let radius = abs(s.z);
-      let hardness = clamp(s.w, 0.0, 0.98);
-      let cov = 1.0 - smoothstep(radius * hardness, radius * (1.0 + u.feather), length(d));
+      let packed = s.w;
+      let hardness = clamp(floor(packed) * 0.01, 0.0, 0.98);
+      let flow = clamp(fract(packed), 0.05, 1.0);
+      let cov = (1.0 - smoothstep(radius * hardness, radius * (1.0 + u.feather), length(d))) * flow;
       if (s.z >= 0.0) {
         m = max(m, cov);
       } else {

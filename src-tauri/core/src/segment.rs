@@ -506,6 +506,322 @@ pub fn extract_hair_mask(subject: &Mask01, img: &RgbF32Buf) -> Mask01 {
     }
 }
 
+fn subject_bbox(subject: &Mask01) -> (usize, usize, usize, usize) {
+    let (w, h) = (subject.width, subject.height);
+    let mut x0 = w;
+    let mut x1 = 0usize;
+    let mut y0 = h;
+    let mut y1 = 0usize;
+    for y in 0..h {
+        for x in 0..w {
+            if subject.data[y * w + x] > 0.22 {
+                x0 = x0.min(x);
+                x1 = x1.max(x);
+                y0 = y0.min(y);
+                y1 = y1.max(y);
+            }
+        }
+    }
+    if x0 > x1 {
+        (0, w.saturating_sub(1), 0, h.saturating_sub(1))
+    } else {
+        (x0, x1, y0, y1)
+    }
+}
+
+/// Face ≈ upper subject ∩ skin (portrait prior).
+pub fn extract_face_mask(subject: &Mask01, img: &RgbF32Buf) -> Mask01 {
+    let (w, h) = (subject.width, subject.height);
+    let (_x0, _x1, y0, y1) = subject_bbox(subject);
+    let span = (y1.saturating_sub(y0)).max(1) as f32;
+    let mut data = vec![0.0f32; w * h];
+    for y in 0..h {
+        let y_norm = (y.saturating_sub(y0) as f32) / span;
+        if y_norm > 0.62 {
+            continue;
+        }
+        for x in 0..w {
+            let i = y * w + x;
+            let s = subject.data[i];
+            if s < 0.15 {
+                continue;
+            }
+            let [r, g, b] = sample_enc_rgb(img, x, y, w, h);
+            let skin = is_skin_rgb(r, g, b);
+            let upper = (1.0 - y_norm / 0.62).clamp(0.15, 1.0);
+            data[i] = (s * skin.max(0.2) * upper).clamp(0.0, 1.0);
+        }
+    }
+    suppress_reflections_and_islands(&mut data, w, h);
+    Mask01 {
+        width: w,
+        height: h,
+        data,
+    }
+}
+
+fn is_lip_rgb(r: f32, g: f32, b: f32) -> f32 {
+    if r < 0.15 || r < g * 1.05 {
+        return 0.0;
+    }
+    let luma = 0.299 * r + 0.587 * g + 0.114 * b;
+    if !(0.12..=0.75).contains(&luma) {
+        return 0.0;
+    }
+    let red = ((r - g.max(b)) / 0.28).clamp(0.0, 1.0);
+    let warm = ((r - b) / 0.35).clamp(0.0, 1.0);
+    red.max(warm * 0.7) * ((0.7 - (luma - 0.35).abs()) / 0.4).clamp(0.25, 1.0)
+}
+
+fn is_eye_rgb(r: f32, g: f32, b: f32) -> f32 {
+    let luma = 0.299 * r + 0.587 * g + 0.114 * b;
+    let mx = r.max(g).max(b);
+    let mn = r.min(g).min(b);
+    let chroma = mx - mn;
+    // Iris / pupil: dark low-chroma, or sclera: bright low-chroma.
+    let dark = (1.0 - luma / 0.28).clamp(0.0, 1.0) * (1.0 - chroma / 0.25).clamp(0.2, 1.0);
+    let sclera = ((luma - 0.55) / 0.35).clamp(0.0, 1.0) * (1.0 - chroma / 0.2).clamp(0.0, 1.0);
+    dark.max(sclera * 0.85)
+}
+
+/// Lips ≈ lower-face skin band ∩ warm red.
+pub fn extract_lips_mask(subject: &Mask01, img: &RgbF32Buf) -> Mask01 {
+    let face = extract_face_mask(subject, img);
+    let (w, h) = (face.width, face.height);
+    let (_x0, _x1, y0, y1) = subject_bbox(subject);
+    let span = (y1.saturating_sub(y0)).max(1) as f32;
+    let mut data = vec![0.0f32; w * h];
+    for y in 0..h {
+        let y_norm = (y.saturating_sub(y0) as f32) / span;
+        // Lips sit in the lower third of the face band.
+        if !(0.38..=0.72).contains(&y_norm) {
+            continue;
+        }
+        for x in 0..w {
+            let i = y * w + x;
+            if face.data[i] < 0.08 {
+                continue;
+            }
+            let [r, g, b] = sample_enc_rgb(img, x, y, w, h);
+            data[i] = (face.data[i] * is_lip_rgb(r, g, b)).clamp(0.0, 1.0);
+        }
+    }
+    Mask01 {
+        width: w,
+        height: h,
+        data,
+    }
+}
+
+/// Eyes ≈ upper-face band ∩ dark iris / bright sclera.
+pub fn extract_eyes_mask(subject: &Mask01, img: &RgbF32Buf) -> Mask01 {
+    let face = extract_face_mask(subject, img);
+    let (w, h) = (face.width, face.height);
+    let (_x0, _x1, y0, y1) = subject_bbox(subject);
+    let span = (y1.saturating_sub(y0)).max(1) as f32;
+    let mut data = vec![0.0f32; w * h];
+    for y in 0..h {
+        let y_norm = (y.saturating_sub(y0) as f32) / span;
+        if !(0.12..=0.42).contains(&y_norm) {
+            continue;
+        }
+        for x in 0..w {
+            let i = y * w + x;
+            if face.data[i] < 0.05 {
+                continue;
+            }
+            let [r, g, b] = sample_enc_rgb(img, x, y, w, h);
+            data[i] = (face.data[i].max(0.35) * is_eye_rgb(r, g, b)).clamp(0.0, 1.0);
+        }
+    }
+    Mask01 {
+        width: w,
+        height: h,
+        data,
+    }
+}
+
+fn mountain_score(r: f32, g: f32, b: f32, y_norm: f32) -> f32 {
+    let luma = 0.299 * r + 0.587 * g + 0.114 * b;
+    let mx = r.max(g).max(b);
+    let mn = r.min(g).min(b);
+    let chroma = mx - mn;
+    // Mid/low chroma rock / distant ridges; prefer mid-frame (not sky, not foreground).
+    if chroma > 0.28 || luma > 0.82 || luma < 0.08 {
+        return 0.0;
+    }
+    let rock = (1.0 - chroma / 0.28).clamp(0.0, 1.0) * ((luma - 0.15) / 0.5).clamp(0.0, 1.0);
+    let band = (1.0 - ((y_norm - 0.42).abs() / 0.38)).clamp(0.0, 1.0);
+    rock * band
+}
+
+fn architecture_score(r: f32, g: f32, b: f32, y_norm: f32) -> f32 {
+    let luma = 0.299 * r + 0.587 * g + 0.114 * b;
+    let mx = r.max(g).max(b);
+    let mn = r.min(g).min(b);
+    let chroma = mx - mn;
+    // Man-made: neutrals / warm neutrals, mid luma, mid-lower frame.
+    if chroma > 0.22 && (r - b).abs() < 0.08 {
+        // saturated non-neutral — downweight
+    }
+    let neutral = (1.0 - chroma / 0.25).clamp(0.0, 1.0);
+    let mid = (1.0 - ((luma - 0.45).abs() / 0.4)).clamp(0.0, 1.0);
+    let band = ((y_norm - 0.15) / 0.7).clamp(0.0, 1.0);
+    neutral * mid * band
+}
+
+fn ground_score(r: f32, g: f32, b: f32, y_norm: f32) -> f32 {
+    let luma = 0.299 * r + 0.587 * g + 0.114 * b;
+    // Earth / pavement / soil — lower frame, not vivid green/blue.
+    if y_norm < 0.45 {
+        return 0.0;
+    }
+    if b > r + 0.06 && b > g {
+        return 0.0; // water/sky bleed
+    }
+    let green = g - r.max(b);
+    if green > 0.08 {
+        return (green / 0.2).clamp(0.0, 1.0) * ((y_norm - 0.45) / 0.55).clamp(0.0, 1.0) * 0.65;
+    }
+    let earth = ((r - b).max(0.0) / 0.25).clamp(0.0, 1.0) * (1.0 - (g - r).max(0.0) / 0.2).clamp(0.2, 1.0);
+    let lower = ((y_norm - 0.5) / 0.5).clamp(0.0, 1.0);
+    (earth.max(0.25) * lower * ((0.65 - luma).max(0.0) / 0.5 + 0.3).clamp(0.0, 1.0)).clamp(0.0, 1.0)
+}
+
+pub fn extract_mountains_mask(img: &RgbF32Buf) -> Mask01 {
+    let (w, h) = (img.width, img.height);
+    let mut data = vec![0.0f32; w * h];
+    for y in 0..h {
+        let y_norm = y as f32 / h.max(1) as f32;
+        for x in 0..w {
+            let i = (y * w + x) * 3;
+            data[y * w + x] = mountain_score(enc(img.data[i]), enc(img.data[i + 1]), enc(img.data[i + 2]), y_norm);
+        }
+    }
+    refine_saliency_mask(&mut data, w, h);
+    Mask01 { width: w, height: h, data }
+}
+
+pub fn extract_architecture_mask(img: &RgbF32Buf) -> Mask01 {
+    let (w, h) = (img.width, img.height);
+    let mut data = vec![0.0f32; w * h];
+    for y in 0..h {
+        let y_norm = y as f32 / h.max(1) as f32;
+        for x in 0..w {
+            let i = (y * w + x) * 3;
+            data[y * w + x] =
+                architecture_score(enc(img.data[i]), enc(img.data[i + 1]), enc(img.data[i + 2]), y_norm);
+        }
+    }
+    refine_saliency_mask(&mut data, w, h);
+    Mask01 { width: w, height: h, data }
+}
+
+pub fn extract_ground_mask(img: &RgbF32Buf) -> Mask01 {
+    let (w, h) = (img.width, img.height);
+    let mut data = vec![0.0f32; w * h];
+    for y in 0..h {
+        let y_norm = y as f32 / h.max(1) as f32;
+        for x in 0..w {
+            let i = (y * w + x) * 3;
+            data[y * w + x] = ground_score(enc(img.data[i]), enc(img.data[i + 1]), enc(img.data[i + 2]), y_norm);
+        }
+    }
+    refine_saliency_mask(&mut data, w, h);
+    Mask01 { width: w, height: h, data }
+}
+
+/// Approximate depth range using vertical position (far=top … near=bottom).
+pub fn extract_depth_mask(img: &RgbF32Buf, near: f32, far: f32) -> Mask01 {
+    let (w, h) = (img.width, img.height);
+    let lo = far.min(near);
+    let hi = far.max(near);
+    let soft = 0.06f32;
+    let mut data = vec![0.0f32; w * h];
+    for y in 0..h {
+        // depth 0 at top (far), 1 at bottom (near)
+        let d = y as f32 / h.max(1) as f32;
+        let m = ((d - (lo - soft)) / (soft * 2.0 + 1e-5)).clamp(0.0, 1.0)
+            * (1.0 - ((d - (hi - soft)) / (soft * 2.0 + 1e-5)).clamp(0.0, 1.0));
+        // slight luma weighting so bright sky doesn't dominate "far"
+        for x in 0..w {
+            let i = (y * w + x) * 3;
+            let luma =
+                0.299 * enc(img.data[i]) + 0.587 * enc(img.data[i + 1]) + 0.114 * enc(img.data[i + 2]);
+            let sky_pen = if d < 0.35 && luma > 0.7 { 0.55 } else { 1.0 };
+            data[y * w + x] = (m * sky_pen).clamp(0.0, 1.0);
+        }
+    }
+    Mask01 { width: w, height: h, data }
+}
+
+/// Shared AI mask runner — keep live preview and export in lockstep.
+pub fn run_ai_mask(
+    kind: &str,
+    img: &RgbF32Buf,
+    hint_point: Option<(f32, f32)>,
+    depth_near: Option<f32>,
+    depth_far: Option<f32>,
+) -> Result<Mask01, CoreError> {
+    let seg = TractSegmenter;
+    match kind {
+        "subject" | "background" | "people" => {
+            if let Some(p) = hint_point {
+                instance_mask_at_point(img, p)
+            } else {
+                seg.subject(img)
+            }
+        }
+        "face" => seg.subject(img).map(|m| extract_face_mask(&m, img)),
+        "skin" => seg.subject(img).map(|m| extract_skin_mask(&m, img)),
+        "hair" => seg.subject(img).map(|m| extract_hair_mask(&m, img)),
+        "lips" => seg.subject(img).map(|m| extract_lips_mask(&m, img)),
+        "eyes" => seg.subject(img).map(|m| extract_eyes_mask(&m, img)),
+        "sky" => seg.sky(img),
+        "water" => Ok(extract_water_mask(img)),
+        "vegetation" => Ok(extract_vegetation_mask(img)),
+        "mountains" => Ok(extract_mountains_mask(img)),
+        "architecture" => Ok(extract_architecture_mask(img)),
+        "ground" => Ok(extract_ground_mask(img)),
+        "depth" => Ok(extract_depth_mask(
+            img,
+            depth_near.unwrap_or(0.35),
+            depth_far.unwrap_or(1.0),
+        )),
+        "object" => {
+            let p = hint_point.unwrap_or((0.5, 0.5));
+            instance_mask_at_point(img, p).or_else(|_| seg.object(img, p))
+        }
+        other => Err(CoreError::InvalidOp(format!("kind {other} is not segmented"))),
+    }
+}
+
+/// Cache / lookup key for a segmented mask texture.
+/// Top-level segmented masks use `mask_id`; composite children use `mask_id#c{i}`.
+pub fn segment_cache_key(mask_id: &str, component_index: Option<usize>) -> String {
+    match component_index {
+        Some(i) => format!("{mask_id}#c{i}"),
+        None => mask_id.to_string(),
+    }
+}
+
+/// Parent mask id from a possibly composite cache key (`id#c0` → `id`).
+pub fn segment_parent_mask_id(cache_key: &str) -> &str {
+    cache_key.split("#c").next().unwrap_or(cache_key)
+}
+
+/// Infer AI kind from a segmented source's `model` field (e.g. `skin_v1` → `skin`).
+pub fn kind_from_segmented_source(parent_kind: &str, source: &serde_json::Value) -> String {
+    if let Some(model) = source.get("model").and_then(|m| m.as_str()) {
+        if let Some(base) = model.split('_').next() {
+            if !base.is_empty() {
+                return base.to_string();
+            }
+        }
+    }
+    parent_kind.to_string()
+}
+
 /// Propose clickable object/subject outlines from saliency (keeps multiple blobs).
 pub fn propose_objects(img: &RgbF32Buf) -> Result<Vec<ObjectProposal>, CoreError> {
     let mut mask = run_u2net(subject_model()?, img)?;
@@ -716,7 +1032,7 @@ fn point_line_dist(px: f32, py: f32, ax: f32, ay: f32, bx: f32, by: f32) -> f32 
     let dy = by - ay;
     let len2 = dx * dx + dy * dy;
     if len2 < 1e-6 {
-        return ((px - ax).hypot(py - ay));
+        return (px - ax).hypot(py - ay);
     }
     let t = ((px - ax) * dx + (py - ay) * dy) / len2;
     let qx = ax + t * dx;
@@ -729,16 +1045,27 @@ fn point_line_dist(px: f32, py: f32, ax: f32, ay: f32, bx: f32, by: f32) -> f32 
 pub fn instance_mask_at_point(img: &RgbF32Buf, point: (f32, f32)) -> Result<Mask01, CoreError> {
     let mut mask = run_u2net(subject_model()?, img)?;
     refine_saliency_mask(&mut mask.data, mask.width, mask.height);
-    if !keep_blob_at_point(&mut mask.data, mask.width, mask.height, point, 0.28) {
+    if !keep_blob_at_point(&mut mask.data, mask.width, mask.height, point, 0.26) {
         // Click missed a saliency blob — fall back to color region-grow.
         return TractSegmenter.object(img, point);
     }
-    // Soft fringe cleanup without killing the chosen instance.
+    // Soft fringe + light color attach inside the blob's bbox only.
     let (w, h) = (mask.width, mask.height);
     let blurred = box_blur_3x3(&mask.data, w, h);
     for i in 0..mask.data.len() {
-        if mask.data[i] > 0.05 {
-            mask.data[i] = (mask.data[i] * 0.75 + blurred[i] * 0.25).clamp(0.0, 1.0);
+        if mask.data[i] > 0.04 {
+            mask.data[i] = (mask.data[i] * 0.72 + blurred[i] * 0.28).clamp(0.0, 1.0);
+        }
+    }
+    // Grow slightly into similar colors but stay near the instance (no full-image flood).
+    if let Ok(grown) = TractSegmenter.object(img, point) {
+        let n = mask.data.len().min(grown.data.len());
+        for i in 0..n {
+            if mask.data[i] > 0.12 && grown.data[i] > 0.2 {
+                mask.data[i] = mask.data[i].max(grown.data[i] * 0.65);
+            } else if mask.data[i] > 0.35 && grown.data[i] > 0.45 {
+                mask.data[i] = mask.data[i].max(grown.data[i] * 0.4);
+            }
         }
     }
     Ok(mask)
@@ -856,12 +1183,14 @@ pub fn refine_sky_mask(data: &mut [f32], w: usize, h: usize, img: &RgbF32Buf) {
                 && luma < 0.55
                 && (b - r.max(g)) > 0.02;
             if y_norm > 0.48 && waterish {
+                data[i] *= 0.05;
+            } else if y_norm > 0.55 && luma < 0.48 && b > r + 0.02 {
                 data[i] *= 0.08;
             } else if y_norm > 0.62 && luma < 0.42 && b > r {
-                data[i] *= 0.12;
+                data[i] *= 0.06;
             } else if y_norm < 0.35 && luma > 0.45 && b >= g * 0.9 {
                 // Boost pale upper sky a touch.
-                data[i] = (data[i] * 1.08).clamp(0.0, 1.0);
+                data[i] = (data[i] * 1.1).clamp(0.0, 1.0);
             }
         }
     }
@@ -920,11 +1249,11 @@ pub fn refine_sky_mask(data: &mut [f32], w: usize, h: usize, img: &RgbF32Buf) {
         let cy = sum_y / (*area).max(1) as f32;
         let upper_frac = *upper as f32 / (*area).max(1) as f32;
         // Ocean / lake blobs: centroid in lower half and little upper presence.
-        if cy > h as f32 * 0.52 && upper_frac < 0.28 {
+        if cy > h as f32 * 0.48 && upper_frac < 0.32 {
             continue;
         }
         // Prefer anything with a real foothold in the top half.
-        if upper_frac >= 0.18 || cy < h as f32 * 0.45 {
+        if upper_frac >= 0.15 || cy < h as f32 * 0.42 {
             keep[i] = true;
         }
     }

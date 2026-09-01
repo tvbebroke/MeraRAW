@@ -1141,8 +1141,17 @@ fn parse_geometry(source: &serde_json::Value) -> (u32, [f32; 2], [f32; 2], f32, 
                         .get("hardness")
                         .and_then(|v| v.as_f64())
                         .unwrap_or(0.5) as f32;
+                    let flow = stroke
+                        .get("flow")
+                        .or_else(|| stroke.get("density"))
+                        .or_else(|| stroke.get("amount"))
+                        .and_then(|v| v.as_f64())
+                        .unwrap_or(1.0) as f32;
                     let sub = stroke.get("mode").and_then(|m| m.as_str()) == Some("subtract");
                     let r = if sub { -radius } else { radius };
+                    // Pack hardness (0..1 → 0..100) + flow fraction into .w for the shader.
+                    let packed =
+                        (hardness.clamp(0.0, 1.0) * 100.0).floor() + flow.clamp(0.0, 0.999);
                     if let Some(points) = stroke.get("points").and_then(|p| p.as_array()) {
                         for p in points {
                             if let Some(a) = p.as_array() {
@@ -1151,7 +1160,7 @@ fn parse_geometry(source: &serde_json::Value) -> (u32, [f32; 2], [f32; 2], f32, 
                                     a.get(1).and_then(|v| v.as_f64()),
                                 ) {
                                     if pts.len() < MAX_STROKE_POINTS {
-                                        pts.push([x as f32, y as f32, r, hardness]);
+                                        pts.push([x as f32, y as f32, r, packed]);
                                     }
                                 }
                             }
@@ -1283,7 +1292,11 @@ fn produce_composite_mask(
                 true
             }
             "segmented" => {
-                if let Some(small_view) = seg_masks.get(&mask.id) {
+                let key = crate::segment::segment_cache_key(&mask.id, Some(i));
+                let small_view = seg_masks
+                    .get(&key)
+                    .or_else(|| seg_masks.get(&mask.id));
+                if let Some(small_view) = small_view {
                     let ub = &pool[*pool_i];
                     *pool_i += 1;
                     // background kind inverts subject model; mask.invert applied in finalize

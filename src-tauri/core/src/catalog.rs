@@ -233,6 +233,20 @@ fn path_under_root_patterns(root: &str) -> (String, String, String) {
 fn folder_root_variants(root: &str) -> Vec<String> {
     let simple = crate::path_safety::simplify_path_str(root);
     let mut out = vec![simple.clone()];
+    // macOS: /tmp vs /private/tmp, canonicalize vs picker paths.
+    #[cfg(unix)]
+    {
+        if let Some(stripped) = simple.strip_prefix("/private") {
+            if !stripped.is_empty() && !out.iter().any(|x| x == stripped) {
+                out.push(stripped.to_string());
+            }
+        } else if simple.starts_with('/') {
+            let with_private = format!("/private{simple}");
+            if !out.iter().any(|x| x == &with_private) {
+                out.push(with_private);
+            }
+        }
+    }
     // Legacy rows stored before verbatim-prefix stripping.
     if !simple.starts_with(r"\\?\") && simple.len() >= 2 && simple.as_bytes().get(1) == Some(&b':')
     {

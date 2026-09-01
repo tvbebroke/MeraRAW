@@ -1,0 +1,13 @@
+# MeraNoise training — Python 3.10+
+torch>=2.2.0
+torchvision>=0.17.0
+numpy>=1.26.0
+Pillow>=10.0.0
+PyYAML>=6.0
+tqdm>=4.66.0
+onnx>=1.15.0
+onnxruntime>=1.17.0
+scikit-image>=0.22.0
+rawpy>=0.19.0; platform_system != "Windows"
+h5py>=3.10.0
+opencv-python-headless>=4.9.0

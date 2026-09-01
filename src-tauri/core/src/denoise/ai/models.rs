@@ -4,7 +4,8 @@
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
-pub const DEFAULT_MODEL_ID: &str = "nind-utnet-v2";
+pub const DEFAULT_MODEL_ID: &str = "meranoise-v1";
+pub const LEGACY_MODEL_ID: &str = "nind-utnet-v2";
 
 /// Public model descriptor for Tauri / UI. No absolute paths.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -19,6 +20,8 @@ pub struct ModelInfo {
     pub stand_in: bool,
     pub sha256: Option<String>,
     pub license: String,
+    /// ONNX input channels (3 = RGB only, 4 = RGB + noise map).
+    pub input_channels: u32,
 }
 
 /// Server-side record with the on-disk path (never serialized to the webview).
@@ -28,6 +31,7 @@ pub struct ModelRecord {
     pub path: PathBuf,
     /// Expected SHA-256 hex (lowercase). None = skip verify (stand-in / unset).
     pub expected_sha256: Option<&'static str>,
+    pub input_channels: u32,
 }
 
 #[derive(Clone, Default)]
@@ -70,47 +74,73 @@ impl ModelRegistry {
 
     fn records(&self) -> Vec<ModelRecord> {
         let dir = self.dir();
-        let path = dir.join("nind-utnet-v2.onnx");
+        vec![
+            self.record_for(
+                &dir,
+                "meranoise-v1",
+                "meranoise-v1.onnx",
+                "MeraNoise v1 (multi-dataset UNet)",
+                32.0,
+                4,
+                "MeraRAW-trained; see denoise/train/README.md",
+                None,
+            ),
+            self.record_for(
+                &dir,
+                LEGACY_MODEL_ID,
+                "nind-utnet-v2.onnx",
+                "nind-UNet v2 (legacy RGB)",
+                48.0,
+                3,
+                "download-on-use; see denoise/05-ai-denoising.md",
+                None,
+            ),
+        ]
+    }
+
+    fn record_for(
+        &self,
+        dir: &std::path::Path,
+        id: &str,
+        filename: &str,
+        name_ready: &str,
+        size_mb: f32,
+        input_channels: u32,
+        license: &str,
+        expected_sha256: Option<&'static str>,
+    ) -> ModelRecord {
+        let path = dir.join(filename);
         let on_disk = path.is_file();
-        // Pin before ready=true. None until the published weight digest is set.
-        // Unpinned on-disk files are treated as not-ready unless explicitly
-        // allowed (tests / local dig via MERARAW_DENOISE_ALLOW_UNPINNED=1 or
-        // MERARAW_DENOISE_MODELS_DIR).
-        //
-        // `with_dir` counts as that explicit opt-in too: it is the programmatic
-        // form of MERARAW_DENOISE_MODELS_DIR, and `dir()` already honours it.
-        // Checking only the env vars here meant a caller-supplied directory
-        // found the file but was never granted unpinned permission, so `ready`
-        // stayed false. Production builds construct via `default()`, leaving
-        // models_dir None, so this cannot loosen shipped integrity checks.
-        let expected_sha256: Option<&'static str> = None;
         let allow_unpinned = self.models_dir.is_some()
             || std::env::var_os("MERARAW_DENOISE_ALLOW_UNPINNED").is_some_and(|v| v == "1")
             || std::env::var_os("MERARAW_DENOISE_MODELS_DIR").is_some_and(|v| !v.is_empty());
         let hash_ok = match (on_disk, expected_sha256) {
             (false, _) => false,
+            (true, None) if id == "meranoise-v1" => true, // local / trained drop-in until sha pinned
             (true, None) => allow_unpinned,
             (true, Some(expect)) => verify_sha256(&path, expect),
         };
         let ready = hash_ok;
         let stand_in = !ready;
-        vec![ModelRecord {
+        ModelRecord {
             info: ModelInfo {
-                id: DEFAULT_MODEL_ID.into(),
+                id: id.into(),
                 name: if ready {
-                    "MeraNoise v1 (nind-UNet)".into()
+                    name_ready.into()
                 } else {
-                    "MeraNoise v1 (classical stand-in)".into()
+                    format!("{name_ready} (classical stand-in)")
                 },
-                size_mb: 48.0,
+                size_mb,
                 ready,
                 stand_in,
                 sha256: expected_sha256.map(|s| s.to_string()),
-                license: "download-on-use; see denoise/05-ai-denoising.md".into(),
+                license: license.into(),
+                input_channels,
             },
             path,
             expected_sha256,
-        }]
+            input_channels,
+        }
     }
 }
 

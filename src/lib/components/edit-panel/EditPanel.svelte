@@ -82,6 +82,23 @@
       {/if}
     </div>
   {:else}
+    <div class="hist-dock">
+      <button
+        type="button"
+        class="group-label hist-toggle"
+        aria-expanded={$histogramOpen}
+        onclick={() => histogramOpen.set(!$histogramOpen)}
+      >
+        <span>Histogram</span>
+        <span class="hist-chevron" class:open={$histogramOpen}>›</span>
+      </button>
+      {#if $histogramOpen}
+        <div class="hist-body" transition:fly={{ y: 6, duration: 180, easing: cubicOut }}>
+          <Histogram embedded />
+        </div>
+      {/if}
+    </div>
+
     <div class="edit-body">
       {#if !$imageOpen}
         <p class="rail-empty empty">
@@ -106,23 +123,6 @@
             <CameraSettings mode="photo" />
             <PresetSettings />
           {/if}
-        </div>
-      {/if}
-    </div>
-
-    <div class="hist-dock">
-      <button
-        type="button"
-        class="group-label hist-toggle"
-        aria-expanded={$histogramOpen}
-        onclick={() => histogramOpen.set(!$histogramOpen)}
-      >
-        <span>Histogram</span>
-        <span class="hist-chevron" class:open={$histogramOpen}>›</span>
-      </button>
-      {#if $histogramOpen}
-        <div class="hist-body" transition:fly={{ y: 6, duration: 180, easing: cubicOut }}>
-          <Histogram embedded />
         </div>
       {/if}
     </div>
@@ -178,7 +178,7 @@
   .empty { padding: var(--space-4) var(--space-3); }
   .hist-dock {
     flex: none;
-    border-top: 1px solid var(--color-border);
+    border-bottom: 1px solid var(--color-border);
   }
   .hist-toggle {
     display: flex;
@@ -202,5 +202,11 @@
     transition: transform 0.15s var(--ease-std);
   }
   .hist-chevron.open { transform: rotate(90deg); }
-  .hist-body { height: 112px; padding: 0 10px 10px; }
+  .hist-dock :global(.rail-chip) {
+    height: 22px;
+    padding: 0 6px;
+    border-radius: 5px;
+    font-size: 10.5px;
+  }
+  .hist-body { height: 150px; padding: 0 10px 10px; }
 </style>

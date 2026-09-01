@@ -63,7 +63,7 @@ impl Default for DenoiseSettings {
             enabled: true,
             mode: DenoiseMode::Classical,
             ai_amount: 50.0,
-            ai_model: "nind-utnet-v2".into(),
+            ai_model: "meranoise-v1".into(),
             luminance: 0.0,
             luma_detail: 50.0,
             chrominance: 0.0,

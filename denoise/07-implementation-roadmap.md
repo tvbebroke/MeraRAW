@@ -64,9 +64,13 @@ Phased plan with milestones, crates, testing, and acceptance criteria.
       `ort`** — fixed 576² padded tiles through one compiled plan; encode/decode
       gamma wrap; classical stand-in only when no model file is installed.
       (`ort`/EP matrix stays open as a perf upgrade.)
+- [x] **MeraNoise v1 training pipeline** — `denoise/train/` (PyTorch UNet, multi-dataset
+      composite loader, ONNX export). Datasets: NIND, SIDD, SID, DIV2K synthetic.
+      Run `bash scripts/download-denoise-datasets.sh` then `python train.py`.
+- [ ] Trained `meranoise-v1.onnx` weights published + sha256 pin in `models.rs`
 - [ ] nind-denoise UNet → ONNX conversion (fp16, dynamic dims); license review;
       model downloader with resume/sha256 (registry exists; drop the weight file
-      at `<app support>/models/denoise/nind-utnet-v2.onnx` or point
+      at `<app support>/models/denoise/meranoise-v1.onnx` or point
       `MERARAW_DENOISE_MODELS_DIR` at it).
 - [x] Tiler (512², 64 px overlap, cosine merge) + job manager (single-flight,
       progress events over the engine event channel, cancel, worker full-res

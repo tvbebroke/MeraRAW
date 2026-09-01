@@ -1,0 +1,43 @@
+# MeraNoise v1 — tuned for Apple M4 Pro (24 GB), ~27 GB disk free
+# On-the-fly procedural scenes + Poisson–Gaussian (no multi-GB downloads).
+
+model:
+  id: meranoise-v1
+  in_channels: 4
+  base_channels: 40
+  depth: 4
+
+data:
+  patch_size: 256
+  batch_size: 2
+  num_workers: 0          # MPS + macOS: avoid fork issues
+  virtual_samples: 4096     # ~2k steps/epoch @ batch 2 → ~2–3 h total on M4
+  datasets:
+    - name: procedural
+      weight: 1.0
+  val_datasets:
+    - name: procedural
+      weight: 1.0
+
+noise:
+  iso_range: [100, 51200]
+  read_noise_scale: 1.0
+
+train:
+  epochs: 32
+  lr: 1.5e-4
+  weight_decay: 1.0e-4
+  amp: false               # MPS: fp32 is safer and still fast on M4
+  grad_clip: 1.0
+  save_every: 12
+  out_dir: runs/meranoise_m4_local
+
+loss:
+  charbonnier: 1.0
+  ssim: 0.2
+  edge: 0.08
+
+export:
+  tile_size: 576
+  opset: 17
+  fp16: true

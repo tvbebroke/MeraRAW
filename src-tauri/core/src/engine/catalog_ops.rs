@@ -1,5 +1,6 @@
 use super::Engine;
 use super::*;
+use crate::raw::Decoder;
 
 impl Engine {
     pub(super) fn catalog_mut(&mut self) -> Result<&mut crate::catalog::Catalog, CoreError> {
@@ -41,8 +42,52 @@ impl Engine {
         let cat = self.catalog_mut()?;
         let selected_only = only_paths.is_some();
         let files = only_paths.unwrap_or_else(|| crate::catalog::scan_folder(&root));
-        let root_canon =
-            crate::path_safety::simplify_path(root.canonicalize().unwrap_or_else(|_| root.clone()));
+        let root_canon = crate::path_safety::simplify_path(
+            root.canonicalize().unwrap_or_else(|_| root.clone()),
+        );
+        let root_key = crate::path_safety::simplify_path_str(
+            crate::catalog::trim_path_root(&root_canon.to_string_lossy()),
+        );
+        if files.is_empty() && !selected_only {
+            match std::fs::read_dir(&root) {
+                Err(e) if e.kind() == std::io::ErrorKind::PermissionDenied => {
+                    return Err(CoreError::InvalidOp(
+                        "macOS blocked reading that folder. Use File → Import or Add Folder \
+                         (the native picker grants access). For iCloud Desktop files, open the \
+                         folder once in Finder so photos download, then try again."
+                            .into(),
+                    ));
+                }
+                Ok(rd) => {
+                    let mut subdirs = 0usize;
+                    let mut direct_media = 0usize;
+                    for entry in rd.flatten() {
+                        let p = entry.path();
+                        if p.is_dir() {
+                            subdirs += 1;
+                        } else if crate::raw::RawlerDecoder::default().probe(&p)
+                            || crate::raw::StandardDecoder.probe(&p)
+                            || crate::video::is_video_path(&p)
+                        {
+                            direct_media += 1;
+                        }
+                    }
+                    if subdirs > 0 && direct_media == 0 {
+                        tracing::warn!(
+                            root = %root.display(),
+                            subdirs,
+                            "import: folder has subfolders but scan found 0 media — check permissions or extensions"
+                        );
+                    }
+                }
+                Err(e) => {
+                    return Err(CoreError::Io(format!(
+                        "cannot read folder {}: {e}",
+                        root.display()
+                    )));
+                }
+            }
+        }
         let todo: Vec<PathBuf> = files
             .into_iter()
             .filter(|p| {
@@ -66,9 +111,7 @@ impl Engine {
                 !cat.is_current(&p.to_string_lossy(), m)
             })
             .collect();
-        cat.remember_folder(&crate::path_safety::simplify_path_str(
-            crate::catalog::trim_path_root(&root.to_string_lossy()),
-        ))?;
+        cat.remember_folder(&root_key)?;
         let total = todo.len() as u64;
         let import_id = self.generation.wrapping_add(1000) + total;
         self.import_state = Some(ImportState {
@@ -275,49 +318,30 @@ impl Engine {
             std::thread::Builder::new()
                 .name("segment-worker".into())
                 .spawn(move || {
-                    use crate::segment::{Segmenter, TractSegmenter};
-                    let seg = TractSegmenter;
                     let started = Instant::now();
-                    // segmentation runs on a further-downscaled copy
                     let input = img.downscale_to(768);
-                    let hint_point = |source: &serde_json::Value| {
-                        source
-                            .get("hint")
-                            .and_then(|h| h.get("point"))
-                            .and_then(|p| p.as_array())
-                            .and_then(|a| {
-                                Some((a.first()?.as_f64()? as f32, a.get(1)?.as_f64()? as f32))
-                            })
-                    };
-                    let result = match kind.as_str() {
-                        "subject" | "background" | "people" => {
-                            if let Some(p) = hint_point(&source) {
-                                crate::segment::instance_mask_at_point(&input, p)
-                            } else {
-                                seg.subject(&input)
-                            }
-                        }
-                        "skin" => seg.subject(&input).map(|m| {
-                            crate::segment::extract_skin_mask(&m, &input)
-                        }),
-                        "hair" => seg.subject(&input).map(|m| {
-                            crate::segment::extract_hair_mask(&m, &input)
-                        }),
-                        "sky" => seg.sky(&input),
-                        "water" => Ok(crate::segment::extract_water_mask(&input)),
-                        "vegetation" => Ok(crate::segment::extract_vegetation_mask(&input)),
-                        "object" => {
-                            let p = hint_point(&source).unwrap_or((0.5, 0.5));
-                            // Outline / click: take the saliency instance at the point.
-                            match crate::segment::instance_mask_at_point(&input, p) {
-                                Ok(m) => Ok(m),
-                                Err(_) => seg.object(&input, p),
-                            }
-                        }
-                        other => Err(CoreError::InvalidOp(format!(
-                            "kind {other} is not segmented"
-                        ))),
-                    };
+                    let hint_point = source
+                        .get("hint")
+                        .and_then(|h| h.get("point"))
+                        .and_then(|p| p.as_array())
+                        .and_then(|a| {
+                            Some((a.first()?.as_f64()? as f32, a.get(1)?.as_f64()? as f32))
+                        });
+                    let depth_near = source
+                        .get("depth_near")
+                        .and_then(|v| v.as_f64())
+                        .map(|v| v as f32);
+                    let depth_far = source
+                        .get("depth_far")
+                        .and_then(|v| v.as_f64())
+                        .map(|v| v as f32);
+                    let result = crate::segment::run_ai_mask(
+                        &kind,
+                        &input,
+                        hint_point,
+                        depth_near,
+                        depth_far,
+                    );
                     tracing::info!(
                         kind = %kind,
                         ms = started.elapsed().as_millis() as u64,
@@ -341,20 +365,32 @@ fn collect_segment_jobs(
     jobs: &mut Vec<(String, String, u64, serde_json::Value)>,
 ) {
     use std::hash::{Hash, Hasher};
-    let mut push = |kind: &str, source: &serde_json::Value| {
+    let mut push = |job_id: String, kind: &str, source: &serde_json::Value| {
         let mut h = std::collections::hash_map::DefaultHasher::new();
         kind.hash(&mut h);
         source.to_string().hash(&mut h);
-        jobs.push((m.id.clone(), kind.to_string(), h.finish(), source.clone()));
+        jobs.push((job_id, kind.to_string(), h.finish(), source.clone()));
     };
     match m.source.get("type").and_then(|t| t.as_str()) {
-        Some("segmented") => push(&m.kind, &m.source),
+        Some("segmented") => {
+            let kind = crate::segment::kind_from_segmented_source(&m.kind, &m.source);
+            push(
+                crate::segment::segment_cache_key(&m.id, None),
+                &kind,
+                &m.source,
+            );
+        }
         Some("composite") => {
             if let Some(comps) = m.source.get("components").and_then(|c| c.as_array()) {
-                for comp in comps {
+                for (i, comp) in comps.iter().enumerate() {
                     let src = comp.get("source").cloned().unwrap_or_else(|| comp.clone());
                     if src.get("type").and_then(|t| t.as_str()) == Some("segmented") {
-                        push(&m.kind, &src);
+                        let kind = crate::segment::kind_from_segmented_source(&m.kind, &src);
+                        push(
+                            crate::segment::segment_cache_key(&m.id, Some(i)),
+                            &kind,
+                            &src,
+                        );
                     }
                 }
             }

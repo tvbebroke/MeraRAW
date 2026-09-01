@@ -52,10 +52,17 @@
     | "background"
     | "object"
     | "people"
+    | "face"
     | "skin"
     | "hair"
+    | "lips"
+    | "eyes"
     | "water"
     | "vegetation"
+    | "mountains"
+    | "architecture"
+    | "ground"
+    | "depth"
     | "parametric";
 
   const KIND_ICON: Record<string, string> = {
@@ -64,10 +71,17 @@
     background: "◫",
     object: "◉",
     people: "☺",
+    face: "☺",
     skin: "◌",
     hair: "∿",
+    lips: "◦",
+    eyes: "◎",
     water: "≋",
     vegetation: "❀",
+    mountains: "⛰",
+    architecture: "⌂",
+    ground: "▁",
+    depth: "⇅",
     brush: "◔",
     linear: "▥",
     radial: "◯",
@@ -107,17 +121,99 @@
         };
       case "people":
         return { type: "segmented", model: "people_v1", hint: null };
+      case "face":
+        return { type: "segmented", model: "face_v1", hint: null };
       case "skin":
         return { type: "segmented", model: "skin_v1", hint: null };
       case "hair":
         return { type: "segmented", model: "hair_v1", hint: null };
+      case "lips":
+        return { type: "segmented", model: "lips_v1", hint: null };
+      case "eyes":
+        return { type: "segmented", model: "eyes_v1", hint: null };
       case "water":
         return { type: "segmented", model: "water_v1", hint: null };
       case "vegetation":
         return { type: "segmented", model: "vegetation_v1", hint: null };
+      case "mountains":
+        return { type: "segmented", model: "mountains_v1", hint: null };
+      case "architecture":
+        return { type: "segmented", model: "architecture_v1", hint: null };
+      case "ground":
+        return { type: "segmented", model: "ground_v1", hint: null };
+      case "depth":
+        return {
+          type: "segmented",
+          model: "depth_v1",
+          hint: null,
+          depth_near: 0.35,
+          depth_far: 1.0,
+        };
       default:
         return { type: "segmented", model: "subject_v1", hint: null };
     }
+  }
+
+  type CompRow = { op: string; source: Record<string, unknown> };
+
+  const activeComponents = $derived.by((): CompRow[] | null => {
+    if (!active || active.source?.type !== "composite") return null;
+    const comps = active.source.components as CompRow[] | undefined;
+    return comps ?? [];
+  });
+
+  async function setCompositeComponents(comps: CompRow[]) {
+    if (!active) return;
+    try {
+      if (comps.length === 0) return;
+      if (comps.length === 1) {
+        reconcile(
+          await applyOp({
+            op: "set_mask_source",
+            id: active.id,
+            source: comps[0].source,
+          }),
+        );
+      } else {
+        reconcile(
+          await applyOp({
+            op: "set_mask_source",
+            id: active.id,
+            source: { type: "composite", components: comps },
+          }),
+        );
+      }
+      syncViewportToolForMask(
+        doc.get()?.masks?.find((m) => m.id === active.id) ?? active,
+      );
+      syncMaskOverlay();
+    } catch {
+      /* ignore */
+    }
+  }
+
+  async function removeComponent(idx: number) {
+    if (!activeComponents) return;
+    const next = activeComponents.filter((_, i) => i !== idx);
+    await setCompositeComponents(next);
+  }
+
+  async function moveComponent(idx: number, dir: -1 | 1) {
+    if (!activeComponents) return;
+    const j = idx + dir;
+    if (j < 0 || j >= activeComponents.length) return;
+    const next = [...activeComponents];
+    const tmp = next[idx];
+    next[idx] = next[j];
+    next[j] = tmp;
+    await setCompositeComponents(next);
+  }
+
+  function compLabel(c: CompRow, i: number): string {
+    const t = (c.source?.type as string) || "part";
+    const model = c.source?.model as string | undefined;
+    const name = model?.split("_")[0] ?? t;
+    return `${c.op || "add"} · ${name} ${i + 1}`;
   }
 
   async function addMask(kind: MaskKind) {
@@ -306,6 +402,32 @@
     }
   }
 
+  function isDepth(m: (typeof masks)[number]): boolean {
+    return (
+      m.kind === "depth" ||
+      (m.source?.type === "segmented" &&
+        String(m.source.model ?? "").startsWith("depth"))
+    );
+  }
+
+  function depthSource(m: (typeof masks)[number]): Record<string, unknown> {
+    if (m.source?.type === "segmented") return m.source as Record<string, unknown>;
+    return defaultSource("depth");
+  }
+
+  async function setDepth(key: "depth_near" | "depth_far", value: number, live = false) {
+    if (!active || !isDepth(active)) return;
+    const src = depthSource(active);
+    const source = { ...src, type: "segmented", model: "depth_v1", [key]: value };
+    try {
+      markMaskPending(active.id);
+      reconcile(await applyOp({ op: "set_mask_source", id: active.id, source }, live));
+      syncMaskOverlay();
+    } catch {
+      /* ignore */
+    }
+  }
+
   function parametricSource(m: (typeof masks)[number]): Record<string, unknown> {
     if (m.source?.type === "parametric") return m.source as Record<string, unknown>;
     if (m.source?.type === "composite") {
@@ -439,16 +561,16 @@
     </button>
     {#if $maskToolGroup === "ai"}
       <div class="tool-grid ai">
-        <button type="button" class="tool-btn" onclick={() => void addMask("subject")}>
+        <button type="button" class="tool-btn" onclick={() => void (active ? addComponent("subject") : addMask("subject"))}>
           <span class="ico">◎</span> Subject (all)
         </button>
         <button type="button" class="tool-btn" onclick={startSubjectPick}>
           <span class="ico">◎</span> Subjects · click
         </button>
-        <button type="button" class="tool-btn" onclick={() => void addMask("sky")}>
+        <button type="button" class="tool-btn" onclick={() => void (active ? addComponent("sky") : addMask("sky"))}>
           <span class="ico">☁</span> Sky
         </button>
-        <button type="button" class="tool-btn" onclick={() => void addMask("background")}>
+        <button type="button" class="tool-btn" onclick={() => void (active ? addComponent("background") : addMask("background"))}>
           <span class="ico">◫</span> Background
         </button>
         <button type="button" class="tool-btn" onclick={startObjectPick}>
@@ -457,17 +579,38 @@
         <button type="button" class="tool-btn" onclick={startPeoplePick}>
           <span class="ico">☺</span> People · click
         </button>
-        <button type="button" class="tool-btn" onclick={() => void addMask("skin")}>
+        <button type="button" class="tool-btn" onclick={() => void (active ? addComponent("face") : addMask("face"))}>
+          <span class="ico">☺</span> Face
+        </button>
+        <button type="button" class="tool-btn" onclick={() => void (active ? addComponent("skin") : addMask("skin"))}>
           <span class="ico">◌</span> Skin
         </button>
-        <button type="button" class="tool-btn" onclick={() => void addMask("hair")}>
+        <button type="button" class="tool-btn" onclick={() => void (active ? addComponent("hair") : addMask("hair"))}>
           <span class="ico">∿</span> Hair
         </button>
-        <button type="button" class="tool-btn" onclick={() => void addMask("water")}>
+        <button type="button" class="tool-btn" onclick={() => void (active ? addComponent("lips") : addMask("lips"))}>
+          <span class="ico">◦</span> Lips
+        </button>
+        <button type="button" class="tool-btn" onclick={() => void (active ? addComponent("eyes") : addMask("eyes"))}>
+          <span class="ico">◎</span> Eyes
+        </button>
+        <button type="button" class="tool-btn" onclick={() => void (active ? addComponent("water") : addMask("water"))}>
           <span class="ico">≋</span> Water
         </button>
-        <button type="button" class="tool-btn" onclick={() => void addMask("vegetation")}>
+        <button type="button" class="tool-btn" onclick={() => void (active ? addComponent("vegetation") : addMask("vegetation"))}>
           <span class="ico">❀</span> Vegetation
+        </button>
+        <button type="button" class="tool-btn" onclick={() => void (active ? addComponent("mountains") : addMask("mountains"))}>
+          <span class="ico">⛰</span> Mountains
+        </button>
+        <button type="button" class="tool-btn" onclick={() => void (active ? addComponent("architecture") : addMask("architecture"))}>
+          <span class="ico">⌂</span> Architecture
+        </button>
+        <button type="button" class="tool-btn" onclick={() => void (active ? addComponent("ground") : addMask("ground"))}>
+          <span class="ico">▁</span> Ground
+        </button>
+        <button type="button" class="tool-btn" onclick={() => void (active ? addComponent("depth") : addMask("depth"))}>
+          <span class="ico">⇅</span> Depth range
         </button>
       </div>
     {/if}
@@ -563,7 +706,7 @@
       onchange={(v) => brushHardness.set(v)}
     />
     <ParamRow
-      label="Flow"
+      label="Density"
       min={0.05}
       max={1}
       step={0.05}
@@ -572,6 +715,40 @@
       oninput={(v) => brushFlow.set(v)}
       onchange={(v) => brushFlow.set(v)}
     />
+
+    {#if activeComponents && activeComponents.length > 0}
+      <p class="group-label">Mask components</p>
+      <ul class="comp-list">
+        {#each activeComponents as c, i}
+          <li class="comp-row">
+            <span class="comp-label">{compLabel(c, i)}</span>
+            <div class="comp-actions">
+              <button
+                type="button"
+                class="comp-btn"
+                disabled={i === 0}
+                title="Move up"
+                onclick={() => void moveComponent(i, -1)}>↑</button
+              >
+              <button
+                type="button"
+                class="comp-btn"
+                disabled={i === activeComponents.length - 1}
+                title="Move down"
+                onclick={() => void moveComponent(i, 1)}>↓</button
+              >
+              <button
+                type="button"
+                class="comp-btn danger"
+                title="Remove"
+                disabled={activeComponents.length <= 1}
+                onclick={() => void removeComponent(i)}>×</button
+              >
+            </div>
+          </li>
+        {/each}
+      </ul>
+    {/if}
 
     <p class="group-label">Selected mask</p>
     <label class="name-row">
@@ -614,6 +791,32 @@
       />
     </div>
 
+    {#if isDepth(active)}
+      {@const ds = depthSource(active)}
+      <p class="group-label">Depth range</p>
+      <p class="hint">0 = far (top of frame), 1 = near (bottom). Selective-focus style.</p>
+      <ParamRow
+        label="Near"
+        min={0}
+        max={1}
+        step={0.01}
+        value={num(ds, "depth_near", 0.35)}
+        resetValue={0.35}
+        oninput={(v) => void setDepth("depth_near", v, true)}
+        onchange={(v) => void setDepth("depth_near", v, false)}
+      />
+      <ParamRow
+        label="Far"
+        min={0}
+        max={1}
+        step={0.01}
+        value={num(ds, "depth_far", 1)}
+        resetValue={1}
+        oninput={(v) => void setDepth("depth_far", v, true)}
+        onchange={(v) => void setDepth("depth_far", v, false)}
+      />
+    {/if}
+
     {#if isParametric(active)}
       {@const ps = parametricSource(active)}
       <p class="group-label">Luminance range</p>
@@ -648,6 +851,7 @@
         onchange={(v) => void setParametric("softness", v, false)}
       />
       <p class="group-label">Color range</p>
+      <p class="hint">Hue max &lt; hue min wraps across red (0°).</p>
       <ParamRow
         label="Chroma min"
         min={0}
@@ -991,6 +1195,64 @@
   }
   .meta-off {
     color: var(--color-subtle);
+  }
+  .comp-list {
+    list-style: none;
+    margin: 0 0 var(--space-2);
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .comp-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    min-height: 28px;
+    padding: 0 6px;
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    background: var(--color-hover);
+  }
+  .comp-label {
+    font-size: 11px;
+    color: var(--color-fg);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .comp-actions {
+    display: flex;
+    gap: 2px;
+    flex-shrink: 0;
+  }
+  .comp-btn {
+    width: 22px;
+    height: 22px;
+    border: 0;
+    border-radius: 4px;
+    background: transparent;
+    color: var(--color-subtle);
+    cursor: pointer;
+    line-height: 1;
+  }
+  .comp-btn:hover:not(:disabled) {
+    color: var(--color-fg);
+    background: var(--color-active);
+  }
+  .comp-btn:disabled {
+    opacity: 0.35;
+    cursor: default;
+  }
+  .comp-btn.danger:hover:not(:disabled) {
+    color: #f87171;
+  }
+  .hint {
+    margin: 0 0 var(--space-2);
+    font-size: 10px;
+    color: var(--color-subtle);
+    line-height: 1.35;
   }
   .mask-act {
     border: 0;

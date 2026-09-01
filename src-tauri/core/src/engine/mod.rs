@@ -1445,6 +1445,7 @@ impl Engine {
                 }
                 let Some(cur) = &mut self.current else { return };
                 cur.pending_segments.remove(&mask_id);
+                let parent_id = crate::segment::segment_parent_mask_id(&mask_id).to_string();
                 match result {
                     Ok(mask) => {
                         let Some(gpu) = &self.gpu else { return };
@@ -1459,12 +1460,12 @@ impl Engine {
                             g.invalidate_from_module("masks");
                         }
                         self.schedule_render();
-                        self.emit(EngineEvent::MaskReady { id: mask_id });
+                        self.emit(EngineEvent::MaskReady { id: parent_id });
                     }
                     Err(e) => {
                         tracing::error!(error = %e, mask_id, "segmentation failed");
                         self.emit(EngineEvent::MaskError {
-                            id: mask_id,
+                            id: parent_id,
                             message: e.to_string(),
                         });
                     }

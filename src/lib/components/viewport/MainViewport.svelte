@@ -139,11 +139,7 @@
         hue_hi: (hue + 18) % 360,
         softness: 0.06,
       };
-      // hue wrap: if band crosses 0, use lo < hi spanning (shader only supports lo < hi)
-      if (source.hue_hi < source.hue_lo) {
-        source.hue_lo = 0;
-        source.hue_hi = 360;
-      }
+      // hue_hi < hue_lo is a wrap-around band; shader supports it.
       reconcile(await applyOp({ op: "set_mask_source", id: mask.id, source }));
       syncMaskOverlay();
     } catch {
@@ -810,6 +806,9 @@
       points: pts,
       radius: brushRadius.get(),
       hardness: brushHardness.get(),
+      flow: brushFlow.get(),
+      density: brushFlow.get(),
+      amount: brushFlow.get(),
       mode: maskRefineMode.get(),
     };
 

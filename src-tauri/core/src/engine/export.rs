@@ -1140,63 +1140,63 @@ fn prepare_batch_image(path: &Path, skip_edits: bool) -> Result<BatchPrepared, C
     let seg_jobs: Vec<(String, String, u64, serde_json::Value)> = if skip_edits {
         Vec::new()
     } else {
-        doc.masks
-            .iter()
-            .filter(|m| m.source.get("type").and_then(|t| t.as_str()) == Some("segmented"))
-            .map(|m| {
-                use std::hash::{Hash, Hasher};
+        let mut jobs = Vec::new();
+        for m in &doc.masks {
+            // Mirror live path: top-level segmented + composite children.
+            use std::hash::{Hash, Hasher};
+            let mut push = |job_id: String, kind: &str, source: &serde_json::Value| {
                 let mut h = std::collections::hash_map::DefaultHasher::new();
-                m.kind.hash(&mut h);
-                m.source.to_string().hash(&mut h);
-                (m.id.clone(), m.kind.clone(), h.finish(), m.source.clone())
-            })
-            .collect()
-    };
-    if !seg_jobs.is_empty() {
-        use crate::segment::{Segmenter, TractSegmenter};
-        let seg = TractSegmenter;
-        let input = payload.small_cpu.downscale_to(768);
-        for (id, kind, hash, source) in seg_jobs {
-            let result = match kind.as_str() {
-                "subject" | "background" | "people" => {
-                    let p = source
-                        .get("hint")
-                        .and_then(|h| h.get("point"))
-                        .and_then(|pt| pt.as_array())
-                        .and_then(|a| {
-                            Some((a.first()?.as_f64()? as f32, a.get(1)?.as_f64()? as f32))
-                        });
-                    if let Some(pt) = p {
-                        crate::segment::instance_mask_at_point(&input, pt)
-                    } else {
-                        seg.subject(&input)
+                kind.hash(&mut h);
+                source.to_string().hash(&mut h);
+                jobs.push((job_id, kind.to_string(), h.finish(), source.clone()));
+            };
+            match m.source.get("type").and_then(|t| t.as_str()) {
+                Some("segmented") => {
+                    let kind = crate::segment::kind_from_segmented_source(&m.kind, &m.source);
+                    push(
+                        crate::segment::segment_cache_key(&m.id, None),
+                        &kind,
+                        &m.source,
+                    );
+                }
+                Some("composite") => {
+                    if let Some(comps) = m.source.get("components").and_then(|c| c.as_array()) {
+                        for (i, comp) in comps.iter().enumerate() {
+                            let src = comp.get("source").cloned().unwrap_or_else(|| comp.clone());
+                            if src.get("type").and_then(|t| t.as_str()) == Some("segmented") {
+                                let kind = crate::segment::kind_from_segmented_source(&m.kind, &src);
+                                push(
+                                    crate::segment::segment_cache_key(&m.id, Some(i)),
+                                    &kind,
+                                    &src,
+                                );
+                            }
+                        }
                     }
                 }
-                "skin" => seg
-                    .subject(&input)
-                    .map(|m| crate::segment::extract_skin_mask(&m, &input)),
-                "hair" => seg
-                    .subject(&input)
-                    .map(|m| crate::segment::extract_hair_mask(&m, &input)),
-                "sky" => seg.sky(&input),
-                "water" => Ok(crate::segment::extract_water_mask(&input)),
-                "vegetation" => Ok(crate::segment::extract_vegetation_mask(&input)),
-                "object" => {
-                    let p = source
-                        .get("hint")
-                        .and_then(|h| h.get("point"))
-                        .and_then(|pt| pt.as_array())
-                        .and_then(|a| {
-                            Some((a.first()?.as_f64()? as f32, a.get(1)?.as_f64()? as f32))
-                        })
-                        .unwrap_or((0.5, 0.5));
-                    crate::segment::instance_mask_at_point(&input, p)
-                        .or_else(|_| seg.object(&input, p))
-                }
-                other => Err(CoreError::InvalidOp(format!(
-                    "kind {other} is not segmented"
-                ))),
-            };
+                _ => {}
+            }
+        }
+        jobs
+    };
+    if !seg_jobs.is_empty() {
+        let input = payload.small_cpu.downscale_to(768);
+        for (id, kind, hash, source) in seg_jobs {
+            let hint_point = source
+                .get("hint")
+                .and_then(|h| h.get("point"))
+                .and_then(|pt| pt.as_array())
+                .and_then(|a| Some((a.first()?.as_f64()? as f32, a.get(1)?.as_f64()? as f32)));
+            let depth_near = source
+                .get("depth_near")
+                .and_then(|v| v.as_f64())
+                .map(|v| v as f32);
+            let depth_far = source
+                .get("depth_far")
+                .and_then(|v| v.as_f64())
+                .map(|v| v as f32);
+            let result =
+                crate::segment::run_ai_mask(&kind, &input, hint_point, depth_near, depth_far);
             match result {
                 Ok(m) => masks.push((id, hash, m)),
                 Err(e) => {

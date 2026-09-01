@@ -1,0 +1,55 @@
+# MeraNoise v1 — multi-dataset ISO-conditioned RGB denoiser
+# Trains on public paired + synthetic data; exports ONNX for tract (576² tiles).
+
+model:
+  id: meranoise-v1
+  in_channels: 4          # RGB (gamma) + normalized log-noise map
+  base_channels: 48
+  depth: 4
+
+data:
+  patch_size: 256
+  batch_size: 8
+  num_workers: 4
+  # Relative to MERANOISE_DATA_ROOT (default: denoise/train/data)
+  datasets:
+    - name: sidd
+      weight: 1.0
+      split: train
+    - name: nind
+      weight: 1.0
+      split: train
+    - name: sid
+      weight: 0.5
+      split: train
+    - name: synthetic_div2k
+      weight: 2.0
+      split: train
+      clean_root: div2k/DIV2K_train_HR
+  val_datasets:
+    - name: sidd
+      split: val
+
+noise:
+  # Poisson–Gaussian augmentation on clean-only sources (DIV2K etc.)
+  iso_range: [100, 25600]
+  read_noise_scale: 1.0
+
+train:
+  epochs: 100
+  lr: 2.0e-4
+  weight_decay: 1.0e-4
+  amp: true
+  grad_clip: 1.0
+  save_every: 5
+  out_dir: runs/meranoise_v1
+
+loss:
+  charbonnier: 1.0
+  ssim: 0.15
+  edge: 0.05
+
+export:
+  tile_size: 576          # must match NET_TILE in ai/tiler.rs
+  opset: 17
+  fp16: true

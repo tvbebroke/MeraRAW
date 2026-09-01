@@ -13,7 +13,7 @@ impl Engine {
     /// re-decodes at full resolution (the retained CPU copy is preview-sized),
     /// so the finished base can replace the working master 1:1.
     pub(super) fn denoise_ai_start(&mut self) -> Result<u64, CoreError> {
-        let (hash, settings, path, profile_path, demosaic) = {
+        let (hash, settings, path, profile_path, demosaic, iso) = {
             let cur = self.current.as_ref().ok_or(CoreError::NoImage)?;
             if cur.meta.kind == crate::raw::ImageKind::Video {
                 return Err(CoreError::InvalidOp(
@@ -45,7 +45,8 @@ impl Engine {
             let profile_path = crate::profile::decode_profile_path(
                 crate::profile::choose_profile(&cur.meta, &index, profile_file.as_deref()).as_ref(),
             );
-            (hash, settings, cur.path.clone(), profile_path, demosaic)
+            let iso = cur.meta.iso;
+            (hash, settings, cur.path.clone(), profile_path, demosaic, iso)
         };
 
         let enqueued = self.ai_denoise.enqueue(
@@ -56,6 +57,7 @@ impl Engine {
                 path: path.clone(),
                 profile_path,
                 demosaic,
+                iso,
             },
         )?;
         match enqueued {

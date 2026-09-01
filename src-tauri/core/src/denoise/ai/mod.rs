@@ -60,11 +60,13 @@ pub enum JobSource {
         rgb: Arc<Vec<f32>>,
         width: usize,
         height: usize,
+        iso: Option<u32>,
     },
     Decode {
         path: PathBuf,
         profile_path: Option<PathBuf>,
         demosaic: crate::raw::Demosaic,
+        iso: Option<u32>,
     },
 }
 
@@ -203,6 +205,7 @@ impl AiJobManager {
         let cache = self.cache.clone();
         let model_path = model.path.clone();
         let use_stand_in = model.info.stand_in;
+        let input_channels = model.input_channels;
         let cache_key_owned = key;
         let notify = self.notify.clone();
 
@@ -231,19 +234,25 @@ impl AiJobManager {
 
                 // 1) Obtain the source buffer (full-res decode for Decode jobs).
                 let src = match source {
-                    JobSource::Buffer { rgb, width, height } => Ok((rgb, width, height)),
+                    JobSource::Buffer {
+                        rgb,
+                        width,
+                        height,
+                        iso,
+                    } => Ok((rgb, width, height, iso)),
                     JobSource::Decode {
                         path,
                         profile_path,
                         demosaic,
+                        iso,
                     } => crate::raw::decoder_for(&path)
                         .decode_with_options(&path, profile_path.as_deref(), demosaic)
                         .map(|img| {
                             let (w, h) = (img.working.width, img.working.height);
-                            (Arc::new(img.working.data), w, h)
+                            (Arc::new(img.working.data), w, h, iso)
                         }),
                 };
-                let (rgb, w, h) = match src {
+                let (rgb, w, h, iso) = match src {
                     Ok(v) => v,
                     Err(e) => {
                         finish(JobState::Failed {
@@ -267,6 +276,8 @@ impl AiJobManager {
                 let result = run_inference(
                     &model_path,
                     use_stand_in,
+                    input_channels,
+                    iso,
                     &rgb,
                     w,
                     h,
@@ -370,6 +381,8 @@ fn lock_mutex<T>(m: &Mutex<T>) -> Result<MutexGuard<'_, T>, CoreError> {
 fn run_inference(
     model_path: &std::path::Path,
     use_stand_in: bool,
+    input_channels: u32,
+    iso: Option<u32>,
     rgb: &[f32],
     w: usize,
     h: usize,
@@ -380,7 +393,17 @@ fn run_inference(
     if use_stand_in {
         run_stand_in(rgb, w, h, amount, cancel, on_progress)
     } else {
-        run_onnx(model_path, rgb, w, h, amount, cancel, on_progress)
+        run_onnx(
+            model_path,
+            input_channels,
+            iso,
+            rgb,
+            w,
+            h,
+            amount,
+            cancel,
+            on_progress,
+        )
     }
 }
 
@@ -413,11 +436,19 @@ fn run_stand_in(
     Ok(out)
 }
 
+/// Normalized log-ISO noise map (channel 4 for MeraNoise v1). Matches train/noise/poisson_gaussian.py.
+fn noise_level_from_iso(iso: f32) -> f32 {
+    let log_iso = (iso.max(50.0) / 100.0).log2();
+    (log_iso / 8.0).clamp(0.0, 1.0)
+}
+
 /// Real ONNX path: fixed-size padded tiles through one tract plan, feather
 /// merged. Model I/O is display-encoded (denoisers train on encoded images);
 /// the working buffer is scene-linear, so encode/decode wraps inference.
 fn run_onnx(
     model_path: &std::path::Path,
+    input_channels: u32,
+    iso: Option<u32>,
     rgb: &[f32],
     w: usize,
     h: usize,
@@ -432,12 +463,13 @@ fn run_onnx(
             model_path.display()
         )));
     }
+    let in_ch = input_channels.max(3) as usize;
     let plan = tract_onnx::onnx()
         .model_for_path(model_path)
         .and_then(|m| {
             m.with_input_fact(
                 0,
-                InferenceFact::dt_shape(f32::datum_type(), tvec!(1, 3, NET_TILE, NET_TILE)),
+                InferenceFact::dt_shape(f32::datum_type(), tvec!(1, in_ch as i64, NET_TILE as i64, NET_TILE as i64)),
             )
         })
         .and_then(|m| m.into_optimized())
@@ -446,6 +478,7 @@ fn run_onnx(
 
     let enc = |v: f32| v.max(0.0).powf(1.0 / 2.2);
     let dec = |v: f32| v.max(0.0).powf(2.2);
+    let nl = noise_level_from_iso(iso.unwrap_or(3200) as f32);
 
     let tiles = split_tiles(w, h);
     let n = tiles.len() as u32;
@@ -453,7 +486,7 @@ fn run_onnx(
     // hundreds of MB at full res).
     let mut acc = vec![0f32; w * h * 3];
     let mut wsum = vec![0f32; w * h];
-    let mut input = vec![0f32; 3 * NET_TILE * NET_TILE];
+    let mut input = vec![0f32; in_ch * NET_TILE * NET_TILE];
     for (i, t) in tiles.iter().enumerate() {
         if cancel.load(Ordering::SeqCst) {
             return Err(CoreError::Decode("cancelled".into()));
@@ -467,6 +500,9 @@ fn run_onnx(
                 let si = (sy * t.pw + sx) * 3;
                 for c in 0..3 {
                     input[c * NET_TILE * NET_TILE + y * NET_TILE + x] = enc(patch[si + c]);
+                }
+                if in_ch >= 4 {
+                    input[3 * NET_TILE * NET_TILE + y * NET_TILE + x] = nl;
                 }
             }
         }
@@ -671,6 +707,7 @@ mod tests {
                     rgb,
                     width: 32,
                     height: 32,
+                    iso: None,
                 },
             )
             .unwrap_err();
@@ -725,6 +762,7 @@ mod tests {
                     rgb,
                     width: w,
                     height: h,
+                    iso: None,
                 },
             )
             .unwrap()
@@ -810,6 +848,7 @@ mod tests {
                     rgb,
                     width: w,
                     height: h,
+                    iso: None,
                 },
             )
             .unwrap()

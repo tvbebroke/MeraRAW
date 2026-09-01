@@ -130,6 +130,11 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
       if (u.hue_hi > u.hue_lo) {
         hy = smoothstep(u.hue_lo - 8.0, u.hue_lo + 8.0, hue)
           * (1.0 - smoothstep(u.hue_hi - 8.0, u.hue_hi + 8.0, hue));
+      } else if (u.hue_hi < u.hue_lo) {
+        // Wrap-around band (e.g. 350°..20°): OR of the two end segments.
+        let a = smoothstep(u.hue_lo - 8.0, u.hue_lo + 8.0, hue);
+        let b = 1.0 - smoothstep(u.hue_hi - 8.0, u.hue_hi + 8.0, hue);
+        hy = max(a, b);
       }
       m = m * ly * cy * hy;
     }
