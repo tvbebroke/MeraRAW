@@ -9,6 +9,7 @@
     applyOp,
     reportFrontendStatus,
     requestFrame,
+    sampleColor,
     setClipWarnings,
     setDisplayLook,
     setPreviewBypass,
@@ -45,13 +46,29 @@
     zoomLabel,
     brushRadius,
   } from "../../../stores/app";
-  import { brushFlow, brushHardness, beginMaskAdjust, deselectMask, endMaskAdjust, markMaskPending, maskAdjusting, maskRefineMode, objectPickActive, colorPickActive, syncMaskOverlay, syncViewportToolForMask } from "../../../stores/mask";
+  import {
+    brushFlow,
+    brushHardness,
+    beginMaskAdjust,
+    deselectMask,
+    endMaskAdjust,
+    markMaskPending,
+    maskAdjusting,
+    maskRefineMode,
+    objectPickActive,
+    instancePickKind,
+    colorPickActive,
+    geomPlacementKind,
+    stopGeomPlacement,
+    maskOverlayVisible,
+    syncMaskOverlay,
+    syncViewportToolForMask,
+  } from "../../../stores/mask";
   import { rightPanelMode } from "../../../stores/editor";
   import MaskGeometryOverlay from "./MaskGeometryOverlay.svelte";
   import ObjectPickOverlay from "./ObjectPickOverlay.svelte";
   import { doc, reconcile } from "../../../stores/doc";
   import { setWorkspace, workspace } from "../../../stores/workspace";
-  import { sampleColor } from "../../../ipc/commands";
 
   let { minimal = false }: { minimal?: boolean } = $props();
 
@@ -63,7 +80,8 @@
       rightPanelMode.get() === "mask" &&
       !!selectedMask.get() &&
       !objectPickActive.get() &&
-      !colorPickActive.get()
+      !colorPickActive.get() &&
+      !geomPlacementKind.get()
     );
   }
 
@@ -133,14 +151,17 @@
     }
   }
 
-  async function createObjectMask(x: number, y: number) {
+  async function createInstanceMask(x: number, y: number) {
+    const kind = instancePickKind.get();
+    const model =
+      kind === "people" ? "people_v1" : kind === "subject" ? "subject_v1" : "object_v1";
     const source = {
       type: "segmented",
-      model: "object_v1",
+      model,
       hint: { point: [x, y] },
     };
     try {
-      const delta = await applyOp({ op: "add_mask", kind: "object", source });
+      const delta = await applyOp({ op: "add_mask", kind, source });
       reconcile(delta);
       if (delta.newMaskId) {
         selectedRetouch.set(null);
@@ -154,6 +175,59 @@
       /* ignore */
     }
   }
+
+  /** In-progress drag for linear/radial placement. */
+  let geomDraft = $state<{
+    kind: "linear" | "radial";
+    start: [number, number];
+    end: [number, number];
+  } | null>(null);
+
+  async function commitGeomPlacement(
+    kind: "linear" | "radial",
+    start: [number, number],
+    end: [number, number],
+  ) {
+    const dx = end[0] - start[0];
+    const dy = end[1] - start[1];
+    const dist = Math.hypot(dx, dy);
+    if (dist < 0.01) {
+      stopGeomPlacement();
+      geomDraft = null;
+      return;
+    }
+    let source: Record<string, unknown>;
+    if (kind === "linear") {
+      source = { type: "linear", start, end };
+    } else {
+      const rx = Math.max(0.04, Math.abs(dx));
+      const ry = Math.max(0.04, Math.abs(dy));
+      source = {
+        type: "radial",
+        center: start,
+        radii: [rx, ry],
+        rotation: 0,
+      };
+    }
+    try {
+      const delta = await applyOp({ op: "add_mask", kind, source });
+      reconcile(delta);
+      stopGeomPlacement();
+      geomDraft = null;
+      if (delta.newMaskId) {
+        selectedRetouch.set(null);
+        selectedMask.set(delta.newMaskId);
+        const m = delta.doc.masks?.find((entry) => entry.id === delta.newMaskId);
+        syncViewportToolForMask(m ?? null);
+        maskOverlayVisible.set(true);
+        syncMaskOverlay();
+      }
+    } catch {
+      stopGeomPlacement();
+      geomDraft = null;
+    }
+  }
+
   const isVideoWs = $derived($workspace === "video");
   const imgAspect = $derived(
     $imageDims && $imageDims.h > 0 ? $imageDims.w / $imageDims.h : 1,
@@ -591,6 +665,17 @@
       onSplitPointerDown(e);
       return;
     }
+    // Lightroom-style linear/radial: drag on image to place a NEW mask.
+    const placeKind = geomPlacementKind.get();
+    if (placeKind && e.button === 0) {
+      const p = toImageCoords(e);
+      if (p) {
+        geomDraft = { kind: placeKind, start: p, end: p };
+        beginMaskAdjust();
+        (e.currentTarget as Element).setPointerCapture(e.pointerId);
+      }
+      return;
+    }
     if (maskAdjusting.get()) return;
     const tool = viewportTool.get();
     if (tool === "mask-geo" && e.button !== 1 && e.button !== 0) return;
@@ -635,6 +720,7 @@
       (e.currentTarget as Element).setPointerCapture(e.pointerId);
       return;
     }
+    // mask-geo: only pan with middle mouse; left-click is for handles / click-off above
     if (tool === "mask-geo" && e.button !== 1) return;
     dragging = { x: e.clientX, y: e.clientY };
     (e.currentTarget as Element).setPointerCapture(e.pointerId);
@@ -643,6 +729,11 @@
   function onPointerMove(e: PointerEvent) {
     if (splitDragging) {
       moveSplit(e);
+      return;
+    }
+    if (geomDraft) {
+      const p = toImageCoords(e);
+      if (p) geomDraft = { ...geomDraft, end: p };
       return;
     }
     if (maskTapStart && !dragging) {
@@ -683,14 +774,21 @@
   }
 
   function onPointerUp(e: PointerEvent) {
+    if (geomDraft) {
+      const draft = geomDraft;
+      geomDraft = null;
+      endMaskAdjust();
+      void commitGeomPlacement(draft.kind, draft.start, draft.end);
+      return;
+    }
     if (maskTapStart) {
       const dx = e.clientX - maskTapStart.x;
       const dy = e.clientY - maskTapStart.y;
       if (dx * dx + dy * dy <= MASK_TAP_PX * MASK_TAP_PX) {
         if (objectPickActive.get()) {
           const p = toImageCoords(e);
-          if (p) void createObjectMask(p[0], p[1]);
-          objectPickActive.set(false);
+          if (p) void createInstanceMask(p[0], p[1]);
+          // Stay in pick mode so multiple subjects/people can be selected.
         } else if (colorPickActive.get()) {
           const p = toImageCoords(e);
           if (p) void applyColorSample(p[0], p[1]);
@@ -1013,7 +1111,7 @@
     bind:this={wrapEl}
     role="img"
     aria-label="Develop preview"
-    class="viewport-surround relative flex min-h-0 min-w-0 flex-1 items-center justify-center select-none {$objectPickActive || $colorPickActive ? 'cursor-crosshair overflow-hidden' : $viewportTool === 'mask-geo' ? 'overflow-visible cursor-default' : $cropActive ? 'cursor-default overflow-hidden' : 'cursor-grab active:cursor-grabbing overflow-hidden'}"
+    class="viewport-surround relative flex min-h-0 min-w-0 flex-1 items-center justify-center select-none {$objectPickActive || $colorPickActive || $geomPlacementKind ? 'cursor-crosshair overflow-hidden' : $viewportTool === 'mask-geo' ? 'overflow-visible cursor-default' : $cropActive ? 'cursor-default overflow-hidden' : 'cursor-grab active:cursor-grabbing overflow-hidden'}"
     onwheel={onWheel}
     onpointerdown={onPointerDown}
     onpointermove={onPointerMove}
@@ -1086,10 +1184,28 @@
         {imgBox}
         {imageNormToLocal}
         onPick={(centroid) => {
-          void createObjectMask(centroid[0], centroid[1]);
-          objectPickActive.set(false);
+          void createInstanceMask(centroid[0], centroid[1]);
         }}
       />
+    {/if}
+
+    {#if geomDraft && imgBox}
+      {@const a = imageNormToLocal(geomDraft.start[0], geomDraft.start[1])}
+      {@const b = imageNormToLocal(geomDraft.end[0], geomDraft.end[1])}
+      {#if a && b}
+        <svg class="geom-draft" aria-hidden="true">
+          {#if geomDraft.kind === "linear"}
+            <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} class="draft-line" />
+            <circle cx={a.x} cy={a.y} r="6" class="draft-handle" />
+            <circle cx={b.x} cy={b.y} r="6" class="draft-handle" />
+          {:else}
+            {@const rx = Math.max(4, Math.abs(b.x - a.x))}
+            {@const ry = Math.max(4, Math.abs(b.y - a.y))}
+            <ellipse cx={a.x} cy={a.y} rx={rx} ry={ry} class="draft-ring" />
+            <circle cx={a.x} cy={a.y} r="6" class="draft-handle" />
+          {/if}
+        </svg>
+      {/if}
     {/if}
 
     {#if loupeOn}
@@ -1156,6 +1272,27 @@
 {/if}
 
 <style>
+  .geom-draft {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 45;
+    overflow: visible;
+  }
+  .draft-line,
+  .draft-ring {
+    fill: none;
+    stroke: rgba(255, 90, 90, 0.95);
+    stroke-width: 2;
+    stroke-dasharray: 6 4;
+  }
+  .draft-handle {
+    fill: #fff;
+    stroke: rgba(255, 80, 80, 0.95);
+    stroke-width: 2;
+  }
   .mismatch {
     display: flex;
     flex: none;

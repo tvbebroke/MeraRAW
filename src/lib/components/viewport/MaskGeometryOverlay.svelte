@@ -19,9 +19,9 @@
       : null,
   );
 
-  type HandleKind = "center" | "edgeX" | "edgeY" | "rotate" | "start" | "end";
+  type HandleKind = "center" | "edgeX" | "edgeY" | "rotate" | "start" | "end" | "move";
 
-  let dragging = $state<{ kind: HandleKind } | null>(null);
+  let dragging = $state<{ kind: HandleKind; last?: [number, number] } | null>(null);
 
   $effect(() => {
     if (!dragging) return;
@@ -111,7 +111,8 @@
   function onPointerDown(e: PointerEvent, kind: HandleKind) {
     e.stopPropagation();
     e.preventDefault();
-    dragging = { kind };
+    const p = toImageCoords(e.clientX, e.clientY);
+    dragging = { kind, last: p ?? undefined };
     beginMaskAdjust();
   }
 
@@ -168,6 +169,12 @@
       } else if (dragging.kind === "end") {
         src.end = [p[0], p[1]];
         src.start = [h.x0, h.y0];
+      } else if (dragging.kind === "move" && dragging.last) {
+        const ddx = p[0] - dragging.last[0];
+        const ddy = p[1] - dragging.last[1];
+        src.start = [h.x0 + ddx, h.y0 + ddy];
+        src.end = [h.x1 + ddx, h.y1 + ddy];
+        dragging = { kind: "move", last: p };
       }
     }
     void updateSource(src, true);
@@ -246,7 +253,24 @@
     {@const b = imageNormToLocal(h.x1, h.y1)}
     {#if a && b}
       <svg class="mask-geo" aria-hidden="true">
+        <line
+          x1={a.x}
+          y1={a.y}
+          x2={b.x}
+          y2={b.y}
+          class="line hit"
+          role="presentation"
+          onpointerdown={(e) => onPointerDown(e, "move")}
+        />
         <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} class="line" />
+        <circle
+          cx={(a.x + b.x) / 2}
+          cy={(a.y + b.y) / 2}
+          r="9"
+          class="handle move"
+          role="presentation"
+          onpointerdown={(e) => onPointerDown(e, "move")}
+        />
         <circle
           cx={a.x}
           cy={a.y}
@@ -289,6 +313,12 @@
     stroke-dasharray: 4 4;
     pointer-events: none;
   }
+  .line.hit {
+    stroke: transparent;
+    stroke-width: 18;
+    pointer-events: stroke;
+    cursor: move;
+  }
   .handle {
     fill: white;
     fill-opacity: 0.92;
@@ -296,6 +326,10 @@
     stroke-width: 2;
     pointer-events: auto;
     cursor: grab;
+  }
+  .handle.move {
+    fill: rgba(255, 255, 255, 0.75);
+    cursor: move;
   }
   .handle.rotate {
     fill: rgba(255, 220, 120, 0.95);

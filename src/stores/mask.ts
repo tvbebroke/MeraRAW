@@ -27,11 +27,23 @@ export const maskPendingIds = atom<Set<string>>(new Set());
 /** Last segmentation error per mask id. */
 export const maskErrors = atom<Map<string, string>>(new Map());
 
-/** Click-to-select object mode: next viewport tap creates an object mask. */
+/** Click-to-select instance mode: next outline taps create masks of this kind. */
+export type InstancePickKind = "object" | "subject" | "people";
 export const objectPickActive = atom(false);
+export const instancePickKind = atom<InstancePickKind>("object");
 
 /** Color-range eyedropper: next tap samples into the selected parametric mask. */
 export const colorPickActive = atom(false);
+
+export function startInstancePick(kind: InstancePickKind): void {
+  colorPickActive.set(false);
+  instancePickKind.set(kind);
+  objectPickActive.set(true);
+}
+
+export function stopInstancePick(): void {
+  objectPickActive.set(false);
+}
 
 export function clearMaskError(id: string): void {
   const next = new Map(maskErrors.get());
@@ -121,11 +133,29 @@ export function endMaskAdjust(): void {
   }
 }
 
+/** Drag-to-place a new linear/radial mask (Lightroom-style). */
+export type GeomPlacementKind = "linear" | "radial";
+export const geomPlacementKind = atom<GeomPlacementKind | null>(null);
+
+export function startGeomPlacement(kind: GeomPlacementKind): void {
+  stopInstancePick();
+  colorPickActive.set(false);
+  endMaskAdjust();
+  geomPlacementKind.set(kind);
+  viewportTool.set("pan");
+}
+
+export function stopGeomPlacement(): void {
+  geomPlacementKind.set(null);
+}
+
+
 /** Click off / Escape: hide overlay and handles; mask edits stay in the render. */
 export function deselectMask(): void {
   if (!selectedMask.get()) return;
   selectedMask.set(null);
   maskAdjusting.set(false);
+  stopGeomPlacement();
   syncViewportToolForMask(null);
   void setMaskOverlay(null);
 }
@@ -140,6 +170,8 @@ export function maskDisplayName(kind: string, index: number, name?: string | nul
     people: "People",
     skin: "Skin",
     hair: "Hair",
+    water: "Water",
+    vegetation: "Vegetation",
     brush: "Brush",
     linear: "Linear Gradient",
     radial: "Radial Gradient",

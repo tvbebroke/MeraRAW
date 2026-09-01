@@ -247,6 +247,8 @@ const MASK_KINDS: &[&str] = &[
     "people",
     "skin",
     "hair",
+    "water",
+    "vegetation",
     "radial",
     "linear",
     "brush",

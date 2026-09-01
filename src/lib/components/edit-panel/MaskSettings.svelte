@@ -18,7 +18,13 @@
     maskRefineMode,
     maskToolGroup,
     objectPickActive,
+    instancePickKind,
     colorPickActive,
+    startInstancePick,
+    stopInstancePick,
+    startGeomPlacement,
+    stopGeomPlacement,
+    geomPlacementKind,
     deselectMask,
     syncMaskOverlay,
     syncViewportToolForMask,
@@ -48,6 +54,8 @@
     | "people"
     | "skin"
     | "hair"
+    | "water"
+    | "vegetation"
     | "parametric";
 
   const KIND_ICON: Record<string, string> = {
@@ -58,6 +66,8 @@
     people: "☺",
     skin: "◌",
     hair: "∿",
+    water: "≋",
+    vegetation: "❀",
     brush: "◔",
     linear: "▥",
     radial: "◯",
@@ -101,6 +111,10 @@
         return { type: "segmented", model: "skin_v1", hint: null };
       case "hair":
         return { type: "segmented", model: "hair_v1", hint: null };
+      case "water":
+        return { type: "segmented", model: "water_v1", hint: null };
+      case "vegetation":
+        return { type: "segmented", model: "vegetation_v1", hint: null };
       default:
         return { type: "segmented", model: "subject_v1", hint: null };
     }
@@ -198,7 +212,8 @@
   }
 
   function select(id: string) {
-    objectPickActive.set(false);
+    stopInstancePick();
+    stopGeomPlacement();
     colorPickActive.set(false);
     if ($selectedMask === id) {
       deselectMask();
@@ -234,14 +249,38 @@
   }
 
   function startObjectPick() {
-    colorPickActive.set(false);
-    objectPickActive.set(true);
+    stopGeomPlacement();
+    startInstancePick("object");
+    showMaskPanel();
+  }
+
+  function startSubjectPick() {
+    stopGeomPlacement();
+    startInstancePick("subject");
+    showMaskPanel();
+  }
+
+  function startPeoplePick() {
+    stopGeomPlacement();
+    startInstancePick("people");
     showMaskPanel();
   }
 
   function startColorPick() {
-    objectPickActive.set(false);
+    stopInstancePick();
+    stopGeomPlacement();
     colorPickActive.set(true);
+    showMaskPanel();
+  }
+
+  /** Linear/Radial always create a new mask via drag-to-place (avoids freezing AI masks). */
+  function startLinearTool() {
+    startGeomPlacement("linear");
+    showMaskPanel();
+  }
+
+  function startRadialTool() {
+    startGeomPlacement("radial");
     showMaskPanel();
   }
 
@@ -368,7 +407,20 @@
   {/if}
 
   {#if $objectPickActive}
-    <p class="pick-banner">Click a dotted outline on the image to mask that object.</p>
+    <p class="pick-banner">
+      {#if $instancePickKind === "subject"}
+        Click each subject outline to add it — Esc when done.
+      {:else if $instancePickKind === "people"}
+        Click each person outline to add them — Esc when done.
+      {:else}
+        Click a dotted outline to mask that object — Esc when done.
+      {/if}
+    </p>
+  {/if}
+  {#if $geomPlacementKind === "linear"}
+    <p class="pick-banner">Drag on the image to place a linear gradient — Esc to cancel.</p>
+  {:else if $geomPlacementKind === "radial"}
+    <p class="pick-banner">Drag on the image to place a radial gradient — Esc to cancel.</p>
   {/if}
   {#if $colorPickActive}
     <p class="pick-banner">Click the image to sample a color range.</p>
@@ -388,7 +440,10 @@
     {#if $maskToolGroup === "ai"}
       <div class="tool-grid ai">
         <button type="button" class="tool-btn" onclick={() => void addMask("subject")}>
-          <span class="ico">◎</span> Subject
+          <span class="ico">◎</span> Subject (all)
+        </button>
+        <button type="button" class="tool-btn" onclick={startSubjectPick}>
+          <span class="ico">◎</span> Subjects · click
         </button>
         <button type="button" class="tool-btn" onclick={() => void addMask("sky")}>
           <span class="ico">☁</span> Sky
@@ -397,16 +452,22 @@
           <span class="ico">◫</span> Background
         </button>
         <button type="button" class="tool-btn" onclick={startObjectPick}>
-          <span class="ico">◉</span> Object · click outline
+          <span class="ico">◉</span> Object · click
         </button>
-        <button type="button" class="tool-btn" onclick={() => void addMask("people")}>
-          <span class="ico">☺</span> People
+        <button type="button" class="tool-btn" onclick={startPeoplePick}>
+          <span class="ico">☺</span> People · click
         </button>
         <button type="button" class="tool-btn" onclick={() => void addMask("skin")}>
           <span class="ico">◌</span> Skin
         </button>
         <button type="button" class="tool-btn" onclick={() => void addMask("hair")}>
           <span class="ico">∿</span> Hair
+        </button>
+        <button type="button" class="tool-btn" onclick={() => void addMask("water")}>
+          <span class="ico">≋</span> Water
+        </button>
+        <button type="button" class="tool-btn" onclick={() => void addMask("vegetation")}>
+          <span class="ico">❀</span> Vegetation
         </button>
       </div>
     {/if}
@@ -433,14 +494,16 @@
         <button
           type="button"
           class="tool-btn"
-          onclick={() => void (active ? addComponent("linear") : addMask("linear"))}
+          class:on={$geomPlacementKind === "linear"}
+          onclick={startLinearTool}
         >
           <span class="ico">▥</span> Linear
         </button>
         <button
           type="button"
           class="tool-btn"
-          onclick={() => void (active ? addComponent("radial") : addMask("radial"))}
+          class:on={$geomPlacementKind === "radial"}
+          onclick={startRadialTool}
         >
           <span class="ico">◯</span> Radial
         </button>

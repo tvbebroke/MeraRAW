@@ -724,6 +724,325 @@ fn point_line_dist(px: f32, py: f32, ax: f32, ay: f32, bx: f32, by: f32) -> f32 
     (px - qx).hypot(py - qy)
 }
 
+/// Keep only the saliency connected component under `point` (normalized 0..1).
+/// Used for multi-subject / object outline picks so each click becomes one instance.
+pub fn instance_mask_at_point(img: &RgbF32Buf, point: (f32, f32)) -> Result<Mask01, CoreError> {
+    let mut mask = run_u2net(subject_model()?, img)?;
+    refine_saliency_mask(&mut mask.data, mask.width, mask.height);
+    if !keep_blob_at_point(&mut mask.data, mask.width, mask.height, point, 0.28) {
+        // Click missed a saliency blob — fall back to color region-grow.
+        return TractSegmenter.object(img, point);
+    }
+    // Soft fringe cleanup without killing the chosen instance.
+    let (w, h) = (mask.width, mask.height);
+    let blurred = box_blur_3x3(&mask.data, w, h);
+    for i in 0..mask.data.len() {
+        if mask.data[i] > 0.05 {
+            mask.data[i] = (mask.data[i] * 0.75 + blurred[i] * 0.25).clamp(0.0, 1.0);
+        }
+    }
+    Ok(mask)
+}
+
+/// Zero every pixel not belonging to the connected component containing `point`.
+/// Returns false if the seed itself is below threshold (no blob).
+fn keep_blob_at_point(
+    data: &mut [f32],
+    w: usize,
+    h: usize,
+    point: (f32, f32),
+    thresh: f32,
+) -> bool {
+    if w * h == 0 {
+        return false;
+    }
+    let cx = ((point.0.clamp(0.0, 1.0) * w as f32) as usize).min(w.saturating_sub(1));
+    let cy = ((point.1.clamp(0.0, 1.0) * h as f32) as usize).min(h.saturating_sub(1));
+    let seed = cy * w + cx;
+    if data[seed] < thresh {
+        // Search a small neighborhood for a strong seed (outline click may land on edge).
+        let mut best = None;
+        let mut best_v = thresh;
+        for dy in -3i32..=3 {
+            for dx in -3i32..=3 {
+                let nx = cx as i32 + dx;
+                let ny = cy as i32 + dy;
+                if nx < 0 || ny < 0 || nx as usize >= w || ny as usize >= h {
+                    continue;
+                }
+                let i = ny as usize * w + nx as usize;
+                if data[i] > best_v {
+                    best_v = data[i];
+                    best = Some(i);
+                }
+            }
+        }
+        let Some(s) = best else {
+            return false;
+        };
+        return flood_keep(data, w, h, s, thresh);
+    }
+    flood_keep(data, w, h, seed, thresh)
+}
+
+fn flood_keep(data: &mut [f32], w: usize, h: usize, seed: usize, thresh: f32) -> bool {
+    let mut keep = vec![false; w * h];
+    let mut stack = vec![seed];
+    keep[seed] = true;
+    while let Some(i) = stack.pop() {
+        let x = i % w;
+        let y = i / w;
+        for (dx, dy) in [(-1i32, 0), (1, 0), (0, -1), (0, 1)] {
+            let nx = x as i32 + dx;
+            let ny = y as i32 + dy;
+            if nx < 0 || ny < 0 || nx as usize >= w || ny as usize >= h {
+                continue;
+            }
+            let j = ny as usize * w + nx as usize;
+            if !keep[j] && data[j] >= thresh {
+                keep[j] = true;
+                stack.push(j);
+            }
+        }
+    }
+    for (i, v) in data.iter_mut().enumerate() {
+        if !keep[i] {
+            *v = 0.0;
+        }
+    }
+    true
+}
+
+/// Drop ocean / water false-positives from a sky segmentation.
+/// Prefers components that live in the upper frame and attenuates
+/// darker blue-cyan pixels in the lower half.
+pub fn refine_sky_mask(data: &mut [f32], w: usize, h: usize, img: &RgbF32Buf) {
+    if w * h == 0 {
+        return;
+    }
+    // Mild contrast stretch so soft skyseg output separates better.
+    for v in data.iter_mut() {
+        *v = ((*v - 0.35) * 1.55 + 0.35).clamp(0.0, 1.0);
+    }
+
+    let sx = img.width as f32 / w as f32;
+    let sy = img.height as f32 / h as f32;
+    let sample = |mx: usize, my: usize| -> [f32; 3] {
+        let ix = ((mx as f32 + 0.5) * sx) as usize;
+        let iy = ((my as f32 + 0.5) * sy) as usize;
+        let i = (iy.min(img.height.saturating_sub(1)) * img.width
+            + ix.min(img.width.saturating_sub(1)))
+            * 3;
+        [
+            enc(img.data[i]),
+            enc(img.data[i + 1]),
+            enc(img.data[i + 2]),
+        ]
+    };
+
+    // Per-pixel: in the lower half, crush water-looking skyseg hits.
+    for y in 0..h {
+        let y_norm = y as f32 / h.max(1) as f32;
+        for x in 0..w {
+            let i = y * w + x;
+            if data[i] < 0.08 {
+                data[i] = 0.0;
+                continue;
+            }
+            let [r, g, b] = sample(x, y);
+            let luma = 0.299 * r + 0.587 * g + 0.114 * b;
+            let waterish = b > r + 0.04
+                && b > g * 0.92
+                && luma < 0.55
+                && (b - r.max(g)) > 0.02;
+            if y_norm > 0.48 && waterish {
+                data[i] *= 0.08;
+            } else if y_norm > 0.62 && luma < 0.42 && b > r {
+                data[i] *= 0.12;
+            } else if y_norm < 0.35 && luma > 0.45 && b >= g * 0.9 {
+                // Boost pale upper sky a touch.
+                data[i] = (data[i] * 1.08).clamp(0.0, 1.0);
+            }
+        }
+    }
+
+    // Connected components: drop blobs that live mostly in the lower frame.
+    const T: f32 = 0.22;
+    let mut labels = vec![0u32; w * h];
+    let mut stats: Vec<(u32, f32, f32, u32)> = Vec::new(); // area, sum_y, sum, upper_count
+    let mut stack = Vec::new();
+    for y in 0..h {
+        for x in 0..w {
+            let i = y * w + x;
+            if data[i] < T || labels[i] != 0 {
+                continue;
+            }
+            let id = (stats.len() + 1) as u32;
+            let mut area = 0u32;
+            let mut sum_y = 0.0f32;
+            let mut sum = 0.0f32;
+            let mut upper = 0u32;
+            stack.clear();
+            stack.push(i);
+            labels[i] = id;
+            while let Some(j) = stack.pop() {
+                let jx = j % w;
+                let jy = j / w;
+                area += 1;
+                sum_y += jy as f32;
+                sum += data[j];
+                if jy < h / 2 {
+                    upper += 1;
+                }
+                for (dx, dy) in [(-1i32, 0), (1, 0), (0, -1), (0, 1)] {
+                    let nx = jx as i32 + dx;
+                    let ny = jy as i32 + dy;
+                    if nx < 0 || ny < 0 || nx as usize >= w || ny as usize >= h {
+                        continue;
+                    }
+                    let k = ny as usize * w + nx as usize;
+                    if labels[k] == 0 && data[k] >= T {
+                        labels[k] = id;
+                        stack.push(k);
+                    }
+                }
+            }
+            stats.push((area, sum_y, sum, upper));
+        }
+    }
+
+    let img_area = (w * h) as f32;
+    let mut keep = vec![false; stats.len()];
+    for (i, (area, sum_y, _sum, upper)) in stats.iter().enumerate() {
+        if *area < (img_area * 0.004).max(8.0) as u32 {
+            continue;
+        }
+        let cy = sum_y / (*area).max(1) as f32;
+        let upper_frac = *upper as f32 / (*area).max(1) as f32;
+        // Ocean / lake blobs: centroid in lower half and little upper presence.
+        if cy > h as f32 * 0.52 && upper_frac < 0.28 {
+            continue;
+        }
+        // Prefer anything with a real foothold in the top half.
+        if upper_frac >= 0.18 || cy < h as f32 * 0.45 {
+            keep[i] = true;
+        }
+    }
+    // Always keep the strongest upper-anchored blob if nothing passed.
+    if !keep.iter().any(|k| *k) {
+        if let Some((bi, _)) = stats
+            .iter()
+            .enumerate()
+            .filter(|(_, (_, _, _, u))| *u > 0)
+            .max_by(|(_, a), (_, b)| {
+                let sa = a.2 * (a.3 as f32 + 1.0);
+                let sb = b.2 * (b.3 as f32 + 1.0);
+                sa.partial_cmp(&sb).unwrap_or(std::cmp::Ordering::Equal)
+            })
+        {
+            keep[bi] = true;
+        }
+    }
+
+    for (i, v) in data.iter_mut().enumerate() {
+        let lab = labels[i];
+        if lab == 0 {
+            if *v < T {
+                *v = 0.0;
+            }
+            continue;
+        }
+        if !keep[(lab - 1) as usize] {
+            *v = 0.0;
+        }
+    }
+}
+
+fn water_score(r: f32, g: f32, b: f32, y_norm: f32) -> f32 {
+    let luma = 0.299 * r + 0.587 * g + 0.114 * b;
+    if b < r + 0.02 || b < g * 0.88 {
+        return 0.0;
+    }
+    if !(0.04..=0.62).contains(&luma) {
+        return 0.0;
+    }
+    let blue = ((b - r.max(g)) / 0.25).clamp(0.0, 1.0);
+    let depth = (1.0 - (luma / 0.55).clamp(0.0, 1.0)).clamp(0.15, 1.0);
+    // Prefer mid/lower frame — sky lives up top.
+    let lower = ((y_norm - 0.28) / 0.55).clamp(0.0, 1.0);
+    blue * depth * (0.25 + 0.75 * lower)
+}
+
+fn vegetation_score(r: f32, g: f32, b: f32) -> f32 {
+    let luma = 0.299 * r + 0.587 * g + 0.114 * b;
+    if g < r * 1.02 || g < b * 1.02 {
+        return 0.0;
+    }
+    if !(0.05..=0.75).contains(&luma) {
+        return 0.0;
+    }
+    let green = ((g - r.max(b)) / 0.28).clamp(0.0, 1.0);
+    let mid = (1.0 - ((luma - 0.35).abs() / 0.4)).clamp(0.2, 1.0);
+    green * mid
+}
+
+/// Landscape water (ocean / lake / river) from color + vertical priors.
+pub fn extract_water_mask(img: &RgbF32Buf) -> Mask01 {
+    let (w, h) = (img.width, img.height);
+    let mut data = vec![0.0f32; w * h];
+    for y in 0..h {
+        let y_norm = y as f32 / h.max(1) as f32;
+        for x in 0..w {
+            let i = (y * w + x) * 3;
+            let (r, g, b) = (enc(img.data[i]), enc(img.data[i + 1]), enc(img.data[i + 2]));
+            data[y * w + x] = water_score(r, g, b, y_norm);
+        }
+    }
+    // Kill tiny speckles; keep large lower bodies.
+    refine_saliency_mask(&mut data, w, h);
+    suppress_upper_false_water(&mut data, w, h);
+    Mask01 {
+        width: w,
+        height: h,
+        data,
+    }
+}
+
+fn suppress_upper_false_water(data: &mut [f32], w: usize, h: usize) {
+    for y in 0..h {
+        let y_norm = y as f32 / h.max(1) as f32;
+        let atten = if y_norm < 0.22 {
+            0.05
+        } else if y_norm < 0.38 {
+            0.35
+        } else {
+            1.0
+        };
+        for x in 0..w {
+            data[y * w + x] *= atten;
+        }
+    }
+}
+
+/// Landscape vegetation (grass / trees / foliage) from green dominance.
+pub fn extract_vegetation_mask(img: &RgbF32Buf) -> Mask01 {
+    let (w, h) = (img.width, img.height);
+    let mut data = vec![0.0f32; w * h];
+    for y in 0..h {
+        for x in 0..w {
+            let i = (y * w + x) * 3;
+            let (r, g, b) = (enc(img.data[i]), enc(img.data[i + 1]), enc(img.data[i + 2]));
+            data[y * w + x] = vegetation_score(r, g, b);
+        }
+    }
+    refine_saliency_mask(&mut data, w, h);
+    Mask01 {
+        width: w,
+        height: h,
+        data,
+    }
+}
+
 impl Segmenter for TractSegmenter {
     fn subject(&self, img: &RgbF32Buf) -> Result<Mask01, CoreError> {
         let mut mask = run_u2net(subject_model()?, img)?;
@@ -733,7 +1052,9 @@ impl Segmenter for TractSegmenter {
 
     /// Sky via dedicated U²-Net weights (MIT — xiongzhu666 Sky-Segmentation).
     fn sky(&self, img: &RgbF32Buf) -> Result<Mask01, CoreError> {
-        run_u2net(sky_model()?, img)
+        let mut mask = run_u2net(sky_model()?, img)?;
+        refine_sky_mask(&mut mask.data, mask.width, mask.height, img);
+        Ok(mask)
     }
 
     /// Object-by-point: color-similarity region grow seeded at the point.
@@ -865,6 +1186,59 @@ mod tests {
         let ocean = at(m.width / 2, m.height * 7 / 8);
         assert!(sky > 0.45, "sky band: {sky}");
         assert!(ocean < sky * 0.55, "ocean {ocean} should be below sky {sky}");
+    }
+
+    #[test]
+    fn sky_refine_drops_lower_ocean_blob() {
+        let img = sky_ocean_scene();
+        let (w, h) = (img.width, img.height);
+        // Fake skyseg that lights up both sky and ocean equally.
+        let mut data = vec![0.0f32; w * h];
+        for y in 0..h {
+            for x in 0..w {
+                data[y * w + x] = 0.85;
+            }
+        }
+        refine_sky_mask(&mut data, w, h, &img);
+        let mut sky = 0.0f32;
+        let mut ocean = 0.0f32;
+        for y in 0..h / 4 {
+            for x in 0..w {
+                sky += data[y * w + x];
+            }
+        }
+        for y in (3 * h / 4)..h {
+            for x in 0..w {
+                ocean += data[y * w + x];
+            }
+        }
+        assert!(sky > ocean * 2.0, "sky {sky} should dominate ocean {ocean}");
+        assert!(ocean < (w * h / 4) as f32 * 0.25, "ocean residual {ocean}");
+    }
+
+    #[test]
+    fn keep_blob_isolates_one_instance() {
+        let (w, h) = (64usize, 64usize);
+        let mut data = vec![0.0f32; w * h];
+        for y in 5..20 {
+            for x in 5..20 {
+                data[y * w + x] = 0.9;
+            }
+        }
+        for y in 40..55 {
+            for x in 40..55 {
+                data[y * w + x] = 0.9;
+            }
+        }
+        assert!(keep_blob_at_point(
+            &mut data,
+            w,
+            h,
+            (12.0 / w as f32, 12.0 / h as f32),
+            0.28
+        ));
+        assert!(data[12 * w + 12] > 0.5);
+        assert!(data[48 * w + 48] < 0.05);
     }
 
     #[test]

@@ -1158,18 +1158,40 @@ fn prepare_batch_image(path: &Path, skip_edits: bool) -> Result<BatchPrepared, C
         let input = payload.small_cpu.downscale_to(768);
         for (id, kind, hash, source) in seg_jobs {
             let result = match kind.as_str() {
-                "subject" | "background" => seg.subject(&input),
+                "subject" | "background" | "people" => {
+                    let p = source
+                        .get("hint")
+                        .and_then(|h| h.get("point"))
+                        .and_then(|pt| pt.as_array())
+                        .and_then(|a| {
+                            Some((a.first()?.as_f64()? as f32, a.get(1)?.as_f64()? as f32))
+                        });
+                    if let Some(pt) = p {
+                        crate::segment::instance_mask_at_point(&input, pt)
+                    } else {
+                        seg.subject(&input)
+                    }
+                }
+                "skin" => seg
+                    .subject(&input)
+                    .map(|m| crate::segment::extract_skin_mask(&m, &input)),
+                "hair" => seg
+                    .subject(&input)
+                    .map(|m| crate::segment::extract_hair_mask(&m, &input)),
                 "sky" => seg.sky(&input),
+                "water" => Ok(crate::segment::extract_water_mask(&input)),
+                "vegetation" => Ok(crate::segment::extract_vegetation_mask(&input)),
                 "object" => {
                     let p = source
                         .get("hint")
                         .and_then(|h| h.get("point"))
-                        .and_then(|p| p.as_array())
+                        .and_then(|pt| pt.as_array())
                         .and_then(|a| {
                             Some((a.first()?.as_f64()? as f32, a.get(1)?.as_f64()? as f32))
                         })
                         .unwrap_or((0.5, 0.5));
-                    seg.object(&input, p)
+                    crate::segment::instance_mask_at_point(&input, p)
+                        .or_else(|_| seg.object(&input, p))
                 }
                 other => Err(CoreError::InvalidOp(format!(
                     "kind {other} is not segmented"

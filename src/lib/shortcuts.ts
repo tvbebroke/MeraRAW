@@ -4,7 +4,7 @@ import { isSettingsOpen, isExportOpen, isBugReportOpen, classicLook, isShortcuts
 import { applyEditFocus, showAiPanel, showMaskPanel } from "./editor/focus";
 import { activePhoto, libraryItems, openPhoto, gridKey } from "../stores/browse";
 import { imageMeta, selectedMask, viewportTool, brushRadius } from "../stores/app";
-import { deselectMask } from "../stores/mask";
+import { colorPickActive, deselectMask, geomPlacementKind, objectPickActive, stopGeomPlacement, stopInstancePick, endMaskAdjust } from "../stores/mask";
 import { editorRoute, isEditorRoute, isLibraryRoute, libraryRoute, workspace } from "../stores/workspace";
 import { copyGrade, pasteGrade } from "./grade";
 
@@ -143,6 +143,13 @@ export function handleGlobalShortcut(e: KeyboardEvent): void {
     if (isBugReportOpen.get()) { isBugReportOpen.set(false); return; }
     if (isShortcutsOpen.get()) { isShortcutsOpen.set(false); return; }
     if (commandPaletteOpen.get()) { commandPaletteOpen.set(false); return; }
+    if (objectPickActive.get() || colorPickActive.get() || geomPlacementKind.get()) {
+      stopInstancePick();
+      colorPickActive.set(false);
+      stopGeomPlacement();
+      endMaskAdjust();
+      return;
+    }
     if (selectedMask.get() && rightPanelMode.get() === "mask") {
       deselectMask();
       return;

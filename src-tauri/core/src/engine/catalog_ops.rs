@@ -280,8 +280,23 @@ impl Engine {
                     let started = Instant::now();
                     // segmentation runs on a further-downscaled copy
                     let input = img.downscale_to(768);
+                    let hint_point = |source: &serde_json::Value| {
+                        source
+                            .get("hint")
+                            .and_then(|h| h.get("point"))
+                            .and_then(|p| p.as_array())
+                            .and_then(|a| {
+                                Some((a.first()?.as_f64()? as f32, a.get(1)?.as_f64()? as f32))
+                            })
+                    };
                     let result = match kind.as_str() {
-                        "subject" | "background" | "people" => seg.subject(&input),
+                        "subject" | "background" | "people" => {
+                            if let Some(p) = hint_point(&source) {
+                                crate::segment::instance_mask_at_point(&input, p)
+                            } else {
+                                seg.subject(&input)
+                            }
+                        }
                         "skin" => seg.subject(&input).map(|m| {
                             crate::segment::extract_skin_mask(&m, &input)
                         }),
@@ -289,34 +304,14 @@ impl Engine {
                             crate::segment::extract_hair_mask(&m, &input)
                         }),
                         "sky" => seg.sky(&input),
+                        "water" => Ok(crate::segment::extract_water_mask(&input)),
+                        "vegetation" => Ok(crate::segment::extract_vegetation_mask(&input)),
                         "object" => {
-                            let p = source
-                                .get("hint")
-                                .and_then(|h| h.get("point"))
-                                .and_then(|p| p.as_array())
-                                .and_then(|a| {
-                                    Some((a.first()?.as_f64()? as f32, a.get(1)?.as_f64()? as f32))
-                                })
-                                .unwrap_or((0.5, 0.5));
-                            // Prefer subject-guided object: grow from click, then
-                            // boost with subject saliency near the seed.
-                            match (seg.object(&input, p), seg.subject(&input)) {
-                                (Ok(mut obj), Ok(subj)) => {
-                                    let n = obj.data.len().min(subj.data.len());
-                                    for i in 0..n {
-                                        if subj.data[i] > 0.35 {
-                                            obj.data[i] = obj.data[i].max(subj.data[i] * 0.55);
-                                        }
-                                    }
-                                    crate::segment::suppress_reflections_and_islands(
-                                        &mut obj.data,
-                                        obj.width,
-                                        obj.height,
-                                    );
-                                    Ok(obj)
-                                }
-                                (Ok(obj), Err(_)) => Ok(obj),
-                                (Err(e), _) => Err(e),
+                            let p = hint_point(&source).unwrap_or((0.5, 0.5));
+                            // Outline / click: take the saliency instance at the point.
+                            match crate::segment::instance_mask_at_point(&input, p) {
+                                Ok(m) => Ok(m),
+                                Err(_) => seg.object(&input, p),
                             }
                         }
                         other => Err(CoreError::InvalidOp(format!(

@@ -1,6 +1,6 @@
 <script lang="ts">
   import { proposeObjectMasks, type ObjectProposal } from "../../../ipc/commands";
-  import { objectPickActive } from "../../../stores/mask";
+  import { instancePickKind, objectPickActive } from "../../../stores/mask";
 
   interface Props {
     imgBox: { left: number; top: number; width: number; height: number } | null;
@@ -15,6 +15,18 @@
   let error = $state<string | null>(null);
   let hoverId = $state<number | null>(null);
   let gen = 0;
+
+  const hintText = $derived(
+    loading
+      ? "Finding subjects…"
+      : error
+        ? error
+        : $instancePickKind === "people"
+          ? "Click each person — Esc when done"
+          : $instancePickKind === "subject"
+            ? "Click each subject — Esc when done"
+            : "Click a dotted outline — Esc when done",
+  );
 
   async function load() {
     const g = ++gen;
@@ -92,13 +104,7 @@
       {/each}
     </svg>
     <div class="pick-hint">
-      {#if loading}
-        Finding objects…
-      {:else if error}
-        {error}
-      {:else}
-        Click a dotted outline to mask that object
-      {/if}
+      {hintText}
     </div>
   </div>
 {/if}
