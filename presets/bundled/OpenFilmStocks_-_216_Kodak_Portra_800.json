@@ -1,0 +1,45 @@
+{
+  "label": "OpenFilmStocks_-_216_Kodak_Portra_800",
+  "tags": [
+    "Film",
+    "High Contrast"
+  ],
+  "modules": {
+    "tone_curve": {
+      "contrast": 80
+    },
+    "color_grade": {
+      "perceptual_sat": 2,
+      "global_chroma": -5
+    },
+    "detail": {
+      "sharpen_amount": 25
+    },
+    "hsl": {
+      "red.hue": 10,
+      "red.sat": -20,
+      "red.lum": -5,
+      "orange.hue": -5,
+      "orange.sat": -15,
+      "orange.lum": 15,
+      "yellow.hue": 10,
+      "yellow.sat": -25,
+      "yellow.lum": 24,
+      "green.hue": 40,
+      "green.sat": -40,
+      "green.lum": -7,
+      "aqua.hue": 10,
+      "aqua.sat": -5,
+      "aqua.lum": -6,
+      "blue.hue": -10,
+      "blue.sat": -20,
+      "blue.lum": -25,
+      "purple.hue": -5,
+      "purple.sat": -60,
+      "purple.lum": -10,
+      "magenta.hue": 0,
+      "magenta.sat": -15,
+      "magenta.lum": -10
+    }
+  }
+}

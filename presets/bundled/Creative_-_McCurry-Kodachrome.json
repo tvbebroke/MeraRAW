@@ -1,0 +1,39 @@
+{
+  "label": "Creative_-_McCurry-Kodachrome",
+  "tags": [
+    "Film",
+    "Pastel"
+  ],
+  "modules": {
+    "tone_curve": {
+      "contrast": 10,
+      "highlights": -20,
+      "shadows": 0,
+      "lights": 10,
+      "darks": 0
+    },
+    "color_grade": {
+      "perceptual_sat": 10,
+      "global_chroma": 12,
+      "shadows_hue": 210,
+      "shadows_sat": 5,
+      "shadows_lum": 0,
+      "midtones_hue": 35,
+      "midtones_sat": 4,
+      "midtones_lum": 0,
+      "highlights_hue": 40,
+      "highlights_sat": 8,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "red.sat": 8,
+      "orange.lum": 12,
+      "green.sat": -10,
+      "blue.sat": -8
+    }
+  }
+}

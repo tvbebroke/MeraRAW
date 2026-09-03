@@ -1,0 +1,43 @@
+{
+  "label": "Mobile_-_Lo-Fi",
+  "tags": [
+    "Warm",
+    "Cool",
+    "High Contrast"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": -0.2
+    },
+    "white_balance": {
+      "temp": 500
+    },
+    "tone_curve": {
+      "contrast": 35,
+      "highlights": -45,
+      "shadows": -10,
+      "lights": 15,
+      "darks": -25
+    },
+    "color_grade": {
+      "perceptual_sat": 20,
+      "global_chroma": 15,
+      "shadows_hue": 35,
+      "shadows_sat": 15,
+      "highlights_hue": 45,
+      "highlights_sat": 18
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "red.sat": 20,
+      "orange.sat": 20,
+      "yellow.sat": 15,
+      "green.sat": -15,
+      "blue.sat": -10,
+      "magenta.sat": 15
+    }
+  }
+}

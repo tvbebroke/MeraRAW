@@ -1,0 +1,41 @@
+{
+  "label": "Seasonal_-_Chinese_New_Year",
+  "tags": [
+    "Warm",
+    "Pastel"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.2
+    },
+    "tone_curve": {
+      "contrast": 15,
+      "highlights": -35,
+      "shadows": 20,
+      "lights": 10,
+      "darks": -8
+    },
+    "color_grade": {
+      "shadows_hue": 25,
+      "shadows_sat": 10,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 35,
+      "highlights_sat": 12,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "red.sat": 15,
+      "red.lum": 5,
+      "orange.sat": 10,
+      "orange.lum": 12,
+      "yellow.sat": 10
+    }
+  }
+}

@@ -1,0 +1,55 @@
+{
+  "label": "Ektar 100 Video",
+  "tags": [
+    "Natural"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.15
+    },
+    "tone_curve": {
+      "contrast": 27,
+      "highlights": -38,
+      "shadows": 22,
+      "lights": 8,
+      "darks": -9
+    },
+    "color_grade": {
+      "global_chroma": 5,
+      "shadows_hue": 210,
+      "shadows_sat": 9,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 45,
+      "highlights_sat": 5,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "red.hue": 10,
+      "red.sat": 21,
+      "red.lum": -10,
+      "orange.hue": -2.5,
+      "orange.sat": 17.5,
+      "orange.lum": -5,
+      "yellow.sat": 16,
+      "yellow.lum": 10,
+      "green.hue": 17.5,
+      "green.sat": 25,
+      "green.lum": -15,
+      "aqua.hue": 5,
+      "aqua.sat": 15,
+      "blue.sat": 17.5,
+      "blue.lum": -15,
+      "purple.hue": 5,
+      "purple.sat": 7.5,
+      "magenta.hue": 5,
+      "magenta.sat": 7.5
+    }
+  }
+}

@@ -1,0 +1,43 @@
+{
+  "label": "Moody PNW Video",
+  "tags": [
+    "Moody",
+    "Muted",
+    "High Contrast",
+    "Dark"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": -0.5
+    },
+    "tone_curve": {
+      "contrast": 32.5,
+      "highlights": -83,
+      "shadows": 75,
+      "lights": 25,
+      "darks": 0
+    },
+    "color_grade": {
+      "global_chroma": -45,
+      "shadows_hue": 260,
+      "shadows_sat": 10,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 160,
+      "highlights_sat": 10,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "orange.lum": 80,
+      "yellow.sat": -30,
+      "green.hue": 50,
+      "green.sat": -60
+    }
+  }
+}

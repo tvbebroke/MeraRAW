@@ -1,0 +1,39 @@
+{
+  "label": "Genre_-_Night_Sky_Landscape",
+  "tags": [
+    "Natural",
+    "Bright & Airy",
+    "Dark"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.5
+    },
+    "tone_curve": {
+      "contrast": 25,
+      "highlights": -55,
+      "shadows": 50,
+      "lights": 15,
+      "darks": -10
+    },
+    "color_grade": {
+      "perceptual_sat": 10,
+      "global_chroma": 5,
+      "shadows_hue": 245,
+      "shadows_sat": 8,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 38,
+      "highlights_sat": 5,
+      "highlights_lum": 0
+    },
+    "hsl": {
+      "yellow.sat": -10,
+      "green.sat": -15,
+      "aqua.sat": 5,
+      "blue.sat": 10
+    }
+  }
+}

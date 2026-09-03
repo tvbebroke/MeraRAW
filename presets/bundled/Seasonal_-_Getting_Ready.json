@@ -1,0 +1,38 @@
+{
+  "label": "Seasonal_-_Getting_Ready",
+  "tags": [
+    "Bright & Airy"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.45
+    },
+    "tone_curve": {
+      "contrast": -10,
+      "highlights": -45,
+      "shadows": 35,
+      "lights": 10,
+      "darks": 5
+    },
+    "color_grade": {
+      "shadows_hue": 200,
+      "shadows_sat": 5,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 40,
+      "highlights_sat": 6,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "orange.sat": -8,
+      "orange.lum": 12,
+      "green.sat": -10
+    }
+  }
+}

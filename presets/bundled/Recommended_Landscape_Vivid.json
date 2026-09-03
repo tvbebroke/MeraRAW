@@ -1,0 +1,35 @@
+{
+  "label": "Recommended · Landscape Vivid",
+  "tags": [
+    "Natural",
+    "Vibrant"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.1
+    },
+    "tone_curve": {
+      "contrast": 22,
+      "highlights": -20,
+      "shadows": 15,
+      "lights": -5,
+      "darks": -10
+    },
+    "color_grade": {
+      "perceptual_sat": 28,
+      "global_chroma": 12
+    },
+    "hsl": {
+      "blue.sat": 18,
+      "aqua.sat": 12,
+      "green.sat": 10,
+      "green.hue": -8,
+      "yellow.sat": 8
+    },
+    "detail": {
+      "sharpen_amount": 55,
+      "noise_luma": 5,
+      "noise_chroma": 20
+    }
+  }
+}

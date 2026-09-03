@@ -1,0 +1,39 @@
+{
+  "label": "Geographic_-_Kyoto_Temple",
+  "tags": [
+    "Pastel"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.1
+    },
+    "tone_curve": {
+      "contrast": -10,
+      "highlights": -35,
+      "shadows": 25,
+      "lights": 5,
+      "darks": 10
+    },
+    "color_grade": {
+      "perceptual_sat": 0,
+      "global_chroma": -5,
+      "shadows_hue": 45,
+      "shadows_sat": 12,
+      "highlights_hue": 40,
+      "highlights_sat": 8
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "orange.sat": -10,
+      "orange.lum": 10,
+      "green.hue": 20,
+      "green.sat": -25,
+      "green.lum": 5,
+      "aqua.sat": -10,
+      "blue.sat": -15
+    }
+  }
+}

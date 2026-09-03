@@ -1,0 +1,55 @@
+{
+  "label": "Color-Negative_-_Ferrania_Solaris_FG_400",
+  "tags": [
+    "Pastel"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.1
+    },
+    "tone_curve": {
+      "contrast": 10,
+      "highlights": -25,
+      "shadows": -10,
+      "lights": 10,
+      "darks": -10
+    },
+    "color_grade": {
+      "shadows_hue": 40,
+      "shadows_sat": 10,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 30,
+      "highlights_sat": 8,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "red.hue": 5,
+      "red.sat": 10,
+      "orange.hue": 5,
+      "orange.sat": 5,
+      "orange.lum": 10,
+      "yellow.hue": -5,
+      "yellow.sat": 5,
+      "yellow.lum": 5,
+      "green.hue": 10,
+      "green.sat": -5,
+      "green.lum": -5,
+      "aqua.hue": -5,
+      "aqua.sat": -10,
+      "blue.hue": -5,
+      "blue.sat": -15,
+      "blue.lum": -10,
+      "purple.hue": -10,
+      "purple.sat": -10,
+      "magenta.hue": -10,
+      "magenta.sat": -15
+    }
+  }
+}

@@ -1,0 +1,42 @@
+{
+  "label": "Geographic_-_Holi_Vibrant",
+  "tags": [
+    "Bright & Airy",
+    "Vibrant"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.3
+    },
+    "tone_curve": {
+      "contrast": 15,
+      "highlights": -35,
+      "shadows": 25,
+      "lights": 20,
+      "darks": -10
+    },
+    "color_grade": {
+      "perceptual_sat": 20,
+      "global_chroma": 15,
+      "shadows_hue": 270,
+      "shadows_sat": 5,
+      "highlights_hue": 45,
+      "highlights_sat": 5
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "red.sat": 25,
+      "orange.sat": 15,
+      "orange.lum": 10,
+      "yellow.sat": 20,
+      "green.sat": 20,
+      "aqua.sat": 20,
+      "blue.sat": 25,
+      "purple.sat": 25,
+      "magenta.sat": 30
+    }
+  }
+}

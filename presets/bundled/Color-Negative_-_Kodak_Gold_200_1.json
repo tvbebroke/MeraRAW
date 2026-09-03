@@ -1,0 +1,59 @@
+{
+  "label": "Color-Negative_-_Kodak_Gold_200_1",
+  "tags": [
+    "Film",
+    "Warm",
+    "Cool",
+    "Pastel",
+    "Teal & Orange"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0
+    },
+    "tone_curve": {
+      "contrast": 2.5,
+      "highlights": -60,
+      "shadows": 17.5,
+      "lights": -20,
+      "darks": 12
+    },
+    "color_grade": {
+      "shadows_hue": 207.5,
+      "shadows_sat": 17.5,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 50,
+      "highlights_sat": 15,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "red.hue": 7.5,
+      "red.sat": 10,
+      "orange.hue": -2.5,
+      "orange.sat": 15,
+      "orange.lum": 15,
+      "yellow.hue": -12.5,
+      "yellow.sat": 20,
+      "yellow.lum": 10,
+      "green.hue": 22.5,
+      "green.sat": -15,
+      "green.lum": -7.5,
+      "aqua.hue": -12.5,
+      "aqua.sat": -5,
+      "blue.hue": -10,
+      "blue.sat": -15,
+      "blue.lum": -10,
+      "purple.hue": -15,
+      "purple.sat": -22.5,
+      "magenta.hue": -15,
+      "magenta.sat": -22.5
+    }
+  }
+}

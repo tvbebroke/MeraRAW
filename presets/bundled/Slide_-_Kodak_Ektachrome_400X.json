@@ -1,0 +1,45 @@
+{
+  "label": "Slide_-_Kodak_Ektachrome_400X",
+  "tags": [
+    "Film",
+    "High Contrast"
+  ],
+  "modules": {
+    "tone_curve": {
+      "contrast": 45,
+      "highlights": -45,
+      "shadows": 10,
+      "lights": 15,
+      "darks": -30
+    },
+    "color_grade": {
+      "perceptual_sat": 3,
+      "global_chroma": 8,
+      "shadows_hue": 200,
+      "shadows_sat": 8,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 55,
+      "highlights_sat": 6,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "red.hue": 10,
+      "red.sat": 5,
+      "orange.sat": 5,
+      "green.hue": 10,
+      "green.sat": 5,
+      "aqua.hue": 5,
+      "blue.hue": -5,
+      "blue.sat": 10,
+      "blue.lum": -15,
+      "magenta.sat": -5
+    }
+  }
+}

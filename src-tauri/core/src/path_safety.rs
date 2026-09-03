@@ -31,24 +31,103 @@ pub fn simplify_path(path: PathBuf) -> PathBuf {
     }
 }
 
-/// Sensitive prefixes we never open from sidecar / edit-doc paths.
-fn is_denied(path: &Path) -> bool {
+/// Sensitive locations we never open from IPC or sidecar paths (defense in depth).
+/// Shared by Tauri `validate_user_path` and sidecar LUT sanitization.
+pub fn is_sensitive_path(path: &Path) -> bool {
     let s = path.to_string_lossy();
     let lower = s.to_lowercase();
 
-    let home_denied = [
+    // Substrings that appear under a home / profile directory on any OS.
+    // Prefer path-segment markers (`/.ssh`, `\chrome\`) so we don't match
+    // innocent names like `my.ssh_photos`.
+    const HOME_DENIED: &[&str] = &[
+        "/.ssh/",
         "/.ssh",
+        "/.gnupg/",
         "/.gnupg",
+        "/.aws/",
         "/.aws",
         "/.config/gcloud",
+        "/.config/op/",
+        "/.config/op",
+        "/.config/1password",
+        "/.kube/",
         "/.kube",
+        "/.docker/",
         "/.docker",
+        "/.password-store/",
+        "/.password-store",
+        "/.netrc",
+        "/.npmrc",
+        "/.pypirc",
+        "/.git-credentials",
+        "/.bash_history",
+        "/.zsh_history",
+        "/.python_history",
+        "/.mysql_history",
+        "/.psql_history",
         "/library/keychains",
+        "/library/keys/",
+        "/library/cookies",
+        "/library/mail/",
+        "/library/messages/",
+        "/library/safari/",
+        "/library/accounts/",
+        "/library/identityservices",
+        "/library/preferences/",
+        "/library/application support/google/chrome",
+        "/library/application support/google/chrome for testing",
+        "/library/application support/chromium",
+        "/library/application support/bravesoftware",
+        "/library/application support/microsoft edge",
+        "/library/application support/firefox",
+        "/library/application support/com.operasoftware",
+        "/library/application support/1password",
+        "/library/application support/com.1password",
+        "/library/application support/slack",
+        "/library/application support/discord",
+        "/library/application support/zoom.us",
+        "\\.ssh\\",
         "\\.ssh",
+        "\\.gnupg\\",
         "\\.gnupg",
+        "\\.aws\\",
         "\\.aws",
+        "\\.config\\gcloud",
+        "\\.config\\op\\",
+        "\\.config\\op",
+        "\\.config\\1password",
+        "\\.kube\\",
+        "\\.kube",
+        "\\.docker\\",
+        "\\.docker",
+        "\\.password-store",
+        "\\.netrc",
+        "\\.npmrc",
+        "\\.pypirc",
+        "\\.git-credentials",
+        "\\.bash_history",
+        "\\.zsh_history",
+        "\\appdata\\local\\google\\chrome",
+        "\\appdata\\local\\chromium",
+        "\\appdata\\local\\microsoft\\edge",
+        "\\appdata\\local\\bravesoftware",
+        "\\appdata\\roaming\\mozilla",
+        "\\appdata\\roaming\\1password",
+        "\\appdata\\local\\1password",
+        "\\appdata\\roaming\\slack",
+        "\\appdata\\roaming\\discord",
     ];
-    if home_denied.iter().any(|d| lower.contains(d)) {
+    if HOME_DENIED.iter().any(|d| lower.contains(d)) {
+        return true;
+    }
+    // Exact filename secrets at home root (`/Users/x/.netrc` ends with `/.netrc`
+    // already covered; also catch Windows `C:\Users\x\.netrc`).
+    if lower.ends_with("\\.netrc")
+        || lower.ends_with("/.netrc")
+        || lower.ends_with("\\.npmrc")
+        || lower.ends_with("/.npmrc")
+    {
         return true;
     }
 
@@ -91,6 +170,10 @@ fn is_denied(path: &Path) -> bool {
     }
 
     false
+}
+
+fn is_denied(path: &Path) -> bool {
+    is_sensitive_path(path)
 }
 
 fn normalize_lexical(path: &Path) -> PathBuf {
@@ -194,6 +277,25 @@ mod tests {
         let p = sanitize_user_path("/tmp/looks/photo.cube");
         assert!(p.is_some());
         assert!(!p.unwrap().to_string_lossy().contains(".."));
+    }
+
+    #[test]
+    fn rejects_browser_and_credential_homes() {
+        assert!(is_sensitive_path(Path::new(
+            "/Users/a/Library/Application Support/Google/Chrome/Default/Cookies"
+        )));
+        assert!(is_sensitive_path(Path::new("/Users/a/.netrc")));
+        assert!(is_sensitive_path(Path::new("/Users/a/.npmrc")));
+        assert!(is_sensitive_path(Path::new("/Users/a/.zsh_history")));
+        assert!(is_sensitive_path(Path::new("/Users/a/.config/op/config")));
+        assert!(is_sensitive_path(Path::new(
+            r"C:\Users\a\AppData\Local\Google\Chrome\User Data\Default\Cookies"
+        )));
+        // Photos / Pictures remain allowed for a RAW editor.
+        assert!(!is_sensitive_path(Path::new("/Users/a/Pictures/raw/a.dng")));
+        assert!(!is_sensitive_path(Path::new(
+            "/Users/a/Library/CloudStorage/photo.dng"
+        )));
     }
 
     #[test]

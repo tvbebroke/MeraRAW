@@ -1,0 +1,44 @@
+{
+  "label": "Alternative-Process_-_12_Autochrome",
+  "tags": [
+    "Muted",
+    "Pastel",
+    "Teal & Orange"
+  ],
+  "modules": {
+    "tone_curve": {
+      "contrast": -15,
+      "highlights": -35,
+      "shadows": 30,
+      "lights": -5,
+      "darks": -5
+    },
+    "color_grade": {
+      "perceptual_sat": -15,
+      "global_chroma": -20,
+      "shadows_hue": 220,
+      "shadows_sat": 8,
+      "shadows_lum": 0,
+      "midtones_hue": 45,
+      "midtones_sat": 5,
+      "midtones_lum": 0,
+      "highlights_hue": 40,
+      "highlights_sat": 8,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "red.sat": -15,
+      "orange.sat": -10,
+      "yellow.sat": 10,
+      "green.sat": -20,
+      "aqua.sat": 10,
+      "blue.sat": -10,
+      "purple.sat": 5,
+      "magenta.sat": 5
+    }
+  }
+}

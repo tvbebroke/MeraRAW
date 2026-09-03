@@ -1,0 +1,40 @@
+{
+  "label": "Decade_-_Disco_Warm",
+  "tags": [
+    "Warm"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.1
+    },
+    "tone_curve": {
+      "contrast": 25,
+      "highlights": -45,
+      "shadows": 20,
+      "lights": 10,
+      "darks": -15
+    },
+    "color_grade": {
+      "shadows_hue": 30,
+      "shadows_sat": 12,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 35,
+      "highlights_sat": 18,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "red.sat": 10,
+      "orange.sat": 15,
+      "orange.lum": 15,
+      "yellow.sat": 10,
+      "blue.sat": -10
+    }
+  }
+}

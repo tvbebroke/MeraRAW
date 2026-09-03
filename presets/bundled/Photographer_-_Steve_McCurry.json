@@ -1,0 +1,44 @@
+{
+  "label": "Photographer_-_Steve_McCurry",
+  "tags": [
+    "Warm"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.1
+    },
+    "tone_curve": {
+      "contrast": 20,
+      "highlights": -30,
+      "shadows": 20,
+      "lights": 10,
+      "darks": -15
+    },
+    "color_grade": {
+      "perceptual_sat": 8,
+      "global_chroma": 5,
+      "shadows_hue": 45,
+      "shadows_sat": 8,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 40,
+      "highlights_sat": 12,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 40
+    },
+    "hsl": {
+      "red.sat": 12,
+      "red.lum": 5,
+      "orange.sat": 5,
+      "orange.lum": 10,
+      "yellow.hue": -8,
+      "green.hue": 10,
+      "green.sat": -15,
+      "blue.sat": -10
+    }
+  }
+}

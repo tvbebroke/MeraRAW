@@ -1,0 +1,39 @@
+{
+  "label": "Geographic_-_Sakura_Season",
+  "tags": [
+    "Bright & Airy"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.75
+    },
+    "tone_curve": {
+      "contrast": -25,
+      "highlights": -50,
+      "shadows": 45,
+      "lights": 20,
+      "darks": 20
+    },
+    "color_grade": {
+      "perceptual_sat": 0,
+      "global_chroma": -5,
+      "shadows_hue": 210,
+      "shadows_sat": 6,
+      "highlights_hue": 330,
+      "highlights_sat": 8
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "orange.sat": -10,
+      "orange.lum": 10,
+      "green.hue": 10,
+      "green.sat": -25,
+      "purple.sat": 10,
+      "magenta.sat": 15,
+      "magenta.lum": 10
+    }
+  }
+}

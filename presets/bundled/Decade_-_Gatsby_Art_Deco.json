@@ -1,0 +1,41 @@
+{
+  "label": "Decade_-_Gatsby_Art_Deco",
+  "tags": [
+    "Warm",
+    "High Contrast"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": -0.1
+    },
+    "tone_curve": {
+      "contrast": 30,
+      "highlights": -50,
+      "shadows": 15,
+      "lights": 5,
+      "darks": -15
+    },
+    "color_grade": {
+      "shadows_hue": 30,
+      "shadows_sat": 12,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 40,
+      "highlights_sat": 15,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "orange.sat": 10,
+      "orange.lum": 10,
+      "yellow.sat": 5,
+      "green.sat": -20,
+      "blue.sat": -15
+    }
+  }
+}

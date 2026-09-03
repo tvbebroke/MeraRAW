@@ -1,0 +1,41 @@
+{
+  "label": "Seasonal_-_Moody_Fall",
+  "tags": [
+    "Moody",
+    "Cool",
+    "Teal & Orange"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": -0.3
+    },
+    "tone_curve": {
+      "contrast": 25,
+      "highlights": -50,
+      "shadows": 15,
+      "lights": 0,
+      "darks": -20
+    },
+    "color_grade": {
+      "shadows_hue": 220,
+      "shadows_sat": 15,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 35,
+      "highlights_sat": 8,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "orange.lum": 15,
+      "yellow.sat": -15,
+      "green.hue": 25,
+      "green.sat": -40
+    }
+  }
+}

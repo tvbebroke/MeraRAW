@@ -1,0 +1,53 @@
+{
+  "label": "Color-Negative_-_Kodak_Portra_800_1",
+  "tags": [
+    "Film",
+    "Cool",
+    "Pastel"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.05
+    },
+    "tone_curve": {
+      "contrast": 0,
+      "highlights": -68,
+      "shadows": 33,
+      "lights": -15,
+      "darks": -26
+    },
+    "color_grade": {
+      "shadows_hue": 240,
+      "shadows_sat": 10,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 50,
+      "highlights_sat": 7,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "red.hue": 5,
+      "red.sat": -15,
+      "orange.hue": 1,
+      "orange.sat": -10,
+      "orange.lum": 24,
+      "yellow.hue": -15,
+      "yellow.sat": -23,
+      "green.hue": -21,
+      "green.sat": -33,
+      "aqua.hue": 5,
+      "aqua.sat": -18,
+      "blue.hue": -10,
+      "blue.sat": -10,
+      "blue.lum": -15,
+      "purple.sat": -15,
+      "magenta.sat": -15
+    }
+  }
+}

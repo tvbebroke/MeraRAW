@@ -1,0 +1,57 @@
+{
+  "label": "Slide_-_Fuji_Velvia_50",
+  "tags": [
+    "Film",
+    "Cool",
+    "Vibrant",
+    "High Contrast"
+  ],
+  "modules": {
+    "tone_curve": {
+      "contrast": 40,
+      "highlights": -65,
+      "shadows": -30,
+      "lights": 15,
+      "darks": -30
+    },
+    "color_grade": {
+      "global_chroma": -5,
+      "shadows_hue": 230,
+      "shadows_sat": 10,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 50,
+      "highlights_sat": 7.5,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "red.hue": 15,
+      "red.sat": 22.5,
+      "orange.hue": -10,
+      "orange.sat": 20,
+      "orange.lum": 7.5,
+      "yellow.hue": -17.5,
+      "yellow.sat": 12.5,
+      "yellow.lum": 7.5,
+      "green.hue": 22.5,
+      "green.sat": 35,
+      "green.lum": -15,
+      "aqua.hue": 15,
+      "aqua.sat": -15,
+      "aqua.lum": -15,
+      "blue.hue": -7.5,
+      "blue.sat": 26.3,
+      "blue.lum": -22.5,
+      "purple.hue": 15,
+      "purple.sat": 15,
+      "magenta.hue": 10,
+      "magenta.sat": 20
+    }
+  }
+}

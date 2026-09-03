@@ -1,0 +1,42 @@
+{
+  "label": "Color-Negative_-_Fujifilm_Pro_400H",
+  "tags": [
+    "Bright & Airy",
+    "Film"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.48
+    },
+    "tone_curve": {
+      "contrast": -19,
+      "highlights": -50,
+      "shadows": 33,
+      "lights": -5,
+      "darks": -15
+    },
+    "color_grade": {
+      "shadows_hue": 190,
+      "shadows_sat": 8,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 45,
+      "highlights_sat": 5,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10
+    },
+    "hsl": {
+      "orange.sat": -15,
+      "orange.lum": 10,
+      "green.hue": 20,
+      "green.sat": -24,
+      "green.lum": -5,
+      "blue.hue": -5,
+      "blue.sat": -18
+    }
+  }
+}

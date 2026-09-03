@@ -1,0 +1,40 @@
+{
+  "label": "Decade_-_Y2K_Digicam",
+  "tags": [
+    "Teal & Orange"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.1
+    },
+    "tone_curve": {
+      "contrast": 20,
+      "highlights": -30,
+      "shadows": 15,
+      "lights": 10,
+      "darks": -10
+    },
+    "color_grade": {
+      "global_chroma": -5,
+      "shadows_hue": 210,
+      "shadows_sat": 8,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 35,
+      "highlights_sat": 8,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "orange.lum": 10,
+      "yellow.sat": 5,
+      "green.sat": -15,
+      "blue.sat": 5
+    }
+  }
+}

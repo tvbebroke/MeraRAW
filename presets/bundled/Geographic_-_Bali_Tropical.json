@@ -1,0 +1,46 @@
+{
+  "label": "Geographic_-_Bali_Tropical",
+  "tags": [
+    "Natural",
+    "Bright & Airy",
+    "Cool",
+    "Pastel"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.3
+    },
+    "white_balance": {
+      "temp": 300
+    },
+    "tone_curve": {
+      "contrast": -10,
+      "highlights": -40,
+      "shadows": 35,
+      "lights": 15,
+      "darks": 10
+    },
+    "color_grade": {
+      "perceptual_sat": 15,
+      "global_chroma": 10,
+      "shadows_hue": 160,
+      "shadows_sat": 5,
+      "highlights_hue": 45,
+      "highlights_sat": 8
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "orange.sat": 5,
+      "orange.lum": 10,
+      "yellow.sat": 15,
+      "yellow.lum": 10,
+      "green.hue": 10,
+      "green.sat": 20,
+      "green.lum": 5,
+      "aqua.sat": 15
+    }
+  }
+}

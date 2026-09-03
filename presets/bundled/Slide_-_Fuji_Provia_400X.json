@@ -1,0 +1,37 @@
+{
+  "label": "Slide_-_Fuji_Provia_400X",
+  "tags": [
+    "Film"
+  ],
+  "modules": {
+    "tone_curve": {
+      "contrast": 22.5,
+      "highlights": -20,
+      "shadows": -25,
+      "lights": 12.5,
+      "darks": -27.5
+    },
+    "color_grade": {
+      "global_chroma": 5,
+      "shadows_hue": 220,
+      "shadows_sat": 6.3,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 45,
+      "highlights_sat": 3.8,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "green.sat": -5,
+      "blue.hue": -5,
+      "blue.sat": 3.8,
+      "blue.lum": -10
+    }
+  }
+}

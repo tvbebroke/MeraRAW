@@ -1,0 +1,42 @@
+{
+  "label": "Geographic_-_Byron_Bay_Surf",
+  "tags": [
+    "Bright & Airy",
+    "Cool"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.6
+    },
+    "white_balance": {
+      "temp": 200
+    },
+    "tone_curve": {
+      "contrast": -20,
+      "highlights": -45,
+      "shadows": 40,
+      "lights": 25,
+      "darks": 15
+    },
+    "color_grade": {
+      "perceptual_sat": 0,
+      "global_chroma": -5,
+      "shadows_hue": 200,
+      "shadows_sat": 5,
+      "highlights_hue": 45,
+      "highlights_sat": 8
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "orange.sat": 5,
+      "orange.lum": 12,
+      "green.sat": -15,
+      "aqua.sat": 15,
+      "aqua.lum": 15,
+      "blue.sat": 10
+    }
+  }
+}

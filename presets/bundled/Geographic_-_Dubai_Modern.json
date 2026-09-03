@@ -1,0 +1,38 @@
+{
+  "label": "Geographic_-_Dubai_Modern",
+  "tags": [
+    "Cool",
+    "High Contrast"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.1
+    },
+    "tone_curve": {
+      "contrast": 30,
+      "highlights": -40,
+      "shadows": 20,
+      "lights": 20,
+      "darks": -15
+    },
+    "color_grade": {
+      "perceptual_sat": -5,
+      "global_chroma": -10,
+      "shadows_hue": 215,
+      "shadows_sat": 12,
+      "highlights_hue": 210,
+      "highlights_sat": 5
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "orange.sat": -15,
+      "orange.lum": 10,
+      "green.sat": -25,
+      "aqua.sat": -5,
+      "blue.sat": -10
+    }
+  }
+}

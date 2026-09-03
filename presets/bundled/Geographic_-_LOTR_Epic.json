@@ -1,0 +1,43 @@
+{
+  "label": "Geographic_-_LOTR_Epic",
+  "tags": [
+    "Moody",
+    "Cool",
+    "Muted",
+    "High Contrast",
+    "Dark"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": -0.4
+    },
+    "tone_curve": {
+      "contrast": 35,
+      "highlights": -65,
+      "shadows": 55,
+      "lights": 15,
+      "darks": -20
+    },
+    "color_grade": {
+      "perceptual_sat": -25,
+      "global_chroma": -30,
+      "shadows_hue": 250,
+      "shadows_sat": 10,
+      "highlights_hue": 155,
+      "highlights_sat": 10
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "orange.lum": 60,
+      "yellow.sat": -30,
+      "green.hue": 45,
+      "green.sat": -60,
+      "green.lum": -10,
+      "aqua.sat": -10,
+      "blue.sat": -15
+    }
+  }
+}

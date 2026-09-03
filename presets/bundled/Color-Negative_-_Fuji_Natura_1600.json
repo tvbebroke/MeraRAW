@@ -1,0 +1,40 @@
+{
+  "label": "Color-Negative_-_Fuji_Natura_1600",
+  "tags": [
+    "Film",
+    "Pastel"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.24
+    },
+    "tone_curve": {
+      "contrast": -14,
+      "highlights": -43,
+      "shadows": 41,
+      "darks": -16
+    },
+    "color_grade": {
+      "global_chroma": -5,
+      "shadows_hue": 215,
+      "shadows_sat": 8,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 42,
+      "highlights_sat": 6,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10
+    },
+    "hsl": {
+      "orange.sat": -5,
+      "green.hue": 16,
+      "green.sat": -20,
+      "green.lum": 5,
+      "blue.sat": 5
+    }
+  }
+}

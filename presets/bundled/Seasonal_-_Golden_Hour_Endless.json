@@ -1,0 +1,41 @@
+{
+  "label": "Seasonal_-_Golden_Hour_Endless",
+  "tags": [
+    "Warm",
+    "Pastel"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.2
+    },
+    "tone_curve": {
+      "contrast": 15,
+      "highlights": -45,
+      "shadows": 25,
+      "lights": 10,
+      "darks": -10
+    },
+    "color_grade": {
+      "shadows_hue": 35,
+      "shadows_sat": 10,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 38,
+      "highlights_sat": 15,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "orange.sat": 15,
+      "orange.lum": 18,
+      "yellow.hue": -10,
+      "yellow.sat": 12,
+      "blue.sat": -10
+    }
+  }
+}

@@ -1,0 +1,43 @@
+{
+  "label": "Mobile_-_Juno",
+  "tags": [
+    "Warm",
+    "Cool"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.15
+    },
+    "white_balance": {
+      "temp": 300
+    },
+    "tone_curve": {
+      "contrast": 15,
+      "highlights": -35,
+      "shadows": 20,
+      "lights": 15,
+      "darks": -5
+    },
+    "color_grade": {
+      "perceptual_sat": 15,
+      "global_chroma": 15,
+      "shadows_hue": 65,
+      "shadows_sat": 8,
+      "midtones_hue": 50,
+      "midtones_sat": 5,
+      "highlights_hue": 45,
+      "highlights_sat": 10
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "orange.sat": 10,
+      "orange.lum": 10,
+      "yellow.sat": 15,
+      "green.sat": 10,
+      "blue.sat": -10
+    }
+  }
+}

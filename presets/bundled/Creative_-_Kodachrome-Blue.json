@@ -1,0 +1,47 @@
+{
+  "label": "Creative_-_Kodachrome-Blue",
+  "tags": [
+    "Film",
+    "Warm",
+    "Cool"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": -0.15
+    },
+    "white_balance": {
+      "temp": 6500,
+      "tint": 20
+    },
+    "tone_curve": {
+      "contrast": 25,
+      "highlights": 30,
+      "shadows": -5,
+      "lights": 15,
+      "darks": 0
+    },
+    "color_grade": {
+      "perceptual_sat": 17,
+      "global_chroma": 20,
+      "shadows_hue": 215,
+      "shadows_sat": 18,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 220,
+      "highlights_sat": 12,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "red.sat": -5,
+      "orange.sat": -5,
+      "aqua.sat": 10,
+      "blue.sat": 15
+    }
+  }
+}

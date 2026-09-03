@@ -1,0 +1,44 @@
+{
+  "label": "Color-Negative_-_Agfa_Vista_200",
+  "tags": [
+    "Pastel"
+  ],
+  "modules": {
+    "tone_curve": {
+      "contrast": 14,
+      "highlights": -11,
+      "shadows": 15,
+      "lights": 19,
+      "darks": -15
+    },
+    "color_grade": {
+      "perceptual_sat": 12,
+      "global_chroma": 8,
+      "shadows_hue": 240,
+      "shadows_sat": 5,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 0,
+      "highlights_sat": 0,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10
+    },
+    "hsl": {
+      "red.hue": -5,
+      "red.sat": 28,
+      "red.lum": 10,
+      "orange.sat": 8,
+      "yellow.hue": -5,
+      "yellow.sat": 12,
+      "green.hue": 5,
+      "green.sat": -5,
+      "blue.hue": -5,
+      "blue.sat": 16,
+      "blue.lum": 5
+    }
+  }
+}

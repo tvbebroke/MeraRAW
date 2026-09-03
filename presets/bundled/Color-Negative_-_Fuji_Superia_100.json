@@ -1,0 +1,42 @@
+{
+  "label": "Color-Negative_-_Fuji_Superia_100",
+  "tags": [
+    "Bright & Airy",
+    "Film"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.5
+    },
+    "tone_curve": {
+      "contrast": 8,
+      "highlights": -10,
+      "shadows": 20,
+      "darks": -5
+    },
+    "color_grade": {
+      "perceptual_sat": 5,
+      "global_chroma": 5,
+      "shadows_hue": 140,
+      "shadows_sat": 8,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 35,
+      "highlights_sat": 5,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 5,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "red.hue": -5,
+      "red.sat": 5,
+      "green.sat": 5,
+      "blue.hue": -3,
+      "blue.sat": 5
+    }
+  }
+}

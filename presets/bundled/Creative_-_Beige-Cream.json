@@ -1,0 +1,35 @@
+{
+  "label": "Creative_-_Beige-Cream",
+  "tags": [
+    "Pastel"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.15
+    },
+    "tone_curve": {
+      "contrast": 14,
+      "highlights": -19,
+      "shadows": 19,
+      "lights": 11,
+      "darks": 0
+    },
+    "color_grade": {
+      "perceptual_sat": 4,
+      "global_chroma": 6,
+      "shadows_hue": 220,
+      "shadows_sat": 7,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 42,
+      "highlights_sat": 9,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    }
+  }
+}

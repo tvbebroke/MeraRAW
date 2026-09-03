@@ -1,0 +1,50 @@
+{
+  "label": "Color-Negative_-_Fuji_NPS_160_Pulled",
+  "tags": [
+    "Bright & Airy",
+    "Film"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.8
+    },
+    "tone_curve": {
+      "contrast": -25,
+      "highlights": -50,
+      "shadows": 40,
+      "lights": 0,
+      "darks": 15
+    },
+    "color_grade": {
+      "perceptual_sat": -10,
+      "global_chroma": -15,
+      "shadows_hue": 160,
+      "shadows_sat": 10,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 40,
+      "highlights_sat": 4,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "red.hue": -3,
+      "red.sat": -10,
+      "orange.sat": -10,
+      "orange.lum": 10,
+      "yellow.sat": -10,
+      "green.hue": -5,
+      "green.sat": -25,
+      "aqua.sat": -12,
+      "blue.hue": -5,
+      "blue.sat": -15,
+      "blue.lum": -8,
+      "magenta.sat": -8
+    }
+  }
+}

@@ -1,0 +1,46 @@
+{
+  "label": "Geographic_-_Desert_Luxury",
+  "tags": [
+    "Moody",
+    "Warm",
+    "Cool",
+    "Earthy"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": -0.15
+    },
+    "white_balance": {
+      "temp": 600
+    },
+    "tone_curve": {
+      "contrast": 20,
+      "highlights": -45,
+      "shadows": 25,
+      "lights": 10,
+      "darks": -15
+    },
+    "color_grade": {
+      "perceptual_sat": 0,
+      "global_chroma": 0,
+      "shadows_hue": 35,
+      "shadows_sat": 18,
+      "midtones_hue": 40,
+      "midtones_sat": 5,
+      "highlights_hue": 45,
+      "highlights_sat": 15
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "red.sat": 10,
+      "orange.sat": 15,
+      "orange.lum": 10,
+      "yellow.sat": 10,
+      "green.sat": -20,
+      "blue.sat": -15
+    }
+  }
+}

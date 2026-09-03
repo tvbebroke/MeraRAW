@@ -1,0 +1,41 @@
+{
+  "label": "Seasonal_-_Reception",
+  "tags": [
+    "Moody",
+    "Warm",
+    "Pastel"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": -0.05
+    },
+    "tone_curve": {
+      "contrast": 15,
+      "highlights": -35,
+      "shadows": 20,
+      "lights": 5,
+      "darks": -10
+    },
+    "color_grade": {
+      "shadows_hue": 32,
+      "shadows_sat": 10,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 38,
+      "highlights_sat": 12,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "orange.sat": 8,
+      "orange.lum": 12,
+      "yellow.sat": 5,
+      "blue.sat": -12
+    }
+  }
+}

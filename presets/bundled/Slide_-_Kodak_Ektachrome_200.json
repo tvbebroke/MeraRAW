@@ -1,0 +1,45 @@
+{
+  "label": "Slide_-_Kodak_Ektachrome_200",
+  "tags": [
+    "Moody",
+    "Film",
+    "High Contrast"
+  ],
+  "modules": {
+    "tone_curve": {
+      "contrast": 38,
+      "highlights": -38,
+      "shadows": 18,
+      "lights": 12,
+      "darks": -28
+    },
+    "color_grade": {
+      "perceptual_sat": 4,
+      "global_chroma": 2,
+      "shadows_hue": 210,
+      "shadows_sat": 6,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 50,
+      "highlights_sat": 4,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "red.hue": 5,
+      "red.sat": 0,
+      "green.hue": 10,
+      "green.sat": -5,
+      "aqua.hue": 5,
+      "blue.hue": -8,
+      "blue.sat": 5,
+      "blue.lum": -12,
+      "magenta.sat": -5
+    }
+  }
+}

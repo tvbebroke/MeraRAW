@@ -1,0 +1,39 @@
+{
+  "label": "Color-Negative_-_Fuji_Superia_X-TRA_400_1",
+  "tags": [
+    "Film",
+    "High Contrast"
+  ],
+  "modules": {
+    "tone_curve": {
+      "contrast": 30,
+      "highlights": -30,
+      "shadows": 0,
+      "darks": -3
+    },
+    "color_grade": {
+      "perceptual_sat": 15,
+      "global_chroma": 15,
+      "shadows_hue": 130,
+      "shadows_sat": 16,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 40,
+      "highlights_sat": 5,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "red.hue": -10,
+      "red.sat": 13,
+      "green.sat": 5,
+      "blue.hue": -5,
+      "blue.sat": -5
+    }
+  }
+}

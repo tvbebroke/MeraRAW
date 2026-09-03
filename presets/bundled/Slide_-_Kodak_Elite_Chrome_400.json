@@ -1,0 +1,38 @@
+{
+  "label": "Slide_-_Kodak_Elite_Chrome_400",
+  "tags": [
+    "Film"
+  ],
+  "modules": {
+    "tone_curve": {
+      "contrast": 25,
+      "highlights": -17.5,
+      "shadows": -20,
+      "lights": 10,
+      "darks": -25
+    },
+    "color_grade": {
+      "global_chroma": 5,
+      "shadows_hue": 50,
+      "shadows_sat": 7.5,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 45,
+      "highlights_sat": 5,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "orange.lum": 7.5,
+      "yellow.hue": -5,
+      "yellow.sat": 5,
+      "green.sat": -5,
+      "blue.lum": -7.5
+    }
+  }
+}

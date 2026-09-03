@@ -1,0 +1,47 @@
+{
+  "label": "Geographic_-_Marrakech_Souk",
+  "tags": [
+    "Moody",
+    "Warm",
+    "Cool"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": -0.15
+    },
+    "white_balance": {
+      "temp": 700
+    },
+    "tone_curve": {
+      "contrast": 25,
+      "highlights": -50,
+      "shadows": 30,
+      "lights": 10,
+      "darks": -15
+    },
+    "color_grade": {
+      "perceptual_sat": 5,
+      "global_chroma": 5,
+      "shadows_hue": 35,
+      "shadows_sat": 15,
+      "highlights_hue": 40,
+      "highlights_sat": 12
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "red.sat": 25,
+      "red.lum": -5,
+      "orange.sat": 20,
+      "orange.lum": 5,
+      "yellow.sat": 15,
+      "green.hue": 20,
+      "green.sat": -30,
+      "aqua.sat": -5,
+      "blue.sat": -10,
+      "magenta.sat": 10
+    }
+  }
+}

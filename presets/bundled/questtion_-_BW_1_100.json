@@ -1,0 +1,23 @@
+{
+  "label": "questtion_-_BW_1_100",
+  "tags": [
+    "Bright & Airy",
+    "Warm",
+    "Black & White"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 1
+    },
+    "white_balance": {
+      "temp": 6500,
+      "tint": 6
+    },
+    "tone_curve": {
+      "highlights": -37,
+      "shadows": 63,
+      "lights": 6,
+      "darks": -38
+    }
+  }
+}

@@ -1,0 +1,48 @@
+{
+  "label": "Geographic_-_Fjord_Moody",
+  "tags": [
+    "Moody",
+    "Cool",
+    "Muted",
+    "High Contrast",
+    "Dark"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": -0.4
+    },
+    "white_balance": {
+      "temp": -300
+    },
+    "tone_curve": {
+      "contrast": 35,
+      "highlights": -60,
+      "shadows": 50,
+      "lights": 10,
+      "darks": -15
+    },
+    "color_grade": {
+      "perceptual_sat": -15,
+      "global_chroma": -20,
+      "shadows_hue": 225,
+      "shadows_sat": 18,
+      "highlights_hue": 200,
+      "highlights_sat": 8
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "orange.sat": -25,
+      "yellow.sat": -35,
+      "green.hue": 40,
+      "green.sat": -55,
+      "aqua.hue": 20,
+      "aqua.sat": 15,
+      "aqua.lum": -15,
+      "blue.sat": 10,
+      "blue.lum": -15
+    }
+  }
+}

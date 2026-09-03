@@ -1,0 +1,39 @@
+{
+  "label": "Color-Negative_-_Fujifilm-Eterna",
+  "tags": [
+    "Film"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": -0.15
+    },
+    "tone_curve": {
+      "contrast": -10,
+      "highlights": 25,
+      "shadows": 0,
+      "lights": -5,
+      "darks": 5
+    },
+    "color_grade": {
+      "perceptual_sat": 12,
+      "global_chroma": 15,
+      "shadows_hue": 40,
+      "shadows_sat": 6,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 45,
+      "highlights_sat": 5,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "orange.lum": 10,
+      "green.sat": -15
+    }
+  }
+}

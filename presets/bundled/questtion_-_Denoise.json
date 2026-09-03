@@ -1,0 +1,15 @@
+{
+  "label": "questtion_-_Denoise",
+  "tags": [
+    "Natural",
+    "Pastel",
+    "Clean"
+  ],
+  "modules": {
+    "detail": {
+      "sharpen_amount": 40,
+      "noise_luma": 44,
+      "noise_chroma": 61
+    }
+  }
+}

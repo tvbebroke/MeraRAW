@@ -1,0 +1,31 @@
+{
+  "label": "Color-Negative_-_Lomochrome_Purple",
+  "tags": [
+    "Cool",
+    "Pastel"
+  ],
+  "modules": {
+    "color_grade": {
+      "shadows_hue": 210,
+      "shadows_sat": 11,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 305,
+      "highlights_sat": 20,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10
+    },
+    "hsl": {
+      "yellow.hue": 33,
+      "green.hue": -60,
+      "green.sat": 34,
+      "blue.hue": -93,
+      "blue.sat": -30,
+      "magenta.sat": 39
+    }
+  }
+}

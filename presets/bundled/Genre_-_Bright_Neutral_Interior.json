@@ -1,0 +1,36 @@
+{
+  "label": "Genre_-_Bright_Neutral_Interior",
+  "tags": [
+    "Bright & Airy",
+    "Clean"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.4
+    },
+    "tone_curve": {
+      "contrast": 10,
+      "highlights": -35,
+      "shadows": 30,
+      "lights": 10,
+      "darks": 0
+    },
+    "color_grade": {
+      "global_chroma": 0,
+      "shadows_hue": 220,
+      "shadows_sat": 3,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 43,
+      "highlights_sat": 3,
+      "highlights_lum": 0
+    },
+    "hsl": {
+      "orange.sat": -5,
+      "aqua.lum": 15,
+      "blue.sat": -10
+    }
+  }
+}

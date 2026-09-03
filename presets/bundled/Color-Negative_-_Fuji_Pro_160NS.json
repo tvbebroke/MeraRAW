@@ -1,0 +1,40 @@
+{
+  "label": "Color-Negative_-_Fuji_Pro_160NS",
+  "tags": [
+    "Bright & Airy",
+    "Film",
+    "Pastel"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.33
+    },
+    "tone_curve": {
+      "contrast": -8,
+      "highlights": -10,
+      "shadows": 0,
+      "darks": 5
+    },
+    "color_grade": {
+      "shadows_hue": 195,
+      "shadows_sat": 6,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 45,
+      "highlights_sat": 3,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10
+    },
+    "hsl": {
+      "orange.lum": 10,
+      "green.hue": 15,
+      "green.sat": -12,
+      "blue.hue": -3,
+      "blue.sat": -5
+    }
+  }
+}

@@ -1,0 +1,59 @@
+{
+  "label": "Color-Negative_-_Fujicolor_NPH",
+  "tags": [
+    "Film",
+    "Pastel"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.25
+    },
+    "tone_curve": {
+      "contrast": -10,
+      "highlights": -40,
+      "shadows": 25,
+      "lights": -5,
+      "darks": 10
+    },
+    "color_grade": {
+      "perceptual_sat": 0,
+      "global_chroma": 0,
+      "shadows_hue": 50,
+      "shadows_sat": 8,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 42,
+      "highlights_sat": 5,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "red.hue": 0,
+      "red.sat": -10,
+      "red.lum": -3,
+      "orange.hue": 0,
+      "orange.sat": -5,
+      "orange.lum": 5,
+      "yellow.hue": 5,
+      "yellow.sat": -8,
+      "green.hue": 10,
+      "green.sat": -20,
+      "green.lum": -5,
+      "aqua.hue": 5,
+      "aqua.sat": -10,
+      "aqua.lum": 3,
+      "blue.hue": 0,
+      "blue.sat": -10,
+      "blue.lum": -5,
+      "purple.hue": 0,
+      "purple.sat": -10,
+      "magenta.hue": 0,
+      "magenta.sat": -8
+    }
+  }
+}

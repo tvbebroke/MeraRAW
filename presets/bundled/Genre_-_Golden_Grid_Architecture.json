@@ -1,0 +1,46 @@
+{
+  "label": "Genre_-_Golden_Grid_Architecture",
+  "tags": [
+    "Bright & Airy",
+    "Warm",
+    "High Contrast",
+    "Editorial"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.45
+    },
+    "white_balance": {
+      "temp": 6500,
+      "tint": 15
+    },
+    "tone_curve": {
+      "contrast": 30,
+      "highlights": -20,
+      "shadows": 15,
+      "lights": 20,
+      "darks": -15
+    },
+    "color_grade": {
+      "perceptual_sat": 20,
+      "global_chroma": 5,
+      "shadows_hue": 0,
+      "shadows_sat": 0,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 45,
+      "highlights_sat": 5,
+      "highlights_lum": 0
+    },
+    "hsl": {
+      "orange.sat": 25,
+      "orange.lum": 10,
+      "yellow.hue": -10,
+      "yellow.sat": 15,
+      "yellow.lum": 5,
+      "green.sat": -20
+    }
+  }
+}

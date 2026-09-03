@@ -1,0 +1,41 @@
+{
+  "label": "Color-Negative_-_Fuji_Superia_1600",
+  "tags": [
+    "Film",
+    "Cool",
+    "High Contrast"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.11
+    },
+    "tone_curve": {
+      "contrast": 28,
+      "highlights": -36,
+      "shadows": 21,
+      "lights": 11,
+      "darks": -19
+    },
+    "color_grade": {
+      "global_chroma": 5,
+      "shadows_hue": 208,
+      "shadows_sat": 13,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 40,
+      "highlights_sat": 7,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10
+    },
+    "hsl": {
+      "red.sat": 11,
+      "green.sat": 21,
+      "blue.hue": -5,
+      "blue.sat": 16
+    }
+  }
+}

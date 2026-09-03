@@ -1,0 +1,47 @@
+{
+  "label": "Color-Negative_-_Kodak_Portra_400_Noritsu",
+  "tags": [
+    "Bright & Airy",
+    "Film",
+    "Teal & Orange"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.5
+    },
+    "tone_curve": {
+      "contrast": 0.5,
+      "highlights": -55,
+      "shadows": 32,
+      "lights": -2,
+      "darks": 12
+    },
+    "color_grade": {
+      "shadows_hue": 205,
+      "shadows_sat": 8,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 50,
+      "highlights_sat": 17,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "orange.hue": -3,
+      "orange.sat": -5,
+      "orange.lum": 15,
+      "yellow.hue": -8,
+      "green.hue": 15,
+      "green.sat": -22.5,
+      "aqua.sat": -10,
+      "blue.hue": -5,
+      "blue.sat": -15,
+      "blue.lum": -10
+    }
+  }
+}

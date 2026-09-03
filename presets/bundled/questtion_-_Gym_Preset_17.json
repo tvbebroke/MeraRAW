@@ -1,0 +1,63 @@
+{
+  "label": "questtion_-_Gym_Preset_17",
+  "tags": [
+    "Bright & Airy",
+    "Cool"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 1.7
+    },
+    "white_balance": {
+      "temp": 4746,
+      "tint": 11
+    },
+    "tone_curve": {
+      "contrast": 0,
+      "highlights": -13,
+      "shadows": 100,
+      "lights": 0,
+      "darks": 0
+    },
+    "color_grade": {
+      "perceptual_sat": 0,
+      "global_chroma": 0,
+      "shadows_lum": 0,
+      "midtones_hue": 76,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 40,
+      "noise_luma": 0,
+      "noise_chroma": 25
+    },
+    "hsl": {
+      "red.hue": 0,
+      "red.sat": 0,
+      "red.lum": 0,
+      "orange.hue": 0,
+      "orange.sat": 0,
+      "orange.lum": 0,
+      "yellow.hue": 0,
+      "yellow.sat": 0,
+      "yellow.lum": 0,
+      "green.hue": 0,
+      "green.sat": 0,
+      "green.lum": 0,
+      "aqua.hue": 0,
+      "aqua.sat": 0,
+      "aqua.lum": 0,
+      "blue.hue": 0,
+      "blue.sat": -51,
+      "blue.lum": 0,
+      "purple.hue": 0,
+      "purple.sat": 0,
+      "purple.lum": 0,
+      "magenta.hue": 0,
+      "magenta.sat": 0,
+      "magenta.lum": 0
+    }
+  }
+}

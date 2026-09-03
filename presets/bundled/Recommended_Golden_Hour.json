@@ -1,0 +1,30 @@
+{
+  "label": "Recommended · Golden Hour",
+  "tags": [
+    "Warm",
+    "Pastel"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.2
+    },
+    "white_balance": {
+      "temp": 6200,
+      "tint": 12
+    },
+    "tone_curve": {
+      "contrast": 12,
+      "highlights": -22,
+      "shadows": 20
+    },
+    "color_grade": {
+      "perceptual_sat": 12,
+      "highlights_hue": 45,
+      "highlights_sat": 18,
+      "midtones_hue": 35,
+      "midtones_sat": 10,
+      "shadows_hue": 25,
+      "shadows_sat": 6
+    }
+  }
+}

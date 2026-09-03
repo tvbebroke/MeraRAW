@@ -1,0 +1,41 @@
+{
+  "label": "Decade_-_Grunge",
+  "tags": [
+    "High Contrast"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": -0.3
+    },
+    "tone_curve": {
+      "contrast": 30,
+      "highlights": -50,
+      "shadows": -10,
+      "lights": 0,
+      "darks": -25
+    },
+    "color_grade": {
+      "global_chroma": -15,
+      "shadows_hue": 90,
+      "shadows_sat": 12,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 40,
+      "highlights_sat": 5,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "orange.sat": -10,
+      "yellow.sat": -15,
+      "green.hue": 25,
+      "green.sat": -30,
+      "blue.sat": -20
+    }
+  }
+}

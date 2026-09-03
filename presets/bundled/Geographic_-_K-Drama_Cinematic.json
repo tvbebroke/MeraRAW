@@ -1,0 +1,43 @@
+{
+  "label": "Geographic_-_K-Drama_Cinematic",
+  "tags": [
+    "Moody",
+    "Cinematic",
+    "Cool",
+    "Teal & Orange"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.05
+    },
+    "tone_curve": {
+      "contrast": 20,
+      "highlights": -40,
+      "shadows": 25,
+      "lights": 10,
+      "darks": -10
+    },
+    "color_grade": {
+      "perceptual_sat": 0,
+      "global_chroma": 0,
+      "shadows_hue": 210,
+      "shadows_sat": 12,
+      "midtones_hue": 35,
+      "midtones_sat": 5,
+      "highlights_hue": 40,
+      "highlights_sat": 10
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "red.lum": 5,
+      "orange.sat": -5,
+      "orange.lum": 12,
+      "green.hue": -50,
+      "green.sat": -35,
+      "blue.sat": -15
+    }
+  }
+}

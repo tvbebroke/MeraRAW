@@ -1,0 +1,49 @@
+{
+  "label": "Color-Negative_-_Fuji_100_Industrial",
+  "tags": [
+    "Bright & Airy",
+    "Film",
+    "Dreamy"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.5
+    },
+    "tone_curve": {
+      "contrast": -10,
+      "highlights": 15,
+      "shadows": 25,
+      "lights": 5,
+      "darks": 8
+    },
+    "color_grade": {
+      "perceptual_sat": 0,
+      "global_chroma": 3,
+      "shadows_hue": 200,
+      "shadows_sat": 4,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 35,
+      "highlights_sat": 4,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "red.hue": 3,
+      "orange.sat": -5,
+      "orange.lum": 8,
+      "green.hue": -5,
+      "green.sat": -15,
+      "green.lum": -3,
+      "aqua.sat": -8,
+      "blue.hue": -2,
+      "blue.sat": -5,
+      "magenta.sat": -3
+    }
+  }
+}

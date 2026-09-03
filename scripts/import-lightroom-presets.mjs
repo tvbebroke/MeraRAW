@@ -15,10 +15,9 @@ const ROOT = path.resolve(import.meta.dirname, "..");
 const OUT_DIR = path.join(ROOT, "presets", "bundled");
 const TMP_DIR = path.join(ROOT, ".preset-import-tmp");
 
+/** Drop packs into preset-sources/ (and public/ via fetch-public-presets). */
 const DEFAULT_SOURCES = [
-  path.join(ROOT, "NAKID PRESETS"),
-  path.join(ROOT, "Cuba Gallery Lightroom Presets - Pack 8"),
-  path.join(ROOT, "450+ Lightroom Presets and Photoshop Actions - [CrackzSoft]"),
+  path.join(ROOT, "preset-sources", "public"),
   path.join(ROOT, "preset-sources"),
 ];
 
@@ -228,8 +227,65 @@ function safePresetId(label) {
   return base || "preset";
 }
 
+/** True when every zip entry would extract under destDir (no Zip Slip). */
+function zipEntriesStayInDest(entries, destDir) {
+  const root = path.resolve(destDir);
+  const rootPrefix = root.endsWith(path.sep) ? root : root + path.sep;
+  for (const name of entries) {
+    if (!name || name === "." || name === "./") continue;
+    // Absolute / drive-letter / UNC
+    if (name.startsWith("/") || name.startsWith("\\") || /^[A-Za-z]:[\\/]/.test(name)) {
+      return false;
+    }
+    if (name.split(/[/\\]/).some((p) => p === "..")) {
+      return false;
+    }
+    const target = path.resolve(destDir, name);
+    if (target !== root && !target.startsWith(rootPrefix)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function listZipEntries(zipPath) {
+  try {
+    // zipinfo -1 (Info-ZIP) lists one name per line; available with unzip on macOS.
+    const out = execFileSync("zipinfo", ["-1", zipPath], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    return out
+      .split(/\r?\n/)
+      .map((s) => s.trim())
+      .filter(Boolean);
+  } catch {
+    try {
+      const out = execFileSync("unzip", ["-Z1", zipPath], {
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "pipe"],
+      });
+      return out
+        .split(/\r?\n/)
+        .map((s) => s.trim())
+        .filter(Boolean);
+    } catch {
+      return null;
+    }
+  }
+}
+
 function extractZip(zipPath, destDir) {
   fs.mkdirSync(destDir, { recursive: true });
+  const entries = listZipEntries(zipPath);
+  if (!entries) {
+    console.warn(`  ⚠ skip zip (cannot list): ${zipPath}`);
+    return false;
+  }
+  if (!zipEntriesStayInDest(entries, destDir)) {
+    console.warn(`  ⚠ skip zip (path escape / Zip Slip): ${zipPath}`);
+    return false;
+  }
   try {
     execFileSync("unzip", ["-q", "-o", zipPath, "-d", destDir], { stdio: "pipe" });
     return true;
@@ -303,8 +359,11 @@ function importSource(sourceRoot, usedNames) {
 }
 
 function clearBundledPresets() {
+  // Keep original Recommended_*.json from generate-recommended-presets.mjs
   for (const f of fs.readdirSync(OUT_DIR)) {
-    if (f.endsWith(".json")) fs.unlinkSync(path.join(OUT_DIR, f));
+    if (!f.endsWith(".json")) continue;
+    if (f.startsWith("Recommended_")) continue;
+    fs.unlinkSync(path.join(OUT_DIR, f));
   }
 }
 

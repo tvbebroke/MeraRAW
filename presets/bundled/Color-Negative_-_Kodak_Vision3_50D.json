@@ -1,0 +1,59 @@
+{
+  "label": "Color-Negative_-_Kodak_Vision3_50D",
+  "tags": [
+    "Bright & Airy",
+    "Film",
+    "Pastel"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.3
+    },
+    "tone_curve": {
+      "contrast": 8,
+      "highlights": -35,
+      "shadows": 25,
+      "lights": -10,
+      "darks": -8
+    },
+    "color_grade": {
+      "perceptual_sat": 0,
+      "global_chroma": -3,
+      "shadows_hue": 210,
+      "shadows_sat": 5,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 45,
+      "highlights_sat": 5,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "red.hue": 5,
+      "red.sat": -5,
+      "red.lum": -3,
+      "orange.hue": 3,
+      "orange.sat": -5,
+      "yellow.hue": -3,
+      "yellow.sat": -5,
+      "green.hue": 12,
+      "green.sat": -12,
+      "green.lum": -5,
+      "aqua.hue": 8,
+      "aqua.sat": -8,
+      "aqua.lum": 3,
+      "blue.hue": 0,
+      "blue.sat": -5,
+      "blue.lum": -3,
+      "purple.hue": 0,
+      "purple.sat": -8,
+      "magenta.hue": 0,
+      "magenta.sat": -5
+    }
+  }
+}

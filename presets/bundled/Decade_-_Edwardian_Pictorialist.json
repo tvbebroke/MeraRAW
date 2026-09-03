@@ -1,0 +1,40 @@
+{
+  "label": "Decade_-_Edwardian_Pictorialist",
+  "tags": [
+    "Pastel"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.1
+    },
+    "tone_curve": {
+      "contrast": -15,
+      "highlights": -40,
+      "shadows": 25,
+      "lights": 0,
+      "darks": 5
+    },
+    "color_grade": {
+      "global_chroma": -10,
+      "shadows_hue": 32,
+      "shadows_sat": 10,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 38,
+      "highlights_sat": 8,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "orange.sat": 5,
+      "yellow.sat": 5,
+      "green.sat": -30,
+      "blue.sat": -30
+    }
+  }
+}

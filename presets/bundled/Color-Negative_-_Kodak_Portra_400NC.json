@@ -1,0 +1,44 @@
+{
+  "label": "Color-Negative_-_Kodak_Portra_400NC",
+  "tags": [
+    "Bright & Airy",
+    "Film",
+    "Matte"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.45
+    },
+    "tone_curve": {
+      "contrast": -12,
+      "highlights": -55,
+      "shadows": 35,
+      "lights": -5,
+      "darks": 15
+    },
+    "color_grade": {
+      "perceptual_sat": -12,
+      "global_chroma": -15,
+      "shadows_hue": 210,
+      "shadows_sat": 5,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 48,
+      "highlights_sat": 5,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10
+    },
+    "hsl": {
+      "red.sat": 5,
+      "orange.lum": 15,
+      "yellow.sat": -5,
+      "green.hue": 12,
+      "green.sat": -22,
+      "blue.sat": -18
+    }
+  }
+}

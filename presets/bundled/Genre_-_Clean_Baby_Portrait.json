@@ -1,0 +1,39 @@
+{
+  "label": "Genre_-_Clean_Baby_Portrait",
+  "tags": [
+    "Film",
+    "Pastel",
+    "Editorial",
+    "Clean"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.25
+    },
+    "tone_curve": {
+      "contrast": 5,
+      "highlights": -25,
+      "shadows": 20,
+      "lights": 5,
+      "darks": 0
+    },
+    "color_grade": {
+      "global_chroma": 0,
+      "shadows_hue": 210,
+      "shadows_sat": 3,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 40,
+      "highlights_sat": 3,
+      "highlights_lum": 0
+    },
+    "hsl": {
+      "red.sat": -5,
+      "orange.sat": -5,
+      "orange.lum": 10,
+      "green.sat": -10
+    }
+  }
+}

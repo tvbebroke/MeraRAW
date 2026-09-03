@@ -1,0 +1,43 @@
+{
+  "label": "Creative_-_Eterna-Summer",
+  "tags": [
+    "Warm"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.15
+    },
+    "white_balance": {
+      "temp": 5800,
+      "tint": -10
+    },
+    "tone_curve": {
+      "contrast": 10,
+      "highlights": 25,
+      "shadows": 0,
+      "lights": 10,
+      "darks": 0
+    },
+    "color_grade": {
+      "perceptual_sat": 15,
+      "global_chroma": 18,
+      "shadows_hue": 30,
+      "shadows_sat": 5,
+      "shadows_lum": 0,
+      "midtones_hue": 38,
+      "midtones_sat": 6,
+      "midtones_lum": 0,
+      "highlights_hue": 42,
+      "highlights_sat": 12,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "orange.lum": 8,
+      "green.sat": -10
+    }
+  }
+}

@@ -1,0 +1,43 @@
+{
+  "label": "Creative_-_Cinematic_Teal_and_Orange",
+  "tags": [
+    "Moody",
+    "Cinematic",
+    "Cool",
+    "Teal & Orange"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": -0.1
+    },
+    "tone_curve": {
+      "contrast": 23.75,
+      "highlights": -40,
+      "shadows": 30,
+      "lights": 15,
+      "darks": 0
+    },
+    "color_grade": {
+      "global_chroma": 0,
+      "shadows_hue": 208.75,
+      "shadows_sat": 20,
+      "shadows_lum": 0,
+      "midtones_hue": 35,
+      "midtones_sat": 7.5,
+      "midtones_lum": 0,
+      "highlights_hue": 35.75,
+      "highlights_sat": 15,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "orange.lum": 10,
+      "green.hue": -60,
+      "green.sat": -40,
+      "blue.sat": -20
+    }
+  }
+}

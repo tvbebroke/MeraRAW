@@ -46,66 +46,7 @@ pub fn ensure_readable(path: &Path) -> Result<(), AppError> {
 
 /// Sensitive prefixes we never open/list via IPC (defense in depth).
 fn is_denied(path: &Path) -> bool {
-    let s = path.to_string_lossy();
-    let lower = s.to_lowercase();
-
-    // Home-relative secrets (any OS)
-    let home_denied = [
-        "/.ssh",
-        "/.gnupg",
-        "/.aws",
-        "/.config/gcloud",
-        "/.kube",
-        "/.docker",
-        "/library/keychains",
-        "\\.ssh",
-        "\\.gnupg",
-        "\\.aws",
-    ];
-    if home_denied.iter().any(|d| lower.contains(d)) {
-        return true;
-    }
-
-    // System dirs
-    #[cfg(unix)]
-    {
-        const DENY: &[&str] = &[
-            "/etc",
-            "/private/etc",
-            "/var/root",
-            // macOS resolves /var -> /private/var, so the canonicalized form
-            // must be denied too (same reason /private/etc is listed).
-            "/private/var/root",
-            "/root",
-            "/System",
-            "/usr/bin",
-            "/usr/sbin",
-            "/bin",
-            "/sbin",
-            "/dev",
-            "/proc",
-            "/sys",
-        ];
-        for d in DENY {
-            if path.starts_with(d) {
-                return true;
-            }
-        }
-    }
-
-    #[cfg(windows)]
-    {
-        let deny = [
-            "\\windows\\system32",
-            "\\windows\\syswow64",
-            "\\$recycle.bin",
-        ];
-        if deny.iter().any(|d| lower.contains(d)) {
-            return true;
-        }
-    }
-
-    false
+    meratech_core::path_safety::is_sensitive_path(path)
 }
 
 /// Normalize without requiring the path to exist (resolve `.` / `..`).
@@ -216,5 +157,14 @@ mod tests {
         assert!(validate_user_path("/var/root/anything").is_err());
         assert!(validate_user_path("/private/var/root/anything").is_err());
         assert!(validate_user_path("/private/etc/passwd").is_err());
+    }
+
+    #[test]
+    fn rejects_credential_homes() {
+        assert!(validate_user_path("/Users/a/.netrc").is_err());
+        assert!(validate_user_path(
+            "/Users/a/Library/Application Support/Google/Chrome/Default/Cookies"
+        )
+        .is_err());
     }
 }

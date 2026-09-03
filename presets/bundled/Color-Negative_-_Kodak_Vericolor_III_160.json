@@ -1,0 +1,50 @@
+{
+  "label": "Color-Negative_-_Kodak_Vericolor_III_160",
+  "tags": [
+    "Bright & Airy",
+    "Film"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.5
+    },
+    "tone_curve": {
+      "contrast": -30,
+      "highlights": -35,
+      "shadows": 25,
+      "lights": -5,
+      "darks": 20
+    },
+    "color_grade": {
+      "perceptual_sat": -2,
+      "global_chroma": -5,
+      "shadows_hue": 320,
+      "shadows_sat": 8,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 35,
+      "highlights_sat": 5,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "red.sat": -5,
+      "orange.hue": 2,
+      "orange.sat": -8,
+      "orange.lum": 10,
+      "yellow.hue": -2,
+      "green.hue": 8,
+      "green.sat": -22,
+      "aqua.sat": -12,
+      "blue.hue": -3,
+      "blue.sat": -18,
+      "blue.lum": -5,
+      "magenta.sat": 5
+    }
+  }
+}

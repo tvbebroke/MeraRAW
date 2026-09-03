@@ -1,0 +1,44 @@
+{
+  "label": "Geographic_-_Brazilian_Amazon",
+  "tags": [
+    "Moody",
+    "Cool",
+    "Pastel"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": -0.15
+    },
+    "white_balance": {
+      "temp": 100
+    },
+    "tone_curve": {
+      "contrast": 15,
+      "highlights": -50,
+      "shadows": 35,
+      "lights": 5,
+      "darks": -10
+    },
+    "color_grade": {
+      "perceptual_sat": 10,
+      "global_chroma": 10,
+      "shadows_hue": 160,
+      "shadows_sat": 10,
+      "highlights_hue": 120,
+      "highlights_sat": 5
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "red.sat": 15,
+      "orange.sat": 10,
+      "yellow.sat": 20,
+      "green.hue": 10,
+      "green.sat": 30,
+      "green.lum": -5,
+      "blue.sat": -15
+    }
+  }
+}

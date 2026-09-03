@@ -1,0 +1,30 @@
+{
+  "label": "Recommended · Teal & Orange",
+  "tags": [
+    "Teal & Orange"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.05
+    },
+    "tone_curve": {
+      "contrast": 18,
+      "highlights": -15,
+      "shadows": 10
+    },
+    "color_grade": {
+      "perceptual_sat": 10,
+      "shadows_hue": 195,
+      "shadows_sat": 22,
+      "midtones_hue": 180,
+      "midtones_sat": 8,
+      "highlights_hue": 40,
+      "highlights_sat": 20
+    },
+    "hsl": {
+      "orange.sat": 15,
+      "aqua.sat": 12,
+      "blue.sat": 10
+    }
+  }
+}

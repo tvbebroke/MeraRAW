@@ -1,0 +1,62 @@
+{
+  "label": "WKW Hong Kong Video",
+  "tags": [
+    "Moody",
+    "Dark"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": -0.4
+    },
+    "tone_curve": {
+      "contrast": 20,
+      "highlights": -58,
+      "shadows": 20,
+      "lights": -15,
+      "darks": 0
+    },
+    "color_grade": {
+      "perceptual_sat": 0,
+      "global_chroma": 0,
+      "shadows_hue": 170,
+      "shadows_sat": 20,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 190,
+      "highlights_sat": 12,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "red.hue": 12,
+      "red.sat": 20,
+      "red.lum": 10,
+      "orange.hue": -2,
+      "orange.sat": -12,
+      "orange.lum": 8,
+      "yellow.hue": -12,
+      "yellow.sat": 15,
+      "yellow.lum": 15,
+      "green.hue": -50,
+      "green.sat": 32,
+      "green.lum": -20,
+      "aqua.hue": -15,
+      "aqua.sat": 28,
+      "aqua.lum": -10,
+      "blue.hue": 8,
+      "blue.sat": 22,
+      "blue.lum": -15,
+      "purple.hue": 5,
+      "purple.sat": 15,
+      "purple.lum": 2,
+      "magenta.hue": 15,
+      "magenta.sat": 32,
+      "magenta.lum": 15
+    }
+  }
+}

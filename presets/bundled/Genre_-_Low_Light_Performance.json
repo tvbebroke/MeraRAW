@@ -1,0 +1,41 @@
+{
+  "label": "Genre_-_Low_Light_Performance",
+  "tags": [
+    "Bright & Airy",
+    "Cool",
+    "Teal & Orange"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.5
+    },
+    "tone_curve": {
+      "contrast": 20,
+      "highlights": -40,
+      "shadows": 30,
+      "lights": 5,
+      "darks": -10
+    },
+    "color_grade": {
+      "perceptual_sat": -3,
+      "global_chroma": -5,
+      "shadows_hue": 235,
+      "shadows_sat": 10,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 40,
+      "highlights_sat": 8,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "noise_luma": 20
+    },
+    "hsl": {
+      "orange.lum": 5,
+      "green.sat": -20,
+      "blue.sat": -15
+    }
+  }
+}

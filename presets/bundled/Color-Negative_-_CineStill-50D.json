@@ -1,0 +1,42 @@
+{
+  "label": "Color-Negative_-_CineStill-50D",
+  "tags": [
+    "Bright & Airy",
+    "Matte",
+    "Muted"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.35
+    },
+    "tone_curve": {
+      "contrast": 8,
+      "highlights": -10,
+      "shadows": 0,
+      "lights": -5,
+      "darks": -5
+    },
+    "color_grade": {
+      "perceptual_sat": -17,
+      "global_chroma": -20,
+      "shadows_hue": 200,
+      "shadows_sat": 5,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 40,
+      "highlights_sat": 8,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "orange.lum": 5,
+      "green.sat": -12,
+      "blue.sat": -5
+    }
+  }
+}

@@ -1,0 +1,39 @@
+{
+  "label": "Genre_-_Detail_Pop",
+  "tags": [
+    "Vibrant",
+    "Pastel"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.15
+    },
+    "tone_curve": {
+      "contrast": 15,
+      "highlights": -30,
+      "shadows": 20,
+      "lights": 10,
+      "darks": -10
+    },
+    "color_grade": {
+      "perceptual_sat": 12,
+      "global_chroma": 10,
+      "shadows_hue": 220,
+      "shadows_sat": 5,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 43,
+      "highlights_sat": 8,
+      "highlights_lum": 0
+    },
+    "hsl": {
+      "orange.sat": 10,
+      "yellow.sat": 10,
+      "green.hue": 10,
+      "green.sat": -15,
+      "blue.sat": 10
+    }
+  }
+}

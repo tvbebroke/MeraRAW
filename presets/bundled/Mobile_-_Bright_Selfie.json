@@ -1,0 +1,41 @@
+{
+  "label": "Mobile_-_Bright_Selfie",
+  "tags": [
+    "Bright & Airy",
+    "Cool"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.4
+    },
+    "white_balance": {
+      "temp": 200
+    },
+    "tone_curve": {
+      "contrast": -10,
+      "highlights": -30,
+      "shadows": 40,
+      "lights": 15,
+      "darks": 15
+    },
+    "color_grade": {
+      "perceptual_sat": 5,
+      "global_chroma": 0,
+      "shadows_hue": 40,
+      "shadows_sat": 3,
+      "highlights_hue": 40,
+      "highlights_sat": 5
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "red.sat": -5,
+      "red.lum": 10,
+      "orange.sat": -10,
+      "orange.lum": 20,
+      "green.sat": -15
+    }
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "label": "Black-White_-_Gold_Tone",
+  "tags": [
+    "Warm",
+    "Black & White"
+  ],
+  "modules": {
+    "tone_curve": {
+      "contrast": 20,
+      "highlights": -15,
+      "shadows": 15,
+      "lights": 10,
+      "darks": -20
+    },
+    "color_grade": {
+      "shadows_hue": 220,
+      "shadows_sat": 8,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 230,
+      "highlights_sat": 10,
+      "highlights_lum": 0,
+      "global_chroma": -100,
+      "perceptual_sat": -100
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    }
+  }
+}

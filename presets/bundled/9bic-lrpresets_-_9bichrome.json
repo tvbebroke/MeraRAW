@@ -1,0 +1,53 @@
+{
+  "label": "9bic-lrpresets_-_9bichrome",
+  "tags": [
+    "Pastel"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0
+    },
+    "tone_curve": {
+      "contrast": 0,
+      "highlights": -26,
+      "shadows": 21,
+      "lights": -5,
+      "darks": -5
+    },
+    "color_grade": {
+      "perceptual_sat": 10,
+      "global_chroma": 5
+    },
+    "detail": {
+      "sharpen_amount": 25,
+      "noise_luma": 11,
+      "noise_chroma": 25
+    },
+    "hsl": {
+      "red.hue": 0,
+      "red.sat": -20,
+      "red.lum": 30,
+      "orange.hue": -10,
+      "orange.sat": 24,
+      "orange.lum": 4,
+      "yellow.hue": -5,
+      "yellow.sat": -15,
+      "yellow.lum": 0,
+      "green.hue": 0,
+      "green.sat": 3,
+      "green.lum": 0,
+      "aqua.hue": 6,
+      "aqua.sat": 11,
+      "aqua.lum": 0,
+      "blue.hue": 3,
+      "blue.sat": 11,
+      "blue.lum": 0,
+      "purple.hue": 3,
+      "purple.sat": 14,
+      "purple.lum": -6,
+      "magenta.hue": 10,
+      "magenta.sat": 2,
+      "magenta.lum": 7
+    }
+  }
+}

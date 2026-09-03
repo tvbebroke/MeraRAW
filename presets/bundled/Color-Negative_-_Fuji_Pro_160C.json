@@ -1,0 +1,44 @@
+{
+  "label": "Color-Negative_-_Fuji_Pro_160C",
+  "tags": [
+    "Bright & Airy",
+    "Film"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.33
+    },
+    "tone_curve": {
+      "contrast": 10,
+      "highlights": -5,
+      "shadows": 15,
+      "darks": -10
+    },
+    "color_grade": {
+      "perceptual_sat": 17,
+      "global_chroma": 20,
+      "shadows_hue": 200,
+      "shadows_sat": 5,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 40,
+      "highlights_sat": 8,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10
+    },
+    "hsl": {
+      "red.hue": -3,
+      "orange.sat": -5,
+      "orange.lum": 10,
+      "yellow.hue": -3,
+      "green.hue": 10,
+      "green.sat": -10,
+      "blue.sat": -8,
+      "blue.lum": -5
+    }
+  }
+}

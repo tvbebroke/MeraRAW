@@ -1,0 +1,33 @@
+{
+  "label": "Alternative-Process_-_10_Van_Dyke_Brown",
+  "tags": [
+    "Moody",
+    "Warm",
+    "Muted"
+  ],
+  "modules": {
+    "tone_curve": {
+      "contrast": 20,
+      "highlights": -15,
+      "shadows": 25,
+      "lights": -5,
+      "darks": -18
+    },
+    "color_grade": {
+      "global_chroma": -55,
+      "shadows_hue": 32,
+      "shadows_sat": 35,
+      "shadows_lum": 0,
+      "midtones_hue": 30,
+      "midtones_sat": 22,
+      "midtones_lum": 0,
+      "highlights_hue": 35,
+      "highlights_sat": 10,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    }
+  }
+}

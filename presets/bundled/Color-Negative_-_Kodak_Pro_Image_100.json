@@ -1,0 +1,56 @@
+{
+  "label": "Color-Negative_-_Kodak_Pro_Image_100",
+  "tags": [
+    "Film",
+    "Pastel"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.15
+    },
+    "tone_curve": {
+      "contrast": -5,
+      "highlights": -40,
+      "shadows": 20,
+      "lights": 0,
+      "darks": 5
+    },
+    "color_grade": {
+      "shadows_hue": 45,
+      "shadows_sat": 8,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 40,
+      "highlights_sat": 8,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "red.hue": 0,
+      "red.sat": 5,
+      "orange.hue": 0,
+      "orange.sat": 5,
+      "orange.lum": 10,
+      "yellow.hue": -5,
+      "yellow.sat": 5,
+      "yellow.lum": 5,
+      "green.hue": 10,
+      "green.sat": -10,
+      "green.lum": -5,
+      "aqua.hue": -5,
+      "aqua.sat": -5,
+      "blue.hue": -5,
+      "blue.sat": -10,
+      "blue.lum": -5,
+      "purple.hue": -10,
+      "purple.sat": -15,
+      "magenta.hue": -10,
+      "magenta.sat": -15
+    }
+  }
+}

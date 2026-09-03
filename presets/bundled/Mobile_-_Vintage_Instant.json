@@ -1,0 +1,42 @@
+{
+  "label": "Mobile_-_Vintage_Instant",
+  "tags": [
+    "Vintage",
+    "Cool"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.05
+    },
+    "white_balance": {
+      "temp": 350
+    },
+    "tone_curve": {
+      "contrast": -20,
+      "highlights": -40,
+      "shadows": 40,
+      "lights": 0,
+      "darks": 25
+    },
+    "color_grade": {
+      "perceptual_sat": -5,
+      "global_chroma": -10,
+      "shadows_hue": 40,
+      "shadows_sat": 12,
+      "highlights_hue": 45,
+      "highlights_sat": 8
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "orange.sat": 15,
+      "orange.lum": 15,
+      "yellow.sat": 10,
+      "green.hue": 15,
+      "green.sat": -20,
+      "blue.sat": -20
+    }
+  }
+}

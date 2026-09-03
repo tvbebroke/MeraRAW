@@ -1,0 +1,43 @@
+{
+  "label": "Decade_-_Neon_Synthwave",
+  "tags": [
+    "Moody",
+    "Cool",
+    "Vibrant",
+    "High Contrast",
+    "Dark"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": -0.2
+    },
+    "tone_curve": {
+      "contrast": 35,
+      "highlights": -60,
+      "shadows": 30,
+      "lights": 15,
+      "darks": -20
+    },
+    "color_grade": {
+      "shadows_hue": 210,
+      "shadows_sat": 22,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 315,
+      "highlights_sat": 25,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "orange.sat": 10,
+      "green.sat": -45,
+      "blue.sat": 15,
+      "magenta.sat": 35
+    }
+  }
+}

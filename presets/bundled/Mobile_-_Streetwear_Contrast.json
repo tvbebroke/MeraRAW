@@ -1,0 +1,40 @@
+{
+  "label": "Mobile_-_Streetwear_Contrast",
+  "tags": [
+    "Cinematic",
+    "Cool",
+    "High Contrast"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": -0.2
+    },
+    "tone_curve": {
+      "contrast": 35,
+      "highlights": -45,
+      "shadows": 15,
+      "lights": 15,
+      "darks": -25
+    },
+    "color_grade": {
+      "perceptual_sat": -10,
+      "global_chroma": -15,
+      "shadows_hue": 215,
+      "shadows_sat": 15,
+      "highlights_hue": 40,
+      "highlights_sat": 5
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "red.sat": 10,
+      "orange.sat": -15,
+      "orange.lum": 5,
+      "yellow.sat": -20,
+      "green.sat": -35,
+      "blue.sat": -15
+    }
+  }
+}

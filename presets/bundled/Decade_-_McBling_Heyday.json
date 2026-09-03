@@ -1,0 +1,40 @@
+{
+  "label": "Decade_-_McBling_Heyday",
+  "tags": [
+    "Teal & Orange"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.25
+    },
+    "tone_curve": {
+      "contrast": 18,
+      "highlights": -25,
+      "shadows": 20,
+      "lights": 12,
+      "darks": -5
+    },
+    "color_grade": {
+      "shadows_hue": 210,
+      "shadows_sat": 8,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 38,
+      "highlights_sat": 10,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "orange.sat": 10,
+      "orange.lum": 12,
+      "yellow.sat": 8,
+      "green.sat": -12,
+      "blue.sat": 5
+    }
+  }
+}

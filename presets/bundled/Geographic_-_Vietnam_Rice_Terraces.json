@@ -1,0 +1,40 @@
+{
+  "label": "Geographic_-_Vietnam_Rice_Terraces",
+  "tags": [
+    "Cool",
+    "Pastel"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.15
+    },
+    "tone_curve": {
+      "contrast": -15,
+      "highlights": -40,
+      "shadows": 30,
+      "lights": 5,
+      "darks": 15
+    },
+    "color_grade": {
+      "perceptual_sat": 5,
+      "global_chroma": 5,
+      "shadows_hue": 200,
+      "shadows_sat": 8,
+      "highlights_hue": 100,
+      "highlights_sat": 5
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "yellow.sat": 15,
+      "yellow.lum": 10,
+      "green.hue": 15,
+      "green.sat": 25,
+      "green.lum": 15,
+      "aqua.sat": -5,
+      "blue.sat": -10
+    }
+  }
+}

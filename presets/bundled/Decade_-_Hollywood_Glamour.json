@@ -1,0 +1,40 @@
+{
+  "label": "Decade_-_Hollywood_Glamour",
+  "tags": [
+    "Bright & Airy"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.35
+    },
+    "tone_curve": {
+      "contrast": -5,
+      "highlights": -40,
+      "shadows": 25,
+      "lights": 10,
+      "darks": 5
+    },
+    "color_grade": {
+      "shadows_hue": 30,
+      "shadows_sat": 5,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 38,
+      "highlights_sat": 8,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "orange.sat": -5,
+      "orange.lum": 12,
+      "yellow.sat": 5,
+      "green.sat": -10,
+      "blue.sat": -8
+    }
+  }
+}

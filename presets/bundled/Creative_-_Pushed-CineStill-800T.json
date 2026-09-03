@@ -1,0 +1,43 @@
+{
+  "label": "Creative_-_Pushed-CineStill-800T",
+  "tags": [
+    "Moody",
+    "Warm",
+    "Cool",
+    "High Contrast",
+    "Teal & Orange"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": -0.2
+    },
+    "white_balance": {
+      "temp": 7700,
+      "tint": 15
+    },
+    "tone_curve": {
+      "contrast": 30,
+      "highlights": -55,
+      "shadows": 40,
+      "lights": -20,
+      "darks": 0
+    },
+    "color_grade": {
+      "perceptual_sat": 12,
+      "global_chroma": 15,
+      "shadows_hue": 200,
+      "shadows_sat": 18,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 40,
+      "highlights_sat": 12,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    }
+  }
+}

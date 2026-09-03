@@ -1,0 +1,57 @@
+{
+  "label": "Color-Negative_-_Fujicolor_C200",
+  "tags": [
+    "Film",
+    "Pastel"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.15
+    },
+    "tone_curve": {
+      "contrast": 15,
+      "highlights": -25,
+      "shadows": 12,
+      "lights": 5,
+      "darks": -10
+    },
+    "color_grade": {
+      "perceptual_sat": 3,
+      "global_chroma": -2,
+      "shadows_hue": 160,
+      "shadows_sat": 12,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 40,
+      "highlights_sat": 5,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "red.hue": -5,
+      "red.sat": -5,
+      "orange.hue": -5,
+      "orange.sat": 5,
+      "yellow.hue": 0,
+      "yellow.sat": 5,
+      "green.hue": 5,
+      "green.sat": 10,
+      "green.lum": -5,
+      "aqua.hue": 10,
+      "aqua.sat": 5,
+      "aqua.lum": 5,
+      "blue.hue": 5,
+      "blue.sat": 8,
+      "blue.lum": -5,
+      "purple.hue": 5,
+      "purple.sat": -5,
+      "magenta.hue": 0,
+      "magenta.sat": -5
+    }
+  }
+}

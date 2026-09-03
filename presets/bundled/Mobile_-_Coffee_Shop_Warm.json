@@ -1,0 +1,46 @@
+{
+  "label": "Mobile_-_Coffee_Shop_Warm",
+  "tags": [
+    "Warm",
+    "Cool",
+    "Pastel"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.05
+    },
+    "white_balance": {
+      "temp": 400
+    },
+    "tone_curve": {
+      "contrast": -10,
+      "highlights": -35,
+      "shadows": 35,
+      "lights": 5,
+      "darks": 15
+    },
+    "color_grade": {
+      "perceptual_sat": 0,
+      "global_chroma": -5,
+      "shadows_hue": 35,
+      "shadows_sat": 15,
+      "midtones_hue": 40,
+      "midtones_sat": 5,
+      "highlights_hue": 45,
+      "highlights_sat": 10
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "red.sat": 10,
+      "orange.sat": 15,
+      "orange.lum": 12,
+      "green.hue": 15,
+      "green.sat": -15,
+      "aqua.sat": -10,
+      "blue.sat": -15
+    }
+  }
+}

@@ -1,0 +1,41 @@
+{
+  "label": "Seasonal_-_Harvest_Warm",
+  "tags": [
+    "Warm",
+    "Pastel"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.1
+    },
+    "tone_curve": {
+      "contrast": 10,
+      "highlights": -35,
+      "shadows": 20,
+      "lights": -5,
+      "darks": -10
+    },
+    "color_grade": {
+      "shadows_hue": 30,
+      "shadows_sat": 12,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 38,
+      "highlights_sat": 10,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "orange.sat": 10,
+      "orange.lum": 10,
+      "yellow.hue": -15,
+      "green.sat": -20,
+      "blue.sat": -15
+    }
+  }
+}

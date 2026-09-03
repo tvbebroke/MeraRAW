@@ -1,0 +1,45 @@
+{
+  "label": "Slide_-_Fuji_Provia_400F",
+  "tags": [
+    "Film",
+    "High Contrast"
+  ],
+  "modules": {
+    "tone_curve": {
+      "contrast": 40,
+      "highlights": -40,
+      "shadows": 12,
+      "lights": 12,
+      "darks": -28
+    },
+    "color_grade": {
+      "perceptual_sat": 5,
+      "global_chroma": 3,
+      "shadows_hue": 320,
+      "shadows_sat": 8,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 45,
+      "highlights_sat": 5,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "red.hue": 5,
+      "orange.sat": -5,
+      "green.hue": 5,
+      "green.sat": -5,
+      "aqua.hue": 5,
+      "blue.hue": 5,
+      "blue.sat": 5,
+      "blue.lum": -10,
+      "purple.sat": 5,
+      "magenta.sat": 5
+    }
+  }
+}

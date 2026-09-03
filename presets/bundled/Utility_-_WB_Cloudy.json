@@ -1,0 +1,67 @@
+{
+  "label": "Utility_-_WB_Cloudy",
+  "tags": [
+    "Warm",
+    "Pastel"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0
+    },
+    "white_balance": {
+      "temp": 6500,
+      "tint": 10
+    },
+    "tone_curve": {
+      "contrast": 0,
+      "highlights": 0,
+      "shadows": 0,
+      "lights": 0,
+      "darks": 0
+    },
+    "color_grade": {
+      "perceptual_sat": 0,
+      "global_chroma": 0,
+      "shadows_hue": 0,
+      "shadows_sat": 0,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 0,
+      "highlights_sat": 0,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 25,
+      "noise_luma": 0,
+      "noise_chroma": 25
+    },
+    "hsl": {
+      "red.hue": 0,
+      "red.sat": 0,
+      "red.lum": 0,
+      "orange.hue": 0,
+      "orange.sat": 0,
+      "orange.lum": 0,
+      "yellow.hue": 0,
+      "yellow.sat": 0,
+      "yellow.lum": 0,
+      "green.hue": 0,
+      "green.sat": 0,
+      "green.lum": 0,
+      "aqua.hue": 0,
+      "aqua.sat": 0,
+      "aqua.lum": 0,
+      "blue.hue": 0,
+      "blue.sat": 0,
+      "blue.lum": 0,
+      "purple.hue": 0,
+      "purple.sat": 0,
+      "purple.lum": 0,
+      "magenta.hue": 0,
+      "magenta.sat": 0,
+      "magenta.lum": 0
+    }
+  }
+}

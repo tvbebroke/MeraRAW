@@ -1,0 +1,41 @@
+{
+  "label": "Decade_-_Hip_Hop_Golden_Era",
+  "tags": [
+    "Moody",
+    "Warm"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": -0.05
+    },
+    "tone_curve": {
+      "contrast": 25,
+      "highlights": -40,
+      "shadows": 20,
+      "lights": 10,
+      "darks": -15
+    },
+    "color_grade": {
+      "shadows_hue": 32,
+      "shadows_sat": 10,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 38,
+      "highlights_sat": 15,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "orange.sat": 12,
+      "orange.lum": 15,
+      "yellow.sat": 10,
+      "green.sat": -20,
+      "blue.sat": -10
+    }
+  }
+}

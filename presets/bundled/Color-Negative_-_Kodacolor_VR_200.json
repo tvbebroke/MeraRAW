@@ -1,0 +1,57 @@
+{
+  "label": "Color-Negative_-_Kodacolor_VR_200",
+  "tags": [
+    "Cool",
+    "Pastel",
+    "Teal & Orange"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.1
+    },
+    "tone_curve": {
+      "contrast": -10,
+      "highlights": -35,
+      "shadows": 20,
+      "lights": -15,
+      "darks": 10
+    },
+    "color_grade": {
+      "shadows_hue": 200,
+      "shadows_sat": 12,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 45,
+      "highlights_sat": 12,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "red.hue": 5,
+      "red.sat": 5,
+      "orange.hue": -5,
+      "orange.sat": 10,
+      "orange.lum": 10,
+      "yellow.hue": -10,
+      "yellow.sat": 10,
+      "yellow.lum": 5,
+      "green.hue": 20,
+      "green.sat": -15,
+      "green.lum": -5,
+      "aqua.hue": -10,
+      "aqua.sat": -10,
+      "blue.hue": -10,
+      "blue.sat": -20,
+      "blue.lum": -10,
+      "purple.hue": -15,
+      "purple.sat": -25,
+      "magenta.hue": -15,
+      "magenta.sat": -25
+    }
+  }
+}

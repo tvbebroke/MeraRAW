@@ -1,0 +1,54 @@
+{
+  "label": "Creative_-_Super_8_Home_Movie",
+  "tags": [
+    "Warm",
+    "Teal & Orange"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.2
+    },
+    "white_balance": {
+      "temp": 6500,
+      "tint": 7
+    },
+    "tone_curve": {
+      "contrast": -20,
+      "highlights": -50,
+      "shadows": 30,
+      "lights": -20,
+      "darks": 0
+    },
+    "color_grade": {
+      "perceptual_sat": -10,
+      "global_chroma": -15,
+      "shadows_hue": 220,
+      "shadows_sat": 8,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 48,
+      "highlights_sat": 12,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "orange.hue": 8,
+      "orange.sat": -10,
+      "orange.lum": 10,
+      "yellow.hue": -8,
+      "yellow.sat": -15,
+      "green.hue": 15,
+      "green.sat": -28,
+      "green.lum": -18,
+      "aqua.sat": -20,
+      "blue.hue": 10,
+      "blue.sat": -22,
+      "blue.lum": -10
+    }
+  }
+}

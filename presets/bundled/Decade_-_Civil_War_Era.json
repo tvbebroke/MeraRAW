@@ -1,0 +1,47 @@
+{
+  "label": "Decade_-_Civil_War_Era",
+  "tags": [
+    "Muted",
+    "High Contrast",
+    "Dark"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": -0.35
+    },
+    "tone_curve": {
+      "contrast": 40,
+      "highlights": -60,
+      "shadows": -25,
+      "lights": -10,
+      "darks": -30
+    },
+    "color_grade": {
+      "global_chroma": -25,
+      "shadows_hue": 30,
+      "shadows_sat": 10,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 35,
+      "highlights_sat": 8,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "red.sat": -40,
+      "orange.sat": -35,
+      "orange.lum": 8,
+      "yellow.sat": -40,
+      "green.sat": -45,
+      "aqua.sat": -45,
+      "blue.sat": -45,
+      "purple.sat": -40,
+      "magenta.sat": -40
+    }
+  }
+}

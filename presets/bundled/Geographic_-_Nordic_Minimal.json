@@ -1,0 +1,43 @@
+{
+  "label": "Geographic_-_Nordic_Minimal",
+  "tags": [
+    "Bright & Airy",
+    "Cool"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.4
+    },
+    "white_balance": {
+      "temp": -400
+    },
+    "tone_curve": {
+      "contrast": -15,
+      "highlights": -30,
+      "shadows": 30,
+      "lights": 25,
+      "darks": 10
+    },
+    "color_grade": {
+      "perceptual_sat": -10,
+      "global_chroma": -15,
+      "shadows_hue": 200,
+      "shadows_sat": 5,
+      "highlights_hue": 200,
+      "highlights_sat": 3
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "red.sat": -10,
+      "orange.sat": -15,
+      "orange.lum": 10,
+      "yellow.sat": -15,
+      "green.hue": 10,
+      "green.sat": -30,
+      "blue.sat": -15
+    }
+  }
+}

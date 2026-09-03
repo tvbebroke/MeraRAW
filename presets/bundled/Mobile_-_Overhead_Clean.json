@@ -1,0 +1,40 @@
+{
+  "label": "Mobile_-_Overhead_Clean",
+  "tags": [
+    "Bright & Airy",
+    "Cool",
+    "Clean"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.5
+    },
+    "white_balance": {
+      "temp": 200
+    },
+    "tone_curve": {
+      "contrast": -15,
+      "highlights": -25,
+      "shadows": 35,
+      "lights": 20,
+      "darks": 15
+    },
+    "color_grade": {
+      "perceptual_sat": 0,
+      "global_chroma": 0,
+      "shadows_hue": 45,
+      "shadows_sat": 3,
+      "highlights_hue": 45,
+      "highlights_sat": 5
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "orange.lum": 10,
+      "green.sat": -10,
+      "blue.sat": -5
+    }
+  }
+}

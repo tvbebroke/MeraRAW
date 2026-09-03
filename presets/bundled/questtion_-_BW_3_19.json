@@ -1,0 +1,18 @@
+{
+  "label": "questtion_-_BW_3_19",
+  "tags": [
+    "Bright & Airy",
+    "Black & White"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 1.9
+    },
+    "tone_curve": {
+      "highlights": -8,
+      "shadows": 26,
+      "lights": 10,
+      "darks": -37
+    }
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "label": "questtion_-_BW_3_000",
+  "tags": [
+    "Matte",
+    "Black & White"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0
+    },
+    "tone_curve": {
+      "contrast": 0,
+      "highlights": -8,
+      "shadows": 26,
+      "lights": 10,
+      "darks": -37
+    },
+    "color_grade": {
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_lum": 0,
+      "global_chroma": -100,
+      "perceptual_sat": -100
+    },
+    "detail": {
+      "sharpen_amount": 40,
+      "noise_luma": 0,
+      "noise_chroma": 25
+    }
+  }
+}

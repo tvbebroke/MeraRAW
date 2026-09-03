@@ -1,0 +1,43 @@
+{
+  "label": "Photographer_-_Gregory_Crewdson",
+  "tags": [
+    "Moody",
+    "Cool",
+    "Teal & Orange"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": -0.2
+    },
+    "tone_curve": {
+      "contrast": 25,
+      "highlights": -45,
+      "shadows": 25,
+      "lights": 5,
+      "darks": -15
+    },
+    "color_grade": {
+      "shadows_hue": 210,
+      "shadows_sat": 18,
+      "shadows_lum": 0,
+      "midtones_hue": 38,
+      "midtones_sat": 6,
+      "midtones_lum": 0,
+      "highlights_hue": 40,
+      "highlights_sat": 10,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 40
+    },
+    "hsl": {
+      "orange.lum": 10,
+      "yellow.hue": -10,
+      "green.hue": -55,
+      "green.sat": -45,
+      "green.lum": -10,
+      "aqua.sat": -15,
+      "blue.sat": -20
+    }
+  }
+}

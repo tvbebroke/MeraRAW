@@ -1,0 +1,44 @@
+{
+  "label": "Decade_-_Prohibition_Sepia",
+  "tags": [
+    "Moody",
+    "Vintage",
+    "Warm",
+    "Pastel"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": -0.15
+    },
+    "tone_curve": {
+      "contrast": 15,
+      "highlights": -40,
+      "shadows": 20,
+      "lights": -5,
+      "darks": -10
+    },
+    "color_grade": {
+      "global_chroma": -5,
+      "shadows_hue": 35,
+      "shadows_sat": 15,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 40,
+      "highlights_sat": 10,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "orange.sat": 5,
+      "yellow.hue": 5,
+      "green.sat": -30,
+      "aqua.sat": -20,
+      "blue.sat": -30
+    }
+  }
+}

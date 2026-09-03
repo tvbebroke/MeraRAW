@@ -1,0 +1,60 @@
+{
+  "label": "Creative_-_Lomography_Cross-Processed",
+  "tags": [
+    "Moody",
+    "Warm",
+    "High Contrast"
+  ],
+  "modules": {
+    "tone_curve": {
+      "contrast": 41.25,
+      "highlights": -20,
+      "shadows": 30,
+      "lights": 25,
+      "darks": 0
+    },
+    "color_grade": {
+      "perceptual_sat": 20,
+      "global_chroma": 15,
+      "shadows_hue": 270,
+      "shadows_sat": 45,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 55,
+      "highlights_sat": 35,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "red.hue": 15,
+      "red.sat": 20,
+      "red.lum": -5,
+      "orange.hue": -10,
+      "orange.sat": 15,
+      "orange.lum": 5,
+      "yellow.hue": -30,
+      "yellow.sat": 25,
+      "yellow.lum": 10,
+      "green.hue": 40,
+      "green.sat": 30,
+      "green.lum": -10,
+      "aqua.hue": 20,
+      "aqua.sat": 15,
+      "aqua.lum": 0,
+      "blue.hue": -15,
+      "blue.sat": -10,
+      "blue.lum": -15,
+      "purple.hue": 20,
+      "purple.sat": 25,
+      "purple.lum": -10,
+      "magenta.hue": 30,
+      "magenta.sat": 20,
+      "magenta.lum": 0
+    }
+  }
+}

@@ -1,0 +1,43 @@
+{
+  "label": "Geographic_-_CCCP_Nostalgia",
+  "tags": [
+    "Cool",
+    "Muted",
+    "Teal & Orange"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": -0.1
+    },
+    "white_balance": {
+      "temp": -500
+    },
+    "tone_curve": {
+      "contrast": -20,
+      "highlights": -30,
+      "shadows": 40,
+      "lights": -10,
+      "darks": 25
+    },
+    "color_grade": {
+      "perceptual_sat": -25,
+      "global_chroma": -30,
+      "shadows_hue": 210,
+      "shadows_sat": 15,
+      "highlights_hue": 55,
+      "highlights_sat": 8
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "red.sat": -20,
+      "orange.sat": -25,
+      "yellow.sat": -25,
+      "green.hue": 25,
+      "green.sat": -20,
+      "blue.sat": -15
+    }
+  }
+}

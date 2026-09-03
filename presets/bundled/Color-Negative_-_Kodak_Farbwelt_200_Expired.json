@@ -1,0 +1,57 @@
+{
+  "label": "Color-Negative_-_Kodak_Farbwelt_200_Expired",
+  "tags": [
+    "Film",
+    "Warm",
+    "Black & White"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.15
+    },
+    "tone_curve": {
+      "contrast": -20,
+      "highlights": -60,
+      "shadows": 35,
+      "lights": -25,
+      "darks": 20
+    },
+    "color_grade": {
+      "shadows_hue": 30,
+      "shadows_sat": 15,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 45,
+      "highlights_sat": 10,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "red.hue": 10,
+      "red.sat": 0,
+      "orange.hue": 5,
+      "orange.sat": 0,
+      "orange.lum": 10,
+      "yellow.hue": -5,
+      "yellow.sat": -5,
+      "yellow.lum": 5,
+      "green.hue": 15,
+      "green.sat": -20,
+      "green.lum": -10,
+      "aqua.hue": -10,
+      "aqua.sat": -15,
+      "blue.hue": -15,
+      "blue.sat": -25,
+      "blue.lum": -15,
+      "purple.hue": -15,
+      "purple.sat": -25,
+      "magenta.hue": -15,
+      "magenta.sat": -30
+    }
+  }
+}

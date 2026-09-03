@@ -1,0 +1,35 @@
+{
+  "label": "Recommended · Portrait Soft",
+  "tags": [
+    "Film",
+    "Pastel",
+    "Editorial"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.2
+    },
+    "tone_curve": {
+      "contrast": 5,
+      "highlights": -18,
+      "shadows": 22,
+      "lights": 8,
+      "darks": 5
+    },
+    "color_grade": {
+      "perceptual_sat": 5,
+      "global_chroma": -4
+    },
+    "hsl": {
+      "orange.sat": 8,
+      "orange.lum": 6,
+      "red.sat": 4,
+      "yellow.sat": -4
+    },
+    "detail": {
+      "sharpen_amount": 25,
+      "noise_luma": 15,
+      "noise_chroma": 30
+    }
+  }
+}

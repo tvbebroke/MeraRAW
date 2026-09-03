@@ -1,0 +1,48 @@
+{
+  "label": "Geographic_-_Sahara_Desert",
+  "tags": [
+    "Moody",
+    "Warm",
+    "Cool",
+    "High Contrast",
+    "Earthy"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": -0.1
+    },
+    "white_balance": {
+      "temp": 1000
+    },
+    "tone_curve": {
+      "contrast": 35,
+      "highlights": -50,
+      "shadows": 25,
+      "lights": 15,
+      "darks": -20
+    },
+    "color_grade": {
+      "perceptual_sat": 5,
+      "global_chroma": 5,
+      "shadows_hue": 40,
+      "shadows_sat": 18,
+      "highlights_hue": 45,
+      "highlights_sat": 20
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "red.sat": 15,
+      "orange.sat": 30,
+      "orange.lum": 15,
+      "yellow.sat": 25,
+      "yellow.lum": 10,
+      "green.hue": 25,
+      "green.sat": -30,
+      "aqua.sat": -20,
+      "blue.sat": -25
+    }
+  }
+}

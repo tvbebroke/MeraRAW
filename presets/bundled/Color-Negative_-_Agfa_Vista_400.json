@@ -1,0 +1,46 @@
+{
+  "label": "Color-Negative_-_Agfa_Vista_400",
+  "tags": [
+    "Moody",
+    "Pastel"
+  ],
+  "modules": {
+    "tone_curve": {
+      "contrast": 15,
+      "highlights": -8,
+      "shadows": 20,
+      "lights": 22,
+      "darks": -18
+    },
+    "color_grade": {
+      "perceptual_sat": 14,
+      "global_chroma": 10,
+      "shadows_hue": 245,
+      "shadows_sat": 5,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 50,
+      "highlights_sat": 5,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "red.hue": -8,
+      "red.sat": 30,
+      "red.lum": 10,
+      "orange.sat": 10,
+      "yellow.hue": -8,
+      "yellow.sat": 15,
+      "green.hue": 5,
+      "green.sat": -8,
+      "blue.hue": -5,
+      "blue.sat": 18,
+      "blue.lum": 5
+    }
+  }
+}

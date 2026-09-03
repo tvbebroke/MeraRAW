@@ -1,0 +1,46 @@
+{
+  "label": "Color-Negative_-_Rollei_Crossbird_200",
+  "tags": [
+    "High Contrast"
+  ],
+  "modules": {
+    "tone_curve": {
+      "contrast": 65,
+      "highlights": -70,
+      "shadows": -25,
+      "lights": 10,
+      "darks": -30
+    },
+    "color_grade": {
+      "perceptual_sat": 8,
+      "global_chroma": 5,
+      "shadows_hue": 160,
+      "shadows_sat": 25,
+      "shadows_lum": 0,
+      "midtones_hue": 70,
+      "midtones_sat": 18,
+      "midtones_lum": 0,
+      "highlights_hue": 320,
+      "highlights_sat": 20,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "red.hue": -10,
+      "orange.sat": 15,
+      "yellow.hue": -10,
+      "yellow.sat": 20,
+      "green.hue": -25,
+      "green.sat": 50,
+      "green.lum": 10,
+      "aqua.sat": 20,
+      "blue.hue": -30,
+      "blue.sat": 15,
+      "purple.sat": 15,
+      "magenta.sat": 25
+    }
+  }
+}

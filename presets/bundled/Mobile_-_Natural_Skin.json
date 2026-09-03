@@ -1,0 +1,37 @@
+{
+  "label": "Mobile_-_Natural_Skin",
+  "tags": [
+    "Pastel"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.15
+    },
+    "tone_curve": {
+      "contrast": 5,
+      "highlights": -25,
+      "shadows": 25,
+      "lights": 10,
+      "darks": 0
+    },
+    "color_grade": {
+      "perceptual_sat": 0,
+      "global_chroma": 0,
+      "shadows_hue": 0,
+      "shadows_sat": 0,
+      "highlights_hue": 0,
+      "highlights_sat": 0
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "red.sat": -8,
+      "red.lum": 5,
+      "orange.sat": -10,
+      "orange.lum": 12,
+      "green.sat": -10
+    }
+  }
+}

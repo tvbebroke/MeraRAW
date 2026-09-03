@@ -1,0 +1,33 @@
+{
+  "label": "Recommended · Cinematic Cool",
+  "tags": [
+    "Cinematic",
+    "Cool",
+    "Teal & Orange"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": -0.1
+    },
+    "tone_curve": {
+      "contrast": 22,
+      "highlights": -28,
+      "shadows": 8,
+      "lights": -15,
+      "darks": -12
+    },
+    "color_grade": {
+      "perceptual_sat": -5,
+      "shadows_hue": 200,
+      "shadows_sat": 25,
+      "midtones_hue": 190,
+      "midtones_sat": 10,
+      "highlights_hue": 35,
+      "highlights_sat": 12,
+      "highlights_lum": -5
+    },
+    "effects": {
+      "vignette_amount": -20
+    }
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "label": "Slide_-_Fuji_Sensia_100",
+  "tags": [
+    "Film",
+    "Pastel"
+  ],
+  "modules": {
+    "tone_curve": {
+      "contrast": 15,
+      "highlights": -12.5,
+      "shadows": -22.5,
+      "lights": 10,
+      "darks": -22.5
+    },
+    "color_grade": {
+      "perceptual_sat": 3.8,
+      "global_chroma": 5,
+      "shadows_hue": 50,
+      "shadows_sat": 5,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 45,
+      "highlights_sat": 5,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "red.hue": 5,
+      "orange.lum": 7.5,
+      "yellow.hue": -5,
+      "yellow.sat": -5,
+      "green.sat": -5
+    }
+  }
+}

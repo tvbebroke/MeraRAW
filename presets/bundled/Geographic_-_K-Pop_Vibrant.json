@@ -1,0 +1,41 @@
+{
+  "label": "Geographic_-_K-Pop_Vibrant",
+  "tags": [
+    "Vibrant"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.25
+    },
+    "tone_curve": {
+      "contrast": 25,
+      "highlights": -30,
+      "shadows": 20,
+      "lights": 20,
+      "darks": -15
+    },
+    "color_grade": {
+      "perceptual_sat": 15,
+      "global_chroma": 10,
+      "shadows_hue": 215,
+      "shadows_sat": 5,
+      "highlights_hue": 45,
+      "highlights_sat": 5
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "red.sat": 15,
+      "orange.sat": 5,
+      "orange.lum": 10,
+      "yellow.sat": 10,
+      "green.hue": 15,
+      "green.sat": -10,
+      "aqua.sat": 15,
+      "blue.sat": 15,
+      "magenta.sat": 20
+    }
+  }
+}

@@ -1,0 +1,66 @@
+{
+  "label": "Creative_-_Ricoh_Superior_100_Negative_Film",
+  "tags": [
+    "Film",
+    "Warm",
+    "Pastel"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.1
+    },
+    "white_balance": {
+      "temp": 6000,
+      "tint": -10
+    },
+    "tone_curve": {
+      "contrast": 15,
+      "highlights": -50,
+      "shadows": 40,
+      "lights": -10,
+      "darks": -5
+    },
+    "color_grade": {
+      "perceptual_sat": 15,
+      "global_chroma": 10,
+      "shadows_hue": 130,
+      "shadows_sat": 5,
+      "shadows_lum": 0,
+      "midtones_hue": 45,
+      "midtones_sat": 15,
+      "midtones_lum": 0,
+      "highlights_hue": 45,
+      "highlights_sat": 20,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 40
+    },
+    "hsl": {
+      "red.hue": 0,
+      "red.sat": 15,
+      "red.lum": 0,
+      "orange.hue": -5,
+      "orange.sat": 5,
+      "orange.lum": 5,
+      "yellow.hue": -10,
+      "yellow.sat": 5,
+      "yellow.lum": 5,
+      "green.hue": 15,
+      "green.sat": -15,
+      "green.lum": -10,
+      "aqua.hue": -15,
+      "aqua.sat": 0,
+      "aqua.lum": 0,
+      "blue.hue": -10,
+      "blue.sat": 0,
+      "blue.lum": -10,
+      "purple.hue": 0,
+      "purple.sat": 0,
+      "purple.lum": 0,
+      "magenta.hue": 0,
+      "magenta.sat": 0,
+      "magenta.lum": 0
+    }
+  }
+}

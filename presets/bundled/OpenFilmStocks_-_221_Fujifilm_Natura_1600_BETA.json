@@ -1,0 +1,45 @@
+{
+  "label": "OpenFilmStocks_-_221_Fujifilm_Natura_1600_BETA",
+  "tags": [
+    "Film",
+    "High Contrast"
+  ],
+  "modules": {
+    "tone_curve": {
+      "contrast": 83
+    },
+    "color_grade": {
+      "perceptual_sat": -5,
+      "global_chroma": -10
+    },
+    "detail": {
+      "sharpen_amount": 40
+    },
+    "hsl": {
+      "red.hue": -19,
+      "red.sat": -36,
+      "red.lum": -17,
+      "orange.hue": -11,
+      "orange.sat": -30,
+      "orange.lum": -4,
+      "yellow.hue": -9,
+      "yellow.sat": -56,
+      "yellow.lum": 5,
+      "green.hue": 8,
+      "green.sat": -37,
+      "green.lum": 1,
+      "aqua.hue": 0,
+      "aqua.sat": -28,
+      "aqua.lum": -5,
+      "blue.hue": 17,
+      "blue.sat": -49,
+      "blue.lum": 5,
+      "purple.hue": -19,
+      "purple.sat": -60,
+      "purple.lum": 3,
+      "magenta.hue": -17,
+      "magenta.sat": -60,
+      "magenta.lum": 15
+    }
+  }
+}

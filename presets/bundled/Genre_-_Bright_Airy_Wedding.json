@@ -1,0 +1,39 @@
+{
+  "label": "Genre_-_Bright_Airy_Wedding",
+  "tags": [
+    "Bright & Airy",
+    "Editorial"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.5
+    },
+    "tone_curve": {
+      "contrast": -15,
+      "highlights": -40,
+      "shadows": 35,
+      "lights": 15,
+      "darks": 15
+    },
+    "color_grade": {
+      "global_chroma": -5,
+      "shadows_hue": 210,
+      "shadows_sat": 4,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 45,
+      "highlights_sat": 4,
+      "highlights_lum": 0
+    },
+    "hsl": {
+      "orange.lum": 10,
+      "yellow.sat": -10,
+      "green.hue": 20,
+      "green.sat": -30,
+      "aqua.lum": 35,
+      "blue.sat": -20
+    }
+  }
+}

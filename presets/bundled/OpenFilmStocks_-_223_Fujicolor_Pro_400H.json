@@ -1,0 +1,42 @@
+{
+  "label": "OpenFilmStocks_-_223_Fujicolor_Pro_400H",
+  "tags": [
+    "Film",
+    "High Contrast"
+  ],
+  "modules": {
+    "tone_curve": {
+      "contrast": 84
+    },
+    "color_grade": {
+      "perceptual_sat": -6,
+      "global_chroma": -10
+    },
+    "hsl": {
+      "red.hue": 6,
+      "red.sat": -10,
+      "red.lum": 0,
+      "orange.hue": 9,
+      "orange.sat": -20,
+      "orange.lum": 0,
+      "yellow.hue": 25,
+      "yellow.sat": -30,
+      "yellow.lum": 30,
+      "green.hue": 50,
+      "green.sat": -50,
+      "green.lum": 30,
+      "aqua.hue": 5,
+      "aqua.sat": 8,
+      "aqua.lum": 15,
+      "blue.hue": -10,
+      "blue.sat": 5,
+      "blue.lum": 20,
+      "purple.hue": 20,
+      "purple.sat": -10,
+      "purple.lum": 20,
+      "magenta.hue": -25,
+      "magenta.sat": -40,
+      "magenta.lum": 15
+    }
+  }
+}

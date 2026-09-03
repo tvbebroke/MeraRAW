@@ -1,0 +1,42 @@
+{
+  "label": "Mobile_-_Flash_Neon",
+  "tags": [
+    "Cool",
+    "Vibrant",
+    "High Contrast",
+    "Dark"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.15
+    },
+    "tone_curve": {
+      "contrast": 35,
+      "highlights": -40,
+      "shadows": 30,
+      "lights": 20,
+      "darks": -15
+    },
+    "color_grade": {
+      "perceptual_sat": 0,
+      "global_chroma": -5,
+      "shadows_hue": 240,
+      "shadows_sat": 15,
+      "highlights_hue": 315,
+      "highlights_sat": 12
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "red.sat": 10,
+      "yellow.sat": -20,
+      "green.hue": -40,
+      "green.sat": -30,
+      "blue.sat": 15,
+      "purple.sat": 20,
+      "magenta.sat": 25
+    }
+  }
+}

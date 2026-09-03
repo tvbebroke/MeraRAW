@@ -1,0 +1,39 @@
+{
+  "label": "Genre_-_Cool_Modern_Interior",
+  "tags": [
+    "Bright & Airy",
+    "Cool",
+    "Pastel"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.3
+    },
+    "tone_curve": {
+      "contrast": 15,
+      "highlights": -30,
+      "shadows": 20,
+      "lights": 15,
+      "darks": 0
+    },
+    "color_grade": {
+      "perceptual_sat": -3,
+      "global_chroma": -5,
+      "shadows_hue": 225,
+      "shadows_sat": 5,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 210,
+      "highlights_sat": 3,
+      "highlights_lum": 0
+    },
+    "hsl": {
+      "orange.sat": -5,
+      "green.sat": -15,
+      "aqua.lum": 15,
+      "blue.sat": -5
+    }
+  }
+}

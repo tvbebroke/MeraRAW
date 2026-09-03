@@ -1,0 +1,38 @@
+{
+  "label": "Slide_-_AgfaChrome_RS_100",
+  "tags": [
+    "Film"
+  ],
+  "modules": {
+    "tone_curve": {
+      "contrast": 20,
+      "highlights": -10,
+      "shadows": -10,
+      "darks": -20
+    },
+    "color_grade": {
+      "global_chroma": 5,
+      "shadows_hue": 50,
+      "shadows_sat": 5,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 45,
+      "highlights_sat": 5,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "red.hue": 5,
+      "red.sat": 5,
+      "yellow.hue": -5,
+      "green.hue": 10,
+      "green.sat": 5,
+      "blue.sat": 5
+    }
+  }
+}

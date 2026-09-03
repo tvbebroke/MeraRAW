@@ -1,0 +1,43 @@
+{
+  "label": "OpenFilmStocks_-_213_Kodak_Gold_200",
+  "tags": [
+    "Film",
+    "Warm",
+    "High Contrast"
+  ],
+  "modules": {
+    "tone_curve": {
+      "contrast": 60
+    },
+    "color_grade": {
+      "perceptual_sat": -5,
+      "global_chroma": -5
+    },
+    "hsl": {
+      "red.hue": 25,
+      "red.sat": -35,
+      "red.lum": -10,
+      "orange.hue": -5,
+      "orange.sat": -25,
+      "orange.lum": -5,
+      "yellow.hue": -5,
+      "yellow.sat": -30,
+      "yellow.lum": 10,
+      "green.hue": 25,
+      "green.sat": -65,
+      "green.lum": -5,
+      "aqua.hue": 0,
+      "aqua.sat": -10,
+      "aqua.lum": 0,
+      "blue.hue": 0,
+      "blue.sat": -45,
+      "blue.lum": -15,
+      "purple.hue": 5,
+      "purple.sat": -40,
+      "purple.lum": 10,
+      "magenta.hue": 0,
+      "magenta.sat": -60,
+      "magenta.lum": 0
+    }
+  }
+}

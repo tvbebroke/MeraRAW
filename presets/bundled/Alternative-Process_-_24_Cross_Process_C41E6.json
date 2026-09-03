@@ -1,0 +1,43 @@
+{
+  "label": "Alternative-Process_-_24_Cross_Process_C41E6",
+  "tags": [
+    "Moody",
+    "Film",
+    "Cool",
+    "High Contrast",
+    "Teal & Orange"
+  ],
+  "modules": {
+    "tone_curve": {
+      "contrast": 42,
+      "highlights": -30,
+      "shadows": 20,
+      "lights": 15,
+      "darks": -25
+    },
+    "color_grade": {
+      "perceptual_sat": 10,
+      "global_chroma": 8,
+      "shadows_hue": 230,
+      "shadows_sat": 22,
+      "shadows_lum": 0,
+      "midtones_hue": 210,
+      "midtones_sat": 10,
+      "midtones_lum": 0,
+      "highlights_hue": 45,
+      "highlights_sat": 15,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "orange.sat": -15,
+      "green.sat": -20,
+      "blue.hue": 10,
+      "blue.sat": 20,
+      "blue.lum": -10
+    }
+  }
+}

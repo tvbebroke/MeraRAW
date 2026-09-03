@@ -1,0 +1,37 @@
+{
+  "label": "Alternative-Process_-_22_BW_Infrared",
+  "tags": [
+    "Bright & Airy",
+    "High Contrast",
+    "Black & White"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.3
+    },
+    "tone_curve": {
+      "contrast": 35,
+      "highlights": -35,
+      "shadows": 25,
+      "lights": 25,
+      "darks": -25
+    },
+    "color_grade": {
+      "shadows_hue": 0,
+      "shadows_sat": 0,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 0,
+      "highlights_sat": 0,
+      "highlights_lum": 0,
+      "global_chroma": -100,
+      "perceptual_sat": -100
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    }
+  }
+}

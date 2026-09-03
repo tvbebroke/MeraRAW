@@ -1,0 +1,35 @@
+{
+  "label": "Creative_-_Cinestill_800T",
+  "tags": [
+    "Bright & Airy",
+    "Cool",
+    "Teal & Orange"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.75
+    },
+    "tone_curve": {
+      "contrast": 15,
+      "highlights": -70,
+      "shadows": 50,
+      "lights": -30,
+      "darks": 0
+    },
+    "color_grade": {
+      "shadows_hue": 210,
+      "shadows_sat": 25,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 50,
+      "highlights_sat": 12.5,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    }
+  }
+}

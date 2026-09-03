@@ -1,0 +1,43 @@
+{
+  "label": "Mobile_-_Food_Flatlay",
+  "tags": [
+    "Bright & Airy",
+    "Cool"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.4
+    },
+    "white_balance": {
+      "temp": 300
+    },
+    "tone_curve": {
+      "contrast": 10,
+      "highlights": -25,
+      "shadows": 30,
+      "lights": 20,
+      "darks": 5
+    },
+    "color_grade": {
+      "perceptual_sat": 10,
+      "global_chroma": 10,
+      "shadows_hue": 40,
+      "shadows_sat": 5,
+      "highlights_hue": 45,
+      "highlights_sat": 8
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "red.sat": 20,
+      "red.lum": 5,
+      "orange.sat": 15,
+      "orange.lum": 12,
+      "yellow.sat": 15,
+      "green.sat": 5,
+      "blue.sat": -10
+    }
+  }
+}

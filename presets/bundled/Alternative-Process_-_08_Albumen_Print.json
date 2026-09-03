@@ -1,0 +1,33 @@
+{
+  "label": "Alternative-Process_-_08_Albumen_Print",
+  "tags": [
+    "Moody",
+    "Warm",
+    "Muted"
+  ],
+  "modules": {
+    "tone_curve": {
+      "contrast": 18,
+      "highlights": -15,
+      "shadows": 25,
+      "lights": 0,
+      "darks": -10
+    },
+    "color_grade": {
+      "global_chroma": -55,
+      "shadows_hue": 45,
+      "shadows_sat": 30,
+      "shadows_lum": 0,
+      "midtones_hue": 42,
+      "midtones_sat": 20,
+      "midtones_lum": 0,
+      "highlights_hue": 40,
+      "highlights_sat": 12,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    }
+  }
+}

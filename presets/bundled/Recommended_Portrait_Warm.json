@@ -1,0 +1,35 @@
+{
+  "label": "Recommended · Portrait Warm",
+  "tags": [
+    "Film",
+    "Warm",
+    "Pastel",
+    "Editorial"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.15
+    },
+    "white_balance": {
+      "temp": 5900,
+      "tint": 8
+    },
+    "tone_curve": {
+      "contrast": 10,
+      "highlights": -12,
+      "shadows": 18
+    },
+    "color_grade": {
+      "perceptual_sat": 10,
+      "midtones_hue": 35,
+      "midtones_sat": 8,
+      "highlights_hue": 40,
+      "highlights_sat": 6
+    },
+    "hsl": {
+      "orange.sat": 12,
+      "orange.lum": 4,
+      "red.sat": 6
+    }
+  }
+}

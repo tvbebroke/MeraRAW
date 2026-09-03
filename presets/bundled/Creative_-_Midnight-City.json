@@ -1,0 +1,39 @@
+{
+  "label": "Creative_-_Midnight-City",
+  "tags": [
+    "Moody",
+    "Cool",
+    "High Contrast",
+    "Dark",
+    "Teal & Orange"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": -0.1
+    },
+    "tone_curve": {
+      "contrast": 28,
+      "highlights": -30,
+      "shadows": 22,
+      "lights": 10,
+      "darks": 0
+    },
+    "color_grade": {
+      "perceptual_sat": 5,
+      "global_chroma": 8,
+      "shadows_hue": 230,
+      "shadows_sat": 15,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 35,
+      "highlights_sat": 8,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    }
+  }
+}

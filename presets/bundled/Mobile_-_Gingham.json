@@ -1,0 +1,38 @@
+{
+  "label": "Mobile_-_Gingham",
+  "tags": [
+    "Cool"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.1
+    },
+    "white_balance": {
+      "temp": 200
+    },
+    "tone_curve": {
+      "contrast": -20,
+      "highlights": -40,
+      "shadows": 40,
+      "lights": 0,
+      "darks": 20
+    },
+    "color_grade": {
+      "perceptual_sat": -10,
+      "global_chroma": -15,
+      "shadows_hue": 60,
+      "shadows_sat": 8,
+      "highlights_hue": 50,
+      "highlights_sat": 5
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "orange.sat": -10,
+      "green.hue": 20,
+      "green.sat": -20
+    }
+  }
+}

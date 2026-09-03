@@ -1,0 +1,43 @@
+{
+  "label": "Mobile_-_Nashville",
+  "tags": [
+    "Warm",
+    "Cool",
+    "Pastel"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.25
+    },
+    "white_balance": {
+      "temp": 300,
+      "tint": 10
+    },
+    "tone_curve": {
+      "contrast": -15,
+      "highlights": -30,
+      "shadows": 35,
+      "lights": 10,
+      "darks": 20
+    },
+    "color_grade": {
+      "perceptual_sat": -5,
+      "global_chroma": -10,
+      "shadows_hue": 330,
+      "shadows_sat": 8,
+      "highlights_hue": 40,
+      "highlights_sat": 10
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "orange.sat": -5,
+      "orange.lum": 10,
+      "green.sat": -20,
+      "blue.sat": -15,
+      "magenta.sat": 10
+    }
+  }
+}

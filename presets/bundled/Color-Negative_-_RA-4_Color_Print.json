@@ -1,0 +1,46 @@
+{
+  "label": "Color-Negative_-_RA-4_Color_Print",
+  "tags": [
+    "Natural"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.15
+    },
+    "tone_curve": {
+      "contrast": 18,
+      "highlights": -35,
+      "shadows": 25,
+      "lights": -5,
+      "darks": 10
+    },
+    "color_grade": {
+      "perceptual_sat": -1,
+      "global_chroma": -3,
+      "shadows_hue": 50,
+      "shadows_sat": 5,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 45,
+      "highlights_sat": 8,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "red.hue": 5,
+      "red.sat": 5,
+      "orange.hue": -3,
+      "orange.sat": 5,
+      "orange.lum": 5,
+      "yellow.hue": -5,
+      "green.hue": 10,
+      "green.sat": -10,
+      "blue.sat": -5
+    }
+  }
+}

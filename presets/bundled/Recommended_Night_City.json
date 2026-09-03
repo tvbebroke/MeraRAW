@@ -1,0 +1,38 @@
+{
+  "label": "Recommended · Night City",
+  "tags": [
+    "Moody",
+    "Cool",
+    "Dark",
+    "Teal & Orange"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": -0.15
+    },
+    "white_balance": {
+      "temp": 4200,
+      "tint": 5
+    },
+    "tone_curve": {
+      "contrast": 25,
+      "highlights": -35,
+      "shadows": 20,
+      "lights": -20
+    },
+    "color_grade": {
+      "perceptual_sat": 15,
+      "shadows_hue": 230,
+      "shadows_sat": 18,
+      "midtones_hue": 210,
+      "midtones_sat": 10,
+      "highlights_hue": 50,
+      "highlights_sat": 12
+    },
+    "detail": {
+      "noise_luma": 35,
+      "noise_chroma": 40,
+      "sharpen_amount": 40
+    }
+  }
+}

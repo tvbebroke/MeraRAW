@@ -1,0 +1,26 @@
+{
+  "label": "Recommended · Bright & Airy",
+  "tags": [
+    "Bright & Airy"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.45
+    },
+    "tone_curve": {
+      "contrast": -5,
+      "highlights": -25,
+      "shadows": 35,
+      "lights": 15,
+      "darks": 10
+    },
+    "color_grade": {
+      "perceptual_sat": -5,
+      "global_chroma": -8
+    },
+    "white_balance": {
+      "temp": 5600,
+      "tint": 4
+    }
+  }
+}

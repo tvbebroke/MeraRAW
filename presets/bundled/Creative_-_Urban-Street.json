@@ -1,0 +1,37 @@
+{
+  "label": "Creative_-_Urban-Street",
+  "tags": [
+    "Cinematic",
+    "Cool",
+    "Teal & Orange"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.1
+    },
+    "tone_curve": {
+      "contrast": 25,
+      "highlights": -35,
+      "shadows": 15,
+      "lights": 10,
+      "darks": 0
+    },
+    "color_grade": {
+      "perceptual_sat": 3,
+      "global_chroma": 5,
+      "shadows_hue": 215,
+      "shadows_sat": 12,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 38,
+      "highlights_sat": 8,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    }
+  }
+}

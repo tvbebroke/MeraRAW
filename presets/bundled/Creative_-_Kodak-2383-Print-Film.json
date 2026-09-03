@@ -1,0 +1,50 @@
+{
+  "label": "Creative_-_Kodak-2383-Print-Film",
+  "tags": [
+    "Film",
+    "Warm",
+    "High Contrast",
+    "Teal & Orange"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": -0.15
+    },
+    "white_balance": {
+      "temp": 5800,
+      "tint": 5
+    },
+    "tone_curve": {
+      "contrast": 38,
+      "highlights": -55,
+      "shadows": 10,
+      "lights": -15,
+      "darks": 0
+    },
+    "color_grade": {
+      "perceptual_sat": -3,
+      "global_chroma": -5,
+      "shadows_hue": 180,
+      "shadows_sat": 20,
+      "shadows_lum": 0,
+      "midtones_hue": 35,
+      "midtones_sat": 8,
+      "midtones_lum": 0,
+      "highlights_hue": 42,
+      "highlights_sat": 12,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "orange.sat": 5,
+      "orange.lum": 10,
+      "green.hue": -20,
+      "green.sat": -15,
+      "blue.sat": -10,
+      "blue.lum": -5
+    }
+  }
+}

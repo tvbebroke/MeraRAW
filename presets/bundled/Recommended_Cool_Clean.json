@@ -1,0 +1,29 @@
+{
+  "label": "Recommended · Cool Clean",
+  "tags": [
+    "Cool",
+    "Pastel",
+    "Clean"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.1
+    },
+    "white_balance": {
+      "temp": 4800,
+      "tint": -4
+    },
+    "tone_curve": {
+      "contrast": 12,
+      "highlights": -10,
+      "shadows": 15
+    },
+    "color_grade": {
+      "perceptual_sat": 5,
+      "shadows_hue": 220,
+      "shadows_sat": 8,
+      "midtones_hue": 205,
+      "midtones_sat": 4
+    }
+  }
+}

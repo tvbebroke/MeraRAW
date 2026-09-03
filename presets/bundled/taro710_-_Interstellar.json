@@ -1,0 +1,62 @@
+{
+  "label": "taro710_-_Interstellar",
+  "tags": [
+    "Pastel"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0
+    },
+    "white_balance": {
+      "temp": 5300,
+      "tint": 15
+    },
+    "tone_curve": {
+      "contrast": -3,
+      "highlights": -10,
+      "shadows": 17,
+      "lights": 27,
+      "darks": -5
+    },
+    "color_grade": {
+      "perceptual_sat": 0,
+      "global_chroma": -9,
+      "shadows_lum": -17,
+      "midtones_hue": 79,
+      "midtones_sat": 12,
+      "midtones_lum": 0,
+      "highlights_lum": -7
+    },
+    "detail": {
+      "sharpen_amount": 0,
+      "noise_luma": 0,
+      "noise_chroma": 0
+    },
+    "hsl": {
+      "red.hue": -1,
+      "red.sat": 4,
+      "red.lum": -4,
+      "orange.hue": -4,
+      "orange.sat": 8,
+      "orange.lum": -11,
+      "yellow.hue": -25,
+      "yellow.sat": 5,
+      "yellow.lum": -7,
+      "green.hue": -9,
+      "green.sat": -5,
+      "green.lum": 0,
+      "aqua.hue": -10,
+      "aqua.sat": -15,
+      "aqua.lum": 8,
+      "blue.hue": -7,
+      "blue.sat": -24,
+      "blue.lum": 12,
+      "purple.hue": -5,
+      "purple.sat": 5,
+      "purple.lum": 8,
+      "magenta.hue": -2,
+      "magenta.sat": 5,
+      "magenta.lum": 4
+    }
+  }
+}

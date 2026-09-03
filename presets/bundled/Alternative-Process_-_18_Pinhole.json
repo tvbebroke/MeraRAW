@@ -1,0 +1,33 @@
+{
+  "label": "Alternative-Process_-_18_Pinhole",
+  "tags": [
+    "Matte",
+    "Muted",
+    "Pastel"
+  ],
+  "modules": {
+    "tone_curve": {
+      "contrast": -10,
+      "highlights": -40,
+      "shadows": 40,
+      "lights": -10,
+      "darks": -5
+    },
+    "color_grade": {
+      "global_chroma": -30,
+      "shadows_hue": 50,
+      "shadows_sat": 10,
+      "shadows_lum": 0,
+      "midtones_hue": 45,
+      "midtones_sat": 5,
+      "midtones_lum": 0,
+      "highlights_hue": 55,
+      "highlights_sat": 8,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    }
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "label": "Recommended · B&W Classic",
+  "tags": [
+    "Black & White"
+  ],
+  "modules": {
+    "color_grade": {
+      "global_chroma": -100,
+      "perceptual_sat": 0
+    },
+    "tone_curve": {
+      "contrast": 20,
+      "highlights": -10,
+      "shadows": 15,
+      "lights": 5,
+      "darks": -8
+    },
+    "detail": {
+      "sharpen_amount": 45
+    }
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "label": "Alternative-Process_-_09_Salt_Print",
+  "tags": [
+    "Moody",
+    "Warm",
+    "Muted"
+  ],
+  "modules": {
+    "tone_curve": {
+      "contrast": 15,
+      "highlights": -10,
+      "shadows": 30,
+      "lights": -5,
+      "darks": -10
+    },
+    "color_grade": {
+      "global_chroma": -55,
+      "shadows_hue": 30,
+      "shadows_sat": 32,
+      "shadows_lum": 0,
+      "midtones_hue": 28,
+      "midtones_sat": 22,
+      "midtones_lum": 0,
+      "highlights_hue": 35,
+      "highlights_sat": 12,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    }
+  }
+}

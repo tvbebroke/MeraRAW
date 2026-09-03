@@ -1,0 +1,38 @@
+{
+  "label": "Seasonal_-_Christmas_Snowy_Bright",
+  "tags": [
+    "Bright & Airy"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.6
+    },
+    "tone_curve": {
+      "contrast": -15,
+      "highlights": -50,
+      "shadows": 40,
+      "lights": 20,
+      "darks": 15
+    },
+    "color_grade": {
+      "shadows_hue": 210,
+      "shadows_sat": 8,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 40,
+      "highlights_sat": 5,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "orange.lum": 10,
+      "aqua.lum": 15,
+      "blue.sat": -10
+    }
+  }
+}

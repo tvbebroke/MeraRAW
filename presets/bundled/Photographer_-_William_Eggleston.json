@@ -1,0 +1,40 @@
+{
+  "label": "Photographer_-_William_Eggleston",
+  "tags": [
+    "Pastel"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.15
+    },
+    "tone_curve": {
+      "contrast": 10,
+      "highlights": -25,
+      "shadows": 15,
+      "lights": 5,
+      "darks": -10
+    },
+    "color_grade": {
+      "perceptual_sat": 5,
+      "global_chroma": 3,
+      "shadows_hue": 48,
+      "shadows_sat": 5,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 42,
+      "highlights_sat": 8,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 40
+    },
+    "hsl": {
+      "red.sat": 8,
+      "orange.lum": 8,
+      "green.sat": -10,
+      "blue.sat": -8
+    }
+  }
+}

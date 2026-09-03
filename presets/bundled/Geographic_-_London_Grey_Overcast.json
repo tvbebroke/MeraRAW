@@ -1,0 +1,43 @@
+{
+  "label": "Geographic_-_London_Grey_Overcast",
+  "tags": [
+    "Cool",
+    "Muted",
+    "Pastel"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": -0.1
+    },
+    "white_balance": {
+      "temp": -300
+    },
+    "tone_curve": {
+      "contrast": -15,
+      "highlights": -30,
+      "shadows": 35,
+      "lights": 5,
+      "darks": 15
+    },
+    "color_grade": {
+      "perceptual_sat": -15,
+      "global_chroma": -20,
+      "shadows_hue": 220,
+      "shadows_sat": 10,
+      "highlights_hue": 215,
+      "highlights_sat": 5
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "red.sat": -10,
+      "orange.sat": -20,
+      "yellow.sat": -25,
+      "green.sat": -25,
+      "aqua.sat": -10,
+      "blue.sat": -15
+    }
+  }
+}

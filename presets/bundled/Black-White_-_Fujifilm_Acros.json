@@ -1,0 +1,34 @@
+{
+  "label": "Black-White_-_Fujifilm_Acros",
+  "tags": [
+    "Film",
+    "Matte",
+    "Black & White"
+  ],
+  "modules": {
+    "tone_curve": {
+      "contrast": 0,
+      "highlights": -40,
+      "shadows": 40,
+      "lights": 15,
+      "darks": -30
+    },
+    "color_grade": {
+      "shadows_hue": 0,
+      "shadows_sat": 0,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 0,
+      "highlights_sat": 0,
+      "highlights_lum": 0,
+      "global_chroma": -100,
+      "perceptual_sat": -100
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    }
+  }
+}

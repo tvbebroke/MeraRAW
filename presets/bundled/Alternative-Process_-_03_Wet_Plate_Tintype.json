@@ -1,0 +1,33 @@
+{
+  "label": "Alternative-Process_-_03_Wet_Plate_Tintype",
+  "tags": [
+    "Warm",
+    "Muted",
+    "High Contrast"
+  ],
+  "modules": {
+    "tone_curve": {
+      "contrast": 35,
+      "highlights": -30,
+      "shadows": 10,
+      "lights": -10,
+      "darks": -25
+    },
+    "color_grade": {
+      "global_chroma": -50,
+      "shadows_hue": 35,
+      "shadows_sat": 30,
+      "shadows_lum": 0,
+      "midtones_hue": 30,
+      "midtones_sat": 20,
+      "midtones_lum": 0,
+      "highlights_hue": 40,
+      "highlights_sat": 10,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    }
+  }
+}

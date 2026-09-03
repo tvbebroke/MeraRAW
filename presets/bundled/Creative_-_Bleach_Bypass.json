@@ -1,0 +1,46 @@
+{
+  "label": "Creative_-_Bleach_Bypass",
+  "tags": [
+    "Film",
+    "Cool",
+    "High Contrast",
+    "Dark"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": -0.5
+    },
+    "tone_curve": {
+      "contrast": 70,
+      "highlights": -65,
+      "shadows": -40,
+      "lights": 15,
+      "darks": 0
+    },
+    "color_grade": {
+      "shadows_hue": 225,
+      "shadows_sat": 10,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 45,
+      "highlights_sat": 6.5,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "red.sat": -30,
+      "orange.sat": -25,
+      "yellow.sat": -35,
+      "green.sat": -40,
+      "aqua.sat": -45,
+      "blue.sat": -20,
+      "purple.sat": -35,
+      "magenta.sat": -40
+    }
+  }
+}

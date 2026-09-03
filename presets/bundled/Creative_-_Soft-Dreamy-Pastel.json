@@ -1,0 +1,39 @@
+{
+  "label": "Creative_-_Soft-Dreamy-Pastel",
+  "tags": [
+    "Pastel",
+    "Dreamy"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.25
+    },
+    "white_balance": {
+      "temp": 5100
+    },
+    "tone_curve": {
+      "contrast": 5,
+      "highlights": -22,
+      "shadows": 18,
+      "lights": 15,
+      "darks": 0
+    },
+    "color_grade": {
+      "perceptual_sat": 10,
+      "global_chroma": 5,
+      "shadows_hue": 200,
+      "shadows_sat": 5,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 45,
+      "highlights_sat": 8,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    }
+  }
+}

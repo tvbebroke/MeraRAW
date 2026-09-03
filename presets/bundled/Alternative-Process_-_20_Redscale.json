@@ -1,0 +1,50 @@
+{
+  "label": "Alternative-Process_-_20_Redscale",
+  "tags": [
+    "Moody",
+    "Warm"
+  ],
+  "modules": {
+    "tone_curve": {
+      "contrast": 25,
+      "highlights": -35,
+      "shadows": 20,
+      "lights": 5,
+      "darks": -20
+    },
+    "color_grade": {
+      "perceptual_sat": -5,
+      "global_chroma": -10,
+      "shadows_hue": 25,
+      "shadows_sat": 28,
+      "shadows_lum": 0,
+      "midtones_hue": 20,
+      "midtones_sat": 20,
+      "midtones_lum": 0,
+      "highlights_hue": 30,
+      "highlights_sat": 15,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "red.sat": 40,
+      "red.lum": 10,
+      "orange.sat": 45,
+      "orange.lum": 15,
+      "yellow.sat": 35,
+      "green.hue": -50,
+      "green.sat": -40,
+      "aqua.hue": -30,
+      "aqua.sat": -50,
+      "aqua.lum": -15,
+      "blue.hue": -20,
+      "blue.sat": -55,
+      "blue.lum": -15,
+      "purple.sat": -20,
+      "magenta.sat": -15
+    }
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "label": "Recommended · Soft Print",
+  "tags": [
+    "Pastel"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.1
+    },
+    "tone_curve": {
+      "contrast": -5,
+      "highlights": -20,
+      "shadows": 25,
+      "lights": 10
+    },
+    "color_grade": {
+      "perceptual_sat": -8,
+      "global_chroma": -10
+    },
+    "detail": {
+      "sharpen_amount": 20
+    }
+  }
+}

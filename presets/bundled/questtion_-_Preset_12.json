@@ -1,0 +1,26 @@
+{
+  "label": "questtion_-_Preset_12",
+  "tags": [
+    "High Contrast"
+  ],
+  "modules": {
+    "white_balance": {
+      "temp": 5500,
+      "tint": 4
+    },
+    "tone_curve": {
+      "contrast": 35,
+      "highlights": -16,
+      "shadows": -6,
+      "lights": 14,
+      "darks": 35
+    },
+    "color_grade": {
+      "shadows_lum": 0,
+      "midtones_hue": 358,
+      "midtones_sat": 10,
+      "midtones_lum": 0,
+      "highlights_lum": 24
+    }
+  }
+}

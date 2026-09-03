@@ -1,0 +1,44 @@
+{
+  "label": "Decade_-_WWII_Newsreel",
+  "tags": [
+    "High Contrast"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": -0.2
+    },
+    "tone_curve": {
+      "contrast": 35,
+      "highlights": -50,
+      "shadows": -10,
+      "lights": 5,
+      "darks": -25
+    },
+    "color_grade": {
+      "global_chroma": -15,
+      "shadows_hue": 220,
+      "shadows_sat": 5,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 40,
+      "highlights_sat": 5,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "red.sat": -20,
+      "orange.sat": -20,
+      "yellow.sat": -25,
+      "green.sat": -35,
+      "aqua.sat": -25,
+      "blue.sat": -20,
+      "purple.sat": -20,
+      "magenta.sat": -20
+    }
+  }
+}

@@ -1,0 +1,41 @@
+{
+  "label": "Photographer_-_Joel_Meyerowitz",
+  "tags": [
+    "Bright & Airy",
+    "Warm"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.4
+    },
+    "tone_curve": {
+      "contrast": -10,
+      "highlights": -40,
+      "shadows": 30,
+      "lights": 12,
+      "darks": 5
+    },
+    "color_grade": {
+      "global_chroma": 0,
+      "shadows_hue": 42,
+      "shadows_sat": 6,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 45,
+      "highlights_sat": 12,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 40
+    },
+    "hsl": {
+      "orange.lum": 12,
+      "yellow.lum": 8,
+      "green.sat": -10,
+      "aqua.sat": -5,
+      "blue.sat": -8
+    }
+  }
+}

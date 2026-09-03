@@ -1,0 +1,47 @@
+{
+  "label": "Alternative-Process_-_23_Cross_Process_E6C41",
+  "tags": [
+    "Moody",
+    "Film",
+    "High Contrast"
+  ],
+  "modules": {
+    "tone_curve": {
+      "contrast": 38,
+      "highlights": -25,
+      "shadows": 30,
+      "lights": 20,
+      "darks": -20
+    },
+    "color_grade": {
+      "perceptual_sat": 15,
+      "global_chroma": 12,
+      "shadows_hue": 160,
+      "shadows_sat": 25,
+      "shadows_lum": 0,
+      "midtones_hue": 70,
+      "midtones_sat": 15,
+      "midtones_lum": 0,
+      "highlights_hue": 320,
+      "highlights_sat": 20,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "red.hue": 15,
+      "yellow.hue": -30,
+      "yellow.sat": 20,
+      "green.hue": 40,
+      "green.sat": 30,
+      "green.lum": -10,
+      "blue.hue": -15,
+      "blue.lum": -15,
+      "purple.sat": 15,
+      "magenta.hue": 30,
+      "magenta.sat": 15
+    }
+  }
+}

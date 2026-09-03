@@ -1,0 +1,62 @@
+{
+  "label": "Color-Negative_-_Kodak_Ultramax_400",
+  "tags": [
+    "Film",
+    "Cool",
+    "Teal & Orange"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.15
+    },
+    "tone_curve": {
+      "contrast": 22,
+      "highlights": -28,
+      "shadows": 16,
+      "lights": 10,
+      "darks": -18
+    },
+    "color_grade": {
+      "perceptual_sat": 1.5,
+      "global_chroma": -3.5,
+      "shadows_hue": 205,
+      "shadows_sat": 13,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 42,
+      "highlights_sat": 17.5,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "red.hue": 6.5,
+      "red.sat": 17.5,
+      "red.lum": -4.5,
+      "orange.hue": -4,
+      "orange.sat": 25,
+      "orange.lum": -3.5,
+      "yellow.hue": -11,
+      "yellow.sat": 13,
+      "yellow.lum": -6.5,
+      "green.hue": -17.5,
+      "green.sat": -5,
+      "green.lum": -14,
+      "aqua.hue": -5,
+      "aqua.sat": -10,
+      "aqua.lum": 3,
+      "blue.hue": 2.5,
+      "blue.sat": -5,
+      "blue.lum": -14,
+      "purple.hue": 5,
+      "purple.sat": -10,
+      "purple.lum": 3,
+      "magenta.hue": 5,
+      "magenta.sat": -5
+    }
+  }
+}

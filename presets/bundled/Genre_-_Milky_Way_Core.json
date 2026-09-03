@@ -1,0 +1,39 @@
+{
+  "label": "Genre_-_Milky_Way_Core",
+  "tags": [
+    "Bright & Airy",
+    "High Contrast"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.4
+    },
+    "tone_curve": {
+      "contrast": 30,
+      "highlights": -60,
+      "shadows": 40,
+      "lights": 25,
+      "darks": -20
+    },
+    "color_grade": {
+      "perceptual_sat": 10,
+      "global_chroma": 5,
+      "shadows_hue": 260,
+      "shadows_sat": 10,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 40,
+      "highlights_sat": 8,
+      "highlights_lum": 0
+    },
+    "hsl": {
+      "green.sat": -20,
+      "blue.sat": 15,
+      "blue.lum": -10,
+      "purple.sat": 20,
+      "magenta.sat": 15
+    }
+  }
+}

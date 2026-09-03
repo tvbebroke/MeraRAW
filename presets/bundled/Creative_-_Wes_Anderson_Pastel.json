@@ -1,0 +1,59 @@
+{
+  "label": "Creative_-_Wes_Anderson_Pastel",
+  "tags": [
+    "Cool",
+    "Pastel",
+    "Teal & Orange"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.25
+    },
+    "tone_curve": {
+      "contrast": -30,
+      "highlights": -60,
+      "shadows": 45,
+      "lights": 15,
+      "darks": 0
+    },
+    "color_grade": {
+      "global_chroma": -12,
+      "shadows_hue": 200,
+      "shadows_sat": 12,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 45,
+      "highlights_sat": 8,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "red.hue": 0,
+      "red.sat": -5,
+      "red.lum": 5,
+      "orange.hue": -10,
+      "orange.sat": -15,
+      "orange.lum": 10,
+      "yellow.hue": -5,
+      "yellow.sat": 10,
+      "yellow.lum": 5,
+      "green.hue": 15,
+      "green.sat": -20,
+      "green.lum": 5,
+      "aqua.hue": 10,
+      "aqua.sat": -10,
+      "blue.hue": 0,
+      "blue.sat": -20,
+      "blue.lum": 5,
+      "purple.hue": 0,
+      "purple.sat": -15,
+      "magenta.hue": 10,
+      "magenta.sat": 5
+    }
+  }
+}

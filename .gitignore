@@ -12,6 +12,10 @@ src-tauri/gen/schemas/
 scripts/license-private.pem
 meraraw-derivatives/
 .preset-import-tmp/
+.preset-fetch-tmp/
+
+# Downloaded third-party preset packs (re-fetch via npm run fetch-public-presets)
+preset-sources/
 
 # Third-party skills bundle — not part of the product
 claude-skills-main/

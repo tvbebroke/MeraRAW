@@ -1,0 +1,52 @@
+{
+  "label": "Creative_-_Y2K_Flash_Digicam",
+  "tags": [
+    "Bright & Airy",
+    "Cool",
+    "High Contrast"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.7
+    },
+    "white_balance": {
+      "temp": 4900,
+      "tint": 8
+    },
+    "tone_curve": {
+      "contrast": 30,
+      "highlights": 25,
+      "shadows": -25,
+      "lights": 25,
+      "darks": 0
+    },
+    "color_grade": {
+      "perceptual_sat": -1,
+      "global_chroma": -5,
+      "shadows_hue": 250,
+      "shadows_sat": 10,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 220,
+      "highlights_sat": 8,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "red.sat": 18,
+      "orange.sat": -10,
+      "yellow.sat": -18,
+      "green.sat": -12,
+      "aqua.sat": -5,
+      "blue.hue": -8,
+      "blue.sat": 5,
+      "purple.sat": 10,
+      "magenta.sat": 12
+    }
+  }
+}

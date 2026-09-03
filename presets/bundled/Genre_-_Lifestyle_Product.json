@@ -1,0 +1,37 @@
+{
+  "label": "Genre_-_Lifestyle_Product",
+  "tags": [
+    "Pastel"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.2
+    },
+    "tone_curve": {
+      "contrast": 10,
+      "highlights": -30,
+      "shadows": 20,
+      "lights": 5,
+      "darks": 0
+    },
+    "color_grade": {
+      "perceptual_sat": 5,
+      "global_chroma": 5,
+      "shadows_hue": 45,
+      "shadows_sat": 8,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 43,
+      "highlights_sat": 5,
+      "highlights_lum": 0
+    },
+    "hsl": {
+      "red.sat": 5,
+      "orange.sat": 5,
+      "orange.lum": 10,
+      "green.sat": -10
+    }
+  }
+}

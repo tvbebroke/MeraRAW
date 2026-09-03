@@ -1,0 +1,40 @@
+{
+  "label": "Seasonal_-_Halloween_Spooky_Dark",
+  "tags": [
+    "Cool",
+    "Dark"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": -0.4
+    },
+    "tone_curve": {
+      "contrast": 25,
+      "highlights": -45,
+      "shadows": -15,
+      "lights": -5,
+      "darks": -20
+    },
+    "color_grade": {
+      "shadows_hue": 220,
+      "shadows_sat": 18,
+      "shadows_lum": 0,
+      "midtones_hue": 270,
+      "midtones_sat": 8,
+      "midtones_lum": 0,
+      "highlights_hue": 40,
+      "highlights_sat": 5,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "orange.sat": -10,
+      "orange.lum": 10,
+      "yellow.sat": -20,
+      "green.sat": -40
+    }
+  }
+}

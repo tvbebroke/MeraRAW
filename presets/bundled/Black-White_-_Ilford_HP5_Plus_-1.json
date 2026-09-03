@@ -1,0 +1,33 @@
+{
+  "label": "Black-White_-_Ilford_HP5_Plus_-1",
+  "tags": [
+    "Matte",
+    "Black & White"
+  ],
+  "modules": {
+    "tone_curve": {
+      "contrast": -7.5,
+      "highlights": -8.8,
+      "shadows": 31.3,
+      "lights": 0,
+      "darks": -1.3
+    },
+    "color_grade": {
+      "shadows_hue": 230,
+      "shadows_sat": 8,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 50,
+      "highlights_sat": 5,
+      "highlights_lum": 0,
+      "global_chroma": -100,
+      "perceptual_sat": -100
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    }
+  }
+}

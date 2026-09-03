@@ -1,0 +1,61 @@
+{
+  "label": "Creative_-_Faded_Summer_Expired",
+  "tags": [
+    "Bright & Airy",
+    "Film",
+    "Muted"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 1
+    },
+    "tone_curve": {
+      "contrast": -38.75,
+      "highlights": -70,
+      "shadows": 40,
+      "lights": 20,
+      "darks": 0
+    },
+    "color_grade": {
+      "shadows_hue": 46.25,
+      "shadows_sat": 20,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 45,
+      "highlights_sat": 7.5,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "red.hue": 10,
+      "red.sat": -10,
+      "red.lum": 5,
+      "orange.hue": -5,
+      "orange.sat": -15,
+      "orange.lum": 10,
+      "yellow.hue": -15,
+      "yellow.sat": -15,
+      "yellow.lum": 5,
+      "green.hue": 37.5,
+      "green.sat": -38.75,
+      "green.lum": -10,
+      "aqua.hue": 15,
+      "aqua.sat": -20,
+      "aqua.lum": 0,
+      "blue.hue": -10,
+      "blue.sat": -20,
+      "blue.lum": 5,
+      "purple.hue": 0,
+      "purple.sat": -20,
+      "purple.lum": 0,
+      "magenta.hue": 10,
+      "magenta.sat": -15,
+      "magenta.lum": 0
+    }
+  }
+}

@@ -1,0 +1,61 @@
+{
+  "label": "Creative_-_1980s_VHS_Synthwave",
+  "tags": [
+    "Cool",
+    "High Contrast"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.25
+    },
+    "tone_curve": {
+      "contrast": 32,
+      "highlights": -90,
+      "shadows": 50,
+      "lights": 22,
+      "darks": 0
+    },
+    "color_grade": {
+      "global_chroma": 0,
+      "shadows_hue": 200,
+      "shadows_sat": 22,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 310,
+      "highlights_sat": 32,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "red.hue": 20,
+      "red.sat": 20,
+      "red.lum": -8,
+      "orange.hue": -10,
+      "orange.sat": 15,
+      "orange.lum": -5,
+      "yellow.hue": 0,
+      "yellow.sat": -10,
+      "yellow.lum": 10,
+      "green.hue": -45,
+      "green.sat": -60,
+      "green.lum": -15,
+      "aqua.hue": 13,
+      "aqua.sat": 28,
+      "aqua.lum": 13,
+      "blue.hue": -20,
+      "blue.sat": 10,
+      "blue.lum": -15,
+      "purple.hue": 23,
+      "purple.sat": 30,
+      "purple.lum": -8,
+      "magenta.hue": 10,
+      "magenta.sat": 33,
+      "magenta.lum": 10
+    }
+  }
+}

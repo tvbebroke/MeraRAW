@@ -1,0 +1,49 @@
+{
+  "label": "Creative_-_Fujifilm-Eterna-Bleach-Bypass",
+  "tags": [
+    "Film",
+    "Cool",
+    "Muted",
+    "High Contrast",
+    "Dark"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": -0.5
+    },
+    "tone_curve": {
+      "contrast": 55,
+      "highlights": -60,
+      "shadows": -20,
+      "lights": 10,
+      "darks": 0
+    },
+    "color_grade": {
+      "perceptual_sat": -15,
+      "global_chroma": -20,
+      "shadows_hue": 220,
+      "shadows_sat": 12,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 50,
+      "highlights_sat": 5,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "red.sat": -25,
+      "orange.sat": -20,
+      "yellow.sat": -30,
+      "green.sat": -35,
+      "aqua.sat": -40,
+      "blue.sat": -15,
+      "purple.sat": -30,
+      "magenta.sat": -35
+    }
+  }
+}

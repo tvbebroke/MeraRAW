@@ -1,0 +1,69 @@
+{
+  "label": "Creative_-_Fuji_Soft_Ember_Classic_Neg",
+  "tags": [
+    "Film",
+    "Warm",
+    "Vibrant",
+    "Pastel"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.2
+    },
+    "white_balance": {
+      "temp": 6500,
+      "tint": 5
+    },
+    "tone_curve": {
+      "contrast": -15,
+      "highlights": -50,
+      "shadows": 40,
+      "lights": -10,
+      "darks": 0
+    },
+    "color_grade": {
+      "perceptual_sat": 35,
+      "global_chroma": 5,
+      "shadows_hue": 210,
+      "shadows_sat": 5,
+      "shadows_lum": 0,
+      "midtones_hue": 45,
+      "midtones_sat": 10,
+      "midtones_lum": 0,
+      "highlights_hue": 45,
+      "highlights_sat": 15,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 20,
+      "noise_luma": 0,
+      "noise_chroma": 10
+    },
+    "hsl": {
+      "red.hue": 5,
+      "red.sat": 15,
+      "red.lum": -10,
+      "orange.hue": -5,
+      "orange.sat": 20,
+      "orange.lum": 5,
+      "yellow.hue": -10,
+      "yellow.sat": 20,
+      "yellow.lum": 10,
+      "green.hue": 25,
+      "green.sat": -30,
+      "green.lum": -10,
+      "aqua.hue": -15,
+      "aqua.sat": -10,
+      "aqua.lum": -10,
+      "blue.hue": -20,
+      "blue.sat": -10,
+      "blue.lum": -15,
+      "purple.hue": 0,
+      "purple.sat": -10,
+      "purple.lum": 0,
+      "magenta.hue": 0,
+      "magenta.sat": -10,
+      "magenta.lum": 0
+    }
+  }
+}

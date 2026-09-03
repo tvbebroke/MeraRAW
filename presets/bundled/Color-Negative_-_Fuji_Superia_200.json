@@ -1,0 +1,42 @@
+{
+  "label": "Color-Negative_-_Fuji_Superia_200",
+  "tags": [
+    "Bright & Airy",
+    "Film"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.4
+    },
+    "tone_curve": {
+      "contrast": 12,
+      "highlights": -15,
+      "shadows": 18,
+      "darks": -2
+    },
+    "color_grade": {
+      "perceptual_sat": 10,
+      "global_chroma": 8,
+      "shadows_hue": 135,
+      "shadows_sat": 12,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 38,
+      "highlights_sat": 5,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 8,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "red.hue": -7,
+      "red.sat": 8,
+      "green.sat": 5,
+      "blue.hue": -4,
+      "blue.sat": 3
+    }
+  }
+}

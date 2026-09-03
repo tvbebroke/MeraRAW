@@ -1,0 +1,45 @@
+{
+  "label": "Genre_-_Dark_Moody_Culinary",
+  "tags": [
+    "Moody",
+    "Cool",
+    "Dark",
+    "Teal & Orange"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": -0.4
+    },
+    "tone_curve": {
+      "contrast": 25,
+      "highlights": -50,
+      "shadows": 10,
+      "lights": -5,
+      "darks": -20
+    },
+    "color_grade": {
+      "perceptual_sat": -12,
+      "global_chroma": -15,
+      "shadows_hue": 220,
+      "shadows_sat": 15,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 40,
+      "highlights_sat": 8,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "red.sat": 10,
+      "orange.sat": 10,
+      "yellow.sat": 5,
+      "green.sat": -30,
+      "blue.sat": -20
+    }
+  }
+}

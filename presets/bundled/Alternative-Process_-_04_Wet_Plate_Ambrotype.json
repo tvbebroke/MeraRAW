@@ -1,0 +1,33 @@
+{
+  "label": "Alternative-Process_-_04_Wet_Plate_Ambrotype",
+  "tags": [
+    "High Contrast",
+    "Black & White"
+  ],
+  "modules": {
+    "tone_curve": {
+      "contrast": 40,
+      "highlights": -35,
+      "shadows": -10,
+      "lights": 5,
+      "darks": -30
+    },
+    "color_grade": {
+      "shadows_hue": 0,
+      "shadows_sat": 0,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 0,
+      "highlights_sat": 0,
+      "highlights_lum": 0,
+      "global_chroma": -100,
+      "perceptual_sat": -100
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    }
+  }
+}

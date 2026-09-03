@@ -1,0 +1,40 @@
+{
+  "label": "Decade_-_Dust_Bowl_Documentary",
+  "tags": [
+    "Natural"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": -0.25
+    },
+    "tone_curve": {
+      "contrast": 20,
+      "highlights": -45,
+      "shadows": 10,
+      "lights": -10,
+      "darks": -20
+    },
+    "color_grade": {
+      "global_chroma": -10,
+      "shadows_hue": 35,
+      "shadows_sat": 12,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 40,
+      "highlights_sat": 8,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "orange.lum": 8,
+      "yellow.sat": -10,
+      "green.sat": -35,
+      "blue.sat": -25
+    }
+  }
+}

@@ -1,0 +1,39 @@
+{
+  "label": "Genre_-_Muted_Avant-Garde",
+  "tags": [
+    "Cool",
+    "Muted"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": -0.25
+    },
+    "tone_curve": {
+      "contrast": 20,
+      "highlights": -40,
+      "shadows": 15,
+      "lights": 5,
+      "darks": -10
+    },
+    "color_grade": {
+      "perceptual_sat": -25,
+      "global_chroma": -30,
+      "shadows_hue": 250,
+      "shadows_sat": 10,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 35,
+      "highlights_sat": 5,
+      "highlights_lum": 0
+    },
+    "hsl": {
+      "red.sat": -20,
+      "orange.sat": -25,
+      "yellow.sat": -30,
+      "green.sat": -50,
+      "blue.sat": -30
+    }
+  }
+}

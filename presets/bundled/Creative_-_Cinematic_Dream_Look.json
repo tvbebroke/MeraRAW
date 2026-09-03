@@ -1,0 +1,38 @@
+{
+  "label": "Creative_-_Cinematic_Dream_Look",
+  "tags": [
+    "Cinematic",
+    "Cool",
+    "Dreamy",
+    "Teal & Orange"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.1
+    },
+    "tone_curve": {
+      "contrast": -25,
+      "highlights": -50,
+      "shadows": 40,
+      "lights": 15,
+      "darks": 0
+    },
+    "color_grade": {
+      "perceptual_sat": -1,
+      "global_chroma": -3,
+      "shadows_hue": 210,
+      "shadows_sat": 10,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 45,
+      "highlights_sat": 15,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    }
+  }
+}

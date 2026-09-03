@@ -1,0 +1,50 @@
+{
+  "label": "9bic-lrpresets_-_mecabify",
+  "tags": [
+    "Natural"
+  ],
+  "modules": {
+    "tone_curve": {
+      "contrast": -70,
+      "highlights": -54,
+      "shadows": 33,
+      "lights": -40,
+      "darks": 20
+    },
+    "color_grade": {
+      "perceptual_sat": 15,
+      "global_chroma": 9
+    },
+    "detail": {
+      "sharpen_amount": 25,
+      "noise_luma": 0,
+      "noise_chroma": 25
+    },
+    "hsl": {
+      "red.hue": 0,
+      "red.sat": 20,
+      "red.lum": 17,
+      "orange.hue": 0,
+      "orange.sat": 90,
+      "orange.lum": 20,
+      "yellow.hue": 0,
+      "yellow.sat": 58,
+      "yellow.lum": 23,
+      "green.hue": 0,
+      "green.sat": 7,
+      "green.lum": 15,
+      "aqua.hue": 0,
+      "aqua.sat": 13,
+      "aqua.lum": 15,
+      "blue.hue": 0,
+      "blue.sat": 20,
+      "blue.lum": 15,
+      "purple.hue": 0,
+      "purple.sat": -3,
+      "purple.lum": 15,
+      "magenta.hue": 0,
+      "magenta.sat": 29,
+      "magenta.lum": 15
+    }
+  }
+}

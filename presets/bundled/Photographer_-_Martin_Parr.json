@@ -1,0 +1,45 @@
+{
+  "label": "Photographer_-_Martin_Parr",
+  "tags": [
+    "Bright & Airy",
+    "Cool",
+    "Teal & Orange"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.3
+    },
+    "tone_curve": {
+      "contrast": 25,
+      "highlights": -30,
+      "shadows": 20,
+      "lights": 20,
+      "darks": -10
+    },
+    "color_grade": {
+      "perceptual_sat": 15,
+      "global_chroma": 12,
+      "shadows_hue": 210,
+      "shadows_sat": 10,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 40,
+      "highlights_sat": 18,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 40
+    },
+    "hsl": {
+      "red.sat": 18,
+      "orange.sat": 12,
+      "orange.lum": 8,
+      "yellow.sat": 15,
+      "green.sat": -20,
+      "blue.sat": -5,
+      "magenta.sat": 10
+    }
+  }
+}

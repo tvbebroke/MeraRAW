@@ -1,0 +1,32 @@
+{
+  "label": "Alternative-Process_-_05_Daguerreotype",
+  "tags": [
+    "Muted",
+    "High Contrast"
+  ],
+  "modules": {
+    "tone_curve": {
+      "contrast": 45,
+      "highlights": -40,
+      "shadows": 5,
+      "lights": 15,
+      "darks": -30
+    },
+    "color_grade": {
+      "global_chroma": -60,
+      "shadows_hue": 40,
+      "shadows_sat": 20,
+      "shadows_lum": 0,
+      "midtones_hue": 35,
+      "midtones_sat": 12,
+      "midtones_lum": 0,
+      "highlights_hue": 45,
+      "highlights_sat": 8,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    }
+  }
+}

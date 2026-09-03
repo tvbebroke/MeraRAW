@@ -1,0 +1,48 @@
+{
+  "label": "Creative_-_Canon_Color_Science",
+  "tags": [
+    "Pastel"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0
+    },
+    "tone_curve": {
+      "contrast": -8,
+      "highlights": -12,
+      "shadows": 10,
+      "lights": 0,
+      "darks": 0
+    },
+    "color_grade": {
+      "perceptual_sat": 0,
+      "global_chroma": 0,
+      "shadows_hue": 35,
+      "shadows_sat": 7,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 42,
+      "highlights_sat": 5,
+      "highlights_lum": 0
+    },
+    "hsl": {
+      "red.hue": 10,
+      "red.sat": 10,
+      "red.lum": 5,
+      "orange.hue": -3,
+      "orange.sat": 15,
+      "orange.lum": 15,
+      "yellow.hue": -3,
+      "yellow.sat": 8,
+      "green.hue": 15,
+      "green.sat": -15,
+      "green.lum": -5,
+      "aqua.sat": -5,
+      "blue.hue": -3,
+      "blue.sat": 8,
+      "blue.lum": -10
+    }
+  }
+}

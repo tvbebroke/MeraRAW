@@ -1,0 +1,48 @@
+{
+  "label": "Color-Negative_-_ORWO_NC_500",
+  "tags": [
+    "Warm",
+    "Pastel"
+  ],
+  "modules": {
+    "tone_curve": {
+      "contrast": 10,
+      "highlights": -25,
+      "shadows": 20,
+      "lights": 0,
+      "darks": -20
+    },
+    "color_grade": {
+      "perceptual_sat": -5,
+      "global_chroma": -10,
+      "shadows_hue": 30,
+      "shadows_sat": 10,
+      "shadows_lum": 0,
+      "midtones_hue": 35,
+      "midtones_sat": 5,
+      "midtones_lum": 0,
+      "highlights_hue": 25,
+      "highlights_sat": 12,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "red.hue": 15,
+      "red.sat": -5,
+      "orange.hue": 5,
+      "orange.sat": 10,
+      "yellow.hue": -5,
+      "yellow.sat": -5,
+      "green.hue": 15,
+      "green.sat": -15,
+      "green.lum": -5,
+      "aqua.sat": -10,
+      "blue.hue": -15,
+      "blue.sat": -10,
+      "blue.lum": -5
+    }
+  }
+}

@@ -1,0 +1,59 @@
+{
+  "label": "Color-Negative_-_Fujicolor_Superia_Premium_400",
+  "tags": [
+    "Film",
+    "Pastel"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.15
+    },
+    "tone_curve": {
+      "contrast": 12,
+      "highlights": -25,
+      "shadows": 15,
+      "lights": 5,
+      "darks": -10
+    },
+    "color_grade": {
+      "perceptual_sat": 3,
+      "global_chroma": -2,
+      "shadows_hue": 150,
+      "shadows_sat": 10,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 42,
+      "highlights_sat": 5,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "red.hue": -3,
+      "red.sat": 5,
+      "red.lum": -3,
+      "orange.hue": -5,
+      "orange.sat": 8,
+      "orange.lum": 3,
+      "yellow.hue": 0,
+      "yellow.sat": 5,
+      "green.hue": 5,
+      "green.sat": 8,
+      "green.lum": -5,
+      "aqua.hue": 8,
+      "aqua.sat": 5,
+      "aqua.lum": 5,
+      "blue.hue": 5,
+      "blue.sat": 5,
+      "blue.lum": -5,
+      "purple.hue": 0,
+      "purple.sat": -5,
+      "magenta.hue": 0,
+      "magenta.sat": -5
+    }
+  }
+}

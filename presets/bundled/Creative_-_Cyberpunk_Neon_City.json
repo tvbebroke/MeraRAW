@@ -1,0 +1,44 @@
+{
+  "label": "Creative_-_Cyberpunk_Neon_City",
+  "tags": [
+    "Moody",
+    "Cool",
+    "Vibrant",
+    "High Contrast",
+    "Dark"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": -0.5
+    },
+    "tone_curve": {
+      "contrast": 45,
+      "highlights": -65,
+      "shadows": 40,
+      "lights": 30,
+      "darks": 0
+    },
+    "color_grade": {
+      "global_chroma": -15,
+      "shadows_hue": 230,
+      "shadows_sat": 22.5,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 315,
+      "highlights_sat": 22.5,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "yellow.sat": -60,
+      "green.hue": -90,
+      "green.sat": -60,
+      "magenta.sat": 55
+    }
+  }
+}

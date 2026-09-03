@@ -1,0 +1,37 @@
+{
+  "label": "Genre_-_Clean_Bright_Food",
+  "tags": [
+    "Bright & Airy",
+    "Clean"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.4
+    },
+    "tone_curve": {
+      "contrast": 5,
+      "highlights": -35,
+      "shadows": 20,
+      "lights": 15,
+      "darks": 0
+    },
+    "color_grade": {
+      "perceptual_sat": 3,
+      "global_chroma": 0,
+      "shadows_hue": 210,
+      "shadows_sat": 3,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 43,
+      "highlights_sat": 3,
+      "highlights_lum": 0
+    },
+    "hsl": {
+      "red.sat": -5,
+      "orange.lum": 10,
+      "green.sat": -10
+    }
+  }
+}

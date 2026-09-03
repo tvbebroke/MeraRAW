@@ -1,0 +1,42 @@
+{
+  "label": "Decade_-_Kodachrome_Mid-Century",
+  "tags": [
+    "Film",
+    "Warm"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.15
+    },
+    "tone_curve": {
+      "contrast": 20,
+      "highlights": -40,
+      "shadows": 20,
+      "lights": 10,
+      "darks": -10
+    },
+    "color_grade": {
+      "shadows_hue": 35,
+      "shadows_sat": 8,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 40,
+      "highlights_sat": 10,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "red.sat": 15,
+      "red.lum": 5,
+      "orange.sat": 10,
+      "yellow.sat": 10,
+      "green.sat": -10,
+      "blue.sat": 10
+    }
+  }
+}

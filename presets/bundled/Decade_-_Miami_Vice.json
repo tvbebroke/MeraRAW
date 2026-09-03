@@ -1,0 +1,42 @@
+{
+  "label": "Decade_-_Miami_Vice",
+  "tags": [
+    "Bright & Airy",
+    "Cool",
+    "Pastel"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.3
+    },
+    "tone_curve": {
+      "contrast": 10,
+      "highlights": -45,
+      "shadows": 30,
+      "lights": 15,
+      "darks": -5
+    },
+    "color_grade": {
+      "shadows_hue": 190,
+      "shadows_sat": 15,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 330,
+      "highlights_sat": 15,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "orange.lum": 10,
+      "green.sat": -20,
+      "aqua.sat": 15,
+      "blue.sat": 10,
+      "magenta.sat": 20
+    }
+  }
+}

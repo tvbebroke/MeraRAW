@@ -1,0 +1,42 @@
+{
+  "label": "OpenFilmStocks_-_222_Fujicolor_Pro_160NS",
+  "tags": [
+    "Film",
+    "High Contrast"
+  ],
+  "modules": {
+    "tone_curve": {
+      "contrast": 74
+    },
+    "color_grade": {
+      "perceptual_sat": -9,
+      "global_chroma": -4
+    },
+    "hsl": {
+      "red.hue": 10,
+      "red.sat": -28,
+      "red.lum": -7,
+      "orange.hue": 5,
+      "orange.sat": -5,
+      "orange.lum": 13,
+      "yellow.hue": 12,
+      "yellow.sat": -15,
+      "yellow.lum": 35,
+      "green.hue": 33,
+      "green.sat": -20,
+      "green.lum": 62,
+      "aqua.hue": 2,
+      "aqua.sat": -21,
+      "aqua.lum": 60,
+      "blue.hue": 2,
+      "blue.sat": 5,
+      "blue.lum": 28,
+      "purple.hue": -4,
+      "purple.sat": -14,
+      "purple.lum": 18,
+      "magenta.hue": 12,
+      "magenta.sat": -27,
+      "magenta.lum": -14
+    }
+  }
+}

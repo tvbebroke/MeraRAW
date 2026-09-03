@@ -1,0 +1,40 @@
+{
+  "label": "Creative_-_Deep-Forest-Green",
+  "tags": [
+    "Moody"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": -0.05
+    },
+    "tone_curve": {
+      "contrast": 18,
+      "highlights": -30,
+      "shadows": 15,
+      "lights": 8,
+      "darks": 0
+    },
+    "color_grade": {
+      "perceptual_sat": 0,
+      "global_chroma": 0,
+      "shadows_hue": 140,
+      "shadows_sat": 10,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 45,
+      "highlights_sat": 5,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "green.hue": -15,
+      "green.sat": -25,
+      "green.lum": -10
+    }
+  }
+}

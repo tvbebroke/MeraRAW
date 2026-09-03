@@ -1,0 +1,43 @@
+{
+  "label": "Mobile_-_Golden_Hour_Selfie",
+  "tags": [
+    "Warm",
+    "Cool",
+    "Pastel"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.25
+    },
+    "white_balance": {
+      "temp": 500
+    },
+    "tone_curve": {
+      "contrast": -5,
+      "highlights": -40,
+      "shadows": 35,
+      "lights": 10,
+      "darks": 10
+    },
+    "color_grade": {
+      "perceptual_sat": 5,
+      "global_chroma": 5,
+      "shadows_hue": 35,
+      "shadows_sat": 8,
+      "highlights_hue": 45,
+      "highlights_sat": 15
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "red.lum": 10,
+      "orange.sat": 5,
+      "orange.lum": 18,
+      "yellow.sat": 5,
+      "green.sat": -15,
+      "blue.sat": -15
+    }
+  }
+}

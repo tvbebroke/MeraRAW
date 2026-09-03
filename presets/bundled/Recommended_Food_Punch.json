@@ -1,0 +1,33 @@
+{
+  "label": "Recommended · Food Punch",
+  "tags": [
+    "Vibrant"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.15
+    },
+    "white_balance": {
+      "temp": 5600,
+      "tint": 6
+    },
+    "tone_curve": {
+      "contrast": 18,
+      "highlights": -12,
+      "shadows": 12
+    },
+    "color_grade": {
+      "perceptual_sat": 35,
+      "global_chroma": 15
+    },
+    "hsl": {
+      "orange.sat": 20,
+      "red.sat": 15,
+      "yellow.sat": 18,
+      "green.sat": 8
+    },
+    "detail": {
+      "sharpen_amount": 50
+    }
+  }
+}

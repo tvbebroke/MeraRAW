@@ -1,0 +1,33 @@
+{
+  "label": "Alternative-Process_-_11_Gum_Bichromate",
+  "tags": [
+    "Matte",
+    "Muted",
+    "Pastel"
+  ],
+  "modules": {
+    "tone_curve": {
+      "contrast": -5,
+      "highlights": -40,
+      "shadows": 40,
+      "lights": -10,
+      "darks": -5
+    },
+    "color_grade": {
+      "global_chroma": -25,
+      "shadows_hue": 45,
+      "shadows_sat": 12,
+      "shadows_lum": 0,
+      "midtones_hue": 50,
+      "midtones_sat": 8,
+      "midtones_lum": 0,
+      "highlights_hue": 40,
+      "highlights_sat": 6,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    }
+  }
+}

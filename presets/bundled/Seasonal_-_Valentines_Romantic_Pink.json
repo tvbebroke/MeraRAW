@@ -1,0 +1,40 @@
+{
+  "label": "Seasonal_-_Valentines_Romantic_Pink",
+  "tags": [
+    "Bright & Airy",
+    "Pastel"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.3
+    },
+    "tone_curve": {
+      "contrast": -10,
+      "highlights": -40,
+      "shadows": 30,
+      "lights": 10,
+      "darks": 10
+    },
+    "color_grade": {
+      "shadows_hue": 330,
+      "shadows_sat": 8,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 20,
+      "highlights_sat": 10,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "red.sat": -5,
+      "orange.lum": 12,
+      "green.sat": -10,
+      "magenta.sat": 10
+    }
+  }
+}

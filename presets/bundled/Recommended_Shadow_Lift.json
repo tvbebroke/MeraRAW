@@ -1,0 +1,20 @@
+{
+  "label": "Recommended · Shadow Lift",
+  "tags": [
+    "Pastel"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.2
+    },
+    "tone_curve": {
+      "contrast": 5,
+      "highlights": -5,
+      "shadows": 45,
+      "darks": 20
+    },
+    "color_grade": {
+      "perceptual_sat": 5
+    }
+  }
+}

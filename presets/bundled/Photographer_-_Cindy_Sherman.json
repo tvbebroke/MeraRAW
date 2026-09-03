@@ -1,0 +1,42 @@
+{
+  "label": "Photographer_-_Cindy_Sherman",
+  "tags": [
+    "Pastel"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": -0.1
+    },
+    "tone_curve": {
+      "contrast": 5,
+      "highlights": -20,
+      "shadows": 15,
+      "lights": 5,
+      "darks": -8
+    },
+    "color_grade": {
+      "global_chroma": -5,
+      "shadows_hue": 50,
+      "shadows_sat": 8,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 42,
+      "highlights_sat": 6,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "red.sat": -5,
+      "orange.sat": -5,
+      "orange.lum": 5,
+      "green.hue": 5,
+      "green.sat": -20,
+      "blue.sat": -12
+    }
+  }
+}

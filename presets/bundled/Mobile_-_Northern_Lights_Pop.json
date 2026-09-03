@@ -1,0 +1,46 @@
+{
+  "label": "Mobile_-_Northern_Lights_Pop",
+  "tags": [
+    "Cool",
+    "Vibrant",
+    "Pastel"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.1
+    },
+    "white_balance": {
+      "temp": -300
+    },
+    "tone_curve": {
+      "contrast": 10,
+      "highlights": -50,
+      "shadows": 30,
+      "lights": 15,
+      "darks": -20
+    },
+    "color_grade": {
+      "perceptual_sat": 10,
+      "global_chroma": 5,
+      "shadows_hue": 230,
+      "shadows_sat": 10,
+      "highlights_hue": 140,
+      "highlights_sat": 10
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "orange.sat": -10,
+      "yellow.sat": -10,
+      "green.sat": 25,
+      "green.lum": 10,
+      "aqua.sat": 15,
+      "blue.sat": 10,
+      "purple.sat": 20,
+      "magenta.sat": 25,
+      "magenta.lum": 10
+    }
+  }
+}

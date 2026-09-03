@@ -1,0 +1,49 @@
+{
+  "label": "Color-Negative_-_Fuji_Superia_HG_1600",
+  "tags": [
+    "Film",
+    "Pastel"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.25
+    },
+    "tone_curve": {
+      "contrast": 10,
+      "highlights": -45,
+      "shadows": 30,
+      "lights": -5,
+      "darks": 5
+    },
+    "color_grade": {
+      "perceptual_sat": 2,
+      "global_chroma": 5,
+      "shadows_hue": 195,
+      "shadows_sat": 5,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 40,
+      "highlights_sat": 8,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "red.hue": 2,
+      "red.sat": -3,
+      "orange.sat": -5,
+      "orange.lum": 10,
+      "green.hue": -8,
+      "green.sat": -15,
+      "aqua.sat": -5,
+      "blue.hue": -3,
+      "blue.sat": 8,
+      "blue.lum": -5,
+      "magenta.sat": -8
+    }
+  }
+}

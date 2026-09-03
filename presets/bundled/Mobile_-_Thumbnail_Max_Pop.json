@@ -1,0 +1,38 @@
+{
+  "label": "Mobile_-_Thumbnail_Max_Pop",
+  "tags": [
+    "Vibrant",
+    "High Contrast",
+    "Teal & Orange"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.2
+    },
+    "tone_curve": {
+      "contrast": 35,
+      "highlights": -20,
+      "shadows": 10,
+      "lights": 25,
+      "darks": -20
+    },
+    "color_grade": {
+      "perceptual_sat": 25,
+      "global_chroma": 20,
+      "shadows_hue": 220,
+      "shadows_sat": 8,
+      "highlights_hue": 45,
+      "highlights_sat": 10
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "red.sat": 15,
+      "orange.sat": 10,
+      "orange.lum": 10,
+      "blue.sat": 15
+    }
+  }
+}

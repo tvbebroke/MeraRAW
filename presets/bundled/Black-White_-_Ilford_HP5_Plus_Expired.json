@@ -1,0 +1,35 @@
+{
+  "label": "Black-White_-_Ilford_HP5_Plus_Expired",
+  "tags": [
+    "Film",
+    "Matte",
+    "Cool",
+    "Black & White"
+  ],
+  "modules": {
+    "tone_curve": {
+      "contrast": -4.5,
+      "highlights": -8.8,
+      "shadows": 26.3,
+      "lights": -10,
+      "darks": 0.7
+    },
+    "color_grade": {
+      "shadows_hue": 200,
+      "shadows_sat": 16,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 50,
+      "highlights_sat": 5,
+      "highlights_lum": 0,
+      "global_chroma": -100,
+      "perceptual_sat": -100
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    }
+  }
+}

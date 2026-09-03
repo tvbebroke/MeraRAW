@@ -1,0 +1,45 @@
+{
+  "label": "Creative_-_Golden-Glow",
+  "tags": [
+    "Warm",
+    "Pastel"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.15
+    },
+    "white_balance": {
+      "temp": 6350,
+      "tint": 10
+    },
+    "tone_curve": {
+      "contrast": 10,
+      "highlights": -20,
+      "shadows": 12,
+      "lights": 5,
+      "darks": 0
+    },
+    "color_grade": {
+      "perceptual_sat": 15,
+      "global_chroma": 10,
+      "shadows_hue": 38,
+      "shadows_sat": 10,
+      "shadows_lum": 0,
+      "midtones_hue": 42,
+      "midtones_sat": 8,
+      "midtones_lum": 0,
+      "highlights_hue": 45,
+      "highlights_sat": 15,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "orange.sat": 10,
+      "orange.lum": 12,
+      "yellow.sat": 8
+    }
+  }
+}

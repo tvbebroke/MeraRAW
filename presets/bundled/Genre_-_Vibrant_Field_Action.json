@@ -1,0 +1,37 @@
+{
+  "label": "Genre_-_Vibrant_Field_Action",
+  "tags": [
+    "Vibrant"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.2
+    },
+    "tone_curve": {
+      "contrast": 20,
+      "highlights": -30,
+      "shadows": 20,
+      "lights": 15,
+      "darks": -10
+    },
+    "color_grade": {
+      "perceptual_sat": 12,
+      "global_chroma": 10,
+      "shadows_hue": 240,
+      "shadows_sat": 5,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 43,
+      "highlights_sat": 8,
+      "highlights_lum": 0
+    },
+    "hsl": {
+      "yellow.sat": 10,
+      "green.hue": 15,
+      "green.sat": -5,
+      "blue.sat": 10
+    }
+  }
+}

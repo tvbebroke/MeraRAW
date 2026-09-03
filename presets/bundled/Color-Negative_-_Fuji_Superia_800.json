@@ -1,0 +1,38 @@
+{
+  "label": "Color-Negative_-_Fuji_Superia_800",
+  "tags": [
+    "Film"
+  ],
+  "modules": {
+    "tone_curve": {
+      "contrast": 20,
+      "highlights": -25,
+      "shadows": 8,
+      "darks": -5
+    },
+    "color_grade": {
+      "perceptual_sat": 12,
+      "global_chroma": 8,
+      "shadows_hue": 140,
+      "shadows_sat": 14,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 40,
+      "highlights_sat": 5,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "red.hue": -10,
+      "red.sat": 10,
+      "green.sat": 8,
+      "blue.hue": -5,
+      "blue.sat": 8
+    }
+  }
+}

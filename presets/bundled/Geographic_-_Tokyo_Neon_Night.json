@@ -1,0 +1,47 @@
+{
+  "label": "Geographic_-_Tokyo_Neon_Night",
+  "tags": [
+    "Moody",
+    "Cool",
+    "Vibrant",
+    "High Contrast",
+    "Dark"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": -0.3
+    },
+    "tone_curve": {
+      "contrast": 35,
+      "highlights": -55,
+      "shadows": 35,
+      "lights": 25,
+      "darks": -20
+    },
+    "color_grade": {
+      "perceptual_sat": -5,
+      "global_chroma": -5,
+      "shadows_hue": 230,
+      "shadows_sat": 18,
+      "highlights_hue": 315,
+      "highlights_sat": 18
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "red.hue": 20,
+      "orange.sat": -30,
+      "yellow.sat": -40,
+      "green.hue": -60,
+      "green.sat": -50,
+      "aqua.sat": 25,
+      "blue.hue": -20,
+      "purple.sat": 35,
+      "purple.lum": 10,
+      "magenta.sat": 45,
+      "magenta.lum": 10
+    }
+  }
+}

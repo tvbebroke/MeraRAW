@@ -1,0 +1,41 @@
+{
+  "label": "Seasonal_-_Summer_Vibes",
+  "tags": [
+    "Bright & Airy",
+    "Warm"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.4
+    },
+    "tone_curve": {
+      "contrast": 10,
+      "highlights": -40,
+      "shadows": 30,
+      "lights": 5,
+      "darks": -5
+    },
+    "color_grade": {
+      "shadows_hue": 38,
+      "shadows_sat": 8,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 42,
+      "highlights_sat": 12,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "orange.lum": 12,
+      "yellow.sat": 10,
+      "green.hue": -10,
+      "green.sat": -10,
+      "blue.sat": 5
+    }
+  }
+}

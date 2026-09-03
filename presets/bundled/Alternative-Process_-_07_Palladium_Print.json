@@ -1,0 +1,33 @@
+{
+  "label": "Alternative-Process_-_07_Palladium_Print",
+  "tags": [
+    "Moody",
+    "Warm",
+    "Muted"
+  ],
+  "modules": {
+    "tone_curve": {
+      "contrast": 22,
+      "highlights": -20,
+      "shadows": 20,
+      "lights": 0,
+      "darks": -20
+    },
+    "color_grade": {
+      "global_chroma": -60,
+      "shadows_hue": 35,
+      "shadows_sat": 28,
+      "shadows_lum": 0,
+      "midtones_hue": 30,
+      "midtones_sat": 18,
+      "midtones_lum": 0,
+      "highlights_hue": 40,
+      "highlights_sat": 10,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    }
+  }
+}

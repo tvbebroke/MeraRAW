@@ -1,0 +1,46 @@
+{
+  "label": "Slide_-_Kodak_Ektachrome_64",
+  "tags": [
+    "Film",
+    "Cool",
+    "High Contrast"
+  ],
+  "modules": {
+    "tone_curve": {
+      "contrast": 35,
+      "highlights": -35,
+      "shadows": 15,
+      "lights": 10,
+      "darks": -28
+    },
+    "color_grade": {
+      "perceptual_sat": -2.5,
+      "global_chroma": -5,
+      "shadows_hue": 225,
+      "shadows_sat": 10,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 40,
+      "highlights_sat": 3,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "red.hue": -5,
+      "red.sat": -10,
+      "green.hue": 10,
+      "green.sat": -5,
+      "aqua.hue": 5,
+      "blue.hue": -20,
+      "blue.sat": 5,
+      "blue.lum": -15,
+      "purple.hue": 5,
+      "magenta.sat": -5
+    }
+  }
+}

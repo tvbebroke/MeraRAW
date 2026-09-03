@@ -1,0 +1,38 @@
+{
+  "label": "Genre_-_Dreamy_Maternity",
+  "tags": [
+    "Bright & Airy",
+    "Dreamy"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.4
+    },
+    "tone_curve": {
+      "contrast": -10,
+      "highlights": -35,
+      "shadows": 30,
+      "lights": 10,
+      "darks": 10
+    },
+    "color_grade": {
+      "perceptual_sat": -3,
+      "global_chroma": -5,
+      "shadows_hue": 45,
+      "shadows_sat": 8,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 40,
+      "highlights_sat": 5,
+      "highlights_lum": 0
+    },
+    "hsl": {
+      "orange.lum": 12,
+      "yellow.sat": -10,
+      "green.hue": 15,
+      "green.sat": -20
+    }
+  }
+}

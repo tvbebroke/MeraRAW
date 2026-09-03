@@ -1,0 +1,49 @@
+{
+  "label": "Slide_-_Kodak_Ektachrome_100VS",
+  "tags": [
+    "Film",
+    "Cool",
+    "High Contrast"
+  ],
+  "modules": {
+    "tone_curve": {
+      "contrast": 45,
+      "highlights": -45,
+      "shadows": -15,
+      "lights": 15,
+      "darks": -30
+    },
+    "color_grade": {
+      "global_chroma": 5,
+      "shadows_hue": 215,
+      "shadows_sat": 10,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 50,
+      "highlights_sat": 5,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "red.hue": 10,
+      "red.sat": 7.5,
+      "orange.hue": -5,
+      "yellow.hue": -5,
+      "yellow.sat": 7.5,
+      "green.hue": 15,
+      "green.sat": 7.5,
+      "aqua.hue": 10,
+      "blue.hue": -12.5,
+      "blue.sat": 15,
+      "blue.lum": -12.5,
+      "purple.hue": 10,
+      "magenta.hue": 5,
+      "magenta.sat": -5
+    }
+  }
+}

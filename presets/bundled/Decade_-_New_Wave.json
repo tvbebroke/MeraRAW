@@ -1,0 +1,39 @@
+{
+  "label": "Decade_-_New_Wave",
+  "tags": [
+    "Cool"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.15
+    },
+    "tone_curve": {
+      "contrast": 25,
+      "highlights": -40,
+      "shadows": 25,
+      "lights": 15,
+      "darks": -10
+    },
+    "color_grade": {
+      "shadows_hue": 205,
+      "shadows_sat": 15,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 310,
+      "highlights_sat": 12,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "yellow.sat": 10,
+      "green.sat": -25,
+      "blue.sat": 15,
+      "magenta.sat": 15
+    }
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "label": "Recommended · Landscape Moody",
+  "tags": [
+    "Natural",
+    "Moody",
+    "Cool",
+    "High Contrast"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": -0.25
+    },
+    "tone_curve": {
+      "contrast": 28,
+      "highlights": -30,
+      "shadows": -5,
+      "lights": -12,
+      "darks": -18
+    },
+    "color_grade": {
+      "perceptual_sat": -8,
+      "global_chroma": -5,
+      "shadows_hue": 210,
+      "shadows_sat": 14,
+      "midtones_hue": 200,
+      "midtones_sat": 6
+    },
+    "white_balance": {
+      "temp": 5000,
+      "tint": -2
+    }
+  }
+}

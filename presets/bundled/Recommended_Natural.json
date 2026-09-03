@@ -1,0 +1,27 @@
+{
+  "label": "Recommended · Natural",
+  "tags": [
+    "Pastel"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.1
+    },
+    "tone_curve": {
+      "contrast": 8,
+      "highlights": -8,
+      "shadows": 12,
+      "lights": 4,
+      "darks": -4
+    },
+    "color_grade": {
+      "perceptual_sat": 8,
+      "global_chroma": 2
+    },
+    "detail": {
+      "sharpen_amount": 35,
+      "noise_luma": 10,
+      "noise_chroma": 25
+    }
+  }
+}

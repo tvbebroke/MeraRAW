@@ -1,0 +1,41 @@
+{
+  "label": "Slide_-_Ektachrome_100G",
+  "tags": [
+    "Film"
+  ],
+  "modules": {
+    "tone_curve": {
+      "contrast": 20,
+      "highlights": -15,
+      "shadows": -15,
+      "lights": -5,
+      "darks": -25
+    },
+    "color_grade": {
+      "global_chroma": 3,
+      "shadows_hue": 215,
+      "shadows_sat": 5,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 40,
+      "highlights_sat": 5,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "red.hue": 5,
+      "red.sat": 5,
+      "red.lum": -5,
+      "green.hue": 10,
+      "aqua.sat": 5,
+      "blue.hue": -5,
+      "blue.sat": 7.5,
+      "blue.lum": -5
+    }
+  }
+}

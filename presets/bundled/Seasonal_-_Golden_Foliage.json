@@ -1,0 +1,42 @@
+{
+  "label": "Seasonal_-_Golden_Foliage",
+  "tags": [
+    "Warm",
+    "Pastel"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.15
+    },
+    "tone_curve": {
+      "contrast": 15,
+      "highlights": -40,
+      "shadows": 25,
+      "lights": 0,
+      "darks": -10
+    },
+    "color_grade": {
+      "shadows_hue": 35,
+      "shadows_sat": 8,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 40,
+      "highlights_sat": 12,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "orange.sat": 15,
+      "orange.lum": 15,
+      "yellow.hue": -10,
+      "yellow.sat": 15,
+      "green.hue": 20,
+      "green.sat": -15
+    }
+  }
+}

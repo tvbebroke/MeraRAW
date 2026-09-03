@@ -1,0 +1,57 @@
+{
+  "label": "Cross-Processed_Velvia_Video",
+  "tags": [
+    "Moody",
+    "Film",
+    "Vibrant",
+    "High Contrast"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": -0.3
+    },
+    "tone_curve": {
+      "contrast": 45,
+      "highlights": -68,
+      "shadows": 30,
+      "lights": 20,
+      "darks": 0
+    },
+    "color_grade": {
+      "global_chroma": 10,
+      "shadows_hue": 160,
+      "shadows_sat": 22,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 305,
+      "highlights_sat": 18,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "red.hue": 15,
+      "red.sat": -30,
+      "red.lum": -15,
+      "orange.hue": 2,
+      "orange.sat": -15,
+      "yellow.hue": -30,
+      "yellow.sat": -40,
+      "green.hue": 30,
+      "green.sat": 30,
+      "green.lum": -15,
+      "aqua.hue": 15,
+      "aqua.sat": 22,
+      "blue.hue": -15,
+      "blue.sat": -15,
+      "purple.hue": 30,
+      "purple.sat": 0,
+      "magenta.hue": 40,
+      "magenta.sat": -10
+    }
+  }
+}

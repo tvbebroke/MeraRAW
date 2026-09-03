@@ -1,0 +1,41 @@
+{
+  "label": "Alternative-Process_-_17_Diana_F",
+  "tags": [
+    "Moody",
+    "Cool",
+    "Teal & Orange"
+  ],
+  "modules": {
+    "tone_curve": {
+      "contrast": 25,
+      "highlights": -45,
+      "shadows": 35,
+      "lights": 10,
+      "darks": -15
+    },
+    "color_grade": {
+      "perceptual_sat": 10,
+      "global_chroma": 5,
+      "shadows_hue": 240,
+      "shadows_sat": 12,
+      "shadows_lum": 0,
+      "midtones_hue": 50,
+      "midtones_sat": 5,
+      "midtones_lum": 0,
+      "highlights_hue": 45,
+      "highlights_sat": 10,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "orange.sat": 8,
+      "yellow.sat": 10,
+      "green.hue": 15,
+      "green.sat": -25,
+      "blue.sat": -15
+    }
+  }
+}

@@ -9,8 +9,11 @@
     "check": "svelte-check --tsconfig ./tsconfig.json",
     "preview": "vite preview",
     "tauri": "tauri",
+    "generate-recommended-presets": "node scripts/generate-recommended-presets.mjs --replace",
+    "fetch-public-presets": "node scripts/fetch-public-presets.mjs",
     "import-presets": "node scripts/import-lightroom-presets.mjs",
     "tag-presets": "node scripts/tag-presets.mjs",
+    "sync-public-presets": "node scripts/fetch-public-presets.mjs --import",
     "release": "bash scripts/release-beta.sh",
     "notarize": "bash scripts/notarize-dmg.sh",
     "test": "vitest run"

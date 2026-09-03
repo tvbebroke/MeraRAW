@@ -1,0 +1,40 @@
+{
+  "label": "Seasonal_-_Diwali_Festive",
+  "tags": [
+    "Warm"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.15
+    },
+    "tone_curve": {
+      "contrast": 20,
+      "highlights": -40,
+      "shadows": 25,
+      "lights": 10,
+      "darks": -10
+    },
+    "color_grade": {
+      "shadows_hue": 30,
+      "shadows_sat": 12,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 38,
+      "highlights_sat": 18,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "red.sat": 10,
+      "orange.sat": 20,
+      "orange.lum": 18,
+      "yellow.hue": -10,
+      "yellow.sat": 15
+    }
+  }
+}

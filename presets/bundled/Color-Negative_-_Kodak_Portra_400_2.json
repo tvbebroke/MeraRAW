@@ -1,0 +1,46 @@
+{
+  "label": "Color-Negative_-_Kodak_Portra_400_2",
+  "tags": [
+    "Film",
+    "Teal & Orange"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.15
+    },
+    "tone_curve": {
+      "contrast": 20.5,
+      "highlights": -75,
+      "shadows": 12,
+      "lights": 8,
+      "darks": -3
+    },
+    "color_grade": {
+      "shadows_hue": 210,
+      "shadows_sat": 8,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 45,
+      "highlights_sat": 12,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "orange.hue": -3,
+      "orange.sat": -5,
+      "orange.lum": 15,
+      "yellow.hue": -8,
+      "green.hue": 15,
+      "green.sat": -22.5,
+      "aqua.sat": -10,
+      "blue.hue": -5,
+      "blue.sat": -15,
+      "blue.lum": -10
+    }
+  }
+}

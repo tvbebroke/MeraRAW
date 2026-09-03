@@ -1,0 +1,45 @@
+{
+  "label": "Color-Negative_-_C-Print",
+  "tags": [
+    "Natural"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.1
+    },
+    "tone_curve": {
+      "contrast": 25,
+      "highlights": -30,
+      "shadows": 20,
+      "lights": 10,
+      "darks": -5
+    },
+    "color_grade": {
+      "perceptual_sat": 5,
+      "global_chroma": 5,
+      "shadows_hue": 210,
+      "shadows_sat": 5,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 45,
+      "highlights_sat": 5,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "red.hue": 5,
+      "red.sat": 10,
+      "orange.sat": 8,
+      "orange.lum": 8,
+      "green.hue": 10,
+      "green.sat": 5,
+      "blue.hue": -5,
+      "blue.sat": 10
+    }
+  }
+}

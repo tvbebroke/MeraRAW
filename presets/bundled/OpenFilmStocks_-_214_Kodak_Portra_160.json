@@ -1,0 +1,42 @@
+{
+  "label": "OpenFilmStocks_-_214_Kodak_Portra_160",
+  "tags": [
+    "Film",
+    "High Contrast"
+  ],
+  "modules": {
+    "tone_curve": {
+      "contrast": 74
+    },
+    "color_grade": {
+      "perceptual_sat": -5,
+      "global_chroma": -9
+    },
+    "hsl": {
+      "red.hue": 3,
+      "red.sat": -14,
+      "red.lum": -9,
+      "orange.hue": 9,
+      "orange.sat": -22,
+      "orange.lum": 6,
+      "yellow.hue": 15,
+      "yellow.sat": -20,
+      "yellow.lum": 10,
+      "green.hue": 25,
+      "green.sat": -17,
+      "green.lum": 23,
+      "aqua.hue": 19,
+      "aqua.sat": 0,
+      "aqua.lum": 10,
+      "blue.hue": 4,
+      "blue.sat": -1,
+      "blue.lum": -4,
+      "purple.hue": -6,
+      "purple.sat": -49,
+      "purple.lum": 0,
+      "magenta.hue": -5,
+      "magenta.sat": -36,
+      "magenta.lum": 0
+    }
+  }
+}

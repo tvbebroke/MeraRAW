@@ -353,11 +353,9 @@ pub async fn apply_grade_to_paths(
 }
 
 fn dig_surface_enabled() -> bool {
+    // Dig/selftest probes are debug-only. Production ACL also omits allow-dev-probes;
+    // keep this closed in release even if MERATECH_* env vars are set.
     cfg!(debug_assertions)
-        || std::env::var("MERATECH_SELFTEST").is_ok_and(|v| !v.is_empty())
-        || std::env::var("MERATECH_LIVE_ASSISTANT").is_ok_and(|v| !v.is_empty())
-        || std::env::var("MERATECH_VERIFY_SLIDER").is_ok_and(|v| !v.is_empty())
-        || std::env::var("MERATECH_OPEN").is_ok_and(|v| !v.is_empty())
 }
 
 /// Dev/test hook: MERATECH_OPEN=<path> auto-opens a file on launch.

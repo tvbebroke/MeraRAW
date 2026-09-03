@@ -1,0 +1,26 @@
+{
+  "label": "Recommended · Flat Neutral (charts)",
+  "tags": [
+    "Clean"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0
+    },
+    "tone_curve": {
+      "contrast": -20,
+      "highlights": 10,
+      "shadows": 15,
+      "lights": 5,
+      "darks": 10
+    },
+    "color_grade": {
+      "perceptual_sat": 0,
+      "global_chroma": 0
+    },
+    "white_balance": {
+      "temp": 5500,
+      "tint": 0
+    }
+  }
+}

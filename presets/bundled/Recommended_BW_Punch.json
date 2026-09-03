@@ -1,0 +1,23 @@
+{
+  "label": "Recommended · B&W Punch",
+  "tags": [
+    "Vibrant",
+    "High Contrast",
+    "Black & White"
+  ],
+  "modules": {
+    "color_grade": {
+      "global_chroma": -100
+    },
+    "tone_curve": {
+      "contrast": 45,
+      "highlights": -30,
+      "shadows": -15,
+      "lights": -10,
+      "darks": -30
+    },
+    "detail": {
+      "sharpen_amount": 70
+    }
+  }
+}

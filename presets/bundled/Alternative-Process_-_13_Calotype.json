@@ -1,0 +1,32 @@
+{
+  "label": "Alternative-Process_-_13_Calotype",
+  "tags": [
+    "Matte",
+    "Muted"
+  ],
+  "modules": {
+    "tone_curve": {
+      "contrast": 10,
+      "highlights": -20,
+      "shadows": 30,
+      "lights": -5,
+      "darks": -10
+    },
+    "color_grade": {
+      "global_chroma": -60,
+      "shadows_hue": 38,
+      "shadows_sat": 25,
+      "shadows_lum": 0,
+      "midtones_hue": 35,
+      "midtones_sat": 15,
+      "midtones_lum": 0,
+      "highlights_hue": 42,
+      "highlights_sat": 8,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    }
+  }
+}

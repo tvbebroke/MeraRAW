@@ -1,0 +1,38 @@
+{
+  "label": "Creative_-_Light_and_Airy_Fine_Art",
+  "tags": [
+    "Bright & Airy"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.5
+    },
+    "tone_curve": {
+      "contrast": -15,
+      "highlights": -40,
+      "shadows": 30,
+      "lights": 10,
+      "darks": 0
+    },
+    "color_grade": {
+      "global_chroma": -5,
+      "shadows_hue": 211,
+      "shadows_sat": 4,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 43,
+      "highlights_sat": 4,
+      "highlights_lum": 0
+    },
+    "hsl": {
+      "orange.lum": 10,
+      "yellow.sat": -10,
+      "green.hue": 20,
+      "green.sat": -30,
+      "aqua.lum": 35,
+      "blue.sat": -20
+    }
+  }
+}

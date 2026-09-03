@@ -1,0 +1,43 @@
+{
+  "label": "Geographic_-_Greek_Islands_WhiteBlue",
+  "tags": [
+    "Bright & Airy",
+    "Cool"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.5
+    },
+    "white_balance": {
+      "temp": 300
+    },
+    "tone_curve": {
+      "contrast": -10,
+      "highlights": -35,
+      "shadows": 30,
+      "lights": 30,
+      "darks": 10
+    },
+    "color_grade": {
+      "perceptual_sat": 10,
+      "global_chroma": 5,
+      "shadows_hue": 210,
+      "shadows_sat": 5,
+      "highlights_hue": 45,
+      "highlights_sat": 8
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "orange.sat": -5,
+      "orange.lum": 10,
+      "green.sat": -15,
+      "aqua.sat": 20,
+      "aqua.lum": 15,
+      "blue.sat": 25,
+      "blue.lum": 10
+    }
+  }
+}

@@ -1,0 +1,45 @@
+{
+  "label": "Geographic_-_South_Island_Fjords",
+  "tags": [
+    "Moody",
+    "Cool",
+    "High Contrast"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": -0.3
+    },
+    "white_balance": {
+      "temp": -500
+    },
+    "tone_curve": {
+      "contrast": 30,
+      "highlights": -55,
+      "shadows": 40,
+      "lights": 10,
+      "darks": -15
+    },
+    "color_grade": {
+      "perceptual_sat": -10,
+      "global_chroma": -15,
+      "shadows_hue": 215,
+      "shadows_sat": 15,
+      "highlights_hue": 195,
+      "highlights_sat": 8
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "orange.sat": -20,
+      "yellow.sat": -20,
+      "green.hue": 30,
+      "green.sat": -35,
+      "aqua.sat": 25,
+      "aqua.lum": -10,
+      "blue.sat": 15,
+      "blue.lum": -15
+    }
+  }
+}

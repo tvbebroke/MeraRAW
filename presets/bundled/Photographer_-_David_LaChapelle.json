@@ -1,0 +1,45 @@
+{
+  "label": "Photographer_-_David_LaChapelle",
+  "tags": [
+    "Cool",
+    "High Contrast",
+    "Teal & Orange"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.2
+    },
+    "tone_curve": {
+      "contrast": 30,
+      "highlights": -25,
+      "shadows": 15,
+      "lights": 15,
+      "darks": -20
+    },
+    "color_grade": {
+      "perceptual_sat": 18,
+      "global_chroma": 15,
+      "shadows_hue": 215,
+      "shadows_sat": 12,
+      "shadows_lum": 0,
+      "midtones_hue": 35,
+      "midtones_sat": 8,
+      "midtones_lum": 0,
+      "highlights_hue": 38,
+      "highlights_sat": 15,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 40
+    },
+    "hsl": {
+      "red.sat": 20,
+      "red.lum": 5,
+      "orange.sat": 15,
+      "orange.lum": 10,
+      "yellow.sat": 12,
+      "blue.sat": 5,
+      "magenta.sat": 15
+    }
+  }
+}

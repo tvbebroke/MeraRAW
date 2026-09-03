@@ -1,0 +1,41 @@
+{
+  "label": "Seasonal_-_Fresh_Pastel",
+  "tags": [
+    "Bright & Airy",
+    "Pastel"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.6
+    },
+    "tone_curve": {
+      "contrast": -25,
+      "highlights": -55,
+      "shadows": 45,
+      "lights": 20,
+      "darks": 18
+    },
+    "color_grade": {
+      "shadows_hue": 200,
+      "shadows_sat": 5,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 45,
+      "highlights_sat": 5,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "orange.sat": -10,
+      "orange.lum": 12,
+      "green.hue": 15,
+      "green.sat": -25,
+      "blue.sat": -15
+    }
+  }
+}

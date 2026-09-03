@@ -1,0 +1,25 @@
+{
+  "label": "Recommended · High Contrast",
+  "tags": [
+    "High Contrast"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.05
+    },
+    "tone_curve": {
+      "contrast": 40,
+      "highlights": -25,
+      "shadows": -10,
+      "lights": -15,
+      "darks": -25
+    },
+    "color_grade": {
+      "perceptual_sat": 8,
+      "global_chroma": 5
+    },
+    "detail": {
+      "sharpen_amount": 60
+    }
+  }
+}

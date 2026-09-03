@@ -1,0 +1,34 @@
+{
+  "label": "Genre_-_White_BG_E-Commerce",
+  "tags": [
+    "Bright & Airy"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.5
+    },
+    "tone_curve": {
+      "contrast": 15,
+      "highlights": -50,
+      "shadows": 15,
+      "lights": 25,
+      "darks": 0
+    },
+    "color_grade": {
+      "global_chroma": 0,
+      "shadows_hue": 215,
+      "shadows_sat": 3,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 43,
+      "highlights_sat": 3,
+      "highlights_lum": 0
+    },
+    "hsl": {
+      "red.sat": -5,
+      "orange.sat": -5
+    }
+  }
+}

@@ -1,0 +1,38 @@
+{
+  "label": "Mobile_-_Filmic_Casual",
+  "tags": [
+    "Moody",
+    "Film",
+    "Pastel"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0
+    },
+    "tone_curve": {
+      "contrast": 15,
+      "highlights": -40,
+      "shadows": 20,
+      "lights": 10,
+      "darks": -10
+    },
+    "color_grade": {
+      "perceptual_sat": 0,
+      "global_chroma": 0,
+      "shadows_hue": 210,
+      "shadows_sat": 5,
+      "highlights_hue": 40,
+      "highlights_sat": 5
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "orange.sat": -5,
+      "orange.lum": 5,
+      "green.hue": -20,
+      "green.sat": -15
+    }
+  }
+}

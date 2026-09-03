@@ -1,0 +1,37 @@
+{
+  "label": "Geographic_-_Wabi-Sabi_Zen",
+  "tags": [
+    "Natural"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.15
+    },
+    "tone_curve": {
+      "contrast": -20,
+      "highlights": -40,
+      "shadows": 35,
+      "lights": 10,
+      "darks": 15
+    },
+    "color_grade": {
+      "perceptual_sat": -5,
+      "global_chroma": -10,
+      "shadows_hue": 45,
+      "shadows_sat": 8,
+      "highlights_hue": 50,
+      "highlights_sat": 5
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "orange.sat": -10,
+      "orange.lum": 5,
+      "green.hue": 15,
+      "green.sat": -20,
+      "blue.sat": -15
+    }
+  }
+}

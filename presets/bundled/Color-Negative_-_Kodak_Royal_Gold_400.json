@@ -1,0 +1,61 @@
+{
+  "label": "Color-Negative_-_Kodak_Royal_Gold_400",
+  "tags": [
+    "Film",
+    "Warm",
+    "Cool",
+    "Teal & Orange"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.2
+    },
+    "tone_curve": {
+      "contrast": 22,
+      "highlights": -32,
+      "shadows": 20,
+      "lights": 5,
+      "darks": -15
+    },
+    "color_grade": {
+      "perceptual_sat": 5,
+      "global_chroma": 0,
+      "shadows_hue": 210,
+      "shadows_sat": 12,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 45,
+      "highlights_sat": 20,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "red.hue": 5,
+      "red.sat": 15,
+      "red.lum": -5,
+      "orange.hue": 5,
+      "orange.sat": 20,
+      "orange.lum": -5,
+      "yellow.hue": -10,
+      "yellow.sat": 18,
+      "yellow.lum": -5,
+      "green.hue": -15,
+      "green.sat": -10,
+      "green.lum": -10,
+      "aqua.hue": -5,
+      "aqua.sat": -10,
+      "blue.hue": 0,
+      "blue.sat": -5,
+      "blue.lum": -10,
+      "purple.hue": -5,
+      "purple.sat": -15,
+      "magenta.hue": -5,
+      "magenta.sat": -10
+    }
+  }
+}

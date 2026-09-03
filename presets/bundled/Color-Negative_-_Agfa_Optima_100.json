@@ -1,0 +1,40 @@
+{
+  "label": "Color-Negative_-_Agfa_Optima_100",
+  "tags": [
+    "Pastel"
+  ],
+  "modules": {
+    "tone_curve": {
+      "contrast": -5,
+      "highlights": -15,
+      "shadows": 15,
+      "lights": 5,
+      "darks": -15
+    },
+    "color_grade": {
+      "perceptual_sat": -5,
+      "global_chroma": -10,
+      "shadows_hue": 35,
+      "shadows_sat": 5,
+      "shadows_lum": 0,
+      "midtones_hue": 40,
+      "midtones_sat": 5,
+      "midtones_lum": 0,
+      "highlights_hue": 45,
+      "highlights_sat": 8,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "red.hue": 5,
+      "orange.sat": -5,
+      "yellow.sat": -5,
+      "green.hue": 10,
+      "green.sat": -10,
+      "blue.sat": -5
+    }
+  }
+}

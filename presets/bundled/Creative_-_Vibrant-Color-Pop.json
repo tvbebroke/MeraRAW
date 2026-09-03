@@ -1,0 +1,42 @@
+{
+  "label": "Creative_-_Vibrant-Color-Pop",
+  "tags": [
+    "Vibrant",
+    "Teal & Orange"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.15
+    },
+    "tone_curve": {
+      "contrast": 10,
+      "highlights": -20,
+      "shadows": 12,
+      "lights": 5,
+      "darks": 0
+    },
+    "color_grade": {
+      "perceptual_sat": 35,
+      "global_chroma": 30,
+      "shadows_hue": 210,
+      "shadows_sat": 8,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 40,
+      "highlights_sat": 10,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "red.sat": 10,
+      "orange.sat": 10,
+      "yellow.sat": 10,
+      "blue.sat": 8
+    }
+  }
+}

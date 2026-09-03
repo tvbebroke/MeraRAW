@@ -1,0 +1,46 @@
+{
+  "label": "Geographic_-_Rajasthan_Golden",
+  "tags": [
+    "Moody",
+    "Warm",
+    "Cool"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.05
+    },
+    "white_balance": {
+      "temp": 600
+    },
+    "tone_curve": {
+      "contrast": 20,
+      "highlights": -45,
+      "shadows": 20,
+      "lights": 10,
+      "darks": -10
+    },
+    "color_grade": {
+      "perceptual_sat": 5,
+      "global_chroma": 5,
+      "shadows_hue": 40,
+      "shadows_sat": 12,
+      "highlights_hue": 45,
+      "highlights_sat": 15
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "red.sat": 15,
+      "red.lum": 5,
+      "orange.sat": 20,
+      "orange.lum": 12,
+      "yellow.sat": 15,
+      "green.hue": 10,
+      "green.sat": -15,
+      "aqua.sat": 10,
+      "blue.sat": 15
+    }
+  }
+}

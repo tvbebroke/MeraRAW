@@ -1,0 +1,48 @@
+{
+  "label": "Kodachrome 64 Video",
+  "tags": [
+    "Film",
+    "Cool",
+    "Pastel"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.1
+    },
+    "tone_curve": {
+      "contrast": 15,
+      "highlights": -21.8,
+      "shadows": 22.5,
+      "lights": -10,
+      "darks": -15
+    },
+    "color_grade": {
+      "perceptual_sat": -5,
+      "global_chroma": -5,
+      "shadows_hue": 220,
+      "shadows_sat": 11.3,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 50,
+      "highlights_sat": 7.5,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "red.hue": 10,
+      "red.sat": 20,
+      "red.lum": -10,
+      "yellow.hue": -5,
+      "green.hue": 15,
+      "aqua.sat": 15,
+      "blue.hue": -10,
+      "blue.sat": 17.5,
+      "blue.lum": -15
+    }
+  }
+}

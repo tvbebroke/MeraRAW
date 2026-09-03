@@ -1,0 +1,12 @@
+{
+  "label": "OpenFilmStocks_-_232_Ilford_Pan_F",
+  "tags": [
+    "Film",
+    "High Contrast"
+  ],
+  "modules": {
+    "tone_curve": {
+      "contrast": 90
+    }
+  }
+}

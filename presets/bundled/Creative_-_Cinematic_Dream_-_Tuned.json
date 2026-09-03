@@ -1,0 +1,66 @@
+{
+  "label": "Creative_-_Cinematic_Dream_-_Tuned",
+  "tags": [
+    "Cinematic",
+    "Warm",
+    "Vibrant",
+    "Pastel",
+    "Dreamy",
+    "Teal & Orange"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.22
+    },
+    "white_balance": {
+      "temp": 5900,
+      "tint": 13
+    },
+    "tone_curve": {
+      "contrast": -11,
+      "highlights": -100,
+      "shadows": 71,
+      "lights": -43,
+      "darks": 40
+    },
+    "color_grade": {
+      "perceptual_sat": 64,
+      "global_chroma": -9,
+      "shadows_hue": 194,
+      "shadows_sat": 8,
+      "shadows_lum": 0,
+      "midtones_hue": 74,
+      "midtones_sat": 10,
+      "midtones_lum": 0,
+      "highlights_hue": 65,
+      "highlights_sat": 22,
+      "highlights_lum": 0
+    },
+    "hsl": {
+      "red.hue": -9,
+      "red.sat": 0,
+      "red.lum": 17,
+      "orange.hue": -46,
+      "orange.sat": -9,
+      "orange.lum": 17,
+      "yellow.hue": -6,
+      "yellow.sat": 15,
+      "yellow.lum": 39,
+      "green.hue": 17,
+      "green.sat": -15,
+      "green.lum": 15,
+      "aqua.hue": 15,
+      "aqua.sat": -26,
+      "aqua.lum": 16,
+      "blue.hue": -20,
+      "blue.sat": -18,
+      "blue.lum": -30,
+      "purple.hue": 5,
+      "purple.sat": 0,
+      "purple.lum": 1,
+      "magenta.hue": 0,
+      "magenta.sat": 0,
+      "magenta.lum": 0
+    }
+  }
+}

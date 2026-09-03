@@ -1,0 +1,54 @@
+{
+  "label": "Color-Negative_-_Kodak_Portra_160",
+  "tags": [
+    "Bright & Airy",
+    "Film"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.5
+    },
+    "tone_curve": {
+      "contrast": -15,
+      "highlights": -25,
+      "shadows": 30,
+      "lights": -10,
+      "darks": 20
+    },
+    "color_grade": {
+      "perceptual_sat": -5,
+      "global_chroma": -10,
+      "shadows_hue": 210,
+      "shadows_sat": 5,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 50,
+      "highlights_sat": 0,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "red.hue": 2,
+      "red.sat": -10,
+      "orange.hue": 5,
+      "orange.sat": -5,
+      "orange.lum": 15,
+      "yellow.hue": 3,
+      "yellow.sat": -5,
+      "green.hue": 8,
+      "green.sat": -15,
+      "green.lum": -5,
+      "aqua.hue": -5,
+      "aqua.sat": -15,
+      "blue.sat": -10,
+      "blue.lum": -10,
+      "purple.sat": -20,
+      "magenta.sat": -10
+    }
+  }
+}

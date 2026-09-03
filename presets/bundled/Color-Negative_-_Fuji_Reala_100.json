@@ -1,0 +1,36 @@
+{
+  "label": "Color-Negative_-_Fuji_Reala_100",
+  "tags": [
+    "Film",
+    "Pastel"
+  ],
+  "modules": {
+    "tone_curve": {
+      "contrast": -8,
+      "highlights": -21,
+      "shadows": 16,
+      "darks": -8
+    },
+    "color_grade": {
+      "global_chroma": -5,
+      "shadows_hue": 216,
+      "shadows_sat": 7,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 210,
+      "highlights_sat": 5,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10
+    },
+    "hsl": {
+      "green.hue": 8,
+      "green.sat": 5,
+      "blue.hue": -8,
+      "blue.sat": -8
+    }
+  }
+}

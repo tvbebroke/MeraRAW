@@ -1,0 +1,63 @@
+{
+  "label": "taro710_-_night-blue",
+  "tags": [
+    "Cool",
+    "Dark"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.18
+    },
+    "white_balance": {
+      "temp": 2750,
+      "tint": 2
+    },
+    "tone_curve": {
+      "contrast": -42,
+      "highlights": -63,
+      "shadows": 70,
+      "lights": 0,
+      "darks": 0
+    },
+    "color_grade": {
+      "perceptual_sat": 0,
+      "global_chroma": -5,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 118,
+      "noise_luma": 12,
+      "noise_chroma": 0
+    },
+    "hsl": {
+      "red.hue": 27,
+      "red.sat": 0,
+      "red.lum": 0,
+      "orange.hue": 22,
+      "orange.sat": 0,
+      "orange.lum": 30,
+      "yellow.hue": 0,
+      "yellow.sat": 0,
+      "yellow.lum": 0,
+      "green.hue": -100,
+      "green.sat": 0,
+      "green.lum": 0,
+      "aqua.hue": 0,
+      "aqua.sat": -28,
+      "aqua.lum": 0,
+      "blue.hue": 19,
+      "blue.sat": -69,
+      "blue.lum": 0,
+      "purple.hue": 0,
+      "purple.sat": 0,
+      "purple.lum": 0,
+      "magenta.hue": 0,
+      "magenta.sat": 0,
+      "magenta.lum": 0
+    }
+  }
+}

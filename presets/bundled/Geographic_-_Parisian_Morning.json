@@ -1,0 +1,43 @@
+{
+  "label": "Geographic_-_Parisian_Morning",
+  "tags": [
+    "Bright & Airy",
+    "Warm",
+    "Cool",
+    "Pastel"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.3
+    },
+    "white_balance": {
+      "temp": 400
+    },
+    "tone_curve": {
+      "contrast": -10,
+      "highlights": -35,
+      "shadows": 30,
+      "lights": 10,
+      "darks": 15
+    },
+    "color_grade": {
+      "perceptual_sat": 0,
+      "global_chroma": -5,
+      "shadows_hue": 45,
+      "shadows_sat": 8,
+      "highlights_hue": 40,
+      "highlights_sat": 10
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "orange.sat": 5,
+      "orange.lum": 12,
+      "green.hue": 10,
+      "green.sat": -15,
+      "blue.sat": -15
+    }
+  }
+}

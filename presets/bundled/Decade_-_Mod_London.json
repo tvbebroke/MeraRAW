@@ -1,0 +1,41 @@
+{
+  "label": "Decade_-_Mod_London",
+  "tags": [
+    "Cool",
+    "Pastel"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.2
+    },
+    "tone_curve": {
+      "contrast": 15,
+      "highlights": -40,
+      "shadows": 25,
+      "lights": 10,
+      "darks": -5
+    },
+    "color_grade": {
+      "shadows_hue": 210,
+      "shadows_sat": 10,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 35,
+      "highlights_sat": 5,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "red.sat": 10,
+      "orange.lum": 10,
+      "green.hue": 15,
+      "green.sat": -25,
+      "blue.sat": 10
+    }
+  }
+}

@@ -1,0 +1,39 @@
+{
+  "label": "Genre_-_Star_Trails",
+  "tags": [
+    "Bright & Airy",
+    "Cool",
+    "High Contrast"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.3
+    },
+    "tone_curve": {
+      "contrast": 35,
+      "highlights": -50,
+      "shadows": 25,
+      "lights": 20,
+      "darks": -15
+    },
+    "color_grade": {
+      "perceptual_sat": 5,
+      "global_chroma": 0,
+      "shadows_hue": 250,
+      "shadows_sat": 15,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 220,
+      "highlights_sat": 5,
+      "highlights_lum": 0
+    },
+    "hsl": {
+      "aqua.sat": 10,
+      "blue.sat": 15,
+      "blue.lum": -15,
+      "purple.sat": 15
+    }
+  }
+}

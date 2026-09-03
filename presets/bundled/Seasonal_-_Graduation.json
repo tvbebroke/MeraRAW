@@ -1,0 +1,39 @@
+{
+  "label": "Seasonal_-_Graduation",
+  "tags": [
+    "Bright & Airy"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.35
+    },
+    "tone_curve": {
+      "contrast": 5,
+      "highlights": -40,
+      "shadows": 30,
+      "lights": 15,
+      "darks": 0
+    },
+    "color_grade": {
+      "shadows_hue": 210,
+      "shadows_sat": 5,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 42,
+      "highlights_sat": 8,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "orange.lum": 10,
+      "yellow.sat": 5,
+      "green.sat": -10,
+      "blue.sat": -5
+    }
+  }
+}

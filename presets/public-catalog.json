@@ -1,0 +1,119 @@
+{
+  "version": 1,
+  "description": "Curated free/open photo-editing presets MeraRAW may fetch. Only SPDX-licensed packs whose authors publish redistribution rights. Not Adobe Premium, not cracked packs, not scrape-everything.",
+  "allowed_licenses": ["MIT", "Apache-2.0", "CC0-1.0", "Unlicense", "BSD-2-Clause", "BSD-3-Clause", "CC-BY-4.0"],
+  "sources": [
+    {
+      "id": "peva3-film-xmp",
+      "name": "peva3 Lightroom film simulations",
+      "format": "xmp",
+      "license": "MIT",
+      "homepage": "https://github.com/peva3/Lightroom-Presets",
+      "kind": "github",
+      "repo": "peva3/Lightroom-Presets",
+      "ref": "main",
+      "include_globs": ["**/*.xmp"],
+      "notes": "~445 film / creative XMP develop presets"
+    },
+    {
+      "id": "9bic-lrpresets",
+      "name": "9bic lrpresets",
+      "format": "xmp",
+      "license": "MIT",
+      "homepage": "https://github.com/9bic/lrpresets",
+      "kind": "github",
+      "repo": "9bic/lrpresets",
+      "ref": "master",
+      "include_globs": ["**/*.xmp", "**/*.lrtemplate"],
+      "notes": "9bichrome / mecabify develop presets"
+    },
+    {
+      "id": "taro710-lightroom-presets",
+      "name": "taro710 lightroom-presets",
+      "format": "xmp",
+      "license": "Unlicense",
+      "homepage": "https://github.com/taro710/lightroom-presets",
+      "kind": "github",
+      "repo": "taro710/lightroom-presets",
+      "ref": "main",
+      "include_globs": ["**/*.xmp"],
+      "notes": "Small personal XMP set (filmic, night-blue, etc.)"
+    },
+    {
+      "id": "clebert-lightroom-preset",
+      "name": "clebert lightroom-preset",
+      "format": "xmp",
+      "license": "MIT",
+      "homepage": "https://github.com/clebert/lightroom-preset",
+      "kind": "github",
+      "repo": "clebert/lightroom-preset",
+      "ref": "main",
+      "include_globs": ["**/*.xmp", "**/*.lrtemplate"],
+      "notes": "MIT Lightroom preset project"
+    },
+    {
+      "id": "starlight-lr-camera",
+      "name": "StarlightDamian lr-camera-presets",
+      "format": "xmp",
+      "license": "MIT",
+      "homepage": "https://github.com/StarlightDamian/lr-camera-presets",
+      "kind": "github",
+      "repo": "StarlightDamian/lr-camera-presets",
+      "ref": "main",
+      "include_globs": ["**/*.xmp"],
+      "enabled": false,
+      "notes": "Repo currently has no .xmp files — re-enable if they publish presets"
+    },
+    {
+      "id": "albin450-lightroom",
+      "name": "albin450 LightroomPresets",
+      "format": "xmp",
+      "license": "MIT",
+      "homepage": "https://github.com/albin450/LightroomPresets",
+      "kind": "github",
+      "repo": "albin450/LightroomPresets",
+      "ref": "main",
+      "include_globs": ["**/*.xmp", "**/*.lrtemplate"],
+      "enabled": false,
+      "notes": "Repo currently empty of XMP — re-enable if they publish presets"
+    },
+    {
+      "id": "questtion-lightroom",
+      "name": "Questtion Lightroom-Presets",
+      "format": "xmp",
+      "license": "MIT",
+      "homepage": "https://github.com/Questtion/Lightroom-Presets",
+      "kind": "github",
+      "repo": "Questtion/Lightroom-Presets",
+      "ref": "main",
+      "include_globs": ["**/*.xmp", "**/*.lrtemplate"],
+      "notes": "MIT Lightroom presets"
+    },
+    {
+      "id": "bovender-darktable",
+      "name": "bovender darktable presets (reference)",
+      "format": "dtstyle",
+      "license": "CC0-1.0",
+      "homepage": "https://github.com/bovender/darktable-presets-and-styles",
+      "kind": "github",
+      "repo": "bovender/darktable-presets-and-styles",
+      "ref": "main",
+      "include_globs": ["**/*.dtstyle", "**/*.dtpreset"],
+      "enabled": false,
+      "notes": "Fetched only when --include-darktable; global mapping to MeraRAW is lossy"
+    },
+    {
+      "id": "t3mujinpack-darktable",
+      "name": "t3mujinpack film simulations (reference)",
+      "format": "dtstyle",
+      "license": "MIT",
+      "homepage": "https://github.com/t3mujinpack/t3mujinpack",
+      "kind": "github",
+      "repo": "t3mujinpack/t3mujinpack",
+      "ref": "master",
+      "include_globs": ["**/*.dtstyle"],
+      "enabled": false,
+      "notes": "Popular darktable film pack — enable with --include-darktable for archival only until mapper lands"
+    }
+  ]
+}

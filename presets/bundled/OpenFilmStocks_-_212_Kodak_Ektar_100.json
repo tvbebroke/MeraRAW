@@ -1,0 +1,42 @@
+{
+  "label": "OpenFilmStocks_-_212_Kodak_Ektar_100",
+  "tags": [
+    "Film",
+    "High Contrast"
+  ],
+  "modules": {
+    "tone_curve": {
+      "contrast": 75
+    },
+    "color_grade": {
+      "perceptual_sat": -6,
+      "global_chroma": 5
+    },
+    "hsl": {
+      "red.hue": 15,
+      "red.sat": -25,
+      "red.lum": -15,
+      "orange.hue": 0,
+      "orange.sat": -25,
+      "orange.lum": -5,
+      "yellow.hue": 0,
+      "yellow.sat": -25,
+      "yellow.lum": -5,
+      "green.hue": 25,
+      "green.sat": -45,
+      "green.lum": -10,
+      "aqua.hue": 5,
+      "aqua.sat": -15,
+      "aqua.lum": -10,
+      "blue.hue": 5,
+      "blue.sat": -30,
+      "blue.lum": -10,
+      "purple.hue": -15,
+      "purple.sat": -20,
+      "purple.lum": 10,
+      "magenta.hue": 15,
+      "magenta.sat": -30,
+      "magenta.lum": 0
+    }
+  }
+}

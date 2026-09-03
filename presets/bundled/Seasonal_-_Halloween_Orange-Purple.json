@@ -1,0 +1,40 @@
+{
+  "label": "Seasonal_-_Halloween_Orange-Purple",
+  "tags": [
+    "Moody",
+    "Warm"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": -0.15
+    },
+    "tone_curve": {
+      "contrast": 20,
+      "highlights": -35,
+      "shadows": 20,
+      "lights": 5,
+      "darks": -15
+    },
+    "color_grade": {
+      "shadows_hue": 280,
+      "shadows_sat": 22,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 25,
+      "highlights_sat": 20,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "orange.sat": 20,
+      "orange.lum": 12,
+      "green.sat": -30,
+      "purple.sat": 25
+    }
+  }
+}

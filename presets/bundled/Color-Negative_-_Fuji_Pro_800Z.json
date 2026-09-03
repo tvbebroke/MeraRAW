@@ -1,0 +1,42 @@
+{
+  "label": "Color-Negative_-_Fuji_Pro_800Z",
+  "tags": [
+    "Bright & Airy",
+    "Film",
+    "Pastel"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.33
+    },
+    "tone_curve": {
+      "contrast": -5,
+      "highlights": -35,
+      "shadows": 25,
+      "lights": -5,
+      "darks": 5
+    },
+    "color_grade": {
+      "perceptual_sat": -5,
+      "global_chroma": -5,
+      "shadows_hue": 220,
+      "shadows_sat": 5,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 40,
+      "highlights_sat": 8,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10
+    },
+    "hsl": {
+      "red.sat": -5,
+      "orange.lum": 15,
+      "green.sat": -15,
+      "blue.sat": -10
+    }
+  }
+}

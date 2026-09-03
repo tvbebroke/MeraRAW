@@ -1,0 +1,43 @@
+{
+  "label": "Geographic_-_English_Garden",
+  "tags": [
+    "Cool",
+    "Pastel"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.25
+    },
+    "white_balance": {
+      "temp": 200
+    },
+    "tone_curve": {
+      "contrast": 10,
+      "highlights": -30,
+      "shadows": 25,
+      "lights": 15,
+      "darks": 5
+    },
+    "color_grade": {
+      "perceptual_sat": 10,
+      "global_chroma": 10,
+      "shadows_hue": 160,
+      "shadows_sat": 5,
+      "highlights_hue": 45,
+      "highlights_sat": 8
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "red.sat": 15,
+      "orange.lum": 10,
+      "yellow.sat": 10,
+      "green.hue": 5,
+      "green.sat": 15,
+      "purple.sat": 15,
+      "magenta.sat": 20
+    }
+  }
+}

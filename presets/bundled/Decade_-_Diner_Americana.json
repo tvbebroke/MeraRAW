@@ -1,0 +1,41 @@
+{
+  "label": "Decade_-_Diner_Americana",
+  "tags": [
+    "Cool",
+    "Pastel",
+    "Teal & Orange"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.1
+    },
+    "tone_curve": {
+      "contrast": 15,
+      "highlights": -35,
+      "shadows": 25,
+      "lights": 5,
+      "darks": -5
+    },
+    "color_grade": {
+      "shadows_hue": 200,
+      "shadows_sat": 12,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 35,
+      "highlights_sat": 10,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "red.sat": 10,
+      "orange.lum": 10,
+      "green.sat": -15,
+      "blue.sat": 5
+    }
+  }
+}

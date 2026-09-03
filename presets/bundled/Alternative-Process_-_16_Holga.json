@@ -1,0 +1,42 @@
+{
+  "label": "Alternative-Process_-_16_Holga",
+  "tags": [
+    "Moody",
+    "Warm",
+    "High Contrast"
+  ],
+  "modules": {
+    "tone_curve": {
+      "contrast": 40,
+      "highlights": -50,
+      "shadows": 40,
+      "lights": 20,
+      "darks": -25
+    },
+    "color_grade": {
+      "perceptual_sat": 15,
+      "global_chroma": 10,
+      "shadows_hue": 260,
+      "shadows_sat": 18,
+      "shadows_lum": 0,
+      "midtones_hue": 40,
+      "midtones_sat": 8,
+      "midtones_lum": 0,
+      "highlights_hue": 50,
+      "highlights_sat": 12,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "red.sat": 10,
+      "orange.sat": 15,
+      "yellow.hue": -10,
+      "yellow.sat": 15,
+      "green.hue": 20,
+      "green.sat": -30
+    }
+  }
+}

@@ -1,0 +1,38 @@
+{
+  "label": "Slide_-_Fuji_Astia_100F",
+  "tags": [
+    "Film",
+    "Pastel"
+  ],
+  "modules": {
+    "tone_curve": {
+      "contrast": -17.5,
+      "highlights": -35,
+      "shadows": 16.3,
+      "lights": -12.5,
+      "darks": -7.5
+    },
+    "color_grade": {
+      "global_chroma": -5,
+      "shadows_hue": 0,
+      "shadows_sat": 0,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 0,
+      "highlights_sat": 0,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "orange.lum": 15,
+      "yellow.sat": -5,
+      "green.sat": -7.5,
+      "blue.sat": -7.5
+    }
+  }
+}

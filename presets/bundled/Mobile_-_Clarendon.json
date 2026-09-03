@@ -1,0 +1,33 @@
+{
+  "label": "Mobile_-_Clarendon",
+  "tags": [
+    "Cool",
+    "Teal & Orange"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.15
+    },
+    "tone_curve": {
+      "contrast": 25,
+      "highlights": -25,
+      "shadows": 15,
+      "lights": 20,
+      "darks": -10
+    },
+    "color_grade": {
+      "perceptual_sat": 10,
+      "global_chroma": 10,
+      "shadows_hue": 210,
+      "shadows_sat": 10,
+      "midtones_hue": 35,
+      "midtones_sat": 5,
+      "highlights_hue": 45,
+      "highlights_sat": 8
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    }
+  }
+}

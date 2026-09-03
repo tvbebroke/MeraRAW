@@ -1,0 +1,42 @@
+{
+  "label": "Decade_-_Post-War_Optimism",
+  "tags": [
+    "Bright & Airy",
+    "Warm",
+    "Pastel"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.3
+    },
+    "tone_curve": {
+      "contrast": 10,
+      "highlights": -35,
+      "shadows": 25,
+      "lights": 12,
+      "darks": -5
+    },
+    "color_grade": {
+      "shadows_hue": 35,
+      "shadows_sat": 6,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 40,
+      "highlights_sat": 10,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "red.sat": 8,
+      "orange.sat": 8,
+      "orange.lum": 10,
+      "green.sat": -10,
+      "blue.sat": 5
+    }
+  }
+}

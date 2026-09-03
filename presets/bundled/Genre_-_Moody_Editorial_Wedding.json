@@ -1,0 +1,45 @@
+{
+  "label": "Genre_-_Moody_Editorial_Wedding",
+  "tags": [
+    "Moody",
+    "Cool",
+    "High Contrast",
+    "Editorial",
+    "Teal & Orange"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": -0.3
+    },
+    "tone_curve": {
+      "contrast": 30,
+      "highlights": -50,
+      "shadows": 25,
+      "lights": 10,
+      "darks": -15
+    },
+    "color_grade": {
+      "perceptual_sat": -8,
+      "global_chroma": -10,
+      "shadows_hue": 225,
+      "shadows_sat": 15,
+      "shadows_lum": 0,
+      "midtones_hue": 35,
+      "midtones_sat": 5,
+      "midtones_lum": 0,
+      "highlights_hue": 40,
+      "highlights_sat": 10,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "orange.lum": 10,
+      "yellow.sat": -15,
+      "green.hue": 30,
+      "green.sat": -40
+    }
+  }
+}

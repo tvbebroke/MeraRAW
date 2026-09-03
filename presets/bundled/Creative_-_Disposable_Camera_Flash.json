@@ -1,0 +1,43 @@
+{
+  "label": "Creative_-_Disposable_Camera_Flash",
+  "tags": [
+    "Warm"
+  ],
+  "modules": {
+    "tone_curve": {
+      "contrast": -25,
+      "highlights": -50,
+      "shadows": 40,
+      "lights": 15,
+      "darks": 0
+    },
+    "color_grade": {
+      "perceptual_sat": 2,
+      "global_chroma": 0,
+      "shadows_hue": 35,
+      "shadows_sat": 12,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 45,
+      "highlights_sat": 18,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "red.hue": 15,
+      "red.sat": 12,
+      "orange.sat": 15,
+      "orange.lum": 10,
+      "yellow.sat": 10,
+      "green.hue": -12,
+      "green.sat": -15,
+      "aqua.sat": -10,
+      "blue.sat": -10
+    }
+  }
+}

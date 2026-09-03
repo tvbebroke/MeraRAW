@@ -1,0 +1,39 @@
+{
+  "label": "Seasonal_-_Cherry_Blossom",
+  "tags": [
+    "Bright & Airy"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.5
+    },
+    "tone_curve": {
+      "contrast": -20,
+      "highlights": -50,
+      "shadows": 40,
+      "lights": 15,
+      "darks": 15
+    },
+    "color_grade": {
+      "shadows_hue": 340,
+      "shadows_sat": 5,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 25,
+      "highlights_sat": 6,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "orange.lum": 10,
+      "green.hue": 10,
+      "green.sat": -15,
+      "magenta.sat": 8
+    }
+  }
+}

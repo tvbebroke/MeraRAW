@@ -1,0 +1,39 @@
+{
+  "label": "Genre_-_Color_Recovery",
+  "tags": [
+    "Bright & Airy"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0.5
+    },
+    "tone_curve": {
+      "contrast": 25,
+      "highlights": -30,
+      "shadows": 25,
+      "lights": 10,
+      "darks": -10
+    },
+    "color_grade": {
+      "perceptual_sat": 15,
+      "global_chroma": 15,
+      "shadows_hue": 40,
+      "shadows_sat": 10,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 38,
+      "highlights_sat": 5,
+      "highlights_lum": 0
+    },
+    "hsl": {
+      "red.sat": 30,
+      "orange.sat": 25,
+      "yellow.sat": 15,
+      "green.sat": -15,
+      "aqua.sat": -10,
+      "blue.sat": -20
+    }
+  }
+}

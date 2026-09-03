@@ -1,0 +1,44 @@
+{
+  "label": "Genre_-_High_Contrast_Editorial",
+  "tags": [
+    "Cool",
+    "High Contrast",
+    "Editorial",
+    "Teal & Orange"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": -0.15
+    },
+    "tone_curve": {
+      "contrast": 40,
+      "highlights": -45,
+      "shadows": 10,
+      "lights": 10,
+      "darks": -20
+    },
+    "color_grade": {
+      "perceptual_sat": -8,
+      "global_chroma": -10,
+      "shadows_hue": 230,
+      "shadows_sat": 18,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 38,
+      "highlights_sat": 10,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "orange.sat": -10,
+      "yellow.sat": -10,
+      "green.sat": -25,
+      "blue.sat": -10
+    }
+  }
+}

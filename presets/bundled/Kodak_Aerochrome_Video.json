@@ -1,0 +1,59 @@
+{
+  "label": "Kodak Aerochrome Video",
+  "tags": [
+    "Film",
+    "Cool",
+    "Pastel"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0
+    },
+    "tone_curve": {
+      "contrast": 13,
+      "highlights": -53,
+      "shadows": 15,
+      "lights": 10,
+      "darks": 0
+    },
+    "color_grade": {
+      "perceptual_sat": 8,
+      "global_chroma": 8,
+      "shadows_hue": 210,
+      "shadows_sat": 10,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 320,
+      "highlights_sat": 12,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "red.hue": 50,
+      "red.sat": 30,
+      "red.lum": 15,
+      "orange.hue": 25,
+      "orange.sat": 15,
+      "yellow.hue": -90,
+      "yellow.sat": -45,
+      "yellow.lum": -15,
+      "green.hue": -100,
+      "green.sat": -60,
+      "green.lum": -30,
+      "aqua.hue": 15,
+      "aqua.sat": 30,
+      "blue.hue": -45,
+      "blue.sat": 45,
+      "blue.lum": -30,
+      "purple.hue": 45,
+      "purple.sat": 30,
+      "magenta.hue": -10,
+      "magenta.sat": 20
+    }
+  }
+}

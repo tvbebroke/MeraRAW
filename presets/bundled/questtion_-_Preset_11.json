@@ -1,0 +1,18 @@
+{
+  "label": "questtion_-_Preset_11",
+  "tags": [
+    "Pastel"
+  ],
+  "modules": {
+    "white_balance": {
+      "temp": 5200,
+      "tint": 22
+    },
+    "tone_curve": {
+      "highlights": -28,
+      "shadows": 31,
+      "lights": 14,
+      "darks": -15
+    }
+  }
+}

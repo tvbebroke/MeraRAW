@@ -1,0 +1,51 @@
+{
+  "label": "questtion_-_Preset_2",
+  "tags": [
+    "Pastel",
+    "Dreamy"
+  ],
+  "modules": {
+    "tone_curve": {
+      "contrast": 0,
+      "highlights": 14,
+      "shadows": 4,
+      "lights": -5,
+      "darks": 60
+    },
+    "color_grade": {
+      "perceptual_sat": 0,
+      "global_chroma": 0,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_lum": 0
+    },
+    "hsl": {
+      "red.hue": 0,
+      "red.sat": 0,
+      "red.lum": 0,
+      "orange.hue": 0,
+      "orange.sat": 0,
+      "orange.lum": 0,
+      "yellow.hue": 0,
+      "yellow.sat": 0,
+      "yellow.lum": 0,
+      "green.hue": 0,
+      "green.sat": 0,
+      "green.lum": 0,
+      "aqua.hue": 0,
+      "aqua.sat": 0,
+      "aqua.lum": 0,
+      "blue.hue": 0,
+      "blue.sat": 0,
+      "blue.lum": 0,
+      "purple.hue": 0,
+      "purple.sat": 0,
+      "purple.lum": 0,
+      "magenta.hue": 0,
+      "magenta.sat": 0,
+      "magenta.lum": 0
+    }
+  }
+}

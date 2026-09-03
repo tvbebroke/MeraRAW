@@ -1,0 +1,12 @@
+{
+  "label": "OpenFilmStocks_-_231_Ilford_Delta_3200",
+  "tags": [
+    "Film",
+    "High Contrast"
+  ],
+  "modules": {
+    "tone_curve": {
+      "contrast": 85
+    }
+  }
+}

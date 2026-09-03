@@ -1,0 +1,57 @@
+{
+  "label": "Color-Negative_-_Fujifilm_Classic_Chrome",
+  "tags": [
+    "Film"
+  ],
+  "modules": {
+    "exposure": {
+      "stops": 0
+    },
+    "tone_curve": {
+      "contrast": 22,
+      "highlights": -50,
+      "shadows": -22,
+      "lights": 0,
+      "darks": -22
+    },
+    "color_grade": {
+      "perceptual_sat": -2.5,
+      "global_chroma": -7.5,
+      "shadows_hue": 212,
+      "shadows_sat": 8,
+      "shadows_lum": 0,
+      "midtones_hue": 0,
+      "midtones_sat": 0,
+      "midtones_lum": 0,
+      "highlights_hue": 50,
+      "highlights_sat": 4.5,
+      "highlights_lum": 0
+    },
+    "detail": {
+      "sharpen_amount": 10,
+      "noise_luma": 0
+    },
+    "hsl": {
+      "red.sat": -22.5,
+      "red.lum": -15,
+      "orange.hue": 2.5,
+      "orange.sat": -15,
+      "orange.lum": -10,
+      "yellow.lum": -7.5,
+      "green.hue": 20,
+      "green.sat": -30,
+      "green.lum": -20,
+      "aqua.hue": 10,
+      "aqua.sat": -20,
+      "aqua.lum": -10,
+      "blue.hue": -7.5,
+      "blue.sat": -26,
+      "blue.lum": -17.5,
+      "purple.hue": -15,
+      "purple.sat": -25,
+      "purple.lum": -10,
+      "magenta.sat": -22.5,
+      "magenta.lum": -15
+    }
+  }
+}
