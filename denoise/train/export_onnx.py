@@ -21,8 +21,12 @@ def main() -> None:
     ap.add_argument("--checkpoint", required=True, help="Path to best.pt or epoch_*.pt")
     ap.add_argument("--output", default="meranoise-v1.onnx")
     ap.add_argument("--tile-size", type=int, default=576)
-    ap.add_argument("--opset", type=int, default=17)
-    ap.add_argument("--fp16", action="store_true")
+    ap.add_argument("--opset", type=int, default=13, help="ONNX opset (13 for tract runtime)")
+    ap.add_argument(
+        "--fp16",
+        action="store_true",
+        help="Export FP16 weights (not supported by MeraRAW tract loader — use FP32)",
+    )
     args = ap.parse_args()
 
     ckpt = torch.load(args.checkpoint, map_location="cpu", weights_only=False)

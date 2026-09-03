@@ -135,8 +135,8 @@
         luma_hi: Math.min(1, luma + 0.12),
         chroma_lo: Math.max(0, chroma - 0.08),
         chroma_hi: Math.min(1, chroma + 0.2),
-        hue_lo: (hue - 18 + 360) % 360,
-        hue_hi: (hue + 18) % 360,
+        hue_lo: (hue - 22 + 360) % 360,
+        hue_hi: (hue + 22) % 360,
         softness: 0.06,
       };
       // hue_hi < hue_lo is a wrap-around band; shader supports it.

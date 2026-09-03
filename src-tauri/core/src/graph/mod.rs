@@ -52,7 +52,8 @@ pub struct RenderGraph {
     mask_tex: HashMap<String, wgpu::Texture>,
     scratch: Vec<wgpu::Texture>,   // 2× local-stack ping-pong
     composite: Vec<wgpu::Texture>, // 2× composite ping-pong
-    mask_scratch: Vec<wgpu::Texture>, // 2× R32 mask ping-pong (composite)
+    /// 3× R32: A/B accumulator ping-pong + C component scratch (composite).
+    mask_scratch: Vec<wgpu::Texture>,
     out_tex: Option<wgpu::Texture>,
     cache_size: Option<(u32, u32)>,
     last_view_key: Option<[u32; 5]>,

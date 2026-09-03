@@ -97,9 +97,13 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
       let packed = s.w;
       let hardness = clamp(floor(packed) * 0.01, 0.0, 0.98);
       let flow = clamp(fract(packed), 0.05, 1.0);
-      let cov = (1.0 - smoothstep(radius * hardness, radius * (1.0 + u.feather), length(d))) * flow;
+      // Softer outer falloff: hardness sets core, feather widens the skirt.
+      let inner = radius * mix(0.15, 0.92, hardness);
+      let outer = radius * (1.0 + max(u.feather, 0.04) * (1.2 - hardness * 0.5));
+      let cov = (1.0 - smoothstep(inner, outer, length(d))) * flow;
       if (s.z >= 0.0) {
-        m = max(m, cov);
+        // Additive flow so low density builds up across overlapping dabs.
+        m = clamp(m + cov * (1.0 - m * 0.35), 0.0, 1.0);
       } else {
         m = min(m, 1.0 - cov);
       }

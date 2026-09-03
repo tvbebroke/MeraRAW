@@ -1446,6 +1446,15 @@ impl Engine {
                 let Some(cur) = &mut self.current else { return };
                 cur.pending_segments.remove(&mask_id);
                 let parent_id = crate::segment::segment_parent_mask_id(&mask_id).to_string();
+                // Drop stale results if the doc source changed while the worker ran.
+                let expected = current_segment_hash(cur, &mask_id);
+                if expected.is_some_and(|h| h != source_hash) {
+                    tracing::debug!(
+                        mask_id = %mask_id,
+                        "dropping stale SegmentDone (source changed)"
+                    );
+                    return;
+                }
                 match result {
                     Ok(mask) => {
                         let Some(gpu) = &self.gpu else { return };
@@ -1455,12 +1464,20 @@ impl Engine {
                             mask.width as u32,
                             mask.height as u32,
                         );
+                        if mask_id.contains("#c") {
+                            cur.masks_gpu.remove(&parent_id);
+                        }
                         cur.masks_gpu.insert(mask_id.clone(), (source_hash, tex));
+                        let parent_still_pending = cur.pending_segments.iter().any(|id| {
+                            crate::segment::segment_parent_mask_id(id) == parent_id
+                        });
                         if let Some(g) = &mut self.graph {
                             g.invalidate_from_module("masks");
                         }
                         self.schedule_render();
-                        self.emit(EngineEvent::MaskReady { id: parent_id });
+                        if !parent_still_pending {
+                            self.emit(EngineEvent::MaskReady { id: parent_id });
+                        }
                     }
                     Err(e) => {
                         tracing::error!(error = %e, mask_id, "segmentation failed");
@@ -1482,6 +1499,39 @@ impl Engine {
             }
         }
     }
+}
+
+/// Recompute the source hash for a segmentation cache key against the live doc.
+/// Used to drop stale SegmentDone results after the user changed the mask source.
+fn current_segment_hash(cur: &CurrentImage, cache_key: &str) -> Option<u64> {
+    use std::hash::{Hash, Hasher};
+    let parent = crate::segment::segment_parent_mask_id(cache_key);
+    let m = cur.doc().masks.iter().find(|m| m.id == parent)?;
+    let (kind, source) = if cache_key.contains("#c") {
+        let idx: usize = cache_key.rsplit("#c").next()?.parse().ok()?;
+        let comps = m.source.get("components")?.as_array()?;
+        let comp = comps.get(idx)?;
+        let src = comp.get("source").cloned().unwrap_or_else(|| comp.clone());
+        if src.get("type").and_then(|t| t.as_str()) != Some("segmented") {
+            return None;
+        }
+        (
+            crate::segment::kind_from_segmented_source(&m.kind, &src),
+            src,
+        )
+    } else {
+        if m.source.get("type").and_then(|t| t.as_str()) != Some("segmented") {
+            return None;
+        }
+        (
+            crate::segment::kind_from_segmented_source(&m.kind, &m.source),
+            m.source.clone(),
+        )
+    };
+    let mut h = std::collections::hash_map::DefaultHasher::new();
+    kind.hash(&mut h);
+    source.to_string().hash(&mut h);
+    Some(h.finish())
 }
 
 fn render_test_frame(width: u32, height: u32, version: u64) -> Frame {

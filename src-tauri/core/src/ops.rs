@@ -304,6 +304,16 @@ pub fn apply_op(doc: &mut EditDoc, op: &Op) -> Result<Option<String>, CoreError>
             }
             check_mask_source(source)?;
             let id = new_mask_id();
+            // Soft default feather on AI / range masks; brush starts sharp for precise refine.
+            let feather = match kind.as_str() {
+                "brush" => 0.0,
+                "radial" | "linear" => 18.0,
+                "parametric" => 12.0,
+                "subject" | "sky" | "background" | "object" | "people" | "face" | "skin"
+                | "hair" | "lips" | "eyes" | "water" | "vegetation" | "mountains"
+                | "architecture" | "ground" | "depth" => 10.0,
+                _ => 8.0,
+            };
             doc.masks.push(Mask {
                 id: id.clone(),
                 kind: kind.clone(),
@@ -311,7 +321,7 @@ pub fn apply_op(doc: &mut EditDoc, op: &Op) -> Result<Option<String>, CoreError>
                 enabled: true,
                 opacity: 100.0,
                 invert: false,
-                feather: 0.0,
+                feather,
                 source: source.clone(),
                 blend: default_blend_for_kind(kind),
                 modules: Default::default(),

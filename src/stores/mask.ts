@@ -2,14 +2,15 @@ import { atom } from "nanostores";
 import { setMaskOverlay } from "../ipc/commands";
 import { selectedMask, type ViewportTool, viewportTool } from "./app";
 import { doc } from "./doc";
+import { rightPanelMode } from "./editor";
 import type { MaskMirror } from "../ipc/types";
 
 /** Add / subtract / intersect when refining an existing mask (Lightroom-style). */
 export type MaskRefineMode = "add" | "subtract" | "intersect";
 
 export const maskRefineMode = atom<MaskRefineMode>("add");
-export const brushHardness = atom(0.6);
-export const brushFlow = atom(1.0);
+export const brushHardness = atom(0.45);
+export const brushFlow = atom(0.85);
 export const maskOverlayVisible = atom(true);
 /** 0 red · 1 white · 2 black · 3 color-on-B&W */
 export type MaskOverlayMode = 0 | 1 | 2 | 3;
@@ -105,11 +106,12 @@ export function maskIsEnabled(m: MaskMirror | null | undefined): boolean {
   return m?.enabled !== false;
 }
 
-/** Apply overlay visibility: hidden while adjusting or when mask is disabled. */
+/** Apply overlay visibility: hidden off Mask tab, while adjusting, or when disabled. */
 export function syncMaskOverlay(): void {
   const id = selectedMask.get();
   const m = id ? doc.get()?.masks?.find((x) => x.id === id) : null;
   const show =
+    rightPanelMode.get() === "mask" &&
     maskOverlayVisible.get() &&
     !maskAdjusting.get() &&
     !!id &&

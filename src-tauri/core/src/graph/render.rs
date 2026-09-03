@@ -286,16 +286,18 @@ impl RenderGraph {
                     make_chain_tex(gpu, out_w, out_h, if i == 0 { "comp-a" } else { "comp-b" })
                 })
                 .collect();
-            self.mask_scratch = (0..2)
+            // A/B = accumulator ping-pong; C = per-component produce target
+            // (must not alias with acc — 2-tex ping-pong wiped layers at 3+ comps).
+            self.mask_scratch = (0..3)
                 .map(|i| {
                     make_mask_tex(
                         gpu,
                         out_w,
                         out_h,
-                        if i == 0 {
-                            "msk-scratch-a"
-                        } else {
-                            "msk-scratch-b"
+                        match i {
+                            0 => "msk-scratch-a",
+                            1 => "msk-scratch-b",
+                            _ => "msk-scratch-c",
                         },
                     )
                 })
@@ -323,7 +325,55 @@ impl RenderGraph {
             }
         }
         let n_masks = doc.masks.len();
-        self.ensure_pools(gpu, n_masks * (2 + NODES.len()), n_masks, n_masks);
+        // Composites need one uniform + optional stroke slot per component.
+        let n_comps: usize = doc
+            .masks
+            .iter()
+            .map(|m| {
+                m.source
+                    .get("components")
+                    .and_then(|c| c.as_array())
+                    .map(|a| a.len().max(1))
+                    .unwrap_or(1)
+            })
+            .sum();
+        let n_brush: usize = doc
+            .masks
+            .iter()
+            .map(|m| {
+                let comps = m
+                    .source
+                    .get("components")
+                    .and_then(|c| c.as_array());
+                match comps {
+                    Some(arr) => arr
+                        .iter()
+                        .filter(|c| {
+                            c.get("source")
+                                .and_then(|s| s.get("type"))
+                                .and_then(|t| t.as_str())
+                                == Some("brush")
+                                || c.get("type").and_then(|t| t.as_str()) == Some("brush")
+                        })
+                        .count()
+                        .max(1),
+                    None => {
+                        if m.source.get("type").and_then(|t| t.as_str()) == Some("brush") {
+                            1
+                        } else {
+                            0
+                        }
+                    }
+                }
+            })
+            .sum::<usize>()
+            .max(n_masks.max(1));
+        self.ensure_pools(
+            gpu,
+            (n_comps * 4 + n_masks * (2 + NODES.len())).max(16),
+            n_masks.max(1),
+            n_brush,
+        );
 
         let configs = node_configs(doc, as_shot_cct, out_w, out_h, lut);
 
@@ -1217,11 +1267,12 @@ fn produce_composite_mask(
     else {
         return false;
     };
-    if comps.is_empty() || mask_scratch.len() < 2 {
+    if comps.is_empty() || mask_scratch.len() < 3 {
         return false;
     }
     let scratch_a = &mask_scratch[0];
     let scratch_b = &mask_scratch[1];
+    let scratch_c = &mask_scratch[2];
     let mut acc_in_a = true;
     let mut any = false;
 
@@ -1229,7 +1280,8 @@ fn produce_composite_mask(
         let op = comp.get("op").and_then(|o| o.as_str()).unwrap_or("add");
         let src = comp.get("source").cloned().unwrap_or_else(|| comp.clone());
         let src_type = src.get("type").and_then(|t| t.as_str()).unwrap_or("");
-        let comp_tex = scratch_b;
+        // Produce into C so the component never aliases the A/B accumulator.
+        let comp_tex = scratch_c;
         let produced = match src_type {
             "radial" | "linear" | "brush" => {
                 let (kind, pa, pb, rotation, strokes) = parse_geometry(&src);
@@ -1293,14 +1345,15 @@ fn produce_composite_mask(
             }
             "segmented" => {
                 let key = crate::segment::segment_cache_key(&mask.id, Some(i));
-                let small_view = seg_masks
-                    .get(&key)
-                    .or_else(|| seg_masks.get(&mask.id));
+                // Never fall back to parent `mask.id` — reuses a stale full-subject tex.
+                let small_view = seg_masks.get(&key);
                 if let Some(small_view) = small_view {
                     let ub = &pool[*pool_i];
                     *pool_i += 1;
-                    // background kind inverts subject model; mask.invert applied in finalize
-                    let invert = (mask.kind == "background") as u32;
+                    let child_kind =
+                        crate::segment::kind_from_segmented_source(&mask.kind, &src);
+                    // Invert from this component's model, not the parent mask kind.
+                    let invert = (child_kind == "background") as u32;
                     let u = mask_sample_uniforms(
                         &src,
                         out_w,

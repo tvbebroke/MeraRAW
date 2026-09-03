@@ -1,0 +1,12 @@
+size: 320
+base_channels: 32
+batch_size: 6
+workers: 2
+lr: 0.0001
+epochs: 8
+out_dir: runs/merasubject_m4_local
+datasets:
+  - images: data/DUTS-TR/DUTS-TR-Image
+    masks: data/DUTS-TR/DUTS-TR-Mask
+  - images: data/ECSSD/images
+    masks: data/ECSSD/masks

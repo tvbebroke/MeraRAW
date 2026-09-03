@@ -23,7 +23,7 @@ mkdir -p "$OUT"
 python export_onnx.py \
   --checkpoint runs/meranoise_m4_local/best.pt \
   --output "$OUT/meranoise-v1.onnx" \
-  --fp16 2>&1 | tee -a "$LOG"
+  2>&1 | tee -a "$LOG"
 
 echo "=== Done $(date) ===" | tee -a "$LOG"
 echo "Model installed: $OUT/meranoise-v1.onnx"

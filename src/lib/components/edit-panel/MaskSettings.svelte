@@ -113,6 +113,9 @@
         };
       case "sky":
         return { type: "segmented", model: "sky_v1", hint: null };
+      case "background":
+        // Distinct model so composite children invert correctly (not subject_v1).
+        return { type: "segmented", model: "background_v1", hint: null };
       case "object":
         return {
           type: "segmented",
@@ -582,35 +585,11 @@
         <button type="button" class="tool-btn" onclick={() => void (active ? addComponent("face") : addMask("face"))}>
           <span class="ico">☺</span> Face
         </button>
-        <button type="button" class="tool-btn" onclick={() => void (active ? addComponent("skin") : addMask("skin"))}>
-          <span class="ico">◌</span> Skin
-        </button>
-        <button type="button" class="tool-btn" onclick={() => void (active ? addComponent("hair") : addMask("hair"))}>
-          <span class="ico">∿</span> Hair
-        </button>
-        <button type="button" class="tool-btn" onclick={() => void (active ? addComponent("lips") : addMask("lips"))}>
-          <span class="ico">◦</span> Lips
-        </button>
-        <button type="button" class="tool-btn" onclick={() => void (active ? addComponent("eyes") : addMask("eyes"))}>
-          <span class="ico">◎</span> Eyes
-        </button>
-        <button type="button" class="tool-btn" onclick={() => void (active ? addComponent("water") : addMask("water"))}>
-          <span class="ico">≋</span> Water
-        </button>
-        <button type="button" class="tool-btn" onclick={() => void (active ? addComponent("vegetation") : addMask("vegetation"))}>
-          <span class="ico">❀</span> Vegetation
-        </button>
-        <button type="button" class="tool-btn" onclick={() => void (active ? addComponent("mountains") : addMask("mountains"))}>
-          <span class="ico">⛰</span> Mountains
-        </button>
-        <button type="button" class="tool-btn" onclick={() => void (active ? addComponent("architecture") : addMask("architecture"))}>
-          <span class="ico">⌂</span> Architecture
-        </button>
-        <button type="button" class="tool-btn" onclick={() => void (active ? addComponent("ground") : addMask("ground"))}>
-          <span class="ico">▁</span> Ground
-        </button>
         <button type="button" class="tool-btn" onclick={() => void (active ? addComponent("depth") : addMask("depth"))}>
-          <span class="ico">⇅</span> Depth range
+          <span class="ico">⇅</span> Depth
+        </button>
+        <button type="button" class="tool-btn" onclick={() => void (active ? addComponent("parametric") : addMask("parametric"))}>
+          <span class="ico">◐</span> Luminance
         </button>
       </div>
     {/if}
@@ -668,13 +647,6 @@
         <button
           type="button"
           class="tool-btn wide"
-          onclick={() => void (active ? addComponent("parametric") : addMask("parametric"))}
-        >
-          <span class="ico">◐</span> Luminance / Color Range
-        </button>
-        <button
-          type="button"
-          class="tool-btn wide"
           class:on={$colorPickActive}
           onclick={startColorPick}
         >
@@ -701,7 +673,7 @@
       max={1}
       step={0.05}
       value={$brushHardness}
-      resetValue={0.6}
+      resetValue={0.45}
       oninput={(v) => brushHardness.set(v)}
       onchange={(v) => brushHardness.set(v)}
     />
@@ -711,7 +683,7 @@
       max={1}
       step={0.05}
       value={$brushFlow}
-      resetValue={1}
+      resetValue={0.85}
       oninput={(v) => brushFlow.set(v)}
       onchange={(v) => brushFlow.set(v)}
     />

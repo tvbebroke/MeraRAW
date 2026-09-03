@@ -138,10 +138,12 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
       }
       m = m * ly * cy * hy;
     }
-    // feather: soften the transition band
-    let f = clamp(u.feather, 0.0, 0.9);
+    // feather: higher = softer / wider transition (old curve inverted around 0.5
+    // and narrowed edges — raising Feather made AI masks harder, not softer).
+    let f = clamp(u.feather, 0.0, 1.0);
     if (f > 0.01) {
-      m = smoothstep(0.5 * f, 1.0 - 0.5 * f, m);
+      let half = 0.05 + 0.45 * f;
+      m = smoothstep(0.5 - half, 0.5 + half, m);
     }
   }
   if (u.invert == 1u) {

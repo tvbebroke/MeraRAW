@@ -308,6 +308,11 @@ impl Engine {
             collect_segment_jobs(m, &mut jobs);
         }
         for (id, kind, hash, source) in jobs {
+            // Composite children must not reuse a leftover top-level parent texture.
+            if id.contains("#c") {
+                let parent = crate::segment::segment_parent_mask_id(&id).to_string();
+                cur.masks_gpu.remove(&parent);
+            }
             let cached = cur.masks_gpu.get(&id).map(|(h, _)| *h) == Some(hash);
             if cached || cur.pending_segments.contains(&id) {
                 continue;

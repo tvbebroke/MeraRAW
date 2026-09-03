@@ -2,9 +2,13 @@
   import { fade, fly } from "svelte/transition";
   import { cubicOut } from "svelte/easing";
   import { histogramOpen, rightPanelMode } from "../../../stores/editor";
-  import { imageOpen, selectedMask } from "../../../stores/app";
-  import { showAiPanel, showMaskPanel } from "../../editor/focus";
-  import { setMaskOverlay } from "../../../ipc/commands";
+  import { imageOpen } from "../../../stores/app";
+  import { applyTool, showAiPanel, showMaskPanel } from "../../editor/focus";
+  import {
+    colorPickActive,
+    stopGeomPlacement,
+    stopInstancePick,
+  } from "../../../stores/mask";
   import LightSettings from "./LightSettings.svelte";
   import ColorSettings from "./ColorSettings.svelte";
   import ToneCurve from "./ToneCurve.svelte";
@@ -28,7 +32,12 @@
   });
 
   function openEditTab() {
-    void setMaskOverlay(null);
+    // Leaving Mask must drop pick tools + red overlay (setMaskOverlay alone is not enough —
+    // selectedMask stayed set and the next sync resurrected the overlay).
+    stopInstancePick();
+    stopGeomPlacement();
+    colorPickActive.set(false);
+    applyTool("edit");
     rightPanelMode.set("edit");
   }
 </script>

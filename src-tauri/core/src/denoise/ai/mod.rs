@@ -506,7 +506,10 @@ fn run_onnx(
                 }
             }
         }
-        let tensor = Tensor::from_shape(&[1, 3, NET_TILE, NET_TILE], &input)
+        let tensor = Tensor::from_shape(
+            &[1, in_ch, NET_TILE, NET_TILE],
+            &input[..in_ch * NET_TILE * NET_TILE],
+        )
             .map_err(|e| CoreError::Decode(format!("denoise tensor: {e}")))?;
         let out = plan
             .run(tvec!(tensor.into()))
@@ -805,6 +808,29 @@ mod tests {
     /// Real ONNX path end-to-end: with an identity model installed, the
     /// denoised base equals the input (enc/dec round-trip + feather merge
     /// are the only transforms, both identity-preserving).
+    #[test]
+    fn meranoise_v1_tract_loads() {
+        let path = std::path::Path::new("/tmp/meranoise-v1-f32.onnx");
+        if !path.is_file() {
+            return;
+        }
+        use tract_onnx::prelude::*;
+        tract_onnx::onnx()
+            .model_for_path(path)
+            .and_then(|m| {
+                m.with_input_fact(
+                    0,
+                    InferenceFact::dt_shape(
+                        f32::datum_type(),
+                        tvec!(1, 4, super::NET_TILE as i64, super::NET_TILE as i64),
+                    ),
+                )
+            })
+            .and_then(|m| m.into_optimized())
+            .and_then(|m| m.into_runnable())
+            .expect("meranoise-v1 f32 ONNX should load in tract");
+    }
+
     #[test]
     fn onnx_identity_model_round_trips() {
         let mut root = std::env::temp_dir();
