@@ -4,6 +4,7 @@ import {
   folderSections,
   gridKey,
   gridQueryFromState,
+  isLibraryFileRoot,
   isPathInFolder,
   libraryFiltersActive,
   sameFolderPath,
@@ -132,6 +133,18 @@ describe("libraryFiltersActive", () => {
     expect(libraryFiltersActive({ ...DEFAULT_LIBRARY_FILTERS, ratingMin: 1 })).toBe(true);
     expect(libraryFiltersActive({ ...DEFAULT_LIBRARY_FILTERS, text: "  " })).toBe(false);
     expect(libraryFiltersActive({ ...DEFAULT_LIBRARY_FILTERS, text: "a7" })).toBe(true);
+  });
+});
+
+describe("isLibraryFileRoot", () => {
+  it("treats a single imported photo as a file, not a folder", () => {
+    expect(
+      isLibraryFileRoot(folder({ root: "/Alaska/DSCF1234.RAF", name: "DSCF1234.RAF", isFile: true })),
+    ).toBe(true);
+    expect(
+      isLibraryFileRoot(folder({ root: "/Alaska/DSCF1234.RAF", name: "DSCF1234.RAF" })),
+    ).toBe(true);
+    expect(isLibraryFileRoot(folder({ root: "/Alaska", name: "Alaska" }))).toBe(false);
   });
 });
 

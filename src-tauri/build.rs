@@ -6,6 +6,7 @@ fn main() {
             "app_info",
             "ping_engine",
             "pick_file",
+            "pick_files",
             "pick_folder",
             "read_file_meta",
             "open_image",

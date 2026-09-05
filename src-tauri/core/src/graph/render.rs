@@ -1284,6 +1284,9 @@ fn produce_composite_mask(
         let comp_tex = scratch_c;
         let produced = match src_type {
             "radial" | "linear" | "brush" => {
+                if *pool_i >= pool.len() || *strokes_i >= strokes_pool.len() {
+                    return false;
+                }
                 let (kind, pa, pb, rotation, strokes) = parse_geometry(&src);
                 let ub = &pool[*pool_i];
                 *pool_i += 1;
@@ -1345,9 +1348,23 @@ fn produce_composite_mask(
             }
             "segmented" => {
                 let key = crate::segment::segment_cache_key(&mask.id, Some(i));
-                // Never fall back to parent `mask.id` — reuses a stale full-subject tex.
-                let small_view = seg_masks.get(&key);
+                // First wrapped component is the original subject — texture is
+                // cached as `mask.id`, not `mask.id#c0`. Falling back here is
+                // required or Subtract/Add refine finds no AI mask and panics
+                // the combine pass (empty accumulator).
+                let small_view = seg_masks
+                    .get(&key)
+                    .or_else(|| {
+                        if i == 0 {
+                            seg_masks.get(&mask.id)
+                        } else {
+                            None
+                        }
+                    });
                 if let Some(small_view) = small_view {
+                    if *pool_i >= pool.len() {
+                        return false;
+                    }
                     let ub = &pool[*pool_i];
                     *pool_i += 1;
                     let child_kind =
@@ -1409,6 +1426,9 @@ fn produce_composite_mask(
                 }
             }
             "parametric" => {
+                if *pool_i >= pool.len() {
+                    return false;
+                }
                 let ub = &pool[*pool_i];
                 *pool_i += 1;
                 let u = mask_sample_uniforms(
@@ -1467,16 +1487,22 @@ fn produce_composite_mask(
         if !produced {
             continue;
         }
-        any = true;
-        let combine_op = if i == 0 { 0 } else { combine_op_id(op) };
-        let acc_tex = if acc_in_a { scratch_a } else { scratch_b };
-        let dst_tex = if i == 0 {
-            scratch_a
+        if *pool_i >= pool.len() {
+            return false;
+        }
+        // First produced layer: replace into A. Acc and dst must be different
+        // textures — wgpu rejects the same resource as sampled + storage, which
+        // is what crashed Subtract on a freshly wrapped subject mask.
+        let (acc_tex, dst_tex, next_acc_in_a) = if !any {
+            (scratch_c, scratch_a, true)
         } else if acc_in_a {
-            scratch_b
+            (scratch_a, scratch_b, false)
         } else {
-            scratch_a
+            (scratch_b, scratch_a, true)
         };
+        let combine_op = if !any { 0 } else { combine_op_id(op) };
+        any = true;
+        acc_in_a = next_acc_in_a;
         let acc_view = acc_tex.create_view(&Default::default());
         let src_view = comp_tex.create_view(&Default::default());
         let dst_view = dst_tex.create_view(&Default::default());
@@ -1518,14 +1544,12 @@ fn produce_composite_mask(
         pass.set_pipeline(&mask_combine.pipeline);
         pass.set_bind_group(0, &bind, &[]);
         pass.dispatch_workgroups(out_w.div_ceil(16), out_h.div_ceil(16), 1);
-        if i > 0 {
-            acc_in_a = !acc_in_a;
-        } else {
-            acc_in_a = true;
-        }
     }
 
     if !any {
+        return false;
+    }
+    if *pool_i >= pool.len() {
         return false;
     }
 

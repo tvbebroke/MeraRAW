@@ -52,7 +52,7 @@ pub fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
         .item(&MenuItem::with_id(
             app,
             "import",
-            "Add Folder…",
+            "Import Photos…",
             true,
             None::<&str>,
         )?)

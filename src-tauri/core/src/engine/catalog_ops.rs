@@ -18,11 +18,12 @@ impl Engine {
         let root = crate::path_safety::simplify_path(root);
         if !root.exists() {
             return Err(CoreError::Io(format!(
-                "folder not found: {}",
+                "path not found: {}",
                 root.display()
             )));
         }
-        if !root.is_dir() {
+        let file_root = root.is_file();
+        if !file_root && !root.is_dir() {
             return Err(CoreError::Io(format!("not a folder: {}", root.display())));
         }
 
@@ -40,8 +41,12 @@ impl Engine {
         }
 
         let cat = self.catalog_mut()?;
-        let selected_only = only_paths.is_some();
-        let files = only_paths.unwrap_or_else(|| crate::catalog::scan_folder(&root));
+        let selected_only = only_paths.is_some() || file_root;
+        let files = if file_root {
+            vec![root.clone()]
+        } else {
+            only_paths.unwrap_or_else(|| crate::catalog::scan_folder(&root))
+        };
         let root_canon = crate::path_safety::simplify_path(
             root.canonicalize().unwrap_or_else(|_| root.clone()),
         );
@@ -391,11 +396,15 @@ fn collect_segment_jobs(
                     let src = comp.get("source").cloned().unwrap_or_else(|| comp.clone());
                     if src.get("type").and_then(|t| t.as_str()) == Some("segmented") {
                         let kind = crate::segment::kind_from_segmented_source(&m.kind, &src);
-                        push(
-                            crate::segment::segment_cache_key(&m.id, Some(i)),
-                            &kind,
-                            &src,
-                        );
+                        // Reuse the top-level cache for the first component so
+                        // refine (add/subtract) does not re-run U²-Net / miss
+                        // the already-computed subject texture.
+                        let job_id = if i == 0 {
+                            crate::segment::segment_cache_key(&m.id, None)
+                        } else {
+                            crate::segment::segment_cache_key(&m.id, Some(i))
+                        };
+                        push(job_id, &kind, &src);
                     }
                 }
             }

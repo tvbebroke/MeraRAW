@@ -26,7 +26,7 @@ import {
   onPhotoWorkspace,
   onVideoWorkspace,
 } from "../../ipc/events";
-import { importAndBrowse, initBrowseBridge, pickAndImportFolder } from "../../stores/browse";
+import { importAndBrowse, initBrowseBridge, pickAndImportPhotos, pinOpenedFile } from "../../stores/browse";
 import {
   decodeState,
   engineReady,
@@ -114,7 +114,9 @@ export function initEngineBridge(): () => void {
       gpuAdapter.set(p.adapter);
       void loadRegistry();
     }),
-    onFileOpened((path) => void openPath(path)),
+    onFileOpened((path) => {
+      void openPath(path).then(() => pinOpenedFile(path));
+    }),
     onPreviewReady((version) => {
       statusMessage.set("preview · decoding…");
       frameVersion.set(version);
@@ -158,7 +160,7 @@ export function initEngineBridge(): () => void {
     }),
     onImportRequested(() => {
       push(libraryRoute());
-      void pickAndImportFolder().catch(() => null);
+      void pickAndImportPhotos().catch(() => null);
     }),
     onExportRequested(() => isExportOpen.set(true)),
     onSettingsRequested(() => isSettingsOpen.set(true)),
@@ -204,7 +206,7 @@ export function initEngineBridge(): () => void {
     .then((p) => {
       if (p && !autoOpened) {
         autoOpened = true;
-        void openPath(p);
+        void openPath(p).then(() => pinOpenedFile(p));
       }
     })
     .catch(() => {});

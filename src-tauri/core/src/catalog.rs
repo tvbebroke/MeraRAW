@@ -60,6 +60,8 @@ pub struct FolderItem {
     pub video_count: i64,
     /// False when the import root is missing (e.g. external drive unmounted).
     pub accessible: bool,
+    /// True when this shortcut is a single imported file, not a folder.
+    pub is_file: bool,
 }
 
 #[derive(Debug, Clone, serde::Serialize)]
@@ -482,8 +484,10 @@ impl Catalog {
                     Ok((r.get(0)?, r.get(1)?))
                 })
                 .unwrap_or((0, 0));
-            let accessible = Path::new(&root_trim).exists();
-            let name = Path::new(&root_trim)
+            let p = Path::new(&root_trim);
+            let accessible = p.exists();
+            let is_file = p.is_file();
+            let name = p
                 .file_name()
                 .map(|s| s.to_string_lossy().into_owned())
                 .filter(|s| !s.is_empty())
@@ -494,6 +498,7 @@ impl Catalog {
                 photo_count,
                 video_count,
                 accessible,
+                is_file,
             });
         }
         Ok(out)
@@ -1562,6 +1567,36 @@ mod tests {
         assert_eq!(folders.len(), 1);
         assert_eq!(folders[0].photo_count, 1, "{folders:?}");
         assert_eq!(folders[0].video_count, 1, "{folders:?}");
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn list_folders_file_root_shows_filename() {
+        let (mut cat, dir) = tmp_cat("file-root");
+        let file = dir.join("puffin.RAF");
+        std::fs::write(&file, b"not-a-raw").unwrap();
+        let path = file.to_string_lossy().into_owned();
+        let parent = file.parent().unwrap().to_string_lossy().into_owned();
+        cat.upsert_asset(
+            &path,
+            &parent,
+            "h",
+            100,
+            0,
+            &meta_stub(&path),
+            None,
+            false,
+            None,
+            None,
+        )
+        .unwrap();
+        cat.remember_folder(&path).unwrap();
+        let folders = cat.list_folders().unwrap();
+        assert_eq!(folders.len(), 1);
+        assert!(folders[0].is_file, "{folders:?}");
+        assert_eq!(folders[0].name, "puffin.RAF");
+        assert_eq!(folders[0].photo_count, 1, "{folders:?}");
+        assert_eq!(folders[0].video_count, 0, "{folders:?}");
         std::fs::remove_dir_all(&dir).ok();
     }
 

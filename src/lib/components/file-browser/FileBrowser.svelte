@@ -13,8 +13,10 @@
     folderKindFor,
     folderSections,
     folders,
+    isLibraryFileRoot,
     loadFolder,
     pickAndImportFolder,
+    pickAndImportPhotos,
     refreshFolders,
     removeFolderShortcut,
     setFolderKind,
@@ -26,6 +28,7 @@
   import FolderNode from "./FolderNode.svelte";
 
   import { setWorkspace, workspace, VIDEO_WORKSPACE_ENABLED } from "../../../stores/workspace";
+  import { isVideoPath } from "../../media";
 
   let { class: cls = "" }: { class?: string } = $props();
   const isVideo = $derived($workspace === "video");
@@ -44,6 +47,10 @@
 
   async function addFolder() {
     await pickAndImportFolder();
+  }
+
+  async function importPhotos() {
+    await pickAndImportPhotos();
   }
 
   function selectFolderPath(path: string, section: "photo" | "video") {
@@ -264,7 +271,7 @@
       <p class="empty-state">Loading…</p>
     {:else if searched.length === 0 && !findOpen}
       <p class="empty-state">
-        {searchQuery ? `No folders matching “${searchQuery}”` : isVideo ? "No clips here. Import a folder to begin." : "No photos here. Import a folder to begin."}
+        {searchQuery ? `No folders matching “${searchQuery}”` : isVideo ? "No clips here. Import a clip or add a folder to begin." : "No photos here. Import a photo or add a folder to begin."}
       </p>
     {:else}
       {#if photoFolders.length}
@@ -275,7 +282,9 @@
               <FolderNode
                 name={item.name}
                 path={item.root}
-                count={item.photoCount ?? 0}
+                isDir={!isLibraryFileRoot(item)}
+                kind={isLibraryFileRoot(item) ? (isVideoPath(item.root) ? "video" : "photo") : null}
+                count={isLibraryFileRoot(item) ? null : (item.photoCount ?? 0)}
                 accessible={item.accessible}
                 section="photo"
                 activePath={$folder}
@@ -295,7 +304,9 @@
               <FolderNode
                 name={item.name}
                 path={item.root}
-                count={item.videoCount ?? 0}
+                isDir={!isLibraryFileRoot(item)}
+                kind={isLibraryFileRoot(item) ? (isVideoPath(item.root) ? "video" : "photo") : null}
+                count={isLibraryFileRoot(item) ? null : (item.videoCount ?? 0)}
                 accessible={item.accessible}
                 section="video"
                 activePath={$folder}
@@ -312,7 +323,7 @@
     <button type="button" class="import-btn" onclick={() => void findFolders()} disabled={finding}>
       {finding ? "Finding folders…" : "Find folders"}
     </button>
-    <button type="button" class="import-btn" onclick={addFolder} disabled={$browseBusy}>
+    <button type="button" class="import-btn" onclick={() => void importPhotos()} disabled={$browseBusy}>
       + Import {$workspace === "video" ? "clips" : "photos"}
     </button>
   </div>

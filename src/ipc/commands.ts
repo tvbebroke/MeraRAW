@@ -27,6 +27,10 @@ export function pickFile(kind?: "photo" | "video" | null): Promise<string | null
   return invoke<string | null>("pick_file", { kind: kind ?? null });
 }
 
+export function pickFiles(kind?: "photo" | "video" | null): Promise<string[] | null> {
+  return invoke<string[] | null>("pick_files", { kind: kind ?? null });
+}
+
 export function pickFolder(): Promise<string | null> {
   return invoke<string | null>("pick_folder");
 }

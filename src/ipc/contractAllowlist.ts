@@ -60,11 +60,7 @@ export const UNCALLED_OK: { command: string; reason: string }[] = [
   },
   {
     command: "scan_import_folder",
-    reason: "selective import UI not built; import_folder is the live path",
-  },
-  {
-    command: "import_selected",
-    reason: "selective import UI not built; import_folder is the live path",
+    reason: "selective import UI not built; import_selected is the live path",
   },
   {
     command: "list_albums",

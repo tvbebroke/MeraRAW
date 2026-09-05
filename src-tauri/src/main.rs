@@ -399,6 +399,7 @@ fn main() {
             commands::app_info,
             commands::ping_engine,
             commands::pick_file,
+            commands::pick_files,
             commands::pick_folder,
             commands::read_file_meta,
             commands::open_image,

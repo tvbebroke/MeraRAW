@@ -4,7 +4,9 @@ import { atom, computed } from "nanostores";
 import {
   getGrid,
   importFolder,
+  importSelected,
   listFolders,
+  pickFiles,
   pickFolder,
   setAssetMeta,
   forgetFolder,
@@ -14,7 +16,7 @@ import type { FolderItem, GridItem, GridQuery, MetaPatch } from "../ipc/types";
 import { customSchemeUrl } from "../lib/engine/customScheme";
 import { currentFolder, lastOpenedDocId, lastOpenedPath, openingPreviewUrl } from "./app";
 import { workspace } from "./workspace";
-import { isVideoPath } from "../lib/media";
+import { extOf, isVideoPath } from "../lib/media";
 
 export const folders = atom<FolderItem[]>([]);
 export const photos = atom<GridItem[]>([]);
@@ -125,6 +127,36 @@ export function setFolderKind(root: string, kind: FolderMediaKind): void {
   } catch {
     /* ignore */
   }
+}
+
+const STILL_LIBRARY_EXTS = new Set([
+  "raf",
+  "arw",
+  "cr2",
+  "cr3",
+  "nef",
+  "nrw",
+  "dng",
+  "orf",
+  "rw2",
+  "pef",
+  "srw",
+  "jpg",
+  "jpeg",
+  "png",
+  "tif",
+  "tiff",
+  "heic",
+  "heif",
+  "webp",
+  "bmp",
+]);
+
+/** True when a sidebar item is one imported file (not a folder of siblings). */
+export function isLibraryFileRoot(item: Pick<FolderItem, "root" | "isFile">): boolean {
+  if (item.isFile) return true;
+  const ext = extOf(item.root);
+  return Boolean(ext) && (isVideoPath(item.root) || STILL_LIBRARY_EXTS.has(ext));
 }
 
 /** Which library sections a folder belongs in. Mixed auto-folders appear in both. */
@@ -280,32 +312,84 @@ export async function loadFolder(root: string | null): Promise<void> {
   }
 }
 
+async function waitForImport(root: string, total: number, latch: {
+  done: Promise<number>;
+  cancel: () => void;
+}): Promise<void> {
+  if (total <= 0) {
+    latch.cancel();
+    return;
+  }
+  await Promise.race([
+    latch.done.catch(() => undefined),
+    (async () => {
+      for (let i = 0; i < 120; i++) {
+        await new Promise((r) => setTimeout(r, 250));
+        const grid = await getGrid({ folder: root, limit: 1, sort: "captured" });
+        if (grid.length > 0) return;
+      }
+    })(),
+  ]);
+}
+
 /** Import a folder into the catalog, wait for workers, then browse it. */
 export async function importAndBrowse(root: string): Promise<void> {
   browseBusy.set(true);
   const latch = await importDoneLatch();
   try {
     const total = await importFolder(root);
-    if (total > 0) {
-      // Wait for workers, but also poll — covers missed events.
-      await Promise.race([
-        latch.done.catch(() => undefined),
-        (async () => {
-          for (let i = 0; i < 120; i++) {
-            await new Promise((r) => setTimeout(r, 250));
-            const grid = await getGrid({ folder: root, limit: 1, sort: "captured" });
-            if (grid.length > 0) return;
-          }
-        })(),
-      ]);
-    } else {
-      latch.cancel();
-    }
+    await waitForImport(root, total, latch);
     await refreshFolders();
     const catalogRoot = resolveCatalogRoot(root, folders.get());
     await loadFolder(catalogRoot);
   } finally {
     latch.cancel();
+    browseBusy.set(false);
+  }
+}
+
+/** Remember a File → Open photo as its own sidebar row (filename only). */
+export async function pinOpenedFile(path: string): Promise<void> {
+  const listed = folders.get();
+  if (listed.some((f) => sameFolderPath(f.root, path))) return;
+  if (listed.some((f) => !isLibraryFileRoot(f) && isPathInFolder(path, f.root))) return;
+  try {
+    const latch = await importDoneLatch();
+    try {
+      const total = await importSelected(path, [path]);
+      await waitForImport(path, total, latch);
+    } finally {
+      latch.cancel();
+    }
+    await refreshFolders();
+  } catch {
+    /* opening the file still succeeded */
+  }
+}
+
+/** Import specific files as their own library items (filename on the sidebar). */
+export async function importAndBrowseSelected(paths: string[]): Promise<string | null> {
+  if (paths.length === 0) return null;
+  browseBusy.set(true);
+  try {
+    for (const file of paths) {
+      const latch = await importDoneLatch();
+      try {
+        const total = await importSelected(file, [file]);
+        await waitForImport(file, total, latch);
+      } finally {
+        latch.cancel();
+      }
+    }
+    await refreshFolders();
+    const last = paths[paths.length - 1];
+    const catalogRoot = resolveCatalogRoot(last, folders.get());
+    await loadFolder(catalogRoot);
+    if (paths.length === 1) {
+      await openLibraryFile(paths[0]);
+    }
+    return catalogRoot;
+  } finally {
     browseBusy.set(false);
   }
 }
@@ -316,6 +400,14 @@ export async function pickAndImportFolder(): Promise<string | null> {
   if (!dir) return null;
   await importAndBrowse(dir);
   return dir;
+}
+
+/** Native file picker (one or more photos/clips) → import → browse. */
+export async function pickAndImportPhotos(): Promise<string | null> {
+  const kind = workspace.get() === "video" ? "video" : "photo";
+  const files = await pickFiles(kind);
+  if (!files?.length) return null;
+  return importAndBrowseSelected(files);
 }
 
 /** Keep the open folder's grid live as import workers upsert assets. */

@@ -196,6 +196,7 @@ export interface FolderItem {
   photoCount: number;
   videoCount: number;
   accessible: boolean;
+  isFile?: boolean;
 }
 
 export interface DiscoveredFolder {

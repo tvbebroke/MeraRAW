@@ -106,6 +106,40 @@ pub async fn pick_file(app: AppHandle, kind: Option<String>) -> Result<Option<St
     }
 }
 
+#[tauri::command]
+pub async fn pick_files(app: AppHandle, kind: Option<String>) -> Result<Option<Vec<String>>, AppError> {
+    let kind = kind.unwrap_or_default();
+    let picked = tauri::async_runtime::spawn_blocking(move || {
+        let dlg = file_dialog(&app);
+        let dlg = match kind.as_str() {
+            "video" => dlg
+                .set_title("Import videos — choose one or more")
+                .add_filter("Video", VIDEO_EXTENSIONS),
+            "photo" => dlg
+                .set_title("Import photos — choose one or more")
+                .add_filter("Photos", PHOTO_EXTENSIONS),
+            _ => dlg
+                .set_title("Import — choose one or more")
+                .add_filter("All media", IMAGE_EXTENSIONS)
+                .add_filter("Photos", PHOTO_EXTENSIONS)
+                .add_filter("Video", VIDEO_EXTENSIONS),
+        };
+        dlg.blocking_pick_files()
+    })
+    .await
+    .map_err(|e| AppError::Internal(format!("files dialog join: {e}")))?;
+    match picked {
+        Some(paths) => {
+            let mut out = Vec::with_capacity(paths.len());
+            for p in paths {
+                out.push(filepath_to_string(p)?);
+            }
+            Ok(Some(out))
+        }
+        None => Ok(None),
+    }
+}
+
 /// Native picker for a 3D look LUT (`.cube`).
 #[tauri::command]
 pub async fn pick_lut(app: AppHandle) -> Result<Option<String>, AppError> {
@@ -577,6 +611,23 @@ pub async fn import_selected(
     paths: Vec<String>,
 ) -> Result<u64, AppError> {
     let root = crate::paths::validate_existing_path(&root)?;
+    // Single-file import: never touch the parent folder (avoids macOS
+    // "grant folder access" and importing siblings).
+    if root.is_file() {
+        return engine
+            .import_selected(root.clone(), vec![root])
+            .await?
+            .map_err(AppError::from);
+    }
+    if paths.len() == 1 {
+        let only = crate::paths::validate_existing_path(&paths[0])?;
+        if only.is_file() {
+            return engine
+                .import_selected(only.clone(), vec![only])
+                .await?
+                .map_err(AppError::from);
+        }
+    }
     let root_canon = root.canonicalize().unwrap_or_else(|_| root.clone());
     let mut validated = Vec::with_capacity(paths.len());
     for p in paths {
