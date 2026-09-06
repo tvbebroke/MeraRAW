@@ -14,6 +14,7 @@
     folderSections,
     folders,
     isLibraryFileRoot,
+    isNestedFolderShortcut,
     loadFolder,
     pickAndImportFolder,
     pickAndImportPhotos,
@@ -56,7 +57,7 @@
   function selectFolderPath(path: string, section: "photo" | "video") {
     if (section === "video" && $workspace !== "video") setWorkspace("video");
     else if (section === "photo" && $workspace !== "photo") setWorkspace("photo");
-    void loadFolder(path);
+    void loadFolder(path, { resumeImport: true });
   }
 
   function folderCtx(e: MouseEvent, path: string) {
@@ -75,10 +76,18 @@
   );
 
   const photoFolders = $derived(
-    searched.filter((f) => folderSections(f, folderKindFor(f.root, $folderKinds)).includes("photo")),
+    searched.filter(
+      (f) =>
+        !isNestedFolderShortcut(f, searched) &&
+        folderSections(f, folderKindFor(f.root, $folderKinds)).includes("photo"),
+    ),
   );
   const videoFolders = $derived(
-    searched.filter((f) => folderSections(f, folderKindFor(f.root, $folderKinds)).includes("video")),
+    searched.filter(
+      (f) =>
+        !isNestedFolderShortcut(f, searched) &&
+        folderSections(f, folderKindFor(f.root, $folderKinds)).includes("video"),
+    ),
   );
 
   const newFound = $derived(

@@ -12,12 +12,18 @@
     applyLibraryFilters,
     clearLibraryFilters,
     folder,
+    folderHydrate,
+    folderLeafName,
+    folders,
     libraryFilters,
     libraryFiltersActive,
     libraryItems,
+    libraryPinFor,
+    loadFolder,
     openPhoto as browseOpenPhoto,
     patchPhotoMeta,
     photos,
+    sameFolderPath,
     thumbUrl,
     gridKey,
   } from "../stores/browse";
@@ -36,6 +42,10 @@
   });
 
   const isVideo = $derived($workspace === "video");
+  const libraryPin = $derived(libraryPinFor($folder, $folders));
+  const showingNestedFolder = $derived(
+    Boolean($folder && libraryPin && !sameFolderPath($folder, libraryPin.root)),
+  );
 
   // Window dimensions for responsive boundaries
   let windowWidth = $state(0);
@@ -518,6 +528,23 @@
         </label>
       </div>
 
+      {#if showingNestedFolder && libraryPin && $folder}
+        <div class="all-photos-bar">
+          <button
+            type="button"
+            class="all-photos-chip"
+            title="Show every photo in {libraryPin.name}"
+            onclick={() => void loadFolder(libraryPin.root)}
+          >
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M7.5 2L3.5 6l4 4" />
+            </svg>
+            All photos in {libraryPin.name}
+          </button>
+          <span class="all-photos-here" title={$folder}>{folderLeafName($folder)}</span>
+        </div>
+      {/if}
+
       <!-- Photo Grid -->
       <div class="min-h-0 flex-1 overflow-y-auto px-[18px] pb-[18px] pt-[6px]">
         {#if !$folder}
@@ -541,7 +568,19 @@
         {:else if filteredPhotos.length === 0}
           <!-- Empty state: folder open but no matching photos -->
           <div class="flex h-full flex-col items-center justify-center gap-3 text-center">
-            <p class="text-[13px] font-medium text-subtle">{isVideo ? "No clips found" : "No photos found"}</p>
+            {#if $folderHydrate?.path === $folder && $folderHydrate.status === "importing"}
+              <p class="text-[13px] font-medium text-subtle">
+                {isVideo ? "Importing clips…" : "Importing photos…"}
+              </p>
+              <p class="empty-state text-[11px] text-subtle">
+                This folder is on disk but not in the library yet. Watch the jobs pill for progress.
+              </p>
+            {:else if $folderHydrate?.path === $folder && $folderHydrate.status === "error"}
+              <p class="text-[13px] font-medium text-subtle">{isVideo ? "No clips found" : "No photos found"}</p>
+              <p class="empty-state text-[11px] text-subtle">{$folderHydrate.message}</p>
+            {:else}
+              <p class="text-[13px] font-medium text-subtle">{isVideo ? "No clips found" : "No photos found"}</p>
+            {/if}
             {#if libraryFiltersActive($libraryFilters)}
               <p class="empty-state text-[11px] text-subtle">No results match these filters</p>
               <button
@@ -738,6 +777,41 @@
   .toolbar-btn:active {
     transform: scale(0.96);
     background: var(--color-active);
+  }
+
+  .all-photos-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0 18px 10px;
+    min-width: 0;
+  }
+  .all-photos-chip {
+    appearance: none;
+    border: 1px solid var(--color-border-strong);
+    background: var(--color-hover);
+    color: var(--color-fg);
+    font: inherit;
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 28px;
+    padding: 0 10px;
+    border-radius: 999px;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .all-photos-chip:hover { background: var(--color-active); }
+  .all-photos-here {
+    color: var(--color-subtle);
+    font-size: 12px;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   /* ── Sort Menu ────────────────────────────────────────── */

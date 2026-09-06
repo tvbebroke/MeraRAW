@@ -162,6 +162,10 @@ export function handleGlobalShortcut(e: KeyboardEvent): void {
       leaveCropTool();
       return;
     }
+    if (isEditorRoute()) {
+      safePush(libraryRoute());
+      return;
+    }
     return;
   }
 

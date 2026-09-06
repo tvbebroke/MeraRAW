@@ -116,7 +116,10 @@ impl Engine {
                 !cat.is_current(&p.to_string_lossy(), m)
             })
             .collect();
-        cat.remember_folder(&root_key)?;
+        let existing_pins = cat.folders()?;
+        if crate::catalog::should_remember_import_root(&existing_pins, &root_key) {
+            cat.remember_folder(&root_key)?;
+        }
         let total = todo.len() as u64;
         let import_id = self.generation.wrapping_add(1000) + total;
         self.import_state = Some(ImportState {

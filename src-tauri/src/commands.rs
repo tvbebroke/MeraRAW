@@ -824,7 +824,7 @@ pub async fn list_folder_children(
     if !path.is_dir() {
         return Err(AppError::InvalidOp("not a folder".into()));
     }
-    tokio::task::spawn_blocking(move || meratech_core::catalog::list_folder_children(&path))
+    tokio::task::spawn_blocking(move || meratech_core::catalog::list_library_folder_children(&path))
         .await
         .map_err(|e| AppError::Internal(format!("list children join: {e}")))?
         .map_err(AppError::from)

@@ -7,6 +7,7 @@ use crate::error::CoreError;
 use crate::raw::{Decoder, ImageMeta, RawlerDecoder};
 use crate::sidecar;
 use rusqlite::Connection;
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 pub const CATALOG_SCHEMA_VERSION: i64 = 2;
@@ -73,7 +74,7 @@ pub struct DiscoveredFolder {
     pub video_count: i64,
 }
 
-#[derive(Debug, Clone, serde::Serialize)]
+#[derive(Debug, Clone, Default, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FolderChild {
     pub name: String,
@@ -81,6 +82,10 @@ pub struct FolderChild {
     pub is_dir: bool,
     /// `"photo"` or `"video"` for files; `None` for directories.
     pub kind: Option<String>,
+    /// Direct stills in this directory (0 for files).
+    pub photo_count: i64,
+    /// Direct clips in this directory (0 for files).
+    pub video_count: i64,
 }
 
 #[derive(Debug, Clone, serde::Serialize)]
@@ -230,6 +235,63 @@ fn path_under_root_patterns(root: &str) -> (String, String, String) {
     (root, like_fwd, like_back)
 }
 
+/// Path segments with Windows/`\\?\` noise and macOS `/private` stripped.
+fn normalized_path_components(path: &str) -> Vec<String> {
+    let simple = crate::path_safety::simplify_path_str(path);
+    let trimmed = trim_path_root(&simple);
+    let stripped = trimmed.strip_prefix("/private").unwrap_or(trimmed);
+    stripped
+        .split(['/', '\\'])
+        .filter(|c| !c.is_empty())
+        .map(|c| c.to_string())
+        .collect()
+}
+
+/// First path segment of `path` beneath `root` (`Alaska/Aug 5` → `Aug 5`).
+/// `None` when `path` is the root itself or lives somewhere else.
+pub fn first_rel_segment(root: &str, path: &str) -> Option<String> {
+    let root_parts = normalized_path_components(root);
+    let path_parts = normalized_path_components(path);
+    if root_parts.is_empty() || path_parts.len() <= root_parts.len() {
+        return None;
+    }
+    let under = root_parts
+        .iter()
+        .zip(path_parts.iter())
+        .all(|(a, b)| a.eq_ignore_ascii_case(b));
+    if !under {
+        return None;
+    }
+    Some(path_parts[root_parts.len()].clone())
+}
+
+/// True when `path` is a descendant of `root` (not the same folder).
+pub fn path_is_strictly_under(path: &str, root: &str) -> bool {
+    first_rel_segment(root, path).is_some()
+}
+
+/// Same folder after slash / `/private` / verbatim-prefix normalization.
+fn folder_matches_root(root: &str, folder: &str) -> bool {
+    let a = normalized_path_components(root);
+    let b = normalized_path_components(folder);
+    a.len() == b.len()
+        && !a.is_empty()
+        && a.iter()
+            .zip(b.iter())
+            .all(|(l, r)| l.eq_ignore_ascii_case(r))
+}
+
+fn folder_keys_equal(a: &str, b: &str) -> bool {
+    folder_matches_root(a, b)
+}
+
+/// Pin the import root only when it is not already inside another shortcut.
+pub fn should_remember_import_root(existing: &[String], root: &str) -> bool {
+    !existing
+        .iter()
+        .any(|pinned| path_is_strictly_under(root, pinned))
+}
+
 /// Query roots that may appear in the DB for the same folder.
 /// Covers picker paths, `\\?\` canonicalize leftovers, and mixed separators.
 fn folder_root_variants(root: &str) -> Vec<String> {
@@ -257,6 +319,13 @@ fn folder_root_variants(root: &str) -> Vec<String> {
     let raw = trim_path_root(root).to_string();
     if !raw.is_empty() && !out.iter().any(|x| x == &raw) {
         out.push(raw);
+    }
+    if let Ok(canon) = Path::new(&simple).canonicalize() {
+        let c = crate::path_safety::simplify_path_str(&canon.to_string_lossy());
+        let c = trim_path_root(&c).to_string();
+        if !c.is_empty() && !out.iter().any(|x| x == &c) {
+            out.push(c);
+        }
     }
     out
 }
@@ -502,6 +571,98 @@ impl Catalog {
             });
         }
         Ok(out)
+    }
+
+    /// Fold catalog rows into a live folder listing so nested days show
+    /// counts (and appear at all) even when the filesystem probe misses them.
+    pub fn merge_folder_children(
+        &self,
+        dir: &Path,
+        kids: &mut Vec<FolderChild>,
+    ) -> Result<(), CoreError> {
+        let root = crate::path_safety::simplify_path_str(&dir.to_string_lossy());
+        if root.is_empty() {
+            return Ok(());
+        }
+        let display_root = trim_path_root(&root);
+        let (clause, params) = sql_under_folder(&root);
+        let video_pred = sql_video_filename_pred();
+        let sql = format!(
+            "SELECT path, folder, filename,
+                    CASE WHEN {video_pred} THEN 1 ELSE 0 END
+             FROM assets WHERE {clause}"
+        );
+        let mut stmt = self.conn.prepare(&sql).map_err(db_err)?;
+        let rows = stmt
+            .query_map(rusqlite::params_from_iter(params.iter()), |r| {
+                Ok((
+                    r.get::<_, String>(0)?,
+                    r.get::<_, String>(1)?,
+                    r.get::<_, String>(2)?,
+                    r.get::<_, i64>(3)? != 0,
+                ))
+            })
+            .map_err(db_err)?;
+
+        let mut child_counts: HashMap<String, (i64, i64)> = HashMap::new();
+        let mut files_here: Vec<(String, String, bool)> = Vec::new();
+        for row in rows.flatten() {
+            let (path, folder, filename, is_video) = row;
+            if let Some(seg) = first_rel_segment(&root, &folder) {
+                let child_path = format!("{display_root}/{seg}");
+                let entry = child_counts.entry(child_path).or_insert((0, 0));
+                if is_video {
+                    entry.1 += 1;
+                } else {
+                    entry.0 += 1;
+                }
+            } else if folder_matches_root(&root, &folder) {
+                files_here.push((path, filename, is_video));
+            }
+        }
+
+        for (child_path, (photos, videos)) in child_counts {
+            if let Some(existing) = kids
+                .iter_mut()
+                .find(|k| k.is_dir && folder_keys_equal(&k.path, &child_path))
+            {
+                existing.photo_count = existing.photo_count.max(photos);
+                existing.video_count = existing.video_count.max(videos);
+            } else {
+                let name = Path::new(&child_path)
+                    .file_name()
+                    .map(|s| s.to_string_lossy().into_owned())
+                    .filter(|s| !s.is_empty())
+                    .unwrap_or_else(|| child_path.clone());
+                kids.push(FolderChild {
+                    name,
+                    path: child_path,
+                    is_dir: true,
+                    kind: None,
+                    photo_count: photos,
+                    video_count: videos,
+                });
+            }
+        }
+
+        for (path, filename, is_video) in files_here {
+            if kids
+                .iter()
+                .any(|k| !k.is_dir && folder_keys_equal(&k.path, &path))
+            {
+                continue;
+            }
+            kids.push(FolderChild {
+                name: filename,
+                path,
+                is_dir: false,
+                kind: Some(if is_video { "video" } else { "photo" }.into()),
+                photo_count: 0,
+                video_count: 0,
+            });
+        }
+        sort_folder_children(kids);
+        Ok(())
     }
 
     /// Roots recorded in folders.json (survives DB deletion).
@@ -1268,6 +1429,47 @@ pub fn discover_media_folders_in(
     found
 }
 
+fn count_direct_media(
+    dir: &Path,
+    raw: &RawlerDecoder,
+    std: &crate::raw::StandardDecoder,
+) -> (i64, i64) {
+    let Ok(rd) = std::fs::read_dir(dir) else {
+        return (0, 0);
+    };
+    let mut photos = 0i64;
+    let mut videos = 0i64;
+    for entry in rd.flatten() {
+        let p = crate::path_safety::simplify_path(entry.path());
+        let name = p
+            .file_name()
+            .map(|n| n.to_string_lossy().into_owned())
+            .unwrap_or_default();
+        if name.starts_with('.') || p.is_dir() {
+            continue;
+        }
+        match file_media_kind(&p, raw, std) {
+            Some("video") => videos += 1,
+            Some(_) => photos += 1,
+            None => {}
+        }
+    }
+    (photos, videos)
+}
+
+fn sort_folder_children(kids: &mut Vec<FolderChild>) {
+    kids.sort_by(|a, b| {
+        b.is_dir
+            .cmp(&a.is_dir)
+            .then_with(|| {
+                a.name
+                    .to_ascii_lowercase()
+                    .cmp(&b.name.to_ascii_lowercase())
+            })
+            .then_with(|| a.path.cmp(&b.path))
+    });
+}
+
 /// Immediate children of a folder: subfolders (not skipped) then valid media files.
 pub fn list_folder_children(dir: &Path) -> Result<Vec<FolderChild>, CoreError> {
     let dir = crate::path_safety::simplify_path(dir.to_path_buf());
@@ -1300,11 +1502,14 @@ pub fn list_folder_children(dir: &Path) -> Result<Vec<FolderChild>, CoreError> {
             if skip_dir_name(&name) {
                 continue;
             }
+            let (photo_count, video_count) = count_direct_media(&p, &raw, &std);
             folders.push(FolderChild {
                 name,
                 path: crate::path_safety::simplify_path_str(&p.to_string_lossy()),
                 is_dir: true,
                 kind: None,
+                photo_count,
+                video_count,
             });
         } else if let Some(kind) = file_media_kind(&p, &raw, &std) {
             files.push(FolderChild {
@@ -1312,19 +1517,29 @@ pub fn list_folder_children(dir: &Path) -> Result<Vec<FolderChild>, CoreError> {
                 path: crate::path_safety::simplify_path_str(&p.to_string_lossy()),
                 is_dir: false,
                 kind: Some(kind.to_string()),
+                photo_count: 0,
+                video_count: 0,
             });
         }
     }
-    let by_name = |a: &FolderChild, b: &FolderChild| {
-        a.name
-            .to_ascii_lowercase()
-            .cmp(&b.name.to_ascii_lowercase())
-            .then_with(|| a.path.cmp(&b.path))
-    };
-    folders.sort_by(by_name);
-    files.sort_by(by_name);
     folders.extend(files);
+    sort_folder_children(&mut folders);
     Ok(folders)
+}
+
+/// Filesystem children plus catalog nested folders/files for the library tree.
+pub fn list_library_folder_children(dir: &Path) -> Result<Vec<FolderChild>, CoreError> {
+    let fs = list_folder_children(dir);
+    let mut kids = fs.as_ref().ok().cloned().unwrap_or_default();
+    match Catalog::open_default() {
+        Ok(cat) => cat.merge_folder_children(dir, &mut kids)?,
+        Err(_) => return fs,
+    }
+    if kids.is_empty() {
+        return fs;
+    }
+    sort_folder_children(&mut kids);
+    Ok(kids)
 }
 
 /// Process one file: metadata + sidecar + previews + cull signals.
@@ -1672,7 +1887,8 @@ mod tests {
         let kids = super::list_folder_children(&dir).unwrap();
         std::fs::remove_dir_all(&dir).ok();
         assert!(
-            kids.iter().any(|c| c.is_dir && c.name == "day1"),
+            kids.iter()
+                .any(|c| c.is_dir && c.name == "day1" && c.photo_count == 1),
             "{kids:?}"
         );
         assert!(
@@ -1687,6 +1903,69 @@ mod tests {
         );
         assert!(!kids.iter().any(|c| c.name == "notes.txt"), "{kids:?}");
         assert!(!kids.iter().any(|c| c.name == "IMG_2.ARW"), "{kids:?}");
+    }
+
+    #[test]
+    fn first_rel_segment_and_remember_nested_pins() {
+        assert_eq!(
+            super::first_rel_segment("/photos/Alaska", "/photos/Alaska/Aug 5"),
+            Some("Aug 5".into())
+        );
+        assert_eq!(
+            super::first_rel_segment("/photos/Alaska", "/photos/Alaska/Aug 5/nested"),
+            Some("Aug 5".into())
+        );
+        assert_eq!(
+            super::first_rel_segment("/photos/Alaska", "/photos/Alaska"),
+            None
+        );
+        assert_eq!(
+            super::first_rel_segment("/photos/Alaska", "/photos/other/Aug 5"),
+            None
+        );
+        assert_eq!(
+            super::first_rel_segment("/private/tmp/Alaska", "/tmp/Alaska/Aug 6"),
+            Some("Aug 6".into())
+        );
+        assert!(super::should_remember_import_root(&[], "/photos/Alaska"));
+        assert!(!super::should_remember_import_root(
+            &["/photos/Alaska".into()],
+            "/photos/Alaska/Aug 5"
+        ));
+        assert!(super::should_remember_import_root(
+            &["/photos/Alaska/Aug 10".into()],
+            "/photos/Alaska"
+        ));
+    }
+
+    #[test]
+    fn merge_folder_children_adds_nested_days_from_catalog() {
+        let (mut cat, dir) = tmp_cat("merge-children");
+        let root = dir.join("Alaska").to_string_lossy().into_owned();
+        let day = format!("{root}/Aug 5");
+        let still = format!("{day}/IMG_0001.JPG");
+        cat.upsert_asset(
+            &still,
+            &day,
+            "h",
+            100,
+            0,
+            &meta_stub(&still),
+            None,
+            false,
+            None,
+            None,
+        )
+        .unwrap();
+        let mut kids = Vec::new();
+        cat.merge_folder_children(std::path::Path::new(&root), &mut kids)
+            .unwrap();
+        std::fs::remove_dir_all(&dir).ok();
+        assert!(
+            kids.iter()
+                .any(|c| c.is_dir && c.name == "Aug 5" && c.photo_count == 1),
+            "{kids:?}"
+        );
     }
 
     #[test]

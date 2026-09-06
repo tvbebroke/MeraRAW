@@ -188,6 +188,11 @@
             path={child.path}
             isDir={true}
             depth={depth + 1}
+            count={
+              section === "video"
+                ? child.videoCount || null
+                : child.photoCount || child.videoCount || null
+            }
             {selectOnClick}
             {section}
             {activePath}

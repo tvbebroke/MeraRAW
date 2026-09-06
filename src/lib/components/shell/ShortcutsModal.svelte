@@ -17,6 +17,7 @@
       items: [
         { label: "Photo Editor / Video Editor", key: "Title bar" },
         { label: "Go to Library / Clips", key: shortcutLabels.library },
+        { label: "Back to Library from a photo", key: "Esc" },
         { label: "Go to Editor / Grade", key: shortcutLabels.edit },
         { label: "Toggle Left Sidebar", key: shortcutLabels.sidebar },
         { label: "Toggle Details Panel (Library)", key: shortcutLabels.details },

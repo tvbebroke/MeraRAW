@@ -4,7 +4,10 @@ import {
   folderSections,
   gridKey,
   gridQueryFromState,
+  folderLeafName,
   isLibraryFileRoot,
+  isNestedFolderShortcut,
+  libraryPinFor,
   isPathInFolder,
   libraryFiltersActive,
   sameFolderPath,
@@ -74,6 +77,42 @@ describe("isPathInFolder", () => {
     expect(isPathInFolder("/Users/kai/photos/day1", "/Users/kai/photos")).toBe(true);
     expect(isPathInFolder("/Users/kai/photos", "/Users/kai/photos")).toBe(true);
     expect(isPathInFolder("/Users/kai/photos-backup/day1", "/Users/kai/photos")).toBe(false);
+  });
+});
+
+describe("libraryPinFor", () => {
+  it("sends a nested day folder back to the parent pin", () => {
+    const alaska = folder({ root: "/photos/Alaska", name: "Alaska" });
+    const aug10 = folder({ root: "/photos/Alaska/Aug 10", name: "Aug 10" });
+    expect(libraryPinFor("/photos/Alaska/alaska aug 5", [alaska, aug10])).toEqual({
+      root: "/photos/Alaska",
+      name: "Alaska",
+    });
+    expect(libraryPinFor("/photos/Alaska/Aug 10", [alaska, aug10])).toEqual({
+      root: "/photos/Alaska",
+      name: "Alaska",
+    });
+    expect(libraryPinFor("/photos/Alaska", [alaska, aug10])).toEqual({
+      root: "/photos/Alaska",
+      name: "Alaska",
+    });
+  });
+});
+
+describe("folderLeafName", () => {
+  it("uses the last path component", () => {
+    expect(folderLeafName("/photos/Alaska/alaska aug 5")).toBe("alaska aug 5");
+  });
+});
+
+describe("isNestedFolderShortcut", () => {
+  it("hides a day folder that already lives under a parent pin", () => {
+    const alaska = folder({ root: "/photos/Alaska", name: "Alaska" });
+    const aug10 = folder({ root: "/photos/Alaska/Aug 10", name: "Aug 10" });
+    const downloads = folder({ root: "/Downloads", name: "Downloads" });
+    expect(isNestedFolderShortcut(aug10, [alaska, aug10, downloads])).toBe(true);
+    expect(isNestedFolderShortcut(alaska, [alaska, aug10, downloads])).toBe(false);
+    expect(isNestedFolderShortcut(downloads, [alaska, aug10, downloads])).toBe(false);
   });
 });
 

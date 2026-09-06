@@ -4,7 +4,6 @@
   import { router, push } from "svelte-spa-router";
   import IconButton from "../primitives/IconButton.svelte";
   import settingsIcon from "../../icons/settings.svg";
-  import libraryIcon from "../../icons/library.svg";
   import helpIcon from "../../icons/help.svg";
   import { isSettingsOpen, isExportOpen, isShortcutsOpen } from "../../../stores/ui";
   import JobsPill from "./JobsPill.svelte";
@@ -14,11 +13,20 @@
   import { openPath } from "../../engine/boot";
   import { shortcutLabels } from "../../shortcuts";
   import { lastOpenedPath, imageMeta } from "../../../stores/app";
-  import { folder, folders, activePhoto } from "../../../stores/browse";
+  import {
+    folder,
+    folders,
+    activePhoto,
+    folderLeafName,
+    libraryPinFor,
+    loadFolder,
+    sameFolderPath,
+  } from "../../../stores/browse";
   import { undo, redo } from "../../../ipc/commands";
   import { reconcile } from "../../../stores/doc";
   import {
     isLibraryRoute,
+    libraryRoute,
     setWorkspace,
     workspace,
   } from "../../../stores/workspace";
@@ -72,12 +80,19 @@
     return parts.at(-1) ?? path;
   }
 
-  const folderName = $derived(
-    $folders.find((f) => f.root === $folder)?.name || basename($folder) || "",
+  const pin = $derived(libraryPinFor($folder, $folders));
+  const nested = $derived(
+    Boolean($folder && pin && !sameFolderPath($folder, pin.root)),
   );
+  const dayName = $derived($folder ? folderLeafName($folder) : "");
   const fileName = $derived(
     $activePhoto?.filename || basename($imageMeta?.path) || basename($lastOpenedPath),
   );
+
+  function goToLibrary(root?: string | null) {
+    if (root) void loadFolder(root);
+    safePush(libraryRoute());
+  }
 
   function beginDrag(e: MouseEvent) {
     if (e.button !== 0) return;
@@ -112,12 +127,42 @@
       title="Video editor coming soon"
     >Coming soon</button>
   </div>
-  {#if folderName || fileName}
-    <span class="crumb-sep" data-tauri-drag-region aria-hidden="true">/</span>
-    {#if folderName}
-      <span class="crumb-muted truncate max-w-[10rem]" data-tauri-drag-region title={$folder ?? ""}>{folderName}</span>
+  {#if pin || $folder || fileName}
+    {#if pin}
+      <span class="crumb-sep" data-tauri-drag-region aria-hidden="true">/</span>
+      {#if isLibrary && !nested}
+        <span class="crumb-file truncate max-w-[10rem]" data-tauri-drag-region title={pin.root}>{pin.name}</span>
+      {:else}
+        <button
+          type="button"
+          class="crumb-link truncate max-w-[10rem]"
+          title="All photos in {pin.name}"
+          onclick={() => goToLibrary(pin.root)}
+        >{pin.name}</button>
+      {/if}
+    {:else if $folder}
+      <span class="crumb-sep" data-tauri-drag-region aria-hidden="true">/</span>
+      <button
+        type="button"
+        class="crumb-link truncate max-w-[10rem]"
+        title={$folder}
+        onclick={() => goToLibrary($folder)}
+      >{dayName}</button>
     {/if}
-    {#if fileName}
+    {#if nested && $folder}
+      <span class="crumb-sep" data-tauri-drag-region aria-hidden="true">/</span>
+      {#if isLibrary}
+        <span class="crumb-file truncate max-w-[10rem]" data-tauri-drag-region title={$folder}>{dayName}</span>
+      {:else}
+        <button
+          type="button"
+          class="crumb-link truncate max-w-[10rem]"
+          title="Photos in {dayName}"
+          onclick={() => goToLibrary($folder)}
+        >{dayName}</button>
+      {/if}
+    {/if}
+    {#if fileName && !isLibrary}
       <span class="crumb-sep" data-tauri-drag-region aria-hidden="true">/</span>
       <span class="crumb-file truncate max-w-[16rem]" data-tauri-drag-region title={fileName}>{fileName}</span>
     {/if}
@@ -158,13 +203,14 @@
         {isVideo ? "Grade" : "Edit"}
       </button>
     {:else}
-      <IconButton
-        icon={libraryIcon}
-        label="Library"
-        title={isVideo ? "Clips" : `Library (${shortcutLabels.library})`}
-        iconClass="h-[15px] w-[19px]"
-        onclick={() => safePush(isVideo ? "/clips" : "/library")}
-      />
+      <button
+        type="button"
+        class="quiet-btn"
+        title={nested && pin ? `All photos in ${pin.name}` : isVideo ? "Clips (G)" : `Library (${shortcutLabels.library})`}
+        onclick={() => goToLibrary(nested && pin ? pin.root : null)}
+      >
+        {nested ? "All photos" : isVideo ? "Clips" : "Library"}
+      </button>
       <button
         type="button"
         class="export-btn"
@@ -200,9 +246,21 @@
     opacity: 0.55;
     font-size: 13px;
   }
-  .crumb-muted {
+  .crumb-link {
+    appearance: none;
+    border: 0;
+    background: transparent;
+    padding: 0;
+    font: inherit;
     font-size: 13px;
     color: var(--color-subtle);
+    cursor: pointer;
+    max-width: 10rem;
+  }
+  .crumb-link:hover {
+    color: var(--color-fg);
+    text-decoration: underline;
+    text-underline-offset: 2px;
   }
   .crumb-file {
     font-size: 13px;

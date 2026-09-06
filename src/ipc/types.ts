@@ -211,6 +211,8 @@ export interface FolderChild {
   path: string;
   isDir: boolean;
   kind: "photo" | "video" | null;
+  photoCount?: number;
+  videoCount?: number;
 }
 
 export interface GridQuery {

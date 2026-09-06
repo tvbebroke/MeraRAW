@@ -31,6 +31,12 @@ export const folders = atom<FolderItem[]>([]);
 export const photos = atom<GridItem[]>([]);
 export const browseBusy = atom(false);
 
+/** True while an empty folder is being indexed so the grid does not say “none.” */
+export type FolderHydrate =
+  | { path: string; status: "importing" }
+  | { path: string; status: "error"; message: string };
+export const folderHydrate = atom<FolderHydrate | null>(null);
+
 /** Darktable-style collection filters. Catalog `get_grid` is the source of truth. */
 export type LibraryFlag = "any" | "pick" | "reject" | "none";
 
@@ -254,6 +260,48 @@ export function isPathInFolder(path: string, root: string): boolean {
   return b.length > 0 && (a.startsWith(b + "/") || a.startsWith(b + "\\"));
 }
 
+/** Last path component for library chrome (e.g. "alaska aug 5"). */
+export function folderLeafName(path: string): string {
+  const n = path.replace(/\\/g, "/").replace(/\/+$/, "");
+  const i = n.lastIndexOf("/");
+  const leaf = i >= 0 ? n.slice(i + 1) : n;
+  return leaf || path;
+}
+
+/**
+ * Sidebar pin that owns this folder. Nested day folders resolve to the
+ * parent shortcut (Alaska), not a child pin that is hidden in the tree.
+ */
+export function libraryPinFor(
+  path: string | null,
+  pins: readonly Pick<FolderItem, "root" | "name" | "isFile">[],
+): { root: string; name: string } | null {
+  if (!path) return null;
+  const matches = pins.filter(
+    (f) => !isLibraryFileRoot(f) && isPathInFolder(path, f.root),
+  );
+  if (!matches.length) return null;
+  const top = matches.filter((f) => !isNestedFolderShortcut(f, pins));
+  const pool = top.length ? top : matches;
+  pool.sort((a, b) => a.root.length - b.root.length);
+  const pin = pool[0];
+  return { root: pin.root, name: pin.name };
+}
+
+/** Hide a pin that already appears as a child of another sidebar shortcut. */
+export function isNestedFolderShortcut(
+  item: Pick<FolderItem, "root" | "isFile">,
+  all: readonly Pick<FolderItem, "root" | "isFile">[],
+): boolean {
+  if (isLibraryFileRoot(item)) return false;
+  return all.some(
+    (f) =>
+      !isLibraryFileRoot(f) &&
+      !sameFolderPath(f.root, item.root) &&
+      isPathInFolder(item.root, f.root),
+  );
+}
+
 /** Prefer the catalog's remembered root when the picker path differs only by prefix. */
 function resolveCatalogRoot(picked: string, listed: FolderItem[]): string {
   return listed.find((f) => sameFolderPath(f.root, picked))?.root ?? picked;
@@ -306,8 +354,13 @@ export async function refreshFolders(): Promise<void> {
   }
 }
 
-export async function loadFolder(root: string | null): Promise<void> {
+export async function loadFolder(
+  root: string | null,
+  opts?: { resumeImport?: boolean },
+): Promise<void> {
   currentFolder.set(root);
+  const hydrate = folderHydrate.get();
+  if (hydrate && hydrate.path !== root) folderHydrate.set(null);
   browseBusy.set(true);
   try {
     const grid = await getGrid(gridQueryFromState(root, libraryFilters.get()));
@@ -318,6 +371,71 @@ export async function loadFolder(root: string | null): Promise<void> {
     photos.set([]);
   } finally {
     browseBusy.set(false);
+  }
+  const empty = photos.get().length === 0;
+  if (
+    opts?.resumeImport &&
+    root &&
+    empty &&
+    !libraryFiltersActive(libraryFilters.get())
+  ) {
+    folderHydrate.set({ path: root, status: "importing" });
+    void hydrateEmptyFolder(root);
+  }
+}
+
+/** Index a folder the catalog has not seen yet, and keep the grid live. */
+async function hydrateEmptyFolder(root: string): Promise<void> {
+  const query = () => getGrid(gridQueryFromState(root, libraryFilters.get()));
+  const stillHere = () => currentFolder.get() === root;
+  try {
+    let total = 0;
+    try {
+      total = await importFolder(root);
+    } catch (e) {
+      if (!stillHere()) return;
+      folderHydrate.set({
+        path: root,
+        status: "error",
+        message: e instanceof Error ? e.message : "Could not import this folder.",
+      });
+      return;
+    }
+    if (!stillHere()) return;
+    if (total > 0) {
+      const latch = await importDoneLatch();
+      try {
+        await waitForImport(root, total, latch);
+      } finally {
+        latch.cancel();
+      }
+    } else {
+      // Queued behind another import, or scan found nothing — wait briefly.
+      for (let i = 0; i < 40; i++) {
+        if (!stillHere()) return;
+        const grid = await query();
+        if (grid.length > 0) {
+          photos.set(grid);
+          break;
+        }
+        await new Promise((r) => setTimeout(r, 250));
+      }
+    }
+    if (!stillHere()) return;
+    await refreshFolders();
+    photos.set(await query());
+    folderHydrate.set(null);
+  } catch (e) {
+    if (!stillHere()) return;
+    folderHydrate.set({
+      path: root,
+      status: "error",
+      message: e instanceof Error ? e.message : "Could not import this folder.",
+    });
+  } finally {
+    if (stillHere() && folderHydrate.get()?.status === "importing") {
+      folderHydrate.set(null);
+    }
   }
 }
 
