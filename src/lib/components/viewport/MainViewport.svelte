@@ -23,6 +23,7 @@
     containRect,
     contentDims,
     contentNormToImageNorm,
+    imageNormToContentNorm,
     cropModeFor,
     readCropFromDoc,
   } from "../../../crop/cropMath";
@@ -515,8 +516,14 @@
     const mode = cropModeFor(crop, cropActive.get());
     const [cw, ch] = contentDims(crop, dims.w, dims.h, mode);
     const dpr = window.devicePixelRatio;
-    const nx = ix;
-    const ny = iy;
+    let nx = ix;
+    let ny = iy;
+    if (mode !== 0) {
+      const mapped = imageNormToContentNorm(ix, iy, crop, dims.w, dims.h, mode);
+      if (!mapped) return null;
+      nx = mapped[0];
+      ny = mapped[1];
+    }
     return {
       x: imgBox.left + imgBox.width / 2 + ((nx - view.centerX) * cw * effScale) / dpr,
       y: imgBox.top + imgBox.height / 2 + ((ny - view.centerY) * ch * effScale) / dpr,

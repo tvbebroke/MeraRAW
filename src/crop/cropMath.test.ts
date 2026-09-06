@@ -10,6 +10,7 @@ import {
   constrainRectToImage,
   contentDims,
   contentNormToImageNorm,
+  imageNormToContentNorm,
   cropModeFor,
   cropParamsEqual,
   cropWithDraft,
@@ -262,6 +263,36 @@ describe("rect editing invariants (P0 regression net)", () => {
     // blank corners return null under rotation
     const p3 = { ...baseParams, angle: 20 };
     expect(contentNormToImageNorm(0.001, 0.001, p3, 6000, 4000, 2)).toBeNull();
+  });
+
+  it("imageNormToContentNorm inverts contentNormToImageNorm", () => {
+    const cases: CropParams[] = [
+      { ...baseParams, rect: { left: 0.2, top: 0.1, right: 0.9, bottom: 0.8 } },
+      { ...baseParams, rotate90: 1 },
+      { ...baseParams, rotate90: 3, flipH: true },
+      { ...baseParams, angle: 12 },
+      { ...baseParams, perspVertical: 20, perspHorizontal: -15 },
+    ];
+    for (const p of cases) {
+      const mode = cropModeFor(p, false) === 0 ? 2 : cropModeFor(p, false);
+      const mid = contentNormToImageNorm(0.4, 0.6, p, 6000, 4000, mode);
+      if (!mid) continue;
+      const back = imageNormToContentNorm(mid[0], mid[1], p, 6000, 4000, mode);
+      expect(back).not.toBeNull();
+      expect(back![0]).toBeCloseTo(0.4, 4);
+      expect(back![1]).toBeCloseTo(0.6, 4);
+    }
+  });
+
+  it("places a mask point through a committed crop, not at the crop center", () => {
+    const p = {
+      ...baseParams,
+      rect: { left: 0.25, top: 0, right: 1, bottom: 1 },
+    };
+    const c = imageNormToContentNorm(0.5, 0.5, p, 6000, 4000, 1);
+    expect(c).not.toBeNull();
+    expect(c![0]).toBeCloseTo((0.5 - 0.25) / 0.75, 5);
+    expect(c![1]).toBeCloseTo(0.5, 5);
   });
 
   it("readCropFromDoc round-trips defaults", () => {

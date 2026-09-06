@@ -332,6 +332,28 @@ export function invPerspective(
   return [x, y];
 }
 
+/** Forward keystone — inverse of invPerspective. */
+export function fwdPerspective(
+  nx: number,
+  ny: number,
+  perspV: number,
+  perspH: number,
+): [number, number] {
+  let x = nx;
+  let y = ny;
+  const v = perspV / 100;
+  const h = perspH / 100;
+  if (Math.abs(h) > 1e-5) {
+    const sy = Math.max(1 + h * (1 - 2 * x), 0.05);
+    y = 0.5 + (y - 0.5) * sy;
+  }
+  if (Math.abs(v) > 1e-5) {
+    const sx = Math.max(1 + v * (1 - 2 * y), 0.05);
+    x = 0.5 + (x - 0.5) * sx;
+  }
+  return [x, y];
+}
+
 /** Extract crop mode: 0 = none, 1 = committed crop, 2 = geometry-only preview. */
 export function cropModeFor(p: CropParams, cropActive: boolean): 0 | 1 | 2 {
   if (!cropActive && !isDefaultCrop(p)) return 1;
@@ -543,6 +565,45 @@ export function contentNormToImageNorm(
   else if (p.rotate90 === 1) [ux, uy] = [uy, 1 - ux];
   if (ux < 0 || ux > 1 || uy < 0 || uy > 1) return null;
   return [ux, uy];
+}
+
+/**
+ * Inverse of contentNormToImageNorm: original-image (mask) coords →
+ * CONTENT-normalized coords (what the viewport and overlay draw in).
+ */
+export function imageNormToContentNorm(
+  ix: number,
+  iy: number,
+  p: CropParams,
+  imgW: number,
+  imgH: number,
+  mode: 0 | 1 | 2,
+): [number, number] | null {
+  if (ix < 0 || ix > 1 || iy < 0 || iy > 1) return null;
+  if (mode === 0) return [ix, iy];
+  let ux = ix;
+  let uy = iy;
+  // inverse of contentNormToImageNorm's discrete undo
+  if (p.rotate90 === 1) [ux, uy] = [1 - uy, ux];
+  else if (p.rotate90 === 2) [ux, uy] = [1 - ux, 1 - uy];
+  else if (p.rotate90 === 3) [ux, uy] = [uy, 1 - ux];
+  if (p.flipH) ux = 1 - ux;
+  if (p.flipV) uy = 1 - uy;
+  const [rw, rh] = rotatedDims(p, imgW, imgH);
+  const t = (p.angle * Math.PI) / 180;
+  const c = Math.cos(t);
+  const s = Math.sin(t);
+  const px = (ux - 0.5) * rw;
+  const py = (uy - 0.5) * rh;
+  let rx = (px * c - py * s) / rw + 0.5;
+  let ry = (px * s + py * c) / rh + 0.5;
+  [rx, ry] = fwdPerspective(rx, ry, p.perspVertical, p.perspHorizontal);
+  if (mode === 1) {
+    const bw = Math.max(p.rect.right - p.rect.left, 0.01);
+    const bh = Math.max(p.rect.bottom - p.rect.top, 0.01);
+    return [(rx - p.rect.left) / bw, (ry - p.rect.top) / bh];
+  }
+  return [rx, ry];
 }
 
 /** Internal — only `cropModeFor` needs this; not part of the module's API. */
