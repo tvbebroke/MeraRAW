@@ -70,6 +70,8 @@ function stateFor(path: string): SendState {
 }
 
 function targetPath(path: string): string {
+  // Crop is a master-frame op. Never write straighten / perspective onto a mask.
+  if (path.startsWith("crop.")) return path;
   const mask = selectedMask.get();
   return mask ? `mask.${mask}.${path}` : path;
 }

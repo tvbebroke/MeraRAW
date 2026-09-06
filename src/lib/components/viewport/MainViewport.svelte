@@ -20,6 +20,7 @@
   import CropOverlay from "../../../crop/CropOverlay.svelte";
   import VideoScrubber from "./VideoScrubber.svelte";
   import {
+    containRect,
     contentDims,
     contentNormToImageNorm,
     cropModeFor,
@@ -358,6 +359,13 @@
       imgBox = null;
       return;
     }
+    // Engine frames are wrap-sized with letterbox around the photo. Size the
+    // crop overlay to the contained photo, not the workspace.
+    const content = viewContentDims();
+    if (cropActive.get() && content && wrap.clientWidth >= 8 && wrap.clientHeight >= 8) {
+      imgBox = containRect(wrap.clientWidth, wrap.clientHeight, content.w, content.h);
+      return;
+    }
     const wr = wrap.getBoundingClientRect();
     const ir = img.getBoundingClientRect();
     imgBox = {
@@ -371,6 +379,9 @@
   $effect(() => {
     const wrap = wrapEl;
     const src = viewportSrc;
+    const _cropOn = $cropActive;
+    const _dims = $imageDims;
+    const _modules = $doc?.modules?.crop;
     if (!wrap || !src) {
       imgBox = null;
       return;
@@ -486,7 +497,7 @@
       inFlight = false;
       if (pending) {
         pending = false;
-        void refresh();
+        void refresh(forceNext);
       }
     }
   }
@@ -670,6 +681,7 @@
   function onWheel(e: WheelEvent) {
     if (!imageOpen.get() || !imageDims.get()) return;
     e.preventDefault();
+    if (cropActive.get()) return;
     const factor = Math.exp(-e.deltaY * 0.0015);
     view.scale = Math.min(8, Math.max(0.02, effScale * factor));
     void refresh();
@@ -1097,6 +1109,7 @@
     const nonce = $viewCmdNonce;
     if (nonce === 0 || !imageOpen.get()) return;
     const cmd = viewCmd.get();
+    if (cropActive.get() && cmd !== "fit") return;
     if (cmd === "fit") view = { scale: null, centerX: 0.5, centerY: 0.5 };
     else if (cmd === "oneToOne") view.scale = 1;
     else if (cmd === "zoomIn")
@@ -1221,8 +1234,8 @@
       </div>
     {/if}
 
-    {#if $cropActive && displaySrc && !isVideoWs}
-      <CropOverlay {wrapEl} />
+    {#if $cropActive && displaySrc && !isVideoWs && imgBox}
+      <CropOverlay photoBox={imgBox} />
     {/if}
 
     {#if displaySrc && $selectedMask && selectedMaskEnabled && !isVideoWs}

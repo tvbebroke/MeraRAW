@@ -1,49 +1,73 @@
 <script lang="ts">
-  import CollapsibleSection from "./CollapsibleSection.svelte";
   import ParamRow from "./ParamRow.svelte";
   import { applyCropParams, resetCropModule } from "../../../crop/cropActions";
-  import { readCropFromDoc, type CropParams } from "../../../crop/cropMath";
+  import {
+    applyAspectPreset,
+    cropWithDraft,
+    flipCropOrientation,
+    type CropParams,
+  } from "../../../crop/cropMath";
+  import { cropDraft, setCropDraft } from "../../../crop/cropSession";
   import { doc, reconcile } from "../../../stores/doc";
+  import { imageDims } from "../../../stores/app";
   import { autoLevel } from "../../../ipc/commands";
+  import { leaveCropTool } from "../../editor/focus";
 
-  const crop = $derived(readCropFromDoc($doc?.modules));
+  const crop = $derived(cropWithDraft($doc?.modules, $cropDraft));
+  const dims = $derived($imageDims);
 
-  const aspectRatios: { id: string; label: string; w: number; h: number }[] = [
+  const labeledRatios = [
     { id: "free", label: "Free", w: 0, h: 0 },
     { id: "original", label: "Original", w: 0, h: 0 },
     { id: "1:1", label: "1:1", w: 1, h: 1 },
-    { id: "16:9", label: "16:9", w: 16, h: 9 },
+    { id: "2:3", label: "2:3", w: 2, h: 3 },
+    { id: "4:5", label: "4:5", w: 4, h: 5 },
     { id: "4:3", label: "4:3", w: 4, h: 3 },
     { id: "5:7", label: "5:7", w: 5, h: 7 },
+    { id: "16:9", label: "16:9", w: 16, h: 9 },
   ];
 
-  let activeRatio = $state("original");
+  const activeRatio = $derived.by(() => {
+    if (!crop.aspectLocked) return "free";
+    if (crop.aspectW <= 0 || crop.aspectH <= 0) return "original";
+    const id = `${crop.aspectW}:${crop.aspectH}`;
+    if (labeledRatios.some((a) => a.id === id)) return id;
+    const flip = `${crop.aspectH}:${crop.aspectW}`;
+    if (labeledRatios.some((a) => a.id === flip)) return flip;
+    return id;
+  });
 
-  async function patch(partial: Partial<CropParams>, live = false) {
+  async function patch(next: CropParams, live = false) {
     try {
-      reconcile(await applyCropParams({ ...crop, ...partial }, live));
+      reconcile(await applyCropParams(next, live));
+      setCropDraft(null);
     } catch {
       /* ignore */
     }
   }
 
-  function setRatio(id: string) {
-    activeRatio = id;
-    const r = aspectRatios.find((a) => a.id === id);
-    if (!r) return;
-    if (id === "free") {
-      void patch({ aspectLocked: false });
-    } else if (id === "original") {
-      void patch({ aspectLocked: true, aspectW: 0, aspectH: 0 });
-    } else {
-      void patch({ aspectLocked: true, aspectW: r.w, aspectH: r.h });
+  function setRatio(preset: (typeof labeledRatios)[number]) {
+    if (!dims) {
+      void patch({
+        ...crop,
+        aspectLocked: preset.id !== "free",
+        aspectW: preset.id === "original" ? 0 : preset.w,
+        aspectH: preset.id === "original" ? 0 : preset.h,
+      });
+      return;
     }
+    void patch(applyAspectPreset(crop, preset, dims.w, dims.h));
+  }
+
+  function flipAspect() {
+    if (!dims) return;
+    void patch(flipCropOrientation(crop, dims.w, dims.h));
   }
 
   async function onAutoLevel() {
     try {
       const deg = await autoLevel();
-      if (deg) void patch({ angle: crop.angle + deg });
+      if (deg) void patch({ ...crop, angle: crop.angle + deg });
     } catch {
       /* ignore */
     }
@@ -51,39 +75,42 @@
 
   async function reset() {
     try {
+      setCropDraft(null);
       reconcile(await resetCropModule());
-      activeRatio = "original";
     } catch {
       /* ignore */
     }
   }
 </script>
 
-<CollapsibleSection id="crop" title="Crop">
+<div class="crop-pane custom-scrollbar">
   <p class="group-label">Aspect</p>
   <div class="grid3">
-    {#each aspectRatios as ratio (ratio.id)}
+    {#each labeledRatios as ratio (ratio.id)}
       <button
         type="button"
         class="rail-chip"
         class:is-active={activeRatio === ratio.id}
-        onclick={() => setRatio(ratio.id)}
+        onclick={() => setRatio(ratio)}
       >
         <span class={/\d/.test(ratio.label) ? "num" : ""}>{ratio.label}</span>
       </button>
     {/each}
   </div>
+  <button type="button" class="rail-btn full" onclick={flipAspect} title="Flip aspect (X)">
+    Flip aspect
+  </button>
 
   <p class="group-label">Transform</p>
-  <ParamRow path="crop.angle" label="Rotate" />
+  <ParamRow path="crop.angle" label="Straighten" />
   <div class="grid2">
-    <button type="button" class="rail-btn" onclick={() => void patch({ flipH: !crop.flipH })}>
+    <button type="button" class="rail-btn" onclick={() => void patch({ ...crop, flipH: !crop.flipH })}>
       Flip Horizontal
     </button>
-    <button type="button" class="rail-btn" onclick={() => void patch({ flipV: !crop.flipV })}>
+    <button type="button" class="rail-btn" onclick={() => void patch({ ...crop, flipV: !crop.flipV })}>
       Flip Vertical
     </button>
-    <button type="button" class="rail-btn" onclick={() => void patch({ rotate90: (crop.rotate90 + 1) % 4 })}>
+    <button type="button" class="rail-btn" onclick={() => void patch({ ...crop, rotate90: (crop.rotate90 + 1) % 4 })}>
       Rotate 90°
     </button>
     <button type="button" class="rail-btn" onclick={() => void onAutoLevel()}>
@@ -98,14 +125,26 @@
   <button
     type="button"
     class="rail-btn full"
-    onclick={() => void patch({ perspVertical: 0, perspHorizontal: 0 })}
+    onclick={() => void patch({ ...crop, perspVertical: 0, perspHorizontal: 0 })}
   >
     Reset Perspective
   </button>
-</CollapsibleSection>
+
+  <button type="button" class="rail-btn done" onclick={() => leaveCropTool()}>
+    Done
+  </button>
+</div>
 
 <style>
+  .crop-pane {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: var(--space-3);
+    padding-bottom: var(--space-4);
+  }
   .grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: var(--space-2); }
   .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-2); }
   .full { width: 100%; margin-top: var(--space-2); }
+  .done { width: 100%; margin-top: var(--space-4); }
 </style>

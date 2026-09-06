@@ -26,7 +26,7 @@
     oninput?: (v: number) => void;
   } = $props();
 
-  let track: HTMLDivElement;
+  let track = $state<HTMLDivElement | null>(null);
   let isHovered = $state(false);
   let isDragging = $state(false);
   let localValue = $state(0);
@@ -51,6 +51,7 @@
   }
 
   function valueFromEvent(e: PointerEvent): number {
+    if (!track) return value;
     const r = track.getBoundingClientRect();
     const f = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width));
     return quantize(min + f * (max - min));
@@ -58,6 +59,8 @@
 
   function onpointerdown(e: PointerEvent) {
     if (disabled || !track) return;
+    e.preventDefault();
+    e.stopPropagation();
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
     isDragging = true;
     const val = valueFromEvent(e);

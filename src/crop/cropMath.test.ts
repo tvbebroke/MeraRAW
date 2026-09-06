@@ -3,13 +3,18 @@
 import { describe, expect, it } from "vitest";
 import type { CropRect } from "./cropConstants";
 import {
+  applyAspectPreset,
   applyAspectToRect,
   clampRect,
+  containRect,
   constrainRectToImage,
   contentDims,
   contentNormToImageNorm,
   cropModeFor,
+  cropParamsEqual,
+  cropWithDraft,
   dragHandle,
+  flipCropOrientation,
   invPerspective,
   isGeometryIdentity,
   maxCenteredRect,
@@ -263,5 +268,86 @@ describe("rect editing invariants (P0 regression net)", () => {
     const p = readCropFromDoc(undefined);
     expect(p.rect).toEqual({ left: 0, top: 0, right: 1, bottom: 1 });
     expect(cropModeFor(p, false)).toBe(0);
+  });
+});
+
+describe("containRect (crop overlay vs letterbox)", () => {
+  it("letterboxes a landscape photo inside a taller workspace", () => {
+    const box = containRect(1000, 800, 6000, 4000);
+    expect(box.width).toBeCloseTo(1000, 5);
+    expect(box.height).toBeCloseTo(1000 * (4000 / 6000), 5);
+    expect(box.left).toBeCloseTo(0, 5);
+    expect(box.top).toBeCloseTo((800 - box.height) / 2, 5);
+    expect(box.top + box.height).toBeLessThan(800);
+  });
+
+  it("pillarboxes a portrait photo inside a wider workspace", () => {
+    const box = containRect(1000, 800, 4000, 6000);
+    expect(box.height).toBeCloseTo(800, 5);
+    expect(box.width).toBeCloseTo(800 * (4000 / 6000), 5);
+    expect(box.top).toBeCloseTo(0, 5);
+    expect(box.left).toBeGreaterThan(0);
+    expect(box.left + box.width).toBeLessThan(1000);
+  });
+});
+
+describe("aspect presets (crop tab)", () => {
+  it("free unlocks without moving the rect", () => {
+    const start = {
+      ...baseParams,
+      aspectLocked: true,
+      aspectW: 1,
+      aspectH: 1,
+      rect: { left: 0.2, top: 0.2, right: 0.8, bottom: 0.8 },
+    };
+    const out = applyAspectPreset(start, { id: "free", w: 0, h: 0 }, 6000, 4000);
+    expect(out.aspectLocked).toBe(false);
+    expect(out.rect).toEqual(start.rect);
+  });
+
+  it("1:1 snaps to a square inside the photo", () => {
+    const out = applyAspectPreset(baseParams, { id: "1:1", w: 1, h: 1 }, 6000, 4000);
+    expect(out.aspectLocked).toBe(true);
+    const w = (out.rect.right - out.rect.left) * 6000;
+    const h = (out.rect.bottom - out.rect.top) * 4000;
+    expect(w / h).toBeCloseTo(1, 3);
+    expect(out.rect.left).toBeGreaterThanOrEqual(0);
+    expect(out.rect.right).toBeLessThanOrEqual(1);
+  });
+
+  it("flip orientation inverts pixel aspect and stays in bounds", () => {
+    const start = applyAspectPreset(baseParams, { id: "16:9", w: 16, h: 9 }, 6000, 4000);
+    const out = flipCropOrientation(start, 6000, 4000);
+    const w = (out.rect.right - out.rect.left) * 6000;
+    const h = (out.rect.bottom - out.rect.top) * 4000;
+    expect(w / h).toBeCloseTo(9 / 16, 3);
+    expect(out.aspectW).toBe(9);
+    expect(out.aspectH).toBe(16);
+    expect(out.rect.left).toBeGreaterThanOrEqual(0);
+    expect(out.rect.top).toBeGreaterThanOrEqual(0);
+    expect(out.rect.right).toBeLessThanOrEqual(1);
+    expect(out.rect.bottom).toBeLessThanOrEqual(1);
+  });
+});
+
+describe("crop draft merge", () => {
+  it("keeps straighten from the doc and the overlay rect", () => {
+    const modules = {
+      crop: { left: 0, top: 0, right: 1, bottom: 1, angle: 4.5 },
+    };
+    const draft = {
+      ...baseParams,
+      rect: { left: 0.2, top: 0.1, right: 0.8, bottom: 0.9 },
+      angle: 0,
+    };
+    const merged = cropWithDraft(modules, draft);
+    expect(merged.angle).toBe(4.5);
+    expect(merged.rect).toEqual(draft.rect);
+    expect(cropParamsEqual(merged, cropWithDraft(modules, null))).toBe(false);
+  });
+
+  it("without a draft equals the doc crop", () => {
+    const modules = { crop: { left: 0.1, top: 0.1, right: 0.9, bottom: 0.9 } };
+    expect(cropWithDraft(modules, null).rect.left).toBeCloseTo(0.1);
   });
 });

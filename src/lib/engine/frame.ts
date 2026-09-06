@@ -1,9 +1,16 @@
 // frame:// transport helpers — shared by the viewport and the selftest rig.
 import { customSchemeUrl } from "./customScheme";
 
+/**
+ * Version lives in the path so WKWebView cannot reuse the first JPEG
+ * (it ignores `current?v=`). `fmt=jpeg` keeps older protocol handlers
+ * serving an image, not raw RGBA.
+ */
 export function frameUrl(version: number, fmt?: "jpeg"): string {
-  const q = fmt === "jpeg" ? "&fmt=jpeg" : "";
-  return customSchemeUrl("frame", `current?v=${version}${q}`);
+  if (fmt === "jpeg") {
+    return customSchemeUrl("frame", `current/${version}.jpg?fmt=jpeg`);
+  }
+  return customSchemeUrl("frame", `current?v=${version}`);
 }
 
 /**

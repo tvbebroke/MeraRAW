@@ -64,7 +64,7 @@ export const imageBrowserCollapsed = atom<boolean>(false);
 export const photoDetailsCollapsed = atom<boolean>(false);
 
 /** Right rail: develop controls vs conversational agent vs local mask edits. */
-export type RightPanelMode = "edit" | "ai" | "mask";
+export type RightPanelMode = "edit" | "crop" | "ai" | "mask";
 export const rightPanelMode = atom<RightPanelMode>("edit");
 
 /** Jump target for shortcuts / command palette. Scrolls that accordion into view. */

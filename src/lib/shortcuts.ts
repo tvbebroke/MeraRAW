@@ -1,9 +1,13 @@
 import { push, router } from "svelte-spa-router";
 import { leftRailCollapsed, isZenMode, imageBrowserCollapsed, photoDetailsCollapsed, commandPaletteOpen, rightPanelMode } from "../stores/editor";
 import { isSettingsOpen, isExportOpen, isBugReportOpen, classicLook, isShortcutsOpen } from "../stores/ui";
-import { applyEditFocus, showAiPanel, showMaskPanel } from "./editor/focus";
+import { applyEditFocus, leaveCropTool, showAiPanel, showMaskPanel } from "./editor/focus";
+import { applyCropParams } from "../crop/cropActions";
+import { cropWithDraft, flipCropOrientation } from "../crop/cropMath";
+import { cropDraft, setCropDraft } from "../crop/cropSession";
+import { cropActive, imageDims, imageMeta, selectedMask, viewportTool, brushRadius } from "../stores/app";
+import { doc, reconcile } from "../stores/doc";
 import { activePhoto, libraryItems, openPhoto, gridKey } from "../stores/browse";
-import { imageMeta, selectedMask, viewportTool, brushRadius } from "../stores/app";
 import { colorPickActive, deselectMask, geomPlacementKind, objectPickActive, stopGeomPlacement, stopInstancePick, endMaskAdjust } from "../stores/mask";
 import { editorRoute, isEditorRoute, isLibraryRoute, libraryRoute, workspace } from "../stores/workspace";
 import { copyGrade, pasteGrade } from "./grade";
@@ -154,6 +158,10 @@ export function handleGlobalShortcut(e: KeyboardEvent): void {
       deselectMask();
       return;
     }
+    if (rightPanelMode.get() === "crop" || cropActive.get()) {
+      leaveCropTool();
+      return;
+    }
     return;
   }
 
@@ -265,6 +273,26 @@ export function handleGlobalShortcut(e: KeyboardEvent): void {
     return;
   }
 
+  // X — Flip crop orientation while the crop tool is open
+  if (key === "x" && (rightPanelMode.get() === "crop" || cropActive.get()) && !isEditVideo()) {
+    const dims = imageDims.get();
+    if (dims) {
+      e.preventDefault();
+      const next = flipCropOrientation(
+        cropWithDraft(doc.get()?.modules, cropDraft.get()),
+        dims.w,
+        dims.h,
+      );
+      void applyCropParams(next)
+        .then((d) => {
+          setCropDraft(null);
+          reconcile(d);
+        })
+        .catch(() => {});
+    }
+    return;
+  }
+
   // 1–5 — Develop sections · 6 — AI agent
   if (key === "1") {
     applyEditFocus("light");
@@ -320,8 +348,12 @@ export function handleGlobalShortcut(e: KeyboardEvent): void {
     return;
   }
 
-  // Enter — Open selected photo in editor (Library)
+  // Enter — Apply crop and return to Edit, or open selected photo in Library
   if (key === "enter") {
+    if ((rightPanelMode.get() === "crop" || cropActive.get()) && isEditorRoute()) {
+      leaveCropTool();
+      return;
+    }
     if (isLibraryRoute() && activePhoto.get()) {
       safePush(editorRoute());
     }

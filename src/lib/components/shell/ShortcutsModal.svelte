@@ -29,7 +29,7 @@
       title: "Tool Switching",
       items: [
         { label: "Focus Light section", key: shortcutLabels.toolEdit },
-        { label: "Focus Crop section (Photo)", key: shortcutLabels.toolCrop },
+        { label: "Crop tab (Photo)", key: shortcutLabels.toolCrop },
         { label: "Focus Mask section (Photo)", key: shortcutLabels.toolMask },
         { label: "Focus Retouch section (Photo)", key: shortcutLabels.toolAi },
         { label: "Focus Presets section", key: shortcutLabels.toolPresets },

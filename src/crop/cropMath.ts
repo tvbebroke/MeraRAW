@@ -49,6 +49,33 @@ export function readCropFromDoc(
   };
 }
 
+/** Overlay owns the rect; straighten / flip / 90° live on the doc. */
+export function cropWithDraft(
+  modules: Record<string, Record<string, unknown>> | undefined,
+  draft: CropParams | null,
+): CropParams {
+  const cur = readCropFromDoc(modules);
+  return draft ? { ...cur, rect: draft.rect } : cur;
+}
+
+export function cropParamsEqual(a: CropParams, b: CropParams, eps = 1e-6): boolean {
+  return (
+    Math.abs(a.rect.left - b.rect.left) < eps &&
+    Math.abs(a.rect.top - b.rect.top) < eps &&
+    Math.abs(a.rect.right - b.rect.right) < eps &&
+    Math.abs(a.rect.bottom - b.rect.bottom) < eps &&
+    Math.abs(a.angle - b.angle) < eps &&
+    a.rotate90 === b.rotate90 &&
+    a.flipH === b.flipH &&
+    a.flipV === b.flipV &&
+    a.aspectLocked === b.aspectLocked &&
+    Math.abs(a.aspectW - b.aspectW) < eps &&
+    Math.abs(a.aspectH - b.aspectH) < eps &&
+    Math.abs(a.perspVertical - b.perspVertical) < 0.05 &&
+    Math.abs(a.perspHorizontal - b.perspHorizontal) < 0.05
+  );
+}
+
 export function cropModulesPatch(p: CropParams): Record<string, number> {
   return {
     "crop.left": p.rect.left,
@@ -119,6 +146,52 @@ export function applyAspectToRect(
     top = r.bottom - newH;
   }
   return clampRect({ left, top, right: left + newW, bottom: top + newH });
+}
+
+export type AspectPreset = { id: string; w: number; h: number };
+
+/** Snap the live crop to a preset ratio (or unlock freeform). Stays in-image. */
+export function applyAspectPreset(
+  p: CropParams,
+  preset: AspectPreset,
+  imgW: number,
+  imgH: number,
+): CropParams {
+  if (preset.id === "free" || (preset.w <= 0 && preset.h <= 0 && preset.id !== "original")) {
+    return { ...p, aspectLocked: false, aspectW: 0, aspectH: 0 };
+  }
+  const [rw, rh] = rotatedDims(p, imgW, imgH);
+  let ratio = rw / Math.max(rh, 1e-6);
+  let aspectW = 0;
+  let aspectH = 0;
+  if (preset.id !== "original" && preset.w > 0 && preset.h > 0) {
+    aspectW = preset.w;
+    aspectH = preset.h;
+    ratio = preset.w / preset.h;
+  }
+  let rect = applyAspectToRect(p.rect, ratio, rw, rh);
+  const next = { ...p, rect, aspectLocked: true, aspectW, aspectH };
+  if (next.constrainCrop && !isGeometryIdentity(next)) {
+    rect = constrainRectToImage(rect, next, imgW, imgH);
+  }
+  return { ...next, rect };
+}
+
+/** Landscape ↔ portrait, Lightroom X. Keeps the crop inside the photo. */
+export function flipCropOrientation(p: CropParams, imgW: number, imgH: number): CropParams {
+  const [rw, rh] = rotatedDims(p, imgW, imgH);
+  const current = aspectRatio(p.rect, rw, rh);
+  const nextRatio = 1 / Math.max(current, 1e-6);
+  let rect = applyAspectToRect(p.rect, nextRatio, rw, rh);
+  const swapped =
+    p.aspectLocked && p.aspectW > 0 && p.aspectH > 0
+      ? { aspectW: p.aspectH, aspectH: p.aspectW }
+      : { aspectW: p.aspectW, aspectH: p.aspectH };
+  const next = { ...p, ...swapped, rect };
+  if (next.constrainCrop && !isGeometryIdentity(next)) {
+    rect = constrainRectToImage(rect, next, imgW, imgH);
+  }
+  return { ...next, rect };
 }
 
 export type HandleId =
@@ -290,6 +363,27 @@ export function contentDims(
   }
   if (mode === 2) return [rw, rh];
   return [imgW, imgH];
+}
+
+/** Axis-aligned object-contain box of `content` inside `box` (CSS px). */
+export function containRect(
+  boxW: number,
+  boxH: number,
+  contentW: number,
+  contentH: number,
+): { left: number; top: number; width: number; height: number } {
+  if (boxW < 1 || boxH < 1 || contentW < 1 || contentH < 1) {
+    return { left: 0, top: 0, width: Math.max(boxW, 0), height: Math.max(boxH, 0) };
+  }
+  const scale = Math.min(boxW / contentW, boxH / contentH);
+  const width = contentW * scale;
+  const height = contentH * scale;
+  return {
+    left: (boxW - width) / 2,
+    top: (boxH - height) / 2,
+    width,
+    height,
+  };
 }
 
 /**

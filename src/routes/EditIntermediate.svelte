@@ -116,7 +116,7 @@
   class="relative h-full w-full min-h-0 min-w-0 overflow-hidden"
 >
   <div
-    class="relative row-span-2 flex h-full min-h-0 min-w-0 flex-col overflow-hidden bg-sidebar border-r border-border {$leftRailCollapsed ? 'pointer-events-none' : ''}"
+    class="relative z-10 row-span-2 flex h-full min-h-0 min-w-0 flex-col overflow-hidden bg-sidebar border-r border-border {$leftRailCollapsed ? 'pointer-events-none' : ''}"
   >
     <FileBrowser class="h-full w-full min-h-0 min-w-0" />
     {#if !$leftRailCollapsed}
@@ -147,7 +147,7 @@
     <MainViewport />
   </div>
 
-  <div class="relative row-span-2 flex h-full min-h-0 min-w-0 flex-col overflow-hidden bg-sidebar border-l border-border {isZen ? 'pointer-events-none' : ''}">
+  <div class="relative z-20 row-span-2 flex h-full min-h-0 min-w-0 flex-col overflow-hidden bg-sidebar border-l border-border {isZen ? 'pointer-events-none' : ''}">
     {#if !isZen}
       <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
       <div

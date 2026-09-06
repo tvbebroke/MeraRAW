@@ -26,7 +26,7 @@
     { id: "curve", group: "Edit", label: "Tone Curve", keywords: "rgb curve", photoOnly: true, run: () => applyEditFocus("curve") },
     { id: "detail", group: "Edit", label: "Adjust Detail", keywords: "sharp sharpen denoise noise", photoOnly: true, run: () => applyEditFocus("detail") },
     { id: "grading", group: "Edit", label: "Color Grading", keywords: "split toning shadows midtones highlights looks", run: () => applyEditFocus("grading") },
-    { id: "crop", group: "Edit", label: "Crop Image", hint: "2", photoOnly: true, run: () => applyEditFocus("crop") },
+    { id: "crop", group: "Edit", label: "Crop tab", hint: "2", photoOnly: true, run: () => applyEditFocus("crop") },
     { id: "mask", group: "Edit", label: "Mask", hint: "3", photoOnly: true, run: () => applyEditFocus("mask") },
     { id: "retouch", group: "Edit", label: "Retouch", hint: "4", keywords: "heal spot object removal", photoOnly: true, run: () => applyEditFocus("retouch") },
     { id: "camera", group: "Edit", label: "Camera", keywords: "profile demosaic lut calibration log", run: () => applyEditFocus("camera") },

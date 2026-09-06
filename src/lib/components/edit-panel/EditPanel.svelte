@@ -3,7 +3,7 @@
   import { cubicOut } from "svelte/easing";
   import { histogramOpen, rightPanelMode } from "../../../stores/editor";
   import { imageOpen } from "../../../stores/app";
-  import { applyTool, showAiPanel, showMaskPanel } from "../../editor/focus";
+  import { applyTool, showAiPanel, showCropPanel, showMaskPanel } from "../../editor/focus";
   import {
     colorPickActive,
     stopGeomPlacement,
@@ -26,7 +26,7 @@
   const isVideo = $derived($workspace === "video");
 
   $effect(() => {
-    if (isVideo && ($rightPanelMode === "ai" || $rightPanelMode === "mask")) {
+    if (isVideo && ($rightPanelMode === "ai" || $rightPanelMode === "mask" || $rightPanelMode === "crop")) {
       rightPanelMode.set("edit");
     }
   });
@@ -58,10 +58,26 @@
       <button
         type="button"
         role="tab"
+        aria-selected={$rightPanelMode === "crop"}
+        class="edit-tab"
+        class:is-active={$rightPanelMode === "crop"}
+        onclick={(e) => {
+          e.stopPropagation();
+          showCropPanel();
+        }}
+      >
+        Crop
+      </button>
+      <button
+        type="button"
+        role="tab"
         aria-selected={$rightPanelMode === "mask"}
         class="edit-tab"
         class:is-active={$rightPanelMode === "mask"}
-        onclick={() => showMaskPanel()}
+        onclick={(e) => {
+          e.stopPropagation();
+          showMaskPanel();
+        }}
       >
         Mask
       </button>
@@ -81,6 +97,30 @@
   {#if $rightPanelMode === "ai"}
     <div class="edit-body" in:fade={{ duration: 160 }}>
       <AgentPanel embedded />
+    </div>
+  {:else if $rightPanelMode === "crop"}
+    <div class="hist-dock">
+      <button
+        type="button"
+        class="group-label hist-toggle"
+        aria-expanded={$histogramOpen}
+        onclick={() => histogramOpen.set(!$histogramOpen)}
+      >
+        <span>Histogram</span>
+        <span class="hist-chevron" class:open={$histogramOpen}>›</span>
+      </button>
+      {#if $histogramOpen}
+        <div class="hist-body" transition:fly={{ y: 6, duration: 180, easing: cubicOut }}>
+          <Histogram embedded />
+        </div>
+      {/if}
+    </div>
+    <div class="edit-body" in:fade={{ duration: 160 }}>
+      {#if !$imageOpen}
+        <p class="rail-empty empty">Open a photo to crop.</p>
+      {:else}
+        <CropSettings />
+      {/if}
     </div>
   {:else if $rightPanelMode === "mask"}
     <div class="edit-body" in:fade={{ duration: 160 }}>
@@ -127,7 +167,6 @@
             <ToneCurve />
             <DetailSettings />
             <GradingSettings />
-            <CropSettings />
             <RetouchSettings />
             <CameraSettings mode="photo" />
             <PresetSettings />
@@ -140,12 +179,15 @@
 
 <style>
   .edit-rail {
+    position: relative;
+    z-index: 2;
     display: flex;
     flex-direction: column;
     width: 100%;
     height: 100%;
     min-width: 0;
     min-height: 0;
+    pointer-events: auto;
     background: var(--color-sidebar);
   }
   .edit-tabs {

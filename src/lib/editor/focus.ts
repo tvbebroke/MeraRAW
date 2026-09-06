@@ -6,7 +6,13 @@ import {
   viewportTool,
 } from "../../stores/app";
 import { doc } from "../../stores/doc";
-import { syncMaskOverlay, syncViewportToolForMask } from "../../stores/mask";
+import {
+  colorPickActive,
+  stopGeomPlacement,
+  stopInstancePick,
+  syncMaskOverlay,
+  syncViewportToolForMask,
+} from "../../stores/mask";
 import {
   activeTool,
   editFocus,
@@ -16,11 +22,23 @@ import {
   type SectionId,
   type Tool,
 } from "../../stores/editor";
+import { flushCropDraft } from "../../crop/cropSession";
 
 export function applyTool(id: Tool) {
+  if (id !== "crop" && cropActive.get()) {
+    void flushCropDraft()
+      .catch(() => {})
+      .then(() => applyToolNow(id));
+    return;
+  }
+  applyToolNow(id);
+}
+
+function applyToolNow(id: Tool) {
   activeTool.set(id);
   cropActive.set(id === "crop");
   if (id === "crop") {
+    selectedMask.set(null);
     selectedRetouch.set(null);
     viewportTool.set("crop");
     void setMaskOverlay(null);
@@ -60,8 +78,7 @@ export function applyEditFocus(focus: EditFocus) {
   if (focus === "mask") {
     showMaskPanel();
   } else if (focus === "crop") {
-    rightPanelMode.set("edit");
-    applyTool("crop");
+    showCropPanel();
   } else if (focus === "retouch") {
     rightPanelMode.set("edit");
     applyTool("ai");
@@ -76,7 +93,7 @@ export function applyEditFocus(focus: EditFocus) {
   if (!focus) return;
   const id = FOCUS_TO_SECTION[focus];
   openSections.setKey(id, true);
-  if (focus !== "mask") {
+  if (focus !== "mask" && focus !== "crop") {
     queueMicrotask(() => {
       document
         .querySelector(`[data-section="${id}"]`)
@@ -95,4 +112,19 @@ export function showAiPanel() {
 export function showMaskPanel() {
   rightPanelMode.set("mask");
   applyTool("mask");
+}
+
+/** Crop as its own develop tab; overlay lives on the photo. */
+export function showCropPanel() {
+  stopInstancePick();
+  stopGeomPlacement();
+  colorPickActive.set(false);
+  rightPanelMode.set("crop");
+  applyTool("crop");
+}
+
+export function leaveCropTool() {
+  if (rightPanelMode.get() !== "crop" && !cropActive.get()) return;
+  rightPanelMode.set("edit");
+  applyTool("edit");
 }

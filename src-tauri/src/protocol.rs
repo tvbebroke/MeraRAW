@@ -135,7 +135,10 @@ pub fn handle_frame_request<R: Runtime>(
 
         match frame {
             Ok(frame) => {
-                let resp = if uri.contains("fmt=jpeg") {
+                let want_jpeg = uri.contains("fmt=jpeg")
+                    || uri.contains(".jpg")
+                    || uri.contains("/jpeg");
+                let resp = if want_jpeg {
                     match frame_jpeg(&frame) {
                         Ok(bytes) => cors_headers(http::Response::builder(), origin)
                             .status(200)
@@ -143,7 +146,7 @@ pub fn handle_frame_request<R: Runtime>(
                             .header("X-Frame-Width", frame.width.to_string())
                             .header("X-Frame-Height", frame.height.to_string())
                             .header("X-Frame-Version", frame.version.to_string())
-                            .header("Cache-Control", "no-store")
+                            .header("Cache-Control", "no-store, no-cache, must-revalidate")
                             .body(bytes),
                         Err(e) => {
                             tracing::error!(error = %e, "frame jpeg encode failed");
