@@ -3,5 +3,5 @@
 mod exif_read;
 mod icc;
 
-pub use exif_read::enrich_from_file;
+pub use exif_read::{enrich_from_file, file_orientation};
 pub use icc::{encoded_rgb_to_working, extract_icc, probe_input_color, InputColorInfo};

@@ -39,6 +39,10 @@ export function readFileMeta(path: string): Promise<FileMeta> {
   return invoke<FileMeta>("read_file_meta", { path });
 }
 
+export function probeOrientation(path: string): Promise<string> {
+  return invoke<string>("probe_orientation", { path });
+}
+
 export function openImage(path: string, docId?: string | null): Promise<ImageMeta> {
   return invoke<ImageMeta>("open_image", { path, docId: docId ?? null });
 }
@@ -369,10 +373,10 @@ export function exportImage(settings: ExportSettings): Promise<string> {
 /** Engine-side batch export: returns the accepted queue length; progress
  * arrives via export-batch-progress / export-batch-done events. */
 export function exportBatch(
-  paths: string[],
+  items: import("./types").BatchExportItem[],
   settings: ExportSettings,
 ): Promise<number> {
-  return invoke<number>("export_batch", { paths, settings });
+  return invoke<number>("export_batch", { items, settings });
 }
 
 export function cancelExportBatch(): Promise<void> {

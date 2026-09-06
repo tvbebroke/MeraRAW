@@ -37,6 +37,7 @@ import {
   imageOpen,
   lastOpenedPath,
   lastOpenedDocId,
+  openingPreviewHint,
   openingPreviewUrl,
   selectedMask,
   statusMessage,
@@ -70,6 +71,10 @@ export async function openPath(
     openingPreviewUrl.set(previewUrl ?? null);
     imageMeta.set(null);
     imageDims.set(null);
+    // Grid clicks set a hint first. Finder / IPC opens have no catalog size.
+    if (previewUrl == null) {
+      openingPreviewHint.set(null);
+    }
     imageOpen.set(true);
     deselectMask();
     clearDoc();
@@ -78,6 +83,11 @@ export async function openPath(
     if (sequence !== openSequence) return;
     imageMeta.set(m);
     imageDims.set({ w: m.width, h: m.height });
+    openingPreviewHint.set({
+      w: m.width,
+      h: m.height,
+      orientation: m.orientation,
+    });
     imageOpen.set(true);
     lastOpenedPath.set(path);
     statusMessage.set("decoding…");

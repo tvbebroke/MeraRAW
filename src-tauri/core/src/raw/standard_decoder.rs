@@ -290,6 +290,13 @@ impl Decoder for StandardDecoder {
                 .map_err(|e| CoreError::Decode(format!("image dims: {e}")))?
         };
         let color = metadata::probe_input_color(path);
+        // JPEG/TIFF often store landscape pixels + EXIF Orientation 6/8.
+        // Report post-bake dims so the viewport is portrait before decode.
+        let (w, h) = if is_jxl(path) || is_heic(path) || is_psd(path) {
+            (w, h)
+        } else {
+            crate::image::oriented_dims(w, h, metadata::file_orientation(path))
+        };
         Ok(rendered_meta(path, w, h, 8, &color))
     }
 
@@ -316,6 +323,7 @@ impl Decoder for StandardDecoder {
             return Ok(Some((rgba.into_raw(), tw, th)));
         }
         let img = image::open(path).map_err(|e| CoreError::Decode(format!("image open: {e}")))?;
+        let img = crate::image::apply_dynamic_orientation(img, metadata::file_orientation(path));
         let thumb = img.thumbnail(max_dim, max_dim); // aspect-preserving downscale
         let rgba = thumb.to_rgba8();
         let (w, h) = (rgba.width(), rgba.height());
@@ -348,9 +356,22 @@ impl Decoder for StandardDecoder {
                 _ => 8,
             };
             // to_rgb32f scales samples to [0,1] WITHOUT TRC decoding — encoded.
+            // `image` 0.25 has no EXIF feature here — pixels stay sensor-stored.
             let rgb = dynimg.to_rgb32f();
             let (w, h) = (rgb.width() as usize, rgb.height() as usize);
             (rgb.into_raw(), w, h, bit_depth)
+        };
+        let (src, w, h) = if is_jxl(path) || is_heic(path) || is_psd(path) {
+            (src, w, h)
+        } else {
+            let baked = RgbF32Buf {
+                width: w,
+                height: h,
+                data: src,
+            }
+            .bake_orientation(metadata::file_orientation(path));
+            let (w, h) = (baked.width, baked.height);
+            (baked.data, w, h)
         };
         // HEIC/JXL/PSD paths don't carry a reliable ICC yet → sRGB fallback.
         let color = if is_jxl(path) || is_heic(path) || is_psd(path) {
@@ -456,6 +477,60 @@ mod tests {
             assert_eq!((m.width, m.height), (8, 6), "{ext} meta dims");
             let _ = std::fs::remove_file(&path);
         }
+    }
+
+    /// Portrait phone/camera JPEGs store landscape pixels + EXIF tag 6.
+    #[test]
+    fn jpeg_exif_orientation_6_opens_upright() {
+        let mut img = image::RgbImage::new(8, 4);
+        for y in 0..4 {
+            for x in 0..8 {
+                let v = if x < 4 { 220 } else { 8 };
+                img.put_pixel(x, y, image::Rgb([v, 0, 0]));
+            }
+        }
+        let dir = std::env::temp_dir();
+        let raw = dir.join("meraraw-ori6-src.jpg");
+        img.save(&raw).unwrap();
+        let bytes = std::fs::read(&raw).unwrap();
+        let oriented = jpeg_with_exif_orientation(&bytes, 6);
+        let path = dir.join("meraraw-ori6.jpg");
+        std::fs::write(&path, oriented).unwrap();
+
+        let dec = StandardDecoder;
+        let meta = dec.metadata(&path).unwrap();
+        assert_eq!(
+            (meta.width, meta.height),
+            (4, 8),
+            "metadata must be post-orientation"
+        );
+        let out = dec.decode_with_profile(&path, None).unwrap();
+        assert_eq!((out.working.width, out.working.height), (4, 8));
+        // 90° CW: stored left half becomes the top half.
+        let sample = |x: usize, y: usize| out.working.data[(y * 4 + x) * 3];
+        assert!(
+            sample(1, 1) > sample(1, 6),
+            "after bake the old left (bright) side should be on top"
+        );
+        let _ = std::fs::remove_file(&raw);
+        let _ = std::fs::remove_file(&path);
+    }
+
+    fn jpeg_with_exif_orientation(jpeg: &[u8], ori: u16) -> Vec<u8> {
+        assert!(jpeg.len() >= 2 && jpeg[0] == 0xFF && jpeg[1] == 0xD8);
+        let mut tiff = Vec::new();
+        tiff.extend_from_slice(&[0x4D, 0x4D, 0x00, 0x2A, 0x00, 0x00, 0x00, 0x08]);
+        tiff.extend_from_slice(&[0x00, 0x01]);
+        tiff.extend_from_slice(&[0x01, 0x12, 0x00, 0x03, 0x00, 0x00, 0x00, 0x01]);
+        tiff.extend_from_slice(&[(ori >> 8) as u8, ori as u8, 0x00, 0x00]);
+        tiff.extend_from_slice(&[0x00, 0x00, 0x00, 0x00]);
+        let mut app1 = b"Exif\0\0".to_vec();
+        app1.extend_from_slice(&tiff);
+        let len = (app1.len() + 2) as u16;
+        let mut out = vec![0xFF, 0xD8, 0xFF, 0xE1, (len >> 8) as u8, len as u8];
+        out.extend_from_slice(&app1);
+        out.extend_from_slice(&jpeg[2..]);
+        out
     }
 
     #[test]

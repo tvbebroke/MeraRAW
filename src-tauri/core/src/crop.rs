@@ -221,4 +221,17 @@ mod tests {
         let (rw, rh) = c.content_dims(6000, 4000, 2);
         assert_eq!((rw as u32, rh as u32), (4000, 6000));
     }
+
+    #[test]
+    fn crop_tool_preview_ignores_rect_only() {
+        let c = CropParams {
+            left: 0.1,
+            top: 0.1,
+            right: 0.9,
+            bottom: 0.9,
+            ..CropParams::default()
+        };
+        assert_eq!(c.mode(true), 0, "tool open: rect is overlay-only");
+        assert_eq!(c.mode(false), 1, "tool closed: rect is committed");
+    }
 }

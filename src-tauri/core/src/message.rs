@@ -440,7 +440,7 @@ pub enum EngineMsg {
     /// worker. Replies with the accepted queue length; completion arrives as
     /// EngineEvent::ExportBatchDone.
     ExportBatch {
-        paths: Vec<PathBuf>,
+        items: Vec<crate::export::BatchExportItem>,
         settings: crate::export::ExportSettings,
         reply: oneshot::Sender<Result<u32, CoreError>>,
     },
@@ -561,6 +561,8 @@ pub struct BatchPrepared {
     pub lut: Option<std::sync::Arc<crate::lut::CubeLut>>,
     /// (mask id, source hash, inferred mask) for doc masks of type "segmented".
     pub masks: Vec<(String, u64, crate::segment::Mask01)>,
+    /// Unique stem for a virtual copy (`DSC_001_vc-1`); None = source stem.
+    pub output_stem: Option<String>,
 }
 
 /// Carried from the decode worker thread: f16-packed working master +

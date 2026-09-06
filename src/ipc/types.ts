@@ -292,6 +292,12 @@ export interface FrameStats {
 
 export type MetadataPolicy = "preserve" | "stripGps" | "stripAll";
 
+export interface BatchExportItem {
+  path: string;
+  /** Sidecar doc id; omit or null for the primary. */
+  docId?: string | null;
+}
+
 export interface ExportSettings {
   format: "jpeg" | "png" | "tiff16" | "heic";
   target: "srgb" | "display-p3" | "adobe-rgb" | "prophoto";

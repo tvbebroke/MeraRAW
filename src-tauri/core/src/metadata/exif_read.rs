@@ -2,9 +2,25 @@
 
 use crate::raw::ImageMeta;
 use exif::{In, Reader, Tag, Value};
+use rawler::Orientation;
 use std::fs::File;
 use std::io::BufReader;
 use std::path::Path;
+
+/// EXIF Orientation tag, or `Normal` when missing / unreadable.
+pub fn file_orientation(path: &Path) -> Orientation {
+    let Ok(file) = File::open(path) else {
+        return Orientation::Normal;
+    };
+    let mut buf = BufReader::new(file);
+    let Ok(exif) = Reader::new().read_from_container(&mut buf) else {
+        return Orientation::Normal;
+    };
+    uint_field(&exif, Tag::Orientation)
+        .map(|n| Orientation::from_u16(n as u16))
+        .filter(|o| !matches!(o, Orientation::Unknown))
+        .unwrap_or(Orientation::Normal)
+}
 
 /// Best-effort: open `path`, parse EXIF, fill empty camera / exposure / GPS
 /// fields on `meta`. Failures are silent (no EXIF is common for PNG/BMP).

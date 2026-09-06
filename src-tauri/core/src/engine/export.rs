@@ -5,16 +5,17 @@ use std::sync::Arc;
 
 const TILE: u32 = 1024;
 
-/// Output dims for an export: the crop content size when a crop is committed
-/// (rotate-90 aware), otherwise the working-master size. Tiling and the tile
-/// view centers run in this content space (extract maps content → source).
-fn export_dims(doc: &EditDoc, src_w: u32, src_h: u32) -> (u32, u32) {
+/// Output dims for an export. `crop_preview` matches the viewport crop tool:
+/// a rect-only crop while the tool is open is overlay-only (full frame).
+fn export_dims(doc: &EditDoc, src_w: u32, src_h: u32, crop_preview: bool) -> (u32, u32) {
     let crop = crate::crop::CropParams::from_doc(doc);
-    if crop.mode(false) == 1 {
-        let (cw, ch) = crop.effective_size(src_w, src_h);
-        ((cw.round() as u32).max(1), (ch.round() as u32).max(1))
-    } else {
-        (src_w, src_h)
+    let mode = crop.mode(crop_preview);
+    match mode {
+        1 | 2 => {
+            let (cw, ch) = crop.content_dims(src_w, src_h, mode);
+            ((cw.round() as u32).max(1), (ch.round() as u32).max(1))
+        }
+        _ => (src_w, src_h),
     }
 }
 
@@ -35,6 +36,12 @@ pub(super) struct ExportJob {
     dcp: Option<Arc<DcpProfile>>,
     lut: Option<Arc<crate::lut::CubeLut>>,
     cct: f32,
+    /// User picked Original (look 4) — empty doc, even on JPEG/PNG.
+    skip_edits: bool,
+    /// Crop tool is open: do not bake an uncommitted rect.
+    crop_preview: bool,
+    /// Waiting for AI masks started by `ensure_segmentations`.
+    waiting_masks: bool,
 }
 
 impl Engine {
@@ -71,22 +78,28 @@ impl Engine {
             if self.export_graph.is_none() {
                 self.export_graph = Some(RenderGraph::new(gpu));
             }
+            // Viewport keys Original off the raw UI look. present_look_for
+            // remaps JPEG/PNG look 4 → 3 (passthrough encode) but must still
+            // skip edits so export matches the unedited preview.
+            let skip_edits = self.display_look == 4;
+            let crop_preview = !skip_edits
+                && self.last_view.is_some_and(|v| v.crop_preview);
             let display_look =
                 crate::lut::present_look_for(cur.meta.kind, self.display_look, cur.doc());
-            // look 4 (Original) renders a fresh doc — no crop, full frame
-            let (out_w, out_h) = if display_look == 4 {
+            let (out_w, out_h) = if skip_edits {
                 (w, h)
             } else {
-                export_dims(cur.doc(), w, h)
+                export_dims(cur.doc(), w, h, crop_preview)
             };
             let tiles_x = out_w.div_ceil(TILE);
             let tiles_y = out_h.div_ceil(TILE);
-            let dcp = if DcpProfile::applies_to_display_look(display_look) {
-                cur.dcp_profile.clone()
-            } else {
+            let dcp = if skip_edits || !DcpProfile::applies_to_display_look(display_look)
+            {
                 None
+            } else {
+                cur.dcp_profile.clone()
             };
-            let lut = if display_look == 4 {
+            let lut = if skip_edits {
                 None
             } else {
                 cur.lut_cube.clone()
@@ -94,6 +107,7 @@ impl Engine {
             if let Some(g) = self.export_graph.as_mut() {
                 g.set_look(display_look);
             }
+            let waiting_masks = !skip_edits && !cur.pending_segments.is_empty();
             Ok(ExportJob {
                 settings,
                 reply: None,
@@ -110,6 +124,9 @@ impl Engine {
                 dcp,
                 lut,
                 cct: cur.as_shot_cct(),
+                skip_edits,
+                crop_preview,
+                waiting_masks,
             })
         })();
 
@@ -120,33 +137,44 @@ impl Engine {
             Ok(mut job) => {
                 job.reply = Some(reply);
                 let total = job.tiles_total;
+                let waiting = job.waiting_masks;
                 self.export_job = Some(job);
-                self.emit(EngineEvent::ExportProgress {
-                    phase: "render".into(),
-                    done: 0,
-                    total,
-                });
-                let _ = self.self_tx.try_send(EngineMsg::ExportStep);
+                if waiting {
+                    self.emit(EngineEvent::ExportProgress {
+                        phase: "segment".into(),
+                        done: 0,
+                        total: 1,
+                    });
+                } else {
+                    self.emit(EngineEvent::ExportProgress {
+                        phase: "render".into(),
+                        done: 0,
+                        total,
+                    });
+                    let _ = self.self_tx.try_send(EngineMsg::ExportStep);
+                }
             }
         }
     }
 
     fn render_working_linear(&mut self) -> Result<(Vec<f32>, u32, u32), CoreError> {
         let gpu = self.gpu.as_ref().ok_or(CoreError::Gpu("no gpu".into()))?;
-        let (display_look, job_w, job_h) = {
+        let (display_look, skip_edits, crop_preview, job_w, job_h) = {
             let cur = self.current.as_ref().ok_or(CoreError::NoImage)?;
             let (_, _, src_w, src_h) = cur
                 .working
                 .as_ref()
                 .ok_or(CoreError::Engine("decode not finished".into()))?;
+            let skip_edits = self.display_look == 4;
+            let crop_preview = !skip_edits && self.last_view.is_some_and(|v| v.crop_preview);
             let display_look =
                 crate::lut::present_look_for(cur.meta.kind, self.display_look, cur.doc());
-            let (job_w, job_h) = if display_look == 4 {
+            let (job_w, job_h) = if skip_edits {
                 (*src_w, *src_h)
             } else {
-                export_dims(cur.doc(), *src_w, *src_h)
+                export_dims(cur.doc(), *src_w, *src_h, crop_preview)
             };
-            (display_look, job_w, job_h)
+            (display_look, skip_edits, crop_preview, job_w, job_h)
         };
         if self.export_graph.is_none() {
             self.export_graph = Some(RenderGraph::new(gpu));
@@ -157,18 +185,18 @@ impl Engine {
             .working
             .as_ref()
             .ok_or(CoreError::Engine("decode not finished".into()))?;
-        let lut = if display_look == 4 {
+        let lut = if skip_edits {
             None
         } else {
             cur.lut_cube.clone()
         };
-        let dcp = if DcpProfile::applies_to_display_look(display_look) {
-            cur.dcp_profile.clone()
-        } else {
+        let dcp = if skip_edits || !DcpProfile::applies_to_display_look(display_look) {
             None
+        } else {
+            cur.dcp_profile.clone()
         };
         let cct = cur.as_shot_cct();
-        let original = display_look == 4;
+        let original = skip_edits;
         let seg_views: std::collections::HashMap<String, wgpu::TextureView> = cur
             .masks_gpu
             .iter()
@@ -194,7 +222,7 @@ impl Engine {
                     scale: Some(1.0),
                     center_x: (tx as f32 + tw as f32 / 2.0) / job_w as f32,
                     center_y: (ty as f32 + th as f32 / 2.0) / job_h as f32,
-                    crop_preview: false,
+                    crop_preview,
                 };
                 let base_doc;
                 let render_doc = if original {
@@ -203,7 +231,7 @@ impl Engine {
                 } else {
                     cur.doc()
                 };
-                let mut tile = graph.render_linear_tile(
+                let tile = graph.render_linear_tile(
                     gpu,
                     tex_view,
                     *src_w,
@@ -213,15 +241,8 @@ impl Engine {
                     cct,
                     &seg_views,
                     lut.as_deref(),
+                    dcp.as_deref(),
                 )?;
-                if DcpProfile::applies_to_display_look(display_look) {
-                    if let Some(dcp) = dcp.as_ref() {
-                        for px in tile.chunks_mut(3) {
-                            let out = dcp.apply_look([px[0], px[1], px[2]], cct);
-                            px.copy_from_slice(&out);
-                        }
-                    }
-                }
                 for row in 0..th as usize {
                     let src = row * tw as usize * 3;
                     let dst = ((ty as usize + row) * job_w as usize + tx as usize) * 3;
@@ -371,6 +392,32 @@ impl Engine {
         let _ = reply.send(result);
     }
 
+    /// Single export waits here until `ensure_segmentations` workers finish.
+    /// Failed / stale segments are already dropped from `pending_segments`.
+    pub(super) fn maybe_start_export_after_masks(&mut self) {
+        let start = match (self.export_job.as_ref(), self.current.as_ref()) {
+            (Some(job), Some(cur)) => job.waiting_masks && cur.pending_segments.is_empty(),
+            _ => false,
+        };
+        if !start {
+            return;
+        }
+        let total = self
+            .export_job
+            .as_ref()
+            .map(|j| j.tiles_total)
+            .unwrap_or(0);
+        if let Some(job) = self.export_job.as_mut() {
+            job.waiting_masks = false;
+        }
+        self.emit(EngineEvent::ExportProgress {
+            phase: "render".into(),
+            done: 0,
+            total,
+        });
+        let _ = self.self_tx.try_send(EngineMsg::ExportStep);
+    }
+
     pub(super) fn export_step(&mut self) {
         let Some(job) = self.export_job.as_ref() else {
             return;
@@ -382,8 +429,8 @@ impl Engine {
         let cct = job.cct;
         let dcp = job.dcp.clone();
         let lut = job.lut.clone();
-        let look = job.look;
-        let original = look == 4;
+        let original = job.skip_edits;
+        let crop_preview = job.crop_preview;
 
         let tile_result: Result<Vec<f32>, CoreError> = (|| {
             let gpu = self.gpu.as_ref().ok_or(CoreError::Gpu("no gpu".into()))?;
@@ -412,7 +459,7 @@ impl Engine {
                 scale: Some(1.0),
                 center_x: (tx as f32 + tw as f32 / 2.0) / job_w as f32,
                 center_y: (ty as f32 + th as f32 / 2.0) / job_h as f32,
-                crop_preview: false,
+                crop_preview,
             };
             let base_doc;
             let render_doc = if original {
@@ -421,7 +468,7 @@ impl Engine {
             } else {
                 cur.doc()
             };
-            let mut tile = graph.render_linear_tile(
+            graph.render_linear_tile(
                 gpu,
                 tex_view,
                 *w,
@@ -431,16 +478,8 @@ impl Engine {
                 cct,
                 &seg_views,
                 lut.as_deref(),
-            )?;
-            if DcpProfile::applies_to_display_look(look) {
-                if let Some(dcp) = dcp.as_ref() {
-                    for px in tile.chunks_mut(3) {
-                        let out = dcp.apply_look([px[0], px[1], px[2]], cct);
-                        px.copy_from_slice(&out);
-                    }
-                }
-            }
-            Ok(tile)
+                dcp.as_deref(),
+            )
         })();
 
         let tile = match tile_result {
@@ -572,7 +611,7 @@ impl Engine {
 
 pub(super) struct BatchState {
     id: u64,
-    paths: Vec<PathBuf>,
+    items: Vec<crate::export::BatchExportItem>,
     settings: crate::export::ExportSettings,
     look: u32,
     ok: Vec<String>,
@@ -616,16 +655,17 @@ struct BatchImage {
     tiles_done: u32,
     tiles_total: u32,
     encoding: bool,
+    output_stem: Option<String>,
 }
 
 impl Engine {
     pub(super) fn export_batch_start(
         &mut self,
-        paths: Vec<PathBuf>,
+        items: Vec<crate::export::BatchExportItem>,
         settings: crate::export::ExportSettings,
         reply: oneshot::Sender<Result<u32, CoreError>>,
     ) {
-        if paths.is_empty() {
+        if items.is_empty() {
             let _ = reply.send(Err(CoreError::InvalidOp("empty export batch".into())));
             return;
         }
@@ -641,10 +681,10 @@ impl Engine {
         // the batch reads sidecars as the canonical docs.
         self.flush_sidecar_now();
         self.batch_seq += 1;
-        let count = paths.len() as u32;
+        let count = items.len() as u32;
         self.export_batch = Some(BatchState {
             id: self.batch_seq,
-            paths,
+            items,
             settings,
             look: self.display_look,
             ok: Vec::new(),
@@ -670,7 +710,7 @@ impl Engine {
         let count = self
             .export_batch
             .as_ref()
-            .map(|b| b.paths.len() as u32)
+            .map(|b| b.items.len() as u32)
             .unwrap_or(0);
         self.emit(EngineEvent::ExportBatchProgress {
             index: index as u32,
@@ -691,22 +731,31 @@ impl Engine {
             };
             if batch.preparing.is_some()
                 || batch.prepared.is_some()
-                || batch.next_prepare >= batch.paths.len()
+                || batch.next_prepare >= batch.items.len()
             {
                 return;
             }
             let index = batch.next_prepare;
             batch.next_prepare += 1;
             batch.preparing = Some(index);
-            (index, batch.paths[index].clone(), batch.id, batch.look == 4)
+            (
+                index,
+                batch.items[index].clone(),
+                batch.id,
+                batch.look == 4,
+            )
         };
-        let (index, path, batch_id, skip_edits) = job;
+        let (index, item, batch_id, skip_edits) = job;
+        let path = item.path.clone();
+        let doc_id = item.doc_id.clone();
         self.emit_batch_progress(index, &path.to_string_lossy(), "decode", 0, 1);
+        let pre = self.snapshot_current_decode(&path);
         let tx = self.self_tx.clone();
         std::thread::Builder::new()
             .name("batch-prepare".into())
             .spawn(move || {
-                let result = prepare_batch_image(&path, skip_edits).map(Box::new);
+                let result =
+                    prepare_batch_image(&path, skip_edits, doc_id.as_deref(), pre).map(Box::new);
                 let _ = tx.blocking_send(EngineMsg::BatchImagePrepared {
                     batch_id,
                     index,
@@ -732,7 +781,7 @@ impl Engine {
             batch.preparing = None;
             match result {
                 Err(e) => {
-                    let path = batch.paths[index].to_string_lossy().into_owned();
+                    let path = batch.items[index].path.to_string_lossy().into_owned();
                     tracing::warn!(error = %e, path = %path, "batch image failed at decode");
                     batch.failed.push((path, e.to_string()));
                     batch.finished += 1;
@@ -766,7 +815,7 @@ impl Engine {
             let Some(batch) = self.export_batch.as_ref() else {
                 return;
             };
-            batch.finished == batch.paths.len()
+            batch.finished == batch.items.len()
         };
         if all_done {
             self.batch_finish(false);
@@ -778,7 +827,7 @@ impl Engine {
             let batch = self.export_batch.as_ref().expect("batch state");
             (
                 batch.look,
-                batch.paths[index].to_string_lossy().into_owned(),
+                batch.items[index].path.to_string_lossy().into_owned(),
             )
         };
         let Some(gpu) = &self.gpu else {
@@ -794,6 +843,7 @@ impl Engine {
             dcp,
             lut,
             masks,
+            output_stem,
         } = *p;
         let tex = upload_working_texture(gpu, &payload.rgba_f16, payload.width, payload.height);
         let view = tex.create_view(&Default::default());
@@ -815,7 +865,7 @@ impl Engine {
             g.set_look(look);
         }
         let (w, h) = (payload.width, payload.height);
-        let (out_w, out_h) = export_dims(&doc, w, h);
+        let (out_w, out_h) = export_dims(&doc, w, h, false);
         let tiles_x = out_w.div_ceil(TILE);
         let tiles_y = out_h.div_ceil(TILE);
         let cct = payload.meta.estimated_cct.unwrap_or(5200.0);
@@ -841,6 +891,7 @@ impl Engine {
             tiles_done: 0,
             tiles_total: tiles_x * tiles_y,
             encoding: false,
+            output_stem,
         };
         let total = img.tiles_total;
         if let Some(batch) = self.export_batch.as_mut() {
@@ -898,7 +949,7 @@ impl Engine {
                 center_y: (ty as f32 + th as f32 / 2.0) / img_h as f32,
                 crop_preview: false,
             };
-            let mut tile = graph.render_linear_tile(
+            graph.render_linear_tile(
                 gpu,
                 &img.view,
                 src_w,
@@ -908,16 +959,8 @@ impl Engine {
                 cct,
                 &seg_views,
                 lut.as_deref(),
-            )?;
-            if DcpProfile::applies_to_display_look(look) {
-                if let Some(dcp) = dcp.as_ref() {
-                    for px in tile.chunks_mut(3) {
-                        let out = dcp.apply_look([px[0], px[1], px[2]], cct);
-                        px.copy_from_slice(&out);
-                    }
-                }
-            }
-            Ok(tile)
+                dcp.as_deref(),
+            )
         })();
 
         let tile = match tile_result {
@@ -927,7 +970,7 @@ impl Engine {
                 let path = {
                     let batch = self.export_batch.as_mut().expect("batch state");
                     batch.cur = None;
-                    let path = batch.paths[index].to_string_lossy().into_owned();
+                    let path = batch.items[index].path.to_string_lossy().into_owned();
                     batch.failed.push((path.clone(), e.to_string()));
                     batch.finished += 1;
                     path
@@ -975,9 +1018,13 @@ impl Engine {
             let batch = self.export_batch.as_mut().expect("batch state");
             let img = batch.cur.as_mut().expect("batch image");
             img.encoding = true;
+            let mut settings = batch.settings.clone();
+            if img.output_stem.is_some() {
+                settings.output_stem = img.output_stem.clone();
+            }
             (
                 batch.id,
-                batch.settings.clone(),
+                settings,
                 std::mem::take(&mut img.full),
                 img.meta.clone(),
             )
@@ -1037,7 +1084,7 @@ impl Engine {
                 return;
             }
             batch.cur = None; // frees this image's GPU resources
-            let path = batch.paths[index].to_string_lossy().into_owned();
+            let path = batch.items[index].path.to_string_lossy().into_owned();
             match result {
                 Ok(out) => batch.ok.push(out),
                 Err(e) => batch.failed.push((path.clone(), e.to_string())),
@@ -1047,6 +1094,28 @@ impl Engine {
         };
         self.emit_batch_progress(index, &path, "encode", 1, 1);
         self.batch_advance();
+    }
+
+    /// Reuse the open image's working master (including in-memory AI denoise)
+    /// when the batch path is the file on screen.
+    fn snapshot_current_decode(&self, path: &Path) -> Option<DecodedPayload> {
+        let cur = self.current.as_ref()?;
+        if cur.path != path {
+            return None;
+        }
+        let clean = cur.clean_rgb.clone()?;
+        let small = cur
+            .small_cpu
+            .clone()
+            .unwrap_or_else(|| Arc::new(clean.downscale_to(2048)));
+        Some(DecodedPayload {
+            rgba_f16: clean.to_rgba_f16_bytes(),
+            width: clean.width as u32,
+            height: clean.height as u32,
+            small_cpu: small,
+            clean_rgb: clean,
+            meta: cur.meta.clone(),
+        })
     }
 
     fn batch_finish(&mut self, cancelled: bool) {
@@ -1068,9 +1137,15 @@ impl Engine {
 }
 
 /// Worker-side mirror of `open_image`'s setup for one queued image: sidecar
-/// doc, camera profile, LUT, demosaic choice, full decode, and segmentation
-/// for the doc's segmented masks. Runs entirely off the actor thread.
-fn prepare_batch_image(path: &Path, skip_edits: bool) -> Result<BatchPrepared, CoreError> {
+/// doc (including a virtual copy), camera profile, LUT, demosaic choice,
+/// full decode or a snapshot of the open working master, optional AI-denoise
+/// cache, and segmentation. Runs entirely off the actor thread.
+fn prepare_batch_image(
+    path: &Path,
+    skip_edits: bool,
+    doc_id: Option<&str>,
+    pre_payload: Option<DecodedPayload>,
+) -> Result<BatchPrepared, CoreError> {
     let decoder = crate::raw::decoder_for(path);
     if !decoder.probe(path) {
         return Err(CoreError::Decode(format!(
@@ -1078,15 +1153,36 @@ fn prepare_batch_image(path: &Path, skip_edits: bool) -> Result<BatchPrepared, C
             path.display()
         )));
     }
-    let meta = decoder.metadata(path)?;
+    let meta = match &pre_payload {
+        Some(p) => p.meta.clone(),
+        None => decoder.metadata(path)?,
+    };
+    let want_copy = doc_id.map(str::trim).filter(|s| !s.is_empty());
+    let primary_id = sidecar::load_edits(path)
+        .ok()
+        .flatten()
+        .map(sidecar::split_copies)
+        .and_then(|mut docs| docs.first_mut().map(|d| d.doc_id.clone()));
+    let output_stem = sidecar::virtual_copy_stem_suffix(want_copy, primary_id.as_deref()).map(
+        |suffix| {
+            let stem = path
+                .file_stem()
+                .map(|s| s.to_string_lossy().into_owned())
+                .unwrap_or_else(|| "export".into());
+            format!("{stem}_{suffix}")
+        },
+    );
     // Original look (4) exports the unedited base — skip sidecar + DCP + LUT.
     let doc = if skip_edits {
         EditDoc::new(&path.to_string_lossy())
     } else {
-        match sidecar::load_edits(path) {
+        match sidecar::load_edits_doc(path, want_copy) {
             Ok(Some(d)) => d,
             Ok(None) => EditDoc::new(&path.to_string_lossy()),
             Err(e) => {
+                if want_copy.is_some() {
+                    return Err(e);
+                }
                 tracing::warn!(error = %e, path = %path.display(), "batch: sidecar unreadable; exporting unedited");
                 EditDoc::new(&path.to_string_lossy())
             }
@@ -1113,13 +1209,21 @@ fn prepare_batch_image(path: &Path, skip_edits: bool) -> Result<BatchPrepared, C
             }
         })
     };
-    let mut demosaic = crate::raw::Demosaic::parse_or_default(doc.meta.demosaic.as_deref());
-    let available = crate::raw::Demosaic::available();
-    if !available.iter().any(|n| n == demosaic.name()) {
-        demosaic = crate::raw::Demosaic::Rcd;
-    }
-    let img = decoder.decode_with_options(path, profile_path.as_deref(), demosaic)?;
-    let mut payload = DecodedPayload::from_decoded(img);
+    let mut payload = if let Some(pre) = pre_payload {
+        pre
+    } else {
+        let mut demosaic = crate::raw::Demosaic::parse_or_default(doc.meta.demosaic.as_deref());
+        let available = crate::raw::Demosaic::available();
+        if !available.iter().any(|n| n == demosaic.name()) {
+            demosaic = crate::raw::Demosaic::Rcd;
+        }
+        let img = decoder.decode_with_options(path, profile_path.as_deref(), demosaic)?;
+        let mut decoded = DecodedPayload::from_decoded(img);
+        if !skip_edits {
+            apply_cached_ai_denoise(&mut decoded, &doc);
+        }
+        decoded
+    };
     // Heal spots rewrite the working master before export (same as viewport).
     if !skip_edits && doc.retouch.iter().any(|s| s.enabled) {
         match crate::retouch::apply_all(&payload.clean_rgb, &doc.retouch) {
@@ -1216,5 +1320,67 @@ fn prepare_batch_image(path: &Path, skip_edits: bool) -> Result<BatchPrepared, C
         dcp,
         lut,
         masks,
+        output_stem,
     })
+}
+
+/// Replay a cached AI denoise base so folder export matches the editor
+/// when the file is not the open image (the open image uses a snapshot).
+fn apply_cached_ai_denoise(payload: &mut DecodedPayload, doc: &EditDoc) {
+    let settings = crate::denoise::DenoiseSettings::from_doc(
+        doc,
+        &crate::denoise::NoiseProfile::from_iso(payload.meta.iso.unwrap_or(800)),
+    );
+    if !settings.ai_active() {
+        return;
+    }
+    let small = payload.small_cpu.as_ref();
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(&(small.width as u32).to_le_bytes());
+    hasher.update(&(small.height as u32).to_le_bytes());
+    hasher.update(bytemuck::cast_slice::<f32, u8>(&small.data));
+    let hash = hasher.finalize().to_hex().to_string();
+    let Ok(key) = crate::denoise::ai::cache_key(&hash, &settings.ai_model, settings.ai_amount)
+    else {
+        return;
+    };
+    let store = crate::denoise::ai::CacheStore::default();
+    let Ok(Some(cache_path)) = store.lookup(&key) else {
+        return;
+    };
+    let Ok((w, h, rgb)) = crate::denoise::ai::CacheStore::load(&cache_path) else {
+        return;
+    };
+    let clean = crate::image::RgbF32Buf {
+        width: w,
+        height: h,
+        data: rgb,
+    };
+    payload.rgba_f16 = clean.to_rgba_f16_bytes();
+    payload.width = clean.width as u32;
+    payload.height = clean.height as u32;
+    payload.small_cpu = Arc::new(clean.downscale_to(2048));
+    payload.clean_rgb = Arc::new(clean);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::export_dims;
+    use crate::doc::{EditDoc, ParamValue};
+
+    #[test]
+    fn crop_preview_keeps_full_frame() {
+        let mut doc = EditDoc::new("/x.ARW");
+        doc.set("crop", "right", ParamValue::F32(0.5));
+        assert_eq!(export_dims(&doc, 6000, 4000, true), (6000, 4000));
+        assert_eq!(export_dims(&doc, 6000, 4000, false), (3000, 4000));
+    }
+
+    #[test]
+    fn crop_preview_honors_live_rotate() {
+        let mut doc = EditDoc::new("/x.ARW");
+        doc.set("crop", "rotate_90", ParamValue::F32(1.0));
+        assert_eq!(export_dims(&doc, 6000, 4000, true), (4000, 6000));
+        assert_eq!(export_dims(&doc, 6000, 4000, false), (4000, 6000));
+    }
 }

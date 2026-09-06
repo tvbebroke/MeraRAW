@@ -150,6 +150,9 @@ impl Engine {
         if let Some(g) = &mut self.graph {
             g.invalidate_all();
         }
+        let expect_w = meta.width;
+        let expect_h = meta.height;
+        let fallback = crate::image::orientation_from_label(&meta.orientation);
         let _ = reply.send(Ok(meta));
 
         // fast path: embedded preview (camera JPEG — replaced when decode finishes)
@@ -162,6 +165,9 @@ impl Engine {
                     let dec = crate::raw::decoder_for(&path);
                     match dec.embedded_preview(&path, 2560) {
                         Ok(Some((rgba, width, height))) => {
+                            let (rgba, width, height) = crate::image::align_preview_rgba(
+                                rgba, width, height, expect_w, expect_h, fallback,
+                            );
                             let _ = tx.blocking_send(EngineMsg::PreviewDone {
                                 generation,
                                 rgba,
@@ -179,8 +185,9 @@ impl Engine {
         self.spawn_full_decode(path, profile_path, demosaic, generation);
     }
 
-    /// Spawn the background full-decode worker. Shared by `open_image` and
-    /// `set_demosaic` (re-decode). Result is delivered as `DecodeDone`.
+    /// Spawn the background full-decode worker. Caller must pass the current
+    /// `generation` (already bumped for this decode). `open_image` increments
+    /// once so preview + full decode share it; do not increment again here.
     pub(super) fn spawn_full_decode(
         &self,
         path: PathBuf,
@@ -366,9 +373,13 @@ impl Engine {
                 cur.meta.camera_profile = Some(display);
                 cur.doc_mut().meta.profile_file = Some(chosen.file.clone());
                 cur.doc_dirty = true;
-                cur.meta.clone()
+                let profile_path = crate::profile::decode_profile_path(Some(chosen));
+                let demosaic =
+                    crate::raw::Demosaic::parse_or_default(cur.doc().meta.demosaic.as_deref());
+                (cur.path.clone(), profile_path, demosaic, cur.meta.clone())
             }
         };
+        let (path, profile_path, demosaic, out_meta) = out_meta;
         if let Some(g) = &mut self.graph {
             g.invalidate_all();
         }
@@ -376,7 +387,10 @@ impl Engine {
         if let Some(g) = &mut self.export_graph {
             g.set_look(display_look);
         }
-        self.schedule_render();
+        // Matrix is baked at decode time — must re-decode or the working
+        // master keeps the previous profile's color.
+        self.generation += 1;
+        self.spawn_full_decode(path, profile_path, demosaic, self.generation);
         let _ = reply.send(Ok(out_meta));
     }
 
@@ -588,8 +602,8 @@ impl Engine {
             );
             (cur.path.clone(), profile_path, cur.meta.clone())
         };
-        // Re-decode with the same generation so DecodeDone isn't discarded as
-        // stale; finish_decode replaces the working buffer and re-renders.
+        // Bump generation so an in-flight decode cannot overwrite this one.
+        self.generation += 1;
         self.spawn_full_decode(path, profile_path, demosaic, self.generation);
         let _ = reply.send(Ok(out_meta));
     }

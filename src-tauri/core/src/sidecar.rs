@@ -178,6 +178,43 @@ pub fn load_edits(source: &Path) -> Result<Option<EditDoc>, CoreError> {
     load_from_xmp(source)
 }
 
+/// Load one virtual copy (or the primary when `doc_id` is empty).
+pub fn load_edits_doc(source: &Path, doc_id: Option<&str>) -> Result<Option<EditDoc>, CoreError> {
+    let Some(bundled) = load_edits(source)? else {
+        if doc_id.map(str::trim).is_some_and(|s| !s.is_empty()) {
+            return Err(CoreError::InvalidOp(format!(
+                "no sidecar for virtual copy {}",
+                doc_id.unwrap_or("")
+            )));
+        }
+        return Ok(None);
+    };
+    let mut docs = split_copies(bundled);
+    if docs.is_empty() {
+        return Ok(None);
+    }
+    let want = doc_id.map(str::trim).filter(|s| !s.is_empty());
+    let Some(id) = want else {
+        return Ok(Some(docs.remove(0)));
+    };
+    docs.into_iter()
+        .find(|d| d.doc_id == id)
+        .map(Some)
+        .ok_or_else(|| CoreError::InvalidOp(format!("no virtual copy {id}")))
+}
+
+/// Extra file-stem suffix so a virtual copy does not overwrite the master export.
+pub fn virtual_copy_stem_suffix(doc_id: Option<&str>, primary_id: Option<&str>) -> Option<String> {
+    let id = doc_id.map(str::trim).filter(|s| !s.is_empty())?;
+    if primary_id.is_some_and(|p| p == id) {
+        return None;
+    }
+    if primary_id.is_none() {
+        return None;
+    }
+    Some(id.to_string())
+}
+
 fn parse_xmp_f32(text: &str, attr: &str) -> Option<f32> {
     let needle = format!("{attr}=\"");
     let start = text.find(&needle)? + needle.len();
@@ -370,6 +407,49 @@ mod tests {
             Some(&ParamValue::F32(1.5))
         );
         assert!(split[0].copies.is_empty());
+        assert_eq!(
+            virtual_copy_stem_suffix(Some("vc-1"), Some(&split[0].doc_id)).as_deref(),
+            Some("vc-1")
+        );
+        assert_eq!(
+            virtual_copy_stem_suffix(Some(&split[0].doc_id), Some(&split[0].doc_id)),
+            None
+        );
+    }
+
+    #[test]
+    fn load_edits_doc_picks_virtual_copy() {
+        let dir = std::env::temp_dir().join(format!(
+            "meratech-vc-load-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        let src = dir.join("a.ARW");
+        std::fs::write(&src, b"fake").unwrap();
+        let mut primary = EditDoc::new(src.to_str().unwrap());
+        primary.set("exposure", "stops", ParamValue::F32(0.2));
+        let mut copy = EditDoc::new(src.to_str().unwrap());
+        copy.doc_id = "vc-1".into();
+        copy.set("exposure", "stops", ParamValue::F32(1.5));
+        write_sidecar(&src, &bundle_copies(&[primary, copy])).unwrap();
+        let loaded = load_edits_doc(&src, Some("vc-1"))
+            .unwrap()
+            .expect("copy");
+        assert_eq!(loaded.doc_id, "vc-1");
+        assert_eq!(
+            loaded.get("exposure", "stops"),
+            Some(&ParamValue::F32(1.5))
+        );
+        let master = load_edits_doc(&src, None).unwrap().expect("primary");
+        assert_eq!(
+            master.get("exposure", "stops"),
+            Some(&ParamValue::F32(0.2))
+        );
+        std::fs::remove_dir_all(&dir).ok();
     }
 
     #[test]

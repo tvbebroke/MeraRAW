@@ -9,6 +9,91 @@ pub struct RgbF32Buf {
     pub data: Vec<f32>, // len = w*h*3
 }
 
+/// True when baking `o` swaps width and height (90/270 / transpose).
+pub fn orientation_swaps_axes(o: Orientation) -> bool {
+    matches!(
+        o,
+        Orientation::Rotate90
+            | Orientation::Rotate270
+            | Orientation::Transpose
+            | Orientation::Transverse
+    )
+}
+
+/// Parse `ImageMeta.orientation` / rawler Debug names (`Rotate90`, …).
+pub fn orientation_from_label(s: &str) -> Orientation {
+    match s {
+        "HorizontalFlip" => Orientation::HorizontalFlip,
+        "Rotate180" => Orientation::Rotate180,
+        "VerticalFlip" => Orientation::VerticalFlip,
+        "Rotate90" => Orientation::Rotate90,
+        "Rotate270" => Orientation::Rotate270,
+        "Transpose" => Orientation::Transpose,
+        "Transverse" => Orientation::Transverse,
+        _ => Orientation::Normal,
+    }
+}
+
+/// Apply EXIF/TIFF orientation to an 8-bit preview (same mapping as bake).
+pub fn apply_dynamic_orientation(
+    img: image::DynamicImage,
+    o: Orientation,
+) -> image::DynamicImage {
+    match o {
+        Orientation::Normal | Orientation::Unknown => img,
+        Orientation::HorizontalFlip => img.fliph(),
+        Orientation::Rotate180 => img.rotate180(),
+        Orientation::VerticalFlip => img.flipv(),
+        Orientation::Rotate90 => img.rotate90(),
+        Orientation::Rotate270 => img.rotate270(),
+        Orientation::Transpose => img.rotate90().fliph(),
+        Orientation::Transverse => img.rotate270().fliph(),
+    }
+}
+
+/// Rotate an 8-bit preview so its aspect matches the oriented working image.
+/// No-op when the preview is already upright (or dims are unusable).
+pub fn align_preview_rgba(
+    rgba: Vec<u8>,
+    w: u32,
+    h: u32,
+    expect_w: u32,
+    expect_h: u32,
+    o: Orientation,
+) -> (Vec<u8>, u32, u32) {
+    if w < 2 || h < 2 || expect_w < 2 || expect_h < 2 {
+        return (rgba, w, h);
+    }
+    let src_portrait = h > w;
+    let dest_portrait = expect_h > expect_w;
+    if src_portrait == dest_portrait {
+        return (rgba, w, h);
+    }
+    if rgba.len() != w as usize * h as usize * 4 {
+        return (rgba, w, h);
+    }
+    let Some(img) = image::RgbaImage::from_raw(w, h, rgba) else {
+        return (Vec::new(), w, h);
+    };
+    let o = if matches!(o, Orientation::Normal | Orientation::Unknown) {
+        Orientation::Rotate90
+    } else {
+        o
+    };
+    let out = apply_dynamic_orientation(image::DynamicImage::ImageRgba8(img), o).to_rgba8();
+    let (nw, nh) = (out.width(), out.height());
+    (out.into_raw(), nw, nh)
+}
+
+/// Working-buffer dims after orientation bake.
+pub fn oriented_dims(width: u32, height: u32, o: Orientation) -> (u32, u32) {
+    if orientation_swaps_axes(o) {
+        (height, width)
+    } else {
+        (width, height)
+    }
+}
+
 impl RgbF32Buf {
     /// Bake EXIF orientation so downstream is always upright (spec 1.7).
     pub fn bake_orientation(self, o: Orientation) -> RgbF32Buf {
@@ -154,6 +239,46 @@ mod tests {
             height: 3,
             data,
         }
+    }
+
+    #[test]
+    fn orientation_from_label_parses_exif_names() {
+        assert_eq!(orientation_from_label("Rotate90"), Orientation::Rotate90);
+        assert_eq!(orientation_from_label("Normal"), Orientation::Normal);
+        assert_eq!(orientation_from_label("bogus"), Orientation::Normal);
+    }
+
+    #[test]
+    fn align_preview_rotates_when_aspect_disagrees() {
+        let w = 4u32;
+        let h = 2u32;
+        let mut rgba = vec![0u8; (w * h * 4) as usize];
+        rgba[0] = 255;
+        let (out, ow, oh) =
+            align_preview_rgba(rgba, w, h, 100, 200, Orientation::Rotate90);
+        assert_eq!((ow, oh), (2, 4));
+        assert_eq!(out.len(), 2 * 4 * 4);
+    }
+
+    #[test]
+    fn align_preview_skips_when_aspect_matches() {
+        let rgba = vec![1u8; 4 * 2 * 4];
+        let (out, ow, oh) =
+            align_preview_rgba(rgba.clone(), 4, 2, 400, 200, Orientation::Rotate90);
+        assert_eq!((ow, oh), (4, 2));
+        assert_eq!(out, rgba);
+    }
+
+    #[test]
+    fn oriented_dims_swaps_on_rotate90() {
+        assert_eq!(
+            oriented_dims(6000, 4000, Orientation::Rotate90),
+            (4000, 6000)
+        );
+        assert_eq!(
+            oriented_dims(6000, 4000, Orientation::Normal),
+            (6000, 4000)
+        );
     }
 
     #[test]

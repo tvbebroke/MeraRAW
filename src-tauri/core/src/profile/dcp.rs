@@ -3,7 +3,9 @@
 use crate::color::{bradford_adapt, mat_inverse, mat_mul, CameraCalibration, Mat3, XYZ_TO_REC2020};
 use crate::curve::ProfileToneCurve;
 use crate::error::CoreError;
-use crate::profile::hue_sat_map::{apply_hue_sat_maps, apply_look_table, correct_blue_cyan_cast, HueSatMap};
+use crate::profile::hue_sat_map::{
+    apply_hue_sat_maps, apply_look_table, correct_blue_cyan_cast, HueSatMap,
+};
 use crate::profile::tone_curve::{parse_baseline_exposure_offset, parse_tone_curve};
 use std::collections::HashMap;
 use std::path::Path;
@@ -533,18 +535,13 @@ impl DcpProfile {
             // Adobe LookTables can oversaturate vs Affinity (Mamiya ZD). Keep
             // most of the hue shift but pull chroma halfway back toward pre-LT.
             const LUMA: [f32; 3] = [0.2126, 0.7152, 0.0722];
-            let l0 = LUMA[0] * rgb[0].max(0.0) + LUMA[1] * rgb[1].max(0.0) + LUMA[2] * rgb[2].max(0.0);
-            let l1 = LUMA[0] * after[0].max(0.0) + LUMA[1] * after[1].max(0.0) + LUMA[2] * after[2].max(0.0);
-            let pre_c = [
-                rgb[0] - l0,
-                rgb[1] - l0,
-                rgb[2] - l0,
-            ];
-            let post_c = [
-                after[0] - l1,
-                after[1] - l1,
-                after[2] - l1,
-            ];
+            let l0 =
+                LUMA[0] * rgb[0].max(0.0) + LUMA[1] * rgb[1].max(0.0) + LUMA[2] * rgb[2].max(0.0);
+            let l1 = LUMA[0] * after[0].max(0.0)
+                + LUMA[1] * after[1].max(0.0)
+                + LUMA[2] * after[2].max(0.0);
+            let pre_c = [rgb[0] - l0, rgb[1] - l0, rgb[2] - l0];
+            let post_c = [after[0] - l1, after[1] - l1, after[2] - l1];
             let t = 0.06f32; // weight on LookTable chroma (Affinity: Mamiya ZD ~neutral)
             rgb = [
                 (l1 + pre_c[0] * (1.0 - t) + post_c[0] * t).max(0.0),
@@ -599,7 +596,10 @@ impl DcpProfile {
         let Ok(raw) = std::env::var(format!("MERARAW_LOOK{look}")) else {
             return default;
         };
-        let parsed: Vec<f32> = raw.split(',').filter_map(|v| v.trim().parse().ok()).collect();
+        let parsed: Vec<f32> = raw
+            .split(',')
+            .filter_map(|v| v.trim().parse().ok())
+            .collect();
         match parsed[..] {
             [g, c, s] => [g, c, s],
             _ => default,
@@ -772,7 +772,7 @@ mod tests {
         assert!(!DcpProfile::applies_to_display_look(4));
         let adobe = DcpProfile::builtin_standard("Sony", "DSC-R1");
         assert!(!adobe.tone_curve_embedded());
-        assert_eq!(DcpProfile::present_look(1, Some(&adobe)), 3);
+        assert_eq!(DcpProfile::present_look(1, Some(&adobe)), 7);
         assert_eq!(DcpProfile::present_look(1, None), 1);
         assert_eq!(DcpProfile::present_look(0, Some(&adobe)), 0);
         assert_eq!(DcpProfile::present_look(2, Some(&adobe)), 2);

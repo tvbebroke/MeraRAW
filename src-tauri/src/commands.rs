@@ -210,6 +210,15 @@ pub async fn read_file_meta(path: String) -> Result<FileMeta, AppError> {
 }
 
 #[tauri::command]
+pub fn probe_orientation(path: String) -> Result<String, AppError> {
+    let path = crate::paths::validate_existing_path(&path)?;
+    Ok(format!(
+        "{:?}",
+        meratech_core::metadata::file_orientation(&path)
+    ))
+}
+
+#[tauri::command]
 /// Tauri deserializes invoke args by field name; these camelCase names are the
 /// IPC contract with `src/ipc/commands.ts` and must not be snake_cased.
 #[allow(non_snake_case)]
@@ -464,13 +473,13 @@ const MAX_EXPORT_BATCH: usize = 500;
 pub async fn export_batch(
     app: AppHandle,
     engine: State<'_, EngineHandle>,
-    paths: Vec<String>,
+    items: Vec<meratech_core::export::BatchExportItem>,
     mut settings: meratech_core::export::ExportSettings,
 ) -> Result<u32, AppError> {
-    if paths.is_empty() {
+    if items.is_empty() {
         return Err(AppError::InvalidOp("export batch empty".into()));
     }
-    if paths.len() > MAX_EXPORT_BATCH {
+    if items.len() > MAX_EXPORT_BATCH {
         return Err(AppError::InvalidOp(format!(
             "export batch too large (max {MAX_EXPORT_BATCH})"
         )));
@@ -492,9 +501,13 @@ pub async fn export_batch(
     settings.dest_dir = crate::paths::validate_user_path(&settings.dest_dir)?
         .to_string_lossy()
         .into_owned();
-    let mut validated = Vec::with_capacity(paths.len());
-    for p in paths {
-        validated.push(crate::paths::validate_existing_path(&p)?);
+    let mut validated = Vec::with_capacity(items.len());
+    for item in items {
+        let path = crate::paths::validate_existing_path(&item.path.to_string_lossy())?;
+        validated.push(meratech_core::export::BatchExportItem {
+            path,
+            doc_id: item.doc_id.filter(|s| !s.trim().is_empty()),
+        });
     }
     engine
         .export_batch(validated, settings)

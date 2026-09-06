@@ -155,8 +155,8 @@ impl Engine {
     }
 
     /// AI Denoise unchecked: restore the plain decode as the working master.
-    /// Mirrors `set_demosaic` (re-decode with the current settings; same
-    /// generation so DecodeDone isn't discarded as stale).
+    /// Mirrors `set_demosaic` (re-decode with a new generation so an older
+    /// in-flight decode cannot overwrite this reset).
     pub(super) fn denoise_ai_reset(&mut self, reply: oneshot::Sender<Result<(), CoreError>>) {
         self.ai_denoise.cancel_active();
         self.pending_denoise = None;
@@ -174,6 +174,7 @@ impl Engine {
             );
             (cur.path.clone(), profile_path, demosaic)
         };
+        self.generation += 1;
         self.spawn_full_decode(path, profile_path, demosaic, self.generation);
         let _ = reply.send(Ok(()));
     }

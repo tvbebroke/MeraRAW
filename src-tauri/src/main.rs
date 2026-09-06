@@ -402,6 +402,7 @@ fn main() {
             commands::pick_files,
             commands::pick_folder,
             commands::read_file_meta,
+            commands::probe_orientation,
             commands::open_image,
             commands::request_frame,
             commands::get_metadata,

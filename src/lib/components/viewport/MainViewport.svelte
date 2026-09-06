@@ -26,6 +26,7 @@
     readCropFromDoc,
   } from "../../../crop/cropMath";
   import { preloadFrame, probeFrameTransport } from "../../engine/frame";
+  import { axesDisagree, hintDestDims, openingRotateDeg } from "../../previewOrient";
   import {
     cropActive,
     decodeState,
@@ -35,6 +36,7 @@
     imageMeta,
     imageOpen,
     lastOpenedPath,
+    openingPreviewHint,
     openingPreviewUrl,
     previewBypass,
     sendViewCmd,
@@ -257,6 +259,23 @@
     null,
   );
   let displaySrc = $state<string | null>(null);
+  let previewNatural = $state<{ w: number; h: number } | null>(null);
+  const destDims = $derived($imageDims ?? hintDestDims($openingPreviewHint));
+  const openingRotate = $derived.by(() => {
+    if (displaySrc) return 0;
+    const dest = destDims;
+    const nat = previewNatural;
+    if (!dest || !nat) return 0;
+    if (!axesDisagree(nat.w, nat.h, dest.w, dest.h)) return 0;
+    return openingRotateDeg($imageMeta?.orientation ?? $openingPreviewHint?.orientation);
+  });
+  const catalogReady = $derived(
+    !!displaySrc ||
+      !!(
+        previewNatural &&
+        (destDims || $openingPreviewHint?.orientation === "Normal")
+      ),
+  );
   const viewportSrc = $derived(displaySrc ?? $openingPreviewUrl);
   let error = $state<string | null>(null);
 
@@ -981,6 +1000,7 @@
   // immediate instead of waiting for RAW preview extraction.
   $effect(() => {
     const preview = $openingPreviewUrl;
+    previewNatural = null;
     if (!preview) return;
     shownVer = 0;
     pendingVer = 0;
@@ -1121,13 +1141,49 @@
   >
     {#if viewportSrc}
       <div class="absolute inset-0 flex items-center justify-center">
-        <img
-          src={viewportSrc}
-          alt=""
-          draggable={false}
-          class="viewport-frame block object-contain pointer-events-none {displaySrc ? 'max-h-full max-w-full' : 'h-full w-full'}"
-          onerror={() => (error = "frame transport failed")}
-        />
+        {#if openingRotate && destDims}
+          <div
+            class="opening-fit"
+            style="aspect-ratio: {destDims.w} / {destDims.h}; --opening-scale: {Math.max(
+              destDims.w / destDims.h,
+              destDims.h / destDims.w,
+            )};"
+          >
+            <img
+              src={viewportSrc}
+              alt=""
+              draggable={false}
+              class="viewport-frame opening-fit-img pointer-events-none"
+              style="transform: rotate({openingRotate}deg) scale(var(--opening-scale)); visibility: {catalogReady
+                ? 'visible'
+                : 'hidden'};"
+              onload={(e) => {
+                const img = e.currentTarget as HTMLImageElement;
+                if (img.naturalWidth > 1 && img.naturalHeight > 1) {
+                  previewNatural = { w: img.naturalWidth, h: img.naturalHeight };
+                }
+              }}
+              onerror={() => (error = "frame transport failed")}
+            />
+          </div>
+        {:else}
+          <img
+            src={viewportSrc}
+            alt=""
+            draggable={false}
+            class="viewport-frame block object-contain pointer-events-none {displaySrc
+              ? 'max-h-full max-w-full'
+              : 'h-full w-full'}"
+            style="visibility: {catalogReady ? 'visible' : 'hidden'}"
+            onload={(e) => {
+              const img = e.currentTarget as HTMLImageElement;
+              if (img.naturalWidth > 1 && img.naturalHeight > 1) {
+                previewNatural = { w: img.naturalWidth, h: img.naturalHeight };
+              }
+            }}
+            onerror={() => (error = "frame transport failed")}
+          />
+        {/if}
         {#if compareSplit && beforeSrc}
           <img
             src={beforeSrc}
@@ -1271,6 +1327,22 @@
 {/if}
 
 <style>
+  .opening-fit {
+    position: relative;
+    height: 100%;
+    width: auto;
+    max-width: 100%;
+    max-height: 100%;
+    overflow: hidden;
+  }
+  .opening-fit-img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    transform-origin: center;
+  }
   .geom-draft {
     position: absolute;
     inset: 0;

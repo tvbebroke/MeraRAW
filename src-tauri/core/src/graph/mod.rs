@@ -92,6 +92,8 @@ pub struct RenderGraph {
 #[derive(Clone, Copy)]
 pub(super) enum FinalTag {
     Extract,
+    /// DCP look ran and no later module wrote a new final.
+    Look,
     Node(usize),
     Comp(usize),
 }

@@ -5,8 +5,7 @@ use super::mask_stage_index;
 use super::resources::{
     make_chain_tex, make_mask_tex, make_tex, BlendUniforms, CropUniform, DcpLookUniforms, DcpMeta,
     ExtractUniforms, MaskCombineUniforms, MaskFinalizeUniforms, MaskGeomUniforms,
-    MaskSampleUniforms, PassResources, PipeKind,
-    PresentUniforms, MAX_STROKE_POINTS, NODE_PIPES,
+    MaskSampleUniforms, PassResources, PipeKind, PresentUniforms, MAX_STROKE_POINTS, NODE_PIPES,
 };
 use super::{FinalTag, RenderGraph, NODES};
 use crate::doc::EditDoc;
@@ -341,10 +340,7 @@ impl RenderGraph {
             .masks
             .iter()
             .map(|m| {
-                let comps = m
-                    .source
-                    .get("components")
-                    .and_then(|c| c.as_array());
+                let comps = m.source.get("components").and_then(|c| c.as_array());
                 match comps {
                     Some(arr) => arr
                         .iter()
@@ -430,7 +426,11 @@ impl RenderGraph {
                     wgpu::BindGroupEntry {
                         binding: 2,
                         resource: wgpu::BindingResource::TextureView(
-                            &self.extract_tex.as_ref().unwrap().create_view(&Default::default()),
+                            &self
+                                .extract_tex
+                                .as_ref()
+                                .unwrap()
+                                .create_view(&Default::default()),
                         ),
                     },
                     wgpu::BindGroupEntry {
@@ -483,7 +483,11 @@ impl RenderGraph {
                     wgpu::BindGroupEntry {
                         binding: 0,
                         resource: wgpu::BindingResource::TextureView(
-                            &self.extract_tex.as_ref().unwrap().create_view(&Default::default()),
+                            &self
+                                .extract_tex
+                                .as_ref()
+                                .unwrap()
+                                .create_view(&Default::default()),
                         ),
                     },
                     wgpu::BindGroupEntry {
@@ -525,7 +529,14 @@ impl RenderGraph {
         } else {
             self.extract_tex.as_ref().unwrap()
         };
-        let mut final_tag = FinalTag::Extract;
+        // Export readback uses last_final. If DCP ran and every module is
+        // identity, present still reads look_tex via `upstream` — last_final
+        // must point at the same texture or zero-edit exports drop the DCP.
+        let mut final_tag = if dcp_active {
+            FinalTag::Look
+        } else {
+            FinalTag::Extract
+        };
         for (i, cfg) in configs.iter().enumerate() {
             let NodeConfig::Run { uniforms, lut } = cfg else {
                 continue;
@@ -572,7 +583,11 @@ impl RenderGraph {
             let mut lut_i = 0usize;
             let mut strokes_i = 0usize;
             let mut comp_flip = 0usize;
-            let extract_view = self.extract_tex.as_ref().unwrap().create_view(&Default::default());
+            let extract_view = self
+                .extract_tex
+                .as_ref()
+                .unwrap()
+                .create_view(&Default::default());
             for mask in &doc.masks {
                 if !mask.enabled {
                     continue;
@@ -670,7 +685,11 @@ impl RenderGraph {
                             );
                             gpu.queue.write_buffer(ub, 0, bytemuck::bytes_of(&u));
                             let mview = mtex.create_view(&Default::default());
-                            let eview = self.extract_tex.as_ref().unwrap().create_view(&Default::default());
+                            let eview = self
+                                .extract_tex
+                                .as_ref()
+                                .unwrap()
+                                .create_view(&Default::default());
                             let bind = gpu.device.create_bind_group(&wgpu::BindGroupDescriptor {
                                 label: Some("mask-sample-bind"),
                                 layout: &self.mask_sample.layout,
@@ -730,7 +749,11 @@ impl RenderGraph {
                         );
                         gpu.queue.write_buffer(ub, 0, bytemuck::bytes_of(&u));
                         let mview = mtex.create_view(&Default::default());
-                        let eview = self.extract_tex.as_ref().unwrap().create_view(&Default::default());
+                        let eview = self
+                            .extract_tex
+                            .as_ref()
+                            .unwrap()
+                            .create_view(&Default::default());
                         let bind = gpu.device.create_bind_group(&wgpu::BindGroupDescriptor {
                             label: Some("mask-param-bind"),
                             layout: &self.mask_sample.layout,
@@ -926,10 +949,7 @@ impl RenderGraph {
                 } else {
                     0.0
                 },
-                look: DcpProfile::present_look(
-                    self.look,
-                    dcp_profile.filter(|_| dcp_active),
-                ),
+                look: DcpProfile::present_look(self.look, dcp_profile.filter(|_| dcp_active)),
                 clip_hi: u32::from(self.clip_hi),
                 clip_lo: u32::from(self.clip_lo),
                 _p0: millis,
@@ -1151,28 +1171,16 @@ fn parse_geometry(source: &serde_json::Value) -> (u32, [f32; 2], [f32; 2], f32, 
         Some("linear") => {
             let start = if source.get("x0").is_some() {
                 [
-                    source
-                        .get("x0")
-                        .and_then(|v| v.as_f64())
-                        .unwrap_or(0.5) as f32,
-                    source
-                        .get("y0")
-                        .and_then(|v| v.as_f64())
-                        .unwrap_or(0.2) as f32,
+                    source.get("x0").and_then(|v| v.as_f64()).unwrap_or(0.5) as f32,
+                    source.get("y0").and_then(|v| v.as_f64()).unwrap_or(0.2) as f32,
                 ]
             } else {
                 get2("start", [0.5, 0.0])
             };
             let end = if source.get("x1").is_some() {
                 [
-                    source
-                        .get("x1")
-                        .and_then(|v| v.as_f64())
-                        .unwrap_or(0.5) as f32,
-                    source
-                        .get("y1")
-                        .and_then(|v| v.as_f64())
-                        .unwrap_or(0.8) as f32,
+                    source.get("x1").and_then(|v| v.as_f64()).unwrap_or(0.5) as f32,
+                    source.get("y1").and_then(|v| v.as_f64()).unwrap_or(0.8) as f32,
                 ]
             } else {
                 get2("end", [0.5, 1.0])
@@ -1260,11 +1268,7 @@ fn produce_composite_mask(
     pool_i: &mut usize,
     strokes_i: &mut usize,
 ) -> bool {
-    let Some(comps) = mask
-        .source
-        .get("components")
-        .and_then(|c| c.as_array())
-    else {
+    let Some(comps) = mask.source.get("components").and_then(|c| c.as_array()) else {
         return false;
     };
     if comps.is_empty() || mask_scratch.len() < 3 {
@@ -1316,7 +1320,8 @@ fn produce_composite_mask(
                 };
                 gpu.queue.write_buffer(ub, 0, bytemuck::bytes_of(&u));
                 if !strokes.is_empty() {
-                    gpu.queue.write_buffer(sb, 0, bytemuck::cast_slice(&strokes));
+                    gpu.queue
+                        .write_buffer(sb, 0, bytemuck::cast_slice(&strokes));
                 }
                 let mview = comp_tex.create_view(&Default::default());
                 let bind = gpu.device.create_bind_group(&wgpu::BindGroupDescriptor {
@@ -1352,23 +1357,20 @@ fn produce_composite_mask(
                 // cached as `mask.id`, not `mask.id#c0`. Falling back here is
                 // required or Subtract/Add refine finds no AI mask and panics
                 // the combine pass (empty accumulator).
-                let small_view = seg_masks
-                    .get(&key)
-                    .or_else(|| {
-                        if i == 0 {
-                            seg_masks.get(&mask.id)
-                        } else {
-                            None
-                        }
-                    });
+                let small_view = seg_masks.get(&key).or_else(|| {
+                    if i == 0 {
+                        seg_masks.get(&mask.id)
+                    } else {
+                        None
+                    }
+                });
                 if let Some(small_view) = small_view {
                     if *pool_i >= pool.len() {
                         return false;
                     }
                     let ub = &pool[*pool_i];
                     *pool_i += 1;
-                    let child_kind =
-                        crate::segment::kind_from_segmented_source(&mask.kind, &src);
+                    let child_kind = crate::segment::kind_from_segmented_source(&mask.kind, &src);
                     // Invert from this component's model, not the parent mask kind.
                     let invert = (child_kind == "background") as u32;
                     let u = mask_sample_uniforms(

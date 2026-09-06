@@ -8,13 +8,22 @@ import {
   listFolders,
   pickFiles,
   pickFolder,
+  probeOrientation,
   setAssetMeta,
   forgetFolder,
 } from "../ipc/commands";
 import { onCatalogChanged, onImportDone } from "../ipc/events";
 import type { FolderItem, GridItem, GridQuery, MetaPatch } from "../ipc/types";
 import { customSchemeUrl } from "../lib/engine/customScheme";
-import { currentFolder, lastOpenedDocId, lastOpenedPath, openingPreviewUrl } from "./app";
+import {
+  currentFolder,
+  imageDims,
+  imageMeta,
+  lastOpenedDocId,
+  lastOpenedPath,
+  openingPreviewHint,
+  openingPreviewUrl,
+} from "./app";
 import { workspace } from "./workspace";
 import { extOf, isVideoPath } from "../lib/media";
 
@@ -446,7 +455,30 @@ export async function patchPhotoMeta(
 export async function openPhoto(item: GridItem): Promise<void> {
   const fastThumb = item.hasThumb ? thumbUrl(item.id, "t") : null;
   const catalogPreview = item.hasThumb ? thumbUrl(item.id, "p") : null;
+  // Drop the outgoing photo's dims so the viewport cannot upright the new
+  // thumb against the previous image's aspect.
+  imageMeta.set(null);
+  imageDims.set(null);
+  openingPreviewHint.set(
+    item.width > 1 && item.height > 1 ? { w: item.width, h: item.height } : null,
+  );
   openingPreviewUrl.set(fastThumb);
+  void probeOrientation(item.path)
+    .then((orientation) => {
+      if (
+        openingPreviewUrl.get() !== fastThumb &&
+        openingPreviewUrl.get() !== catalogPreview
+      ) {
+        return;
+      }
+      const hint = openingPreviewHint.get();
+      openingPreviewHint.set({
+        w: hint?.w ?? item.width,
+        h: hint?.h ?? item.height,
+        orientation,
+      });
+    })
+    .catch(() => {});
 
   // The filmstrip thumbnail is normally already in WebKit's cache, so it
   // appears immediately. Upgrade it to the larger catalog preview in the

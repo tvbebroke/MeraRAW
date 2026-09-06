@@ -629,10 +629,21 @@ impl Catalog {
         if !src.exists() {
             return None;
         }
-        let dec = RawlerDecoder::default();
+        let dec = crate::raw::decoder_for(&src);
         let (rgba, w, h) = match dec.embedded_preview(&src, 640) {
             Ok(Some(v)) => v,
             _ => return None,
+        };
+        let (rgba, w, h) = match dec.metadata(&src) {
+            Ok(meta) => crate::image::align_preview_rgba(
+                rgba,
+                w,
+                h,
+                meta.width,
+                meta.height,
+                crate::image::orientation_from_label(&meta.orientation),
+            ),
+            Err(_) => (rgba, w, h),
         };
         let img = image::RgbaImage::from_raw(w, h, rgba)?;
         let thumb = image::DynamicImage::ImageRgba8(img)
@@ -1353,6 +1364,14 @@ pub fn import_one(path: &Path) -> Result<ImportedFile, CoreError> {
     let (mut thumb_jpeg, mut preview_jpeg) = (None, None);
     let (mut phash, mut blur) = (None, None);
     if let Ok(Some((rgba, w, h))) = dec.embedded_preview(&path, 1600) {
+        let (rgba, w, h) = crate::image::align_preview_rgba(
+            rgba,
+            w,
+            h,
+            meta.width,
+            meta.height,
+            crate::image::orientation_from_label(&meta.orientation),
+        );
         if let Some(img) = image::RgbaImage::from_raw(w, h, rgba) {
             let dynimg = image::DynamicImage::ImageRgba8(img);
             let preview = dynimg.thumbnail(1600, 1600).to_rgb8();

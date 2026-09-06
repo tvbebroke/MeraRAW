@@ -108,6 +108,16 @@ impl Default for ExportSettings {
     }
 }
 
+/// One folder-batch slot. Virtual copies share `path` and are distinguished
+/// by `doc_id` so each copy keeps its own sidecar and output stem.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BatchExportItem {
+    pub path: PathBuf,
+    #[serde(default)]
+    pub doc_id: Option<String>,
+}
+
 impl ExportSettings {
     pub fn effective_policy(&self) -> MetadataPolicy {
         if self.strip_metadata {
@@ -218,6 +228,73 @@ fn view_look(rgb: [f32; 3], camera: bool) -> [f32; 3] {
         *c = (l2 + (*c - l2) * sat).max(0.0);
     }
     out
+}
+
+/// Clipped-green magenta highlights — MIRRORS present.wgsl `fix_magenta_highlights`.
+fn fix_magenta_highlights(c: [f32; 3]) -> [f32; 3] {
+    let [r, g, b] = c;
+    let mx = r.max(g.max(b));
+    if mx < 0.40 {
+        return c;
+    }
+    if (r - b).abs() > 0.08 * mx {
+        return c;
+    }
+    let rb_min = r.min(b);
+    if rb_min < g + 0.02 {
+        return c;
+    }
+    let rb = 0.5 * (r + b);
+    let lag = rb - g;
+    if lag < 0.02 {
+        return c;
+    }
+    let hi = ((mx - 0.40) / 0.40).clamp(0.0, 1.0);
+    let t = (lag / rb.max(1e-6)).clamp(0.0, 1.0) * hi;
+    [r, g + (rb - g) * t * 0.90, b]
+}
+
+/// Fuji cyan/blue Rec.2020→sRGB clip — MIRRORS present.wgsl `fix_srgb_cyan`.
+/// Allows slightly negative R from the gamut matrix (do not clamp first).
+fn fix_srgb_cyan(c: [f32; 3]) -> [f32; 3] {
+    let [r, g, b] = c;
+    if b < 0.02 || b < g {
+        return c;
+    }
+    let mx = r.max(g.max(b));
+    let mn = r.min(g.min(b));
+    let chroma = (mx - mn) / mx.max(1e-6);
+    if chroma < 0.18 || (mx > 0.55 && chroma < 0.28) {
+        return c;
+    }
+    let rb = r / b.max(1e-6);
+    let gb = g / b.max(1e-6);
+    if rb > 0.38 {
+        return c;
+    }
+    if gb < 0.12 && rb > 0.15 {
+        return c;
+    }
+    let luma = 0.2126 * r.max(0.0) + 0.7152 * g.max(0.0) + 0.0722 * b.max(0.0);
+    let crush = ((0.38 - rb) / 0.38).clamp(0.0, 1.0);
+    let cyan = (gb / 0.85).clamp(0.0, 1.0);
+    let strength = crush * cyan.max(0.45);
+    if strength < 0.08 {
+        return c;
+    }
+    let mut out = [
+        c[0] + (luma - c[0]) * (0.50 * strength),
+        c[1] + (luma - c[1]) * (0.50 * strength),
+        c[2] + (luma - c[2]) * (0.50 * strength),
+    ];
+    let want_rb = if gb > 0.55 { 0.45 } else { 0.22 };
+    out[0] = out[0].max(want_rb * b * strength);
+    out[1] *= 1.0 - 0.18 * strength * (gb / 0.6).clamp(0.0, 1.0);
+    out
+}
+
+fn apply_present_gamut_fixes(c: [f32; 3]) -> [f32; 3] {
+    fix_srgb_cyan(fix_magenta_highlights(c))
 }
 
 /// Post-matrix look used by present.wgsl after Rec.2020 → sRGB.
@@ -426,7 +503,8 @@ fn encode_looked(
             linear[i * 3 + 1].max(0.0),
             linear[i * 3 + 2].max(0.0),
         ];
-        let looked = apply_present_look(mat_vec(&to_srgb, lin).map(|c| c.max(0.0)), look);
+        // present.wgsl: matrix → magenta/cyan fixes (neg R allowed) → look.
+        let looked = apply_present_look(apply_present_gamut_fixes(mat_vec(&to_srgb, lin)), look);
         let target_lin = gamut_compress(mat_vec(&srgb_to_target, looked));
         for c in target_lin {
             let e = oetf(target, c);
@@ -1110,7 +1188,7 @@ mod tests {
             "look 7 must not equal no-DCP Camera"
         );
         let to_srgb = target_from_rec2020(TargetSpace::Srgb);
-        let srgb = mat_vec(&to_srgb, lin).map(|c| c.max(0.0));
+        let srgb = apply_present_gamut_fixes(mat_vec(&to_srgb, lin));
         let graded = DcpProfile::view_look_display(srgb);
         for ch in 0..3 {
             let expect =
@@ -1142,7 +1220,7 @@ mod tests {
             [0.75, 0.80, 0.30],
         ] {
             for look in [0u32, 1, 5, 6, 7] {
-                let c = mat_vec(&PRESENT_REC2020_TO_SRGB, rec).map(|v| v.max(0.0));
+                let c = apply_present_gamut_fixes(mat_vec(&PRESENT_REC2020_TO_SRGB, rec));
                 let preview = apply_present_look(c, look)
                     .map(|v| (oetf(TargetSpace::Srgb, v.clamp(0.0, 1.0)) * 255.0).round() as i32);
                 let got = output_transform_look(&rec, 1, 1, TargetSpace::Srgb, false, look);

@@ -63,7 +63,8 @@
       if (batchMode) return;
       const pct = p.total > 0 ? Math.round((p.done / p.total) * 100) : 0;
       progress = { phase: p.phase, pct };
-      if (p.phase === "render") status = `Rendering tiles ${p.done}/${p.total}…`;
+      if (p.phase === "segment") status = "Waiting for masks…";
+      else if (p.phase === "render") status = `Rendering tiles ${p.done}/${p.total}…`;
       else if (p.phase === "encode") status = "Encoding…";
     }).then((u) => {
       if (cancelled) u();
@@ -140,8 +141,10 @@
     progress = null;
 
     if (batchMode) {
-      const paths = $libraryItems.map((p) => p.path).filter(Boolean);
-      if (paths.length === 0) {
+      const items = $libraryItems
+        .filter((p) => p.path)
+        .map((p) => ({ path: p.path, docId: p.docId || null }));
+      if (items.length === 0) {
         status = `No ${noun} in the current folder to export.`;
         busy = false;
         return;
@@ -151,9 +154,9 @@
         busy = false;
         return;
       }
-      status = `Queuing ${paths.length} exports…`;
+      status = `Queuing ${items.length} exports…`;
       try {
-        const n = await exportBatch(paths, buildSettings());
+        const n = await exportBatch(items, buildSettings());
         status = `Exporting ${n} ${noun}…`;
       } catch (e) {
         status = `Export failed: ${formatAppError(e)}`;

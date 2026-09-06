@@ -413,10 +413,13 @@ export async function runSelfTest(_latestVersion: number, scope = "1"): Promise<
           });
         },
       );
-      const batchPaths = (await getGrid({ limit: 3, folder })).map((g) => g.path);
-      if (batchPaths.length < 2) return void (await fail("batch: <2 grid paths"));
+      const batchItems = (await getGrid({ limit: 3, folder })).map((g) => ({
+        path: g.path,
+        docId: g.docId ?? null,
+      }));
+      if (batchItems.length < 2) return void (await fail("batch: <2 grid paths"));
       const accepted = await invoke<number>("export_batch", {
-        paths: batchPaths,
+        items: batchItems,
         settings: {
           format: "jpeg",
           target: "srgb",
@@ -426,16 +429,16 @@ export async function runSelfTest(_latestVersion: number, scope = "1"): Promise<
           destDir: "/tmp/meratech-selftest-batch",
         },
       });
-      if (accepted !== batchPaths.length) {
-        return void (await fail(`batch accepted ${accepted}/${batchPaths.length}`));
+      if (accepted !== batchItems.length) {
+        return void (await fail(`batch accepted ${accepted}/${batchItems.length}`));
       }
       const done = await donePromise.finally(() => unBatch?.());
       if (done.cancelled) return void (await fail("batch cancelled unexpectedly"));
       if (done.failed.length > 0) {
         return void (await fail(`batch failed: ${done.failed[0].error}`));
       }
-      if (done.ok.length !== batchPaths.length) {
-        return void (await fail(`batch wrote ${done.ok.length}/${batchPaths.length}`));
+      if (done.ok.length !== batchItems.length) {
+        return void (await fail(`batch wrote ${done.ok.length}/${batchItems.length}`));
       }
       for (const outPath of done.ok) {
         const m = await readFileMeta(outPath);

@@ -9,6 +9,7 @@ fn main() {
             "pick_files",
             "pick_folder",
             "read_file_meta",
+            "probe_orientation",
             "open_image",
             "request_frame",
             "get_metadata",

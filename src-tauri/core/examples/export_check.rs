@@ -80,7 +80,18 @@ fn main() {
                 crop_preview: false,
             };
             let tile = graph
-                .render_linear_tile(&gpu, &tv, w, h, &view, &doc, cct, &HashMap::new(), None)
+                .render_linear_tile(
+                    &gpu,
+                    &tv,
+                    w,
+                    h,
+                    &view,
+                    &doc,
+                    cct,
+                    &HashMap::new(),
+                    None,
+                    None,
+                )
                 .expect("tile");
             for row in 0..th as usize {
                 let src = row * tw as usize * 3;

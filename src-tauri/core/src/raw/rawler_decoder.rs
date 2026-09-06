@@ -178,7 +178,14 @@ impl Decoder for RawlerDecoder {
             let raw = decoder.raw_image(&source, &params, true).map_err(dec_err)?;
             let cal = CameraCalibration::from_raw(&raw);
             let cct = Some(cal.estimate_cct(&effective_wb(raw.wb_coeffs, &cal)));
-            Ok(self.meta_from(path, &raw, &md, raw.width as u32, raw.height as u32, cct))
+            // Match ImageMeta's "after orientation bake" contract so the UI
+            // aspect is right before the full decode lands (portrait ARW).
+            let (w, h) = crate::image::oriented_dims(
+                raw.width as u32,
+                raw.height as u32,
+                effective_orientation(&raw, &md),
+            );
+            Ok(self.meta_from(path, &raw, &md, w, h, cct))
         })
     }
 
@@ -213,14 +220,7 @@ impl Decoder for RawlerDecoder {
             let Some(img) = img else {
                 return Ok(None);
             };
-            let img = match orientation {
-                rawler::Orientation::Rotate90 => img.rotate90(),
-                rawler::Orientation::Rotate180 => img.rotate180(),
-                rawler::Orientation::Rotate270 => img.rotate270(),
-                rawler::Orientation::HorizontalFlip => img.fliph(),
-                rawler::Orientation::VerticalFlip => img.flipv(),
-                _ => img,
-            };
+            let img = crate::image::apply_dynamic_orientation(img, orientation);
             let img = if img.width().max(img.height()) > max_dim {
                 img.thumbnail(max_dim, max_dim)
             } else {

@@ -484,11 +484,11 @@ impl EngineHandle {
     /// progress + completion arrive as ExportBatchProgress/ExportBatchDone.
     pub async fn export_batch(
         &self,
-        paths: Vec<PathBuf>,
+        items: Vec<crate::export::BatchExportItem>,
         settings: crate::export::ExportSettings,
     ) -> Result<Result<u32, CoreError>, EngineError> {
         self.request(|reply| EngineMsg::ExportBatch {
-            paths,
+            items,
             settings,
             reply,
         })
@@ -1315,11 +1315,11 @@ impl Engine {
                 self.export_step();
             }
             EngineMsg::ExportBatch {
-                paths,
+                items,
                 settings,
                 reply,
             } => {
-                self.export_batch_start(paths, settings, reply);
+                self.export_batch_start(items, settings, reply);
             }
             EngineMsg::ExportBatchCancel { reply } => {
                 self.export_batch_cancel(reply);
@@ -1453,11 +1453,15 @@ impl Engine {
                         mask_id = %mask_id,
                         "dropping stale SegmentDone (source changed)"
                     );
+                    self.maybe_start_export_after_masks();
                     return;
                 }
                 match result {
                     Ok(mask) => {
-                        let Some(gpu) = &self.gpu else { return };
+                        let Some(gpu) = &self.gpu else {
+                            self.maybe_start_export_after_masks();
+                            return;
+                        };
                         let tex = crate::graph::upload_small_mask(
                             gpu,
                             &mask.data,
@@ -1487,6 +1491,7 @@ impl Engine {
                         });
                     }
                 }
+                self.maybe_start_export_after_masks();
             }
             EngineMsg::WbFromPoint { x, y, reply } => {
                 let result = self.wb_from_point(x, y);
