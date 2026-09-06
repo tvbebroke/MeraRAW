@@ -601,6 +601,8 @@ struct BatchImage {
     /// working-master texture dims
     src_w: u32,
     src_h: u32,
+    /// per-image present look (`present_look_for`), not the batch-wide UI look
+    look: u32,
     doc: EditDoc,
     dcp: Option<Arc<DcpProfile>>,
     lut: Option<Arc<crate::lut::CubeLut>>,
@@ -772,7 +774,7 @@ impl Engine {
     }
 
     fn batch_begin_render(&mut self, index: usize, p: Box<BatchPrepared>) {
-        let (look, path) = {
+        let (user_look, path) = {
             let batch = self.export_batch.as_ref().expect("batch state");
             (
                 batch.look,
@@ -803,6 +805,7 @@ impl Engine {
                 (id, t)
             })
             .collect();
+        let look = crate::lut::present_look_for(payload.meta.kind, user_look, &doc);
         if self.export_graph.is_none() {
             self.export_graph = Some(RenderGraph::new(gpu));
         }
@@ -825,6 +828,7 @@ impl Engine {
             h: out_h,
             src_w: w,
             src_h: h,
+            look,
             doc,
             dcp,
             lut,
@@ -865,7 +869,7 @@ impl Engine {
             img.src_w,
             img.src_h,
             img.cct,
-            batch.look,
+            img.look,
         );
         let dcp = img.dcp.clone();
         let lut = img.lut.clone();
@@ -979,10 +983,7 @@ impl Engine {
             )
         };
         self.emit_batch_progress(index, &path, "encode", 0, 1);
-        let enc_look = {
-            let effective = crate::raw::effective_display_look(meta.kind, look);
-            DcpProfile::present_look(effective, dcp.as_deref())
-        };
+        let enc_look = DcpProfile::present_look(look, dcp.as_deref());
         let tx_chan = self.self_tx.clone();
         std::thread::Builder::new()
             .name("batch-encode".into())
@@ -1164,7 +1165,8 @@ fn prepare_batch_image(path: &Path, skip_edits: bool) -> Result<BatchPrepared, C
                         for (i, comp) in comps.iter().enumerate() {
                             let src = comp.get("source").cloned().unwrap_or_else(|| comp.clone());
                             if src.get("type").and_then(|t| t.as_str()) == Some("segmented") {
-                                let kind = crate::segment::kind_from_segmented_source(&m.kind, &src);
+                                let kind =
+                                    crate::segment::kind_from_segmented_source(&m.kind, &src);
                                 push(
                                     crate::segment::segment_cache_key(&m.id, Some(i)),
                                     &kind,

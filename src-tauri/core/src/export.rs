@@ -9,6 +9,7 @@
 
 use crate::color::{self, bradford_adapt, mat_mul, mat_vec, Mat3};
 use crate::error::CoreError;
+use crate::profile::DcpProfile;
 use crate::raw::ImageMeta;
 use std::path::{Path, PathBuf};
 
@@ -189,60 +190,47 @@ fn oetf(target: TargetSpace, v: f32) -> f32 {
     }
 }
 
-/// Scene luminance where the Camera look starts crossfading from the
-/// luminance-mapped result to the per-channel one. Mirrors present.wgsl.
-const HL_PC_LO: f32 = 0.5;
+/// Reinhard white point — MIRRORS present.wgsl `VIEW_LW`.
+const VIEW_LW: f32 = 4.0;
 
-/// Reinhard-extended shoulder + gentle S-curve. White point == gain, so scene
-/// luminance 1.0 (sensor saturation) lands on display white.
-fn tone_curve(v: f32, g: f32, contrast: f32) -> f32 {
-    let x = v * g;
-    let r = x * (1.0 + x / (g * g)) / (1.0 + x);
-    let s = 0.5 - 0.5 * (r.clamp(0.0, 1.0) * std::f32::consts::PI).cos();
-    (r + (s - r) * contrast).clamp(0.0, 1.0)
-}
-
-/// Display look — MIRRORS present.wgsl `view_look` so export == preview.
+/// Display look — MIRRORS present.wgsl `view_look` (looks 0 / 1).
+/// Camera-without-DCP is the Affinity-matched fallback (gain 1.08), not the
+/// old punchy Reinhard. DCP Camera uses looks 5/6/7 via [`apply_present_look`].
 fn view_look(rgb: [f32; 3], camera: bool) -> [f32; 3] {
-    let (gain, contrast, sat, baseline_ev, hl_pc) = if camera {
-        (1.6f32, 0.62f32, 1.22f32, 0.75f32, 1.0f32)
+    let (gain, contrast, sat) = if camera {
+        (1.08f32, 0.16f32, 1.02f32)
     } else {
-        // Neutral stays colorimetric — no baseline lift, no highlight blend.
-        (1.15f32, 0.12f32, 1.0f32, 0.0f32, 0.0f32)
+        (1.15f32, 0.12f32, 1.0f32)
     };
-    // Baseline exposure rides on the gain; the white point tracks it, so scene
-    // luminance 1.0 still lands on display white. See present.wgsl::view_look.
-    let g = gain * baseline_ev.exp2();
     let rgb = [rgb[0].max(0.0), rgb[1].max(0.0), rgb[2].max(0.0)];
     let l = 0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2];
     if l <= 1e-8 {
         return [0.0; 3];
     }
-    let ld = tone_curve(l, g, contrast);
+    let x = l * gain;
+    let r = x * (1.0 + x / (VIEW_LW * VIEW_LW)) / (1.0 + x);
+    let s = 0.5 - 0.5 * (r.clamp(0.0, 1.0) * std::f32::consts::PI).cos();
+    let ld = (r + (s - r) * contrast).clamp(0.0, 1.0);
     let k = ld / l;
     let mut out = [rgb[0] * k, rgb[1] * k, rgb[2] * k];
     let l2 = 0.2126 * out[0].max(0.0) + 0.7152 * out[1].max(0.0) + 0.0722 * out[2].max(0.0);
     for c in out.iter_mut() {
         *c = (l2 + (*c - l2) * sat).max(0.0);
     }
-    // Crossfade into a per-channel curve near white so highlights desaturate
-    // instead of carrying the illuminant's cast to display white.
-    if hl_pc > 0.0 {
-        let u = ((ld - HL_PC_LO) / (1.0 - HL_PC_LO)).clamp(0.0, 1.0);
-        let w = u * u * (3.0 - 2.0 * u) * hl_pc;
-        for (c, &s) in out.iter_mut().zip(rgb.iter()) {
-            *c += (tone_curve(s, g, contrast) - *c) * w;
-        }
-    }
-    let mx = out[0].max(out[1]).max(out[2]);
-    if mx > 1.0 {
-        let l3 = 0.2126 * out[0] + 0.7152 * out[1] + 0.0722 * out[2];
-        let w = ((mx - 1.0) / mx).clamp(0.0, 1.0);
-        for c in out.iter_mut() {
-            *c = (*c + (l3 - *c) * w).max(0.0);
-        }
-    }
     out
+}
+
+/// Post-matrix look used by present.wgsl after Rec.2020 → sRGB.
+/// Looks 5/6/7 are the DCP Camera grades; 0/1 are Neutral / no-DCP Camera.
+fn apply_present_look(srgb: [f32; 3], look: u32) -> [f32; 3] {
+    let c = [srgb[0].max(0.0), srgb[1].max(0.0), srgb[2].max(0.0)];
+    match look {
+        5 => DcpProfile::view_look_display(c),
+        6 => DcpProfile::view_look_display_embedded(c),
+        7 => DcpProfile::view_look_display_builtin(c),
+        1 => view_look(c, true),
+        _ => view_look(c, false),
+    }
 }
 
 /// Constant-hue gamut compression: mix toward luma until in-gamut (≥0).
@@ -272,51 +260,16 @@ pub fn output_transform(
     want16: bool,
     camera_look: bool,
 ) -> EncodedImage {
-    let m = target_from_rec2020(target);
     // present.wgsl converts Rec.2020 → sRGB *before* running the look, so the
     // look must run in linear sRGB here too or export drifts from the preview.
-    // The operator is not colour-space agnostic: it weights luminance with
-    // Rec.709 coefficients and scales saturation about it, so feeding it
-    // Rec.2020 primaries shifts both. Re-encode to the requested target after.
-    let to_srgb = target_from_rec2020(TargetSpace::Srgb);
-    let srgb_to_target = mat_mul(
-        &m,
-        &color::mat_inverse(&to_srgb).expect("srgb matrix invertible"),
-    );
-    let px = (width * height) as usize;
-    let mut rgb8 = if want16 {
-        Vec::new()
-    } else {
-        Vec::with_capacity(px * 3)
-    };
-    let mut rgb16 = if want16 {
-        Vec::with_capacity(px * 3)
-    } else {
-        Vec::new()
-    };
-    for i in 0..px {
-        let lin = [
-            linear[i * 3].max(0.0),
-            linear[i * 3 + 1].max(0.0),
-            linear[i * 3 + 2].max(0.0),
-        ];
-        let looked = view_look(mat_vec(&to_srgb, lin).map(|c| c.max(0.0)), camera_look);
-        let target_lin = gamut_compress(mat_vec(&srgb_to_target, looked));
-        for c in target_lin {
-            let e = oetf(target, c);
-            if want16 {
-                rgb16.push((e * 65535.0).round() as u16);
-            } else {
-                rgb8.push((e * 255.0).round() as u8);
-            }
-        }
-    }
-    EncodedImage {
+    encode_looked(
+        linear,
         width,
         height,
-        rgb8,
-        rgb16,
-    }
+        target,
+        want16,
+        if camera_look { 1 } else { 0 },
+    )
 }
 
 /// Original look — gamut map + OETF only (mirrors present.wgsl look 4).
@@ -419,10 +372,11 @@ fn agx_srgb_output(linear: &[f32], width: u32, height: u32) -> EncodedImage {
     }
 }
 
-/// Look-aware output: look 0/1 → the Reinhard view transform; look 2 (Filmic
-/// AgX) → AgX for sRGB 8-bit; look 3/4 → gamut map + OETF only (no view look).
-/// Look 3 is the JPEG/raster zero-edit path — must NOT fall through to the
-/// Camera punchy transform (`look >= 1` used to treat 3 as punchy).
+/// Look-aware output — MIRRORS present.wgsl dispatch:
+/// look 2 (Filmic AgX) → AgX for sRGB 8-bit; look 3/4 → gamut map + OETF;
+/// look 5/6/7 → DCP Camera grades; look 0/1 → Neutral / no-DCP Camera.
+/// Looks 5/6/7 used to fall through to `look >= 1` (old punchy Reinhard),
+/// which made Camera-look ARW exports diverge from the viewport.
 pub fn output_transform_look(
     linear: &[f32],
     width: u32,
@@ -437,7 +391,58 @@ pub fn output_transform_look(
     if look == 3 || look == 4 {
         return output_transform_passthrough(linear, width, height, target, want16);
     }
-    output_transform(linear, width, height, target, want16, look >= 1)
+    encode_looked(linear, width, height, target, want16, look)
+}
+
+/// Rec.2020 → sRGB → present look → delivery space + OETF.
+fn encode_looked(
+    linear: &[f32],
+    width: u32,
+    height: u32,
+    target: TargetSpace,
+    want16: bool,
+    look: u32,
+) -> EncodedImage {
+    let m = target_from_rec2020(target);
+    let to_srgb = target_from_rec2020(TargetSpace::Srgb);
+    let srgb_to_target = mat_mul(
+        &m,
+        &color::mat_inverse(&to_srgb).expect("srgb matrix invertible"),
+    );
+    let px = (width * height) as usize;
+    let mut rgb8 = if want16 {
+        Vec::new()
+    } else {
+        Vec::with_capacity(px * 3)
+    };
+    let mut rgb16 = if want16 {
+        Vec::with_capacity(px * 3)
+    } else {
+        Vec::new()
+    };
+    for i in 0..px {
+        let lin = [
+            linear[i * 3].max(0.0),
+            linear[i * 3 + 1].max(0.0),
+            linear[i * 3 + 2].max(0.0),
+        ];
+        let looked = apply_present_look(mat_vec(&to_srgb, lin).map(|c| c.max(0.0)), look);
+        let target_lin = gamut_compress(mat_vec(&srgb_to_target, looked));
+        for c in target_lin {
+            let e = oetf(target, c);
+            if want16 {
+                rgb16.push((e * 65535.0).round() as u16);
+            } else {
+                rgb8.push((e * 255.0).round() as u8);
+            }
+        }
+    }
+    EncodedImage {
+        width,
+        height,
+        rgb8,
+        rgb16,
+    }
 }
 
 /// Lanczos resize in LINEAR space (before the output transform — quality).
@@ -1047,19 +1052,17 @@ mod tests {
         }
     }
 
-    /// The shoulder must compress toward white rather than clip early: scene
-    /// luminance 1.0 is sensor saturation and belongs at display white, but
-    /// everything below it has to stay off the ceiling, and the response has
-    /// to flatten as it approaches white instead of running straight into it.
+    /// Neutral look (present.wgsl VIEW_LW=4) is monotone and does not clip
+    /// mid-highlights. Sensor sat does *not* slam to display white — that was
+    /// the old export-only Reinhard (white point == gain).
     #[test]
-    fn highlights_roll_off_into_white() {
+    fn highlights_roll_off_without_clipping() {
         let enc = |v: f32| {
             output_transform(&[v, v, v], 1, 1, TargetSpace::Srgb, false, false).rgb8[0] as i32
         };
-        assert_eq!(enc(1.0), 255, "sensor saturation must reach display white");
-        assert!(enc(0.7) < 255, "premature clip at 0.7: {}", enc(0.7));
+        assert!(enc(1.0) < 255, "Neutral look must not slam sat to white");
+        assert!(enc(0.7) < enc(1.0), "not monotone at the top");
         assert!(enc(0.5) < enc(0.7), "not monotone");
-        // concave shoulder: the same linear step buys less near white
         assert!(
             enc(0.7) - enc(0.5) < enc(0.3) - enc(0.1),
             "no compression near white: {} vs {}",
@@ -1068,46 +1071,56 @@ mod tests {
         );
     }
 
-    /// Camera look carries a baseline exposure, so a mid-gray renders well
-    /// above the colorimetric Neutral look — without burning the top end,
-    /// because the shoulder's white point rides the same gain.
+    /// No-DCP Camera (look 1) is the milder Affinity fallback, not a +20-byte
+    /// punchy lift over Neutral. Both stay off the ceiling at mid-highlights.
     #[test]
-    fn camera_look_lifts_midtones_without_burning_white() {
+    fn camera_fallback_stays_near_neutral() {
         let enc = |v: f32, camera: bool| {
             output_transform(&[v, v, v], 1, 1, TargetSpace::Srgb, false, camera).rgb8[0] as i32
         };
         let (mid_cam, mid_neu) = (enc(0.1655, true), enc(0.1655, false));
         assert!(
-            mid_cam > mid_neu + 20,
-            "no baseline lift: camera {mid_cam} vs neutral {mid_neu}"
+            (mid_cam - mid_neu).abs() < 20,
+            "look 1 drifted from Neutral: camera {mid_cam} vs neutral {mid_neu}"
         );
-        assert_eq!(enc(1.0, true), 255, "sensor saturation must reach white");
         assert!(enc(0.75, true) < 255, "burnt at 0.75: {}", enc(0.75, true));
         assert!(enc(0.5, true) < enc(0.75, true), "not monotone");
     }
 
-    /// A cast that survives to display white leaves highlights tinted instead
-    /// of white. The per-channel crossfade must pull a bright off-neutral back
-    /// toward neutral while leaving the same chromaticity alone in the mids.
+    /// DCP Camera grades (looks 5/6/7) must not fall through to look 1.
+    /// That fall-through was the old punchy Reinhard and made ARW Camera
+    /// exports diverge from the viewport.
     #[test]
-    fn camera_highlights_converge_toward_neutral() {
-        let spread = |v: f32| {
-            let e = output_transform(
-                &[v * 0.80, v * 0.90, v],
-                1,
-                1,
-                TargetSpace::Srgb,
-                false,
-                true,
-            );
-            e.rgb8[2] as i32 - e.rgb8[0] as i32
-        };
-        assert!(
-            spread(0.98) < spread(0.45),
-            "cast not neutralised near white: {} at 0.98 vs {} at 0.45",
-            spread(0.98),
-            spread(0.45)
+    fn dcp_camera_grades_are_not_punchy_fallback() {
+        let lin = [0.35f32, 0.38, 0.36];
+        let fallback = output_transform_look(&lin, 1, 1, TargetSpace::Srgb, false, 1);
+        let look5 = output_transform_look(&lin, 1, 1, TargetSpace::Srgb, false, 5);
+        let look6 = output_transform_look(&lin, 1, 1, TargetSpace::Srgb, false, 6);
+        let look7 = output_transform_look(&lin, 1, 1, TargetSpace::Srgb, false, 7);
+        assert_ne!(
+            look5.rgb8, fallback.rgb8,
+            "look 5 must not equal no-DCP Camera"
         );
+        assert_ne!(
+            look6.rgb8, fallback.rgb8,
+            "look 6 must not equal no-DCP Camera"
+        );
+        assert_ne!(
+            look7.rgb8, fallback.rgb8,
+            "look 7 must not equal no-DCP Camera"
+        );
+        let to_srgb = target_from_rec2020(TargetSpace::Srgb);
+        let srgb = mat_vec(&to_srgb, lin).map(|c| c.max(0.0));
+        let graded = DcpProfile::view_look_display(srgb);
+        for ch in 0..3 {
+            let expect =
+                (oetf(TargetSpace::Srgb, graded[ch].clamp(0.0, 1.0)) * 255.0).round() as i32;
+            assert!(
+                (look5.rgb8[ch] as i32 - expect).abs() <= 1,
+                "look 5 must use the DCP grade: ch{ch} got {} want {expect}",
+                look5.rgb8[ch]
+            );
+        }
     }
 
     /// present.wgsl converts Rec.2020 → sRGB and *then* runs the look. sRGB
@@ -1128,16 +1141,16 @@ mod tests {
             [0.02, 0.02, 0.02],
             [0.75, 0.80, 0.30],
         ] {
-            for camera in [false, true] {
+            for look in [0u32, 1, 5, 6, 7] {
                 let c = mat_vec(&PRESENT_REC2020_TO_SRGB, rec).map(|v| v.max(0.0));
-                let preview = view_look(c, camera)
+                let preview = apply_present_look(c, look)
                     .map(|v| (oetf(TargetSpace::Srgb, v.clamp(0.0, 1.0)) * 255.0).round() as i32);
-                let got = output_transform(&rec, 1, 1, TargetSpace::Srgb, false, camera);
+                let got = output_transform_look(&rec, 1, 1, TargetSpace::Srgb, false, look);
                 for ch in 0..3 {
                     let d = (preview[ch] - got.rgb8[ch] as i32).abs();
                     assert!(
                         d <= 1,
-                        "preview/export split on {rec:?} camera={camera} ch{ch}: \
+                        "preview/export split on {rec:?} look={look} ch{ch}: \
                          preview {} vs export {}",
                         preview[ch],
                         got.rgb8[ch]
