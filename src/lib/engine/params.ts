@@ -5,7 +5,8 @@ import { atom } from "nanostores";
 import { getRegistry, setParam } from "../../ipc/commands";
 import type { EditDocMirror, ImageMeta, ParamSpec } from "../../ipc/types";
 import { docParam, reconcile } from "../../stores/doc";
-import { selectedMask } from "../../stores/app";
+import { cropActive, selectedMask } from "../../stores/app";
+import { markCropGesture } from "../../crop/cropSession";
 import { beginMaskAdjust, endMaskAdjust } from "../../stores/mask";
 
 export const registry = atom<ParamSpec[]>([]);
@@ -77,6 +78,7 @@ function targetPath(path: string): string {
 }
 
 function send(path: string, v: number, live: boolean): Promise<void> {
+  if (path.startsWith("crop.")) markCropGesture();
   const s = stateFor(path);
   const seq = ++s.seq;
   return setParam(targetPath(path), v, live)
@@ -118,7 +120,9 @@ export function commitParam(path: string, v: number): Promise<void> {
   const s = stateFor(path);
   s.pendingLive = null;
   if (selectedMask.get()) beginMaskAdjust();
-  return send(path, v, false).finally(() => {
+  // Keep crop-tool slider releases inside the same undo gesture as the overlay.
+  const live = path.startsWith("crop.") && cropActive.get();
+  return send(path, v, live).finally(() => {
     if (selectedMask.get()) endMaskAdjust();
   });
 }

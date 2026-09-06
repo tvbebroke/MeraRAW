@@ -4,7 +4,7 @@ import { isSettingsOpen, isExportOpen, isBugReportOpen, classicLook, isShortcuts
 import { applyEditFocus, leaveCropTool, showAiPanel, showMaskPanel } from "./editor/focus";
 import { applyCropParams } from "../crop/cropActions";
 import { cropWithDraft, flipCropOrientation } from "../crop/cropMath";
-import { cropDraft, setCropDraft } from "../crop/cropSession";
+import { cropDraft, markCropGesture, setCropDraft } from "../crop/cropSession";
 import { cropActive, imageDims, imageMeta, selectedMask, viewportTool, brushRadius } from "../stores/app";
 import { doc, reconcile } from "../stores/doc";
 import { activePhoto, libraryItems, openPhoto, gridKey } from "../stores/browse";
@@ -283,7 +283,8 @@ export function handleGlobalShortcut(e: KeyboardEvent): void {
         dims.w,
         dims.h,
       );
-      void applyCropParams(next)
+      markCropGesture();
+      void applyCropParams(next, true)
         .then((d) => {
           setCropDraft(null);
           reconcile(d);

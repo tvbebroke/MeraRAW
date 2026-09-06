@@ -1,6 +1,5 @@
 <script lang="ts">
-  import { onDestroy } from "svelte";
-  import { cropDraft, flushCropDraft, setCropDraft } from "./cropSession";
+  import { cropDraft, setCropDraft } from "./cropSession";
   import {
     aspectRatio,
     cropParamsEqual,
@@ -44,10 +43,6 @@
       window.removeEventListener("pointerup", up);
       window.removeEventListener("pointercancel", up);
     };
-  });
-
-  onDestroy(() => {
-    void flushCropDraft();
   });
 
   function previewCrop(): CropParams {
@@ -143,12 +138,9 @@
     const start = drag.start;
     const next = previewCrop();
     drag = null;
-    if (cropParamsEqual(next, start)) {
-      setCropDraft(null);
-      return;
-    }
-    setCropDraft(next);
-    void flushCropDraft();
+    // Keep the in-progress rect locally. Writing on every pointer-up
+    // recorded a history step per drag; Enter flushes once.
+    if (!cropParamsEqual(next, start)) setCropDraft(next);
   }
 </script>
 

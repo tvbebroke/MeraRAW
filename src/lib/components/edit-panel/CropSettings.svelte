@@ -7,7 +7,7 @@
     flipCropOrientation,
     type CropParams,
   } from "../../../crop/cropMath";
-  import { cropDraft, setCropDraft } from "../../../crop/cropSession";
+  import { abandonCropSession, cropDraft, markCropGesture, setCropDraft } from "../../../crop/cropSession";
   import { doc, reconcile } from "../../../stores/doc";
   import { imageDims } from "../../../stores/app";
   import { autoLevel } from "../../../ipc/commands";
@@ -37,9 +37,11 @@
     return id;
   });
 
-  async function patch(next: CropParams, live = false) {
+  async function patch(next: CropParams) {
+    markCropGesture();
+    setCropDraft(next);
     try {
-      reconcile(await applyCropParams(next, live));
+      reconcile(await applyCropParams(next, true));
       setCropDraft(null);
     } catch {
       /* ignore */
@@ -75,7 +77,7 @@
 
   async function reset() {
     try {
-      setCropDraft(null);
+      abandonCropSession();
       reconcile(await resetCropModule());
     } catch {
       /* ignore */
