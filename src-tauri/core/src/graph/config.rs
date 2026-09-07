@@ -185,9 +185,13 @@ struct EffectsU {
     grain_size: f32,
     vignette_amount: f32,
     vignette_midpoint: f32,
+    dehaze: f32,
+    _pad0: f32,
+    _pad1: f32,
     width: u32,
     height: u32,
     frame_index: u32,
+    _pad2: u32,
 }
 
 fn rows(m: &Mat3) -> ([f32; 4], [f32; 4], [f32; 4]) {
@@ -692,7 +696,7 @@ pub fn node_configs(
         }
     }
 
-    // effects (grain / vignette / clarity) — identity when all amounts are 0
+    // effects (dehaze / grain / vignette / clarity) — identity when all amounts are 0
     {
         let clarity = eff(doc, "effects", "clarity");
         let frame = doc
@@ -702,7 +706,10 @@ pub fn node_configs(
             .unwrap_or(0) as u32;
         let grain = eff(doc, "effects", "grain_amount");
         let vignette = eff(doc, "effects", "vignette_amount");
-        if !module_enabled(doc, "effects") || (clarity == 0.0 && grain == 0.0 && vignette == 0.0) {
+        let dehaze = eff(doc, "effects", "dehaze");
+        if !module_enabled(doc, "effects")
+            || (clarity == 0.0 && grain == 0.0 && vignette == 0.0 && dehaze == 0.0)
+        {
             out.push(NodeConfig::Skip);
         } else {
             out.push(run(EffectsU {
@@ -711,9 +718,13 @@ pub fn node_configs(
                 grain_size: eff(doc, "effects", "grain_size"),
                 vignette_amount: vignette / 100.0,
                 vignette_midpoint: eff(doc, "effects", "vignette_midpoint") / 100.0,
+                dehaze: dehaze / 100.0,
+                _pad0: 0.0,
+                _pad1: 0.0,
                 width: w,
                 height: h,
                 frame_index: frame,
+                _pad2: 0,
             }));
         }
     }
@@ -805,5 +816,14 @@ mod tests {
         doc.set("exposure", "enabled", ParamValue::F32(0.0));
         let configs = node_configs(&doc, 5200.0, 10, 10, None);
         assert!(matches!(configs[0], NodeConfig::Skip));
+    }
+
+    #[test]
+    fn dehaze_activates_effects_node() {
+        let mut doc = EditDoc::new("/x.ARW");
+        doc.set("effects", "dehaze", ParamValue::F32(40.0));
+        let configs = node_configs(&doc, 5200.0, 10, 10, None);
+        assert!(matches!(configs[10], NodeConfig::Run { .. }));
+        assert_eq!(std::mem::size_of::<EffectsU>() % 16, 0);
     }
 }

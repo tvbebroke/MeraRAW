@@ -11,6 +11,7 @@
   <ParamRow path="tone_curve.highlights" label="Highlights" />
   <ParamRow path="tone_curve.shadows" label="Shadows" />
   <ParamRow path="tone_curve.sigmoid" label="Sigmoid" />
+  <ParamRow path="effects.dehaze" label="Dehaze" />
   <Disclosure label="Advanced">
     <ParamRow path="highlights.clip" label="Highlight clip" />
     <ParamRow path="highlights.enabled" label="Highlights on" />

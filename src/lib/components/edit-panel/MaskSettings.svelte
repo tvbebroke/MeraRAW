@@ -585,6 +585,9 @@
         <button type="button" class="tool-btn" onclick={() => void (active ? addComponent("face") : addMask("face"))}>
           <span class="ico">☺</span> Face
         </button>
+        <button type="button" class="tool-btn" onclick={() => void (active ? addComponent("eyes") : addMask("eyes"))}>
+          <span class="ico">◎</span> Eyes
+        </button>
         <button type="button" class="tool-btn" onclick={() => void (active ? addComponent("depth") : addMask("depth"))}>
           <span class="ico">⇅</span> Depth
         </button>

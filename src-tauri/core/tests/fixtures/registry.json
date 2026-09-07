@@ -728,6 +728,19 @@
     }
   },
   {
+    "path": "effects.dehaze",
+    "ty": "f32",
+    "min": -100.0,
+    "max": 100.0,
+    "default": 0.0,
+    "ui": {
+      "label": "Dehaze",
+      "step": 1.0,
+      "scale": "linear",
+      "group": "Effects"
+    }
+  },
+  {
     "path": "effects.enabled",
     "ty": "f32",
     "min": 0.0,

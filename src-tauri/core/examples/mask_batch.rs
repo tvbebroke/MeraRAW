@@ -255,6 +255,17 @@ fn main() {
                             flags.push("face_tall");
                         }
                     }
+                    if kind == "eyes" && cov_soft < 0.0008 {
+                        flags.push("eyes_empty");
+                    }
+                    if kind == "water" {
+                        if cov_soft < 0.02 {
+                            flags.push("water_empty");
+                        }
+                        if cov > 0.92 {
+                            flags.push("water_too_large");
+                        }
+                    }
                     file_rep["kinds"][kind] = json!({
                         "ms": ms,
                         "cov05": (cov * 1000.0).round() / 10.0,

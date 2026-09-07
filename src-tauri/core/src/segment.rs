@@ -6,6 +6,8 @@
 //! Subject: bundled u2netp, or override via `MERARAW_SUBJECT_MODEL` /
 //! `~/Library/Application Support/MeraRAW/models/subject/merasubject-v1.onnx`
 //! (see `segment/train/`). Sky: bundled U²-Net skyseg (MIT, xiongzhu666).
+//! People faces: bundled UltraFace RFB-320 (MIT, Linzaer). Eyes: UltraFace
+//! boxes plus a contrast detector on the subject (wildlife + portraits).
 //! Object-by-point: color-similarity region grow seeded at the point.
 
 use crate::error::CoreError;
@@ -2175,12 +2177,19 @@ fn sample_enc_rgb(img: &RgbF32Buf, mx: usize, my: usize, mw: usize, mh: usize) -
 }
 
 fn is_skin_rgb(r: f32, g: f32, b: f32) -> f32 {
-    // Encoded-RGB skin gate — covers light → deep skin, olive, and warm undertones.
+    // Encoded-RGB skin gate — covers light → deep skin, olive, and cool fill.
     if r < 0.05 || g < 0.03 || b < 0.015 {
         return 0.0;
     }
-    // Skin is typically R ≥ G ≥ B (or near), allowing deep / olive tones.
-    if r + 0.02 < g || g + 0.04 < b * 0.9 {
+    // Skin is typically R ≥ G (or near). Overcast fill can lift B toward G
+    // without becoming sky-blue (that still fails the B-vs-R check below).
+    if r + 0.025 < g {
+        return 0.0;
+    }
+    if b > r + 0.08 {
+        return 0.0;
+    }
+    if g + 0.055 < b * 0.92 && r + 0.01 < b {
         return 0.0;
     }
     let rg = r - g;
@@ -2524,13 +2533,61 @@ fn subject_bbox(subject: &Mask01) -> (usize, usize, usize, usize) {
     }
 }
 
-/// Face ≈ upper subject ∩ skin (portrait prior), biased toward center.
+/// Face ≈ detected people boxes ∪ upper subject ∩ skin ∪ head around eyes.
 ///
-/// Skin evidence is required for a non-empty face — oval-only fallback was
-/// lighting up bird/animal heads. Without skin, return empty (correct for
-/// wildlife and back-of-head portraits). B&W portraits use a midtone oval
-/// only when the whole subject is achromatic.
+/// Skin-only fallback still requires real skin hits so a cool grey torso
+/// does not become a face. Wildlife heads come from eye blobs, not skin.
 pub fn extract_face_mask(subject: &Mask01, img: &RgbF32Buf) -> Mask01 {
+    let (w, h) = (subject.width, subject.height);
+    let mut data = vec![0.0f32; w * h];
+
+    for face in crate::face_detect::detect_faces(img) {
+        if face.width() * face.height() > 0.22 {
+            // Huge boxes without skin are usually animals / torso false hits.
+            let skin_frac = face_box_skin_fraction(img, face);
+            if skin_frac < 0.12 {
+                continue;
+            }
+        }
+        paint_detected_face(&mut data, w, h, face, subject, img);
+    }
+
+    let skin = face_from_skin_heuristic(subject, img);
+    for i in 0..data.len() {
+        data[i] = data[i].max(skin.data[i]);
+    }
+
+    let eyes = find_eye_blobs(subject, img, img.width, img.height);
+    let sx = w as f32 / img.width.max(1) as f32;
+    let sy = h as f32 / img.height.max(1) as f32;
+    let scaled: Vec<EyeBlob> = eyes
+        .iter()
+        .map(|e| EyeBlob {
+            cx: e.cx * sx,
+            cy: e.cy * sy,
+            rx: e.rx * sx,
+            ry: e.ry * sy,
+            score: e.score,
+        })
+        .collect();
+    paint_heads_around_eyes(&mut data, w, h, &scaled, subject, img);
+
+    if data.iter().all(|v| *v < 0.08) {
+        return Mask01 {
+            width: w,
+            height: h,
+            data,
+        };
+    }
+    soft_cleanup_face(&mut data, w, h);
+    Mask01 {
+        width: w,
+        height: h,
+        data,
+    }
+}
+
+fn face_from_skin_heuristic(subject: &Mask01, img: &RgbF32Buf) -> Mask01 {
     let (w, h) = (subject.width, subject.height);
     let (x0, x1, y0, y1) = subject_bbox(subject);
     let span_y = (y1.saturating_sub(y0)).max(1) as f32;
@@ -2538,7 +2595,7 @@ pub fn extract_face_mask(subject: &Mask01, img: &RgbF32Buf) -> Mask01 {
     let cx = (x0 + x1) as f32 * 0.5;
     let bw = subject_is_achromatic(subject, img);
     let cy = if bw {
-        y0 as f32 + span_y * 0.34 // B&W: sit lower so cheeks/mouth enter midtone oval
+        y0 as f32 + span_y * 0.34
     } else {
         y0 as f32 + span_y * 0.28
     };
@@ -2546,7 +2603,6 @@ pub fn extract_face_mask(subject: &Mask01, img: &RgbF32Buf) -> Mask01 {
     let mut skin_hits = 0u32;
     for y in 0..h {
         let y_norm = (y.saturating_sub(y0) as f32) / span_y;
-        // Face lives in the upper ~55% of the subject bbox (tighter than body).
         if y_norm > 0.55 {
             continue;
         }
@@ -2565,13 +2621,11 @@ pub fn extract_face_mask(subject: &Mask01, img: &RgbF32Buf) -> Mask01 {
             let [r, g, b] = sample_enc_rgb(img, x, y, w, h);
             let mut skin = is_skin_rgb(r, g, b);
             if bw && skin < 0.16 {
-                // Grayscale face: midtone oval only (not hair-dark / shirt-light).
                 let luma = 0.299 * r + 0.587 * g + 0.114 * b;
                 if (0.28..=0.82).contains(&luma) && oval > 0.35 {
                     skin = ((0.72 - (luma - 0.5).abs()) / 0.5).clamp(0.2, 0.7) * oval;
                 }
             }
-            // Fur / beak / feathers often weakly match skin — require real hits.
             if skin < 0.16 {
                 continue;
             }
@@ -2580,7 +2634,6 @@ pub fn extract_face_mask(subject: &Mask01, img: &RgbF32Buf) -> Mask01 {
             data[i] = (s * (0.25 + 0.75 * skin) * prior).clamp(0.0, 1.0);
         }
     }
-    // Too little skin in the upper subject → not a human face (birds, pets, backs).
     let upper_area = ((span_y * 0.55) * span_x).max(1.0);
     let min_hits = if bw {
         (upper_area * 0.008).max(8.0)
@@ -2594,11 +2647,81 @@ pub fn extract_face_mask(subject: &Mask01, img: &RgbF32Buf) -> Mask01 {
             data: vec![0.0; w * h],
         };
     }
-    soft_cleanup_face(&mut data, w, h);
     Mask01 {
         width: w,
         height: h,
         data,
+    }
+}
+
+fn face_box_skin_fraction(img: &RgbF32Buf, face: crate::face_detect::FaceBox) -> f32 {
+    let (w, h) = (img.width.max(1), img.height.max(1));
+    let x0 = (face.x0 * w as f32) as usize;
+    let y0 = (face.y0 * h as f32) as usize;
+    let x1 = (face.x1 * w as f32).min(w as f32) as usize;
+    let y1 = (face.y1 * h as f32).min(h as f32) as usize;
+    if x1 <= x0 || y1 <= y0 {
+        return 0.0;
+    }
+    let step = ((x1 - x0).max(y1 - y0) / 16).max(1);
+    let mut n = 0u32;
+    let mut skin = 0u32;
+    for y in (y0..y1).step_by(step) {
+        for x in (x0..x1).step_by(step) {
+            n += 1;
+            let i = (y * w + x) * 3;
+            let (r, g, b) = (enc(img.data[i]), enc(img.data[i + 1]), enc(img.data[i + 2]));
+            if is_skin_rgb(r, g, b) > 0.16 {
+                skin += 1;
+            }
+        }
+    }
+    if n == 0 {
+        0.0
+    } else {
+        skin as f32 / n as f32
+    }
+}
+
+fn paint_detected_face(
+    data: &mut [f32],
+    w: usize,
+    h: usize,
+    face: crate::face_detect::FaceBox,
+    subject: &Mask01,
+    img: &RgbF32Buf,
+) {
+    let pad_x = face.width() * 0.08;
+    let pad_y = face.height() * 0.10;
+    let x0 = ((face.x0 - pad_x) * w as f32).floor().max(0.0) as usize;
+    let y0 = ((face.y0 - pad_y) * h as f32).floor().max(0.0) as usize;
+    let x1 = ((face.x1 + pad_x) * w as f32).ceil().min(w as f32) as usize;
+    let y1 = ((face.y1 + pad_y) * h as f32).ceil().min(h as f32) as usize;
+    let cx = face.cx() * w as f32;
+    let cy = face.cy() * h as f32;
+    let rx = (face.width() * w as f32 * 0.52).max(2.0);
+    let ry = (face.height() * h as f32 * 0.56).max(2.0);
+    for y in y0..y1 {
+        for x in x0..x1 {
+            let nx = (x as f32 - cx) / rx;
+            let ny = (y as f32 - cy) / ry;
+            let d = nx * nx + ny * ny;
+            if d > 1.05 {
+                continue;
+            }
+            let i = y * w + x;
+            let [r, g, b] = sample_enc_rgb(img, x, y, w, h);
+            let skin = is_skin_rgb(r, g, b);
+            let luma = 0.299 * r + 0.587 * g + 0.114 * b;
+            let sub = subject.data.get(i).copied().unwrap_or(0.0);
+            let inside = (1.0 - d * 0.45).clamp(0.2, 1.0);
+            let boost = skin.max(0.35).max(if (0.12..=0.92).contains(&luma) {
+                0.45
+            } else {
+                0.2
+            });
+            data[i] = data[i].max((inside * boost * (0.55 + 0.45 * sub.max(0.4))).clamp(0.0, 1.0));
+        }
     }
 }
 
@@ -2624,11 +2747,16 @@ fn is_eye_rgb(r: f32, g: f32, b: f32) -> f32 {
     let mx = r.max(g).max(b);
     let mn = r.min(g).min(b);
     let chroma = mx - mn;
-    // Iris / pupil: dark low-chroma; sclera: bright low-chroma; mild blue iris boost.
-    let dark = (1.0 - luma / 0.3).clamp(0.0, 1.0) * (1.0 - chroma / 0.28).clamp(0.15, 1.0);
+    // Iris / pupil: dark low-chroma; sclera: bright low-chroma; blue / amber irises.
+    let dark = (1.0 - luma / 0.42).clamp(0.0, 1.0) * (1.0 - chroma / 0.28).clamp(0.15, 1.0);
     let sclera = ((luma - 0.52) / 0.38).clamp(0.0, 1.0) * (1.0 - chroma / 0.22).clamp(0.0, 1.0);
     let blue_iris = ((b - r) / 0.2).clamp(0.0, 1.0) * ((0.45 - luma).max(0.0) / 0.35 + 0.2);
-    dark.max(sclera * 0.9).max(blue_iris * 0.55)
+    let amber = ((r.max(g) - b) / 0.28).clamp(0.0, 1.0)
+        * (1.0 - (r - g).abs() / 0.22).clamp(0.2, 1.0)
+        * ((0.52 - luma).max(0.0) / 0.4 + 0.15);
+    dark.max(sclera * 0.9)
+        .max(blue_iris * 0.55)
+        .max(amber * 0.7)
 }
 
 /// Lips ≈ lower-face skin band ∩ warm red.
@@ -2661,41 +2789,409 @@ pub fn extract_lips_mask(subject: &Mask01, img: &RgbF32Buf) -> Mask01 {
     }
 }
 
-/// Eyes ≈ upper-face band ∩ dark iris / bright sclera, left+right bias.
-pub fn extract_eyes_mask(subject: &Mask01, img: &RgbF32Buf) -> Mask01 {
-    let face = extract_face_mask(subject, img);
-    let (w, h) = (face.width, face.height);
-    let (fx0, fx1, fy0, fy1) = subject_bbox(&face);
-    let span_y = (fy1.saturating_sub(fy0)).max(1) as f32;
-    let span_x = (fx1.saturating_sub(fx0)).max(1) as f32;
-    let cx = (fx0 + fx1) as f32 * 0.5;
-    let mut data = vec![0.0f32; w * h];
-    for y in 0..h {
-        let y_norm = (y.saturating_sub(fy0) as f32) / span_y;
-        if !(0.18..=0.48).contains(&y_norm) {
+fn subject_at(subject: &Mask01, x: usize, y: usize, w: usize, h: usize) -> f32 {
+    if subject.width == 0 || subject.height == 0 {
+        return 0.0;
+    }
+    if subject.width == w && subject.height == h {
+        return subject.data.get(y * w + x).copied().unwrap_or(0.0);
+    }
+    let sx = ((x as f32 + 0.5) * subject.width as f32 / w.max(1) as f32) as usize;
+    let sy = ((y as f32 + 0.5) * subject.height as f32 / h.max(1) as f32) as usize;
+    subject.data.get(
+        sy.min(subject.height.saturating_sub(1)) * subject.width + sx.min(subject.width.saturating_sub(1)),
+    )
+    .copied()
+    .unwrap_or(0.0)
+}
+
+fn subject_near(subject: &Mask01, x: usize, y: usize, w: usize, h: usize, radius: i32) -> f32 {
+    let mut best = subject_at(subject, x, y, w, h);
+    if best > 0.2 || radius <= 0 {
+        return best;
+    }
+    for (dx, dy) in [
+        (-radius, 0),
+        (radius, 0),
+        (0, -radius),
+        (0, radius),
+        (-radius, -radius),
+        (radius, -radius),
+        (-radius, radius),
+        (radius, radius),
+    ] {
+        let nx = x as i32 + dx;
+        let ny = y as i32 + dy;
+        if nx < 0 || ny < 0 || nx as usize >= w || ny as usize >= h {
             continue;
         }
-        for x in 0..w {
-            let i = y * w + x;
-            if face.data[i] < 0.05 {
-                continue;
-            }
-            // Eyes sit off-center horizontally within the face.
-            let x_off = ((x as f32 - cx).abs() / (span_x * 0.5)).clamp(0.0, 1.0);
-            let eye_zone = if (0.12..=0.72).contains(&x_off) {
-                1.0
-            } else {
-                0.25
-            };
-            let [r, g, b] = sample_enc_rgb(img, x, y, w, h);
-            data[i] = (face.data[i].max(0.3) * is_eye_rgb(r, g, b) * eye_zone).clamp(0.0, 1.0);
+        best = best.max(subject_at(subject, nx as usize, ny as usize, w, h));
+    }
+    best
+}
+
+/// Eyes ≈ UltraFace eye bands ∪ dark/amber contrast blobs on the subject.
+pub fn extract_eyes_mask(subject: &Mask01, img: &RgbF32Buf) -> Mask01 {
+    let (w, h) = (img.width, img.height);
+    let mut data = vec![0.0f32; w * h];
+    for face in crate::face_detect::detect_faces(img) {
+        paint_human_eye_pair(&mut data, w, h, face, img);
+    }
+    for blob in find_eye_blobs(subject, img, w, h) {
+        paint_ellipse(
+            &mut data,
+            w,
+            h,
+            blob.cx,
+            blob.cy,
+            blob.rx * 1.15,
+            blob.ry * 1.15,
+            blob.score.clamp(0.45, 1.0),
+        );
+    }
+    let blurred = box_blur_3x3(&data, w, h);
+    for i in 0..data.len() {
+        data[i] = (data[i] * 0.65 + blurred[i] * 0.35).clamp(0.0, 1.0);
+        if data[i] < 0.05 {
+            data[i] = 0.0;
         }
     }
-    soft_cleanup_part(&mut data, w, h);
+    keep_strongest_blobs(&mut data, w, h, 0.10, 4);
     Mask01 {
         width: w,
         height: h,
         data,
+    }
+}
+
+#[derive(Clone, Copy)]
+struct EyeBlob {
+    cx: f32,
+    cy: f32,
+    rx: f32,
+    ry: f32,
+    score: f32,
+}
+
+fn mask_coverage(subject: &Mask01, thr: f32) -> f32 {
+    if subject.data.is_empty() {
+        return 0.0;
+    }
+    subject.data.iter().filter(|v| **v > thr).count() as f32 / subject.data.len() as f32
+}
+
+fn find_eye_blobs(subject: &Mask01, img: &RgbF32Buf, w: usize, h: usize) -> Vec<EyeBlob> {
+    if w < 12 || h < 12 {
+        return Vec::new();
+    }
+    let cov = mask_coverage(subject, 0.22);
+    if cov < 0.002 {
+        return Vec::new();
+    }
+    let loose_subject = cov > 0.42;
+    let min_contrast = if loose_subject { 0.16 } else { 0.08 };
+    let mut heat = vec![0.0f32; w * h];
+    let (sx0, sx1, sy0, sy1) = subject_bbox(subject);
+    let scale_x = w as f32 / subject.width.max(1) as f32;
+    let scale_y = h as f32 / subject.height.max(1) as f32;
+    let sub_w = ((sx1.saturating_sub(sx0)) as f32 * scale_x).max(1.0);
+    let sub_h = ((sy1.saturating_sub(sy0)) as f32 * scale_y).max(1.0);
+    let pad_x = (sub_w * 0.28).max(12.0);
+    let pad_y = (sub_h * 0.28).max(12.0);
+    let x_lo = ((sx0 as f32 * scale_x) - pad_x).max(2.0) as usize;
+    let y_lo = ((sy0 as f32 * scale_y) - pad_y).max(2.0) as usize;
+    let x_hi = ((sx1 as f32 * scale_x) + pad_x).min((w.saturating_sub(2)) as f32) as usize;
+    let y_hi = ((sy1 as f32 * scale_y) + pad_y).min((h.saturating_sub(2)) as f32) as usize;
+
+    for y in y_lo..y_hi {
+        let y_norm = y as f32 / h.max(1) as f32;
+        for x in x_lo..x_hi {
+            let i = y * w + x;
+            let sub = subject_near(subject, x, y, w, h, ((w.min(h) as f32) * 0.04) as i32);
+            let [r, g, b] = sample_enc_rgb(img, x, y, w, h);
+            if g > r + 0.07 && g > b + 0.04 {
+                continue;
+            }
+            // Dark pupils look like water; keep them when the surround is much brighter.
+            let luma = 0.299 * r + 0.587 * g + 0.114 * b;
+            let mut sur = 0.0f32;
+            let mut n = 0.0f32;
+            for (dx, dy) in [
+                (-2, 0),
+                (2, 0),
+                (0, -2),
+                (0, 2),
+                (-2, -2),
+                (2, -2),
+                (-2, 2),
+                (2, 2),
+            ] {
+                let [sr, sg, sb] = sample_enc_rgb(
+                    img,
+                    (x as i32 + dx) as usize,
+                    (y as i32 + dy) as usize,
+                    w,
+                    h,
+                );
+                sur += 0.299 * sr + 0.587 * sg + 0.114 * sb;
+                n += 1.0;
+            }
+            let surround = sur / n.max(1.0);
+            let contrast = (surround - luma).clamp(0.0, 1.0);
+            if contrast < min_contrast {
+                continue;
+            }
+            if water_score(r, g, b, y_norm) > 0.45 && contrast < 0.22 {
+                continue;
+            }
+            let color = is_eye_rgb(r, g, b);
+            let hole = contrast * (1.0 - luma / 0.55).clamp(0.25, 1.0);
+            let on_face = if surround > 0.48 { 1.35 } else { 1.0 };
+            heat[i] = (color.max(hole) * (0.3 + 0.7 * contrast) * sub.max(0.35) * on_face).clamp(0.0, 1.0);
+        }
+    }
+
+    let thr = if loose_subject { 0.24 } else { 0.14 };
+    let mut labels = vec![0u32; w * h];
+    let mut blobs = Vec::new();
+    let mut stack = Vec::new();
+    for y in 0..h {
+        for x in 0..w {
+            let i = y * w + x;
+            if heat[i] < thr || labels[i] != 0 {
+                continue;
+            }
+            let id = (blobs.len() + 1) as u32;
+            let mut mass = 0.0f32;
+            let mut mx = 0.0f32;
+            let mut my = 0.0f32;
+            let mut x0 = x;
+            let mut x1 = x;
+            let mut y0 = y;
+            let mut y1 = y;
+            stack.clear();
+            stack.push(i);
+            labels[i] = id;
+            while let Some(j) = stack.pop() {
+                mass += heat[j];
+                let jx = j % w;
+                let jy = j / w;
+                mx += jx as f32 * heat[j];
+                my += jy as f32 * heat[j];
+                x0 = x0.min(jx);
+                x1 = x1.max(jx);
+                y0 = y0.min(jy);
+                y1 = y1.max(jy);
+                for (dx, dy) in [(-1i32, 0), (1, 0), (0, -1), (0, 1)] {
+                    let nx = jx as i32 + dx;
+                    let ny = jy as i32 + dy;
+                    if nx < 0 || ny < 0 || nx as usize >= w || ny as usize >= h {
+                        continue;
+                    }
+                    let k = ny as usize * w + nx as usize;
+                    if labels[k] == 0 && heat[k] >= thr {
+                        labels[k] = id;
+                        stack.push(k);
+                    }
+                }
+            }
+            if mass < 0.35 {
+                continue;
+            }
+            let bw = (x1 + 1).saturating_sub(x0).max(1) as f32;
+            let bh = (y1 + 1).saturating_sub(y0).max(1) as f32;
+            let area = bw * bh;
+            let fill = mass / area.max(1.0);
+            if fill < 0.10 {
+                continue;
+            }
+            let max_dim = if loose_subject {
+                (w.min(h) as f32) * 0.05
+            } else {
+                sub_w.min(sub_h) * 0.42
+            };
+            let min_dim = if loose_subject { 1.4 } else { 0.9 };
+            if bw.min(bh) < min_dim || bw.max(bh) > max_dim.max(4.0) {
+                continue;
+            }
+            let aspect = bw.max(bh) / bw.min(bh).max(1.0);
+            if aspect > 2.4 {
+                continue;
+            }
+            blobs.push(EyeBlob {
+                cx: mx / mass.max(1e-5),
+                cy: my / mass.max(1e-5),
+                rx: (bw * 0.62).max(1.4),
+                ry: (bh * 0.62).max(1.4),
+                score: (mass * fill).clamp(0.3, 1.0),
+            });
+        }
+    }
+    if blobs.is_empty() {
+        return blobs;
+    }
+    blobs.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+    pick_eye_pair_or_best(&blobs, sub_w)
+}
+
+fn pick_eye_pair_or_best(blobs: &[EyeBlob], subject_w: f32) -> Vec<EyeBlob> {
+    let limit = blobs.iter().take(6).cloned().collect::<Vec<_>>();
+    let mut best_pair: Option<(f32, EyeBlob, EyeBlob)> = None;
+    for i in 0..limit.len() {
+        for j in (i + 1)..limit.len() {
+            let a = limit[i];
+            let b = limit[j];
+            let dx = (a.cx - b.cx).abs();
+            let dy = (a.cy - b.cy).abs();
+            let size = (a.rx + b.rx) * 0.5;
+            if dy > size * 1.8 {
+                continue;
+            }
+            if dx < size * 1.4 || dx > subject_w.max(8.0) * 0.7 {
+                continue;
+            }
+            let pair = a.score + b.score - dy * 0.02;
+            if best_pair.map(|p| pair > p.0).unwrap_or(true) {
+                best_pair = Some((pair, a, b));
+            }
+        }
+    }
+    if let Some((_, a, b)) = best_pair {
+        return vec![a, b];
+    }
+    limit.into_iter().take(2).collect()
+}
+
+fn paint_ellipse(data: &mut [f32], w: usize, h: usize, cx: f32, cy: f32, rx: f32, ry: f32, peak: f32) {
+    let rx = rx.max(1.0);
+    let ry = ry.max(1.0);
+    let x0 = (cx - rx).floor().max(0.0) as usize;
+    let y0 = (cy - ry).floor().max(0.0) as usize;
+    let x1 = ((cx + rx).ceil() as usize + 1).min(w);
+    let y1 = ((cy + ry).ceil() as usize + 1).min(h);
+    for y in y0..y1 {
+        for x in x0..x1 {
+            let nx = (x as f32 - cx) / rx;
+            let ny = (y as f32 - cy) / ry;
+            let d = nx * nx + ny * ny;
+            if d <= 1.0 {
+                let i = y * w + x;
+                data[i] = data[i].max(peak * (1.0 - d * 0.4).clamp(0.2, 1.0));
+            }
+        }
+    }
+}
+
+fn paint_human_eye_pair(
+    data: &mut [f32],
+    w: usize,
+    h: usize,
+    face: crate::face_detect::FaceBox,
+    img: &RgbF32Buf,
+) {
+    for &xf in &[0.30f32, 0.70] {
+        let wx0 = ((face.x0 + face.width() * (xf - 0.14)) * w as f32).max(0.0) as usize;
+        let wx1 = ((face.x0 + face.width() * (xf + 0.14)) * w as f32).min(w as f32) as usize;
+        let wy0 = ((face.y0 + face.height() * 0.24) * h as f32).max(0.0) as usize;
+        let wy1 = ((face.y0 + face.height() * 0.50) * h as f32).min(h as f32) as usize;
+        if wx1 <= wx0 || wy1 <= wy0 {
+            continue;
+        }
+        let mut best = 0.0f32;
+        let mut bx = (wx0 + wx1) as f32 * 0.5;
+        let mut by = (wy0 + wy1) as f32 * 0.5;
+        for y in wy0..wy1 {
+            for x in wx0..wx1 {
+                let [r, g, bcol] = sample_enc_rgb(img, x, y, w, h);
+                let luma = 0.299 * r + 0.587 * g + 0.114 * bcol;
+                let mut sur = 0.0f32;
+                let mut n = 0.0f32;
+                for (dx, dy) in [(-2i32, 0), (2, 0), (0, -2), (0, 2)] {
+                    let nx = x as i32 + dx;
+                    let ny = y as i32 + dy;
+                    if nx < 0 || ny < 0 || nx as usize >= w || ny as usize >= h {
+                        continue;
+                    }
+                    let [sr, sg, sb] = sample_enc_rgb(img, nx as usize, ny as usize, w, h);
+                    sur += 0.299 * sr + 0.587 * sg + 0.114 * sb;
+                    n += 1.0;
+                }
+                let contrast = (sur / n.max(1.0) - luma).clamp(0.0, 1.0);
+                let s = is_eye_rgb(r, g, bcol) * (0.3 + 0.7 * contrast);
+                if s > best {
+                    best = s;
+                    bx = x as f32;
+                    by = y as f32;
+                }
+            }
+        }
+        if best < 0.12 {
+            continue;
+        }
+        let rx = (face.width() * w as f32 * 0.09).max(1.6);
+        let ry = (face.height() * h as f32 * 0.055).max(1.2);
+        paint_ellipse(data, w, h, bx, by, rx, ry, best.clamp(0.5, 1.0));
+    }
+}
+
+fn paint_heads_around_eyes(
+    data: &mut [f32],
+    w: usize,
+    h: usize,
+    eyes: &[EyeBlob],
+    subject: &Mask01,
+    img: &RgbF32Buf,
+) {
+    if eyes.is_empty() {
+        return;
+    }
+    let (sx0, sx1, sy0, sy1) = subject_bbox(subject);
+    let sub_w = (sx1.saturating_sub(sx0)).max(1) as f32;
+    let sub_h = (sy1.saturating_sub(sy0)).max(1) as f32;
+    let (cx, cy, rx, ry) = if eyes.len() >= 2 {
+        let a = eyes[0];
+        let b = eyes[1];
+        let mid_x = (a.cx + b.cx) * 0.5;
+        let mid_y = (a.cy + b.cy) * 0.5;
+        let dx = (a.cx - b.cx).abs().max(6.0);
+        (
+            mid_x,
+            mid_y + dx * 0.12,
+            dx * 1.15,
+            dx * 1.25,
+        )
+    } else {
+        let e = eyes[0];
+        (
+            e.cx,
+            e.cy,
+            (e.rx * 6.5).min(sub_w * 0.28).max(4.0),
+            (e.ry * 6.5).min(sub_h * 0.28).max(4.0),
+        )
+    };
+    let x0 = (cx - rx).floor().max(0.0) as usize;
+    let y0 = (cy - ry).floor().max(0.0) as usize;
+    let x1 = ((cx + rx).ceil() as usize + 1).min(w);
+    let y1 = ((cy + ry).ceil() as usize + 1).min(h);
+    for y in y0..y1 {
+        for x in x0..x1 {
+            let nx = (x as f32 - cx) / rx.max(1.0);
+            let ny = (y as f32 - cy) / ry.max(1.0);
+            if nx * nx + ny * ny > 1.05 {
+                continue;
+            }
+            let i = y * w + x;
+            if subject.data[i] < 0.10 {
+                continue;
+            }
+            let [r, g, b] = sample_enc_rgb(img, x, y, w, h);
+            let luma = 0.299 * r + 0.587 * g + 0.114 * b;
+            let skin = is_skin_rgb(r, g, b);
+            let white_head = (luma - 0.55).clamp(0.0, 1.0) * (1.0 - (r.max(g).max(b) - r.min(g).min(b)) / 0.22).clamp(0.0, 1.0);
+            let fur_face = (1.0 - (luma - 0.35).abs() / 0.4).clamp(0.0, 1.0);
+            let hit = skin.max(white_head).max(fur_face * 0.45).max(0.28);
+            data[i] = data[i].max((subject.data[i] * hit * (1.0 - (nx * nx + ny * ny) * 0.35)).clamp(0.0, 1.0));
+        }
     }
 }
 
@@ -3408,20 +3904,39 @@ pub fn refine_sky_mask(data: &mut [f32], w: usize, h: usize, img: &RgbF32Buf) {
 
 fn water_score(r: f32, g: f32, b: f32, y_norm: f32) -> f32 {
     let luma = 0.299 * r + 0.587 * g + 0.114 * b;
-    // Ocean / lake / river: blue-cyan, mid-lower frame; allow brighter shallows.
-    let blue_lead = b > r + 0.015 && b >= g * 0.85;
-    let teal = g > r + 0.02 && b > r + 0.02 && (b - r) > 0.02;
-    if !blue_lead && !teal {
+    let mx = r.max(g).max(b);
+    let mn = r.min(g).min(b);
+    let chroma = mx - mn;
+    // Trees / grass are not water even when the frame is low.
+    if g > r + 0.05 && g > b + 0.03 && chroma > 0.06 && luma > 0.12 {
         return 0.0;
     }
-    if !(0.03..=0.72).contains(&luma) {
-        return 0.0;
-    }
+    let lower = ((y_norm - 0.18) / 0.65).clamp(0.0, 1.0);
+    let blue_lead = b > r + 0.012 && b >= g * 0.82;
+    let teal = g > r + 0.015 && b > r + 0.015 && (b - r) > 0.015;
     let blue = ((b - r.max(g * 0.9)) / 0.28).clamp(0.0, 1.0);
     let cyan = ((b.min(g) - r) / 0.22).clamp(0.0, 1.0);
-    let depth = (1.0 - (luma / 0.62).clamp(0.0, 1.0)).clamp(0.12, 1.0);
-    let lower = ((y_norm - 0.24) / 0.6).clamp(0.0, 1.0);
-    blue.max(cyan * 0.85) * depth * (0.2 + 0.8 * lower)
+    let mut score = 0.0f32;
+    if (blue_lead || teal) && (0.03..=0.88).contains(&luma) {
+        let depth = (1.0 - (luma / 0.80).clamp(0.0, 1.0)).clamp(0.22, 1.0);
+        score = score.max(blue.max(cyan * 0.9) * depth * (0.30 + 0.70 * lower));
+    }
+    // Glacial / overcast lakes: grey-green, low chroma, mid luma, mid-lower frame.
+    if chroma < 0.12 && (0.06..=0.64).contains(&luma) && y_norm > 0.20 {
+        let grey = (1.0 - chroma / 0.12).clamp(0.0, 1.0);
+        let cool = ((b + g) * 0.5 - r).clamp(0.0, 0.14) / 0.14;
+        score = score.max(grey * (0.40 + 0.60 * cool) * (0.35 + 0.65 * lower));
+    }
+    // Dark water under ice / dusk.
+    if luma < 0.20 && chroma < 0.14 && y_norm > 0.26 {
+        score = score.max((1.0 - luma / 0.20) * (1.0 - chroma / 0.14) * lower * 0.85);
+    }
+    // White foam / falls — scored weakly; extract_water_mask grows these
+    // only when they touch other water so clouds stay out.
+    if luma > 0.70 && chroma < 0.10 && y_norm > 0.14 {
+        score = score.max(((luma - 0.70) / 0.30).clamp(0.0, 1.0) * (1.0 - chroma / 0.10) * 0.40);
+    }
+    score
 }
 
 fn vegetation_score(r: f32, g: f32, b: f32) -> f32 {
@@ -3441,7 +3956,7 @@ fn vegetation_score(r: f32, g: f32, b: f32) -> f32 {
     green.max(sunlit * 0.7) * mid
 }
 
-/// Landscape water (ocean / lake / river) from color + vertical priors.
+/// Landscape water (ocean / lake / river / falls) from color + vertical priors.
 pub fn extract_water_mask(img: &RgbF32Buf) -> Mask01 {
     let (w, h) = (img.width, img.height);
     let mut data = vec![0.0f32; w * h];
@@ -3453,13 +3968,143 @@ pub fn extract_water_mask(img: &RgbF32Buf) -> Mask01 {
             data[y * w + x] = water_score(r, g, b, y_norm);
         }
     }
-    // Kill tiny speckles; keep large lower bodies.
-    refine_saliency_mask(&mut data, w, h);
+    grow_foam_on_water(&mut data, img, w, h);
+    suppress_compact_bright_objects(&mut data, img, w, h);
+    let blurred = box_blur_3x3(&data, w, h);
+    for i in 0..data.len() {
+        data[i] = (data[i] * 0.7 + blurred[i] * 0.3).clamp(0.0, 1.0);
+        if data[i] < 0.06 {
+            data[i] = 0.0;
+        }
+    }
     suppress_upper_false_water(&mut data, w, h);
     Mask01 {
         width: w,
         height: h,
         data,
+    }
+}
+
+fn grow_foam_on_water(data: &mut [f32], img: &RgbF32Buf, w: usize, h: usize) {
+    if w < 3 || h < 3 {
+        return;
+    }
+    for _ in 0..10 {
+        let prior = data.to_vec();
+        let mut grew = false;
+        for y in 1..h - 1 {
+            let y_norm = y as f32 / h.max(1) as f32;
+            if y_norm < 0.12 {
+                continue;
+            }
+            for x in 1..w - 1 {
+                let i = y * w + x;
+                if prior[i] > 0.2 {
+                    continue;
+                }
+                let pi = (y * w + x) * 3;
+                let (r, g, b) = (enc(img.data[pi]), enc(img.data[pi + 1]), enc(img.data[pi + 2]));
+                let luma = 0.299 * r + 0.587 * g + 0.114 * b;
+                let chroma = r.max(g).max(b) - r.min(g).min(b);
+                if luma < 0.68 || chroma > 0.14 {
+                    continue;
+                }
+                let mut n = 0u32;
+                for (dx, dy) in [(-1, 0), (1, 0), (0, -1), (0, 1)] {
+                    if prior[(y as i32 + dy) as usize * w + (x as i32 + dx) as usize] > 0.14 {
+                        n += 1;
+                    }
+                }
+                if n >= 1 {
+                    data[i] = data[i].max(0.62);
+                    grew = true;
+                }
+            }
+        }
+        if !grew {
+            break;
+        }
+    }
+}
+
+fn suppress_compact_bright_objects(data: &mut [f32], img: &RgbF32Buf, w: usize, h: usize) {
+    if w * h == 0 {
+        return;
+    }
+    let mut labels = vec![0u32; w * h];
+    let mut stats: Vec<(u32, f32, f32, usize, usize, usize, usize)> = Vec::new();
+    let mut stack = Vec::new();
+    const T: f32 = 0.22;
+    for y in 0..h {
+        for x in 0..w {
+            let i = y * w + x;
+            if data[i] < T || labels[i] != 0 {
+                continue;
+            }
+            let id = (stats.len() + 1) as u32;
+            let mut area = 0.0f32;
+            let mut luma_sum = 0.0f32;
+            let mut x0 = x;
+            let mut x1 = x;
+            let mut y0 = y;
+            let mut y1 = y;
+            stack.clear();
+            stack.push(i);
+            labels[i] = id;
+            while let Some(j) = stack.pop() {
+                area += 1.0;
+                let jx = j % w;
+                let jy = j / w;
+                x0 = x0.min(jx);
+                x1 = x1.max(jx);
+                y0 = y0.min(jy);
+                y1 = y1.max(jy);
+                let pi = (jy.min(img.height.saturating_sub(1)) * img.width
+                    + jx.min(img.width.saturating_sub(1)))
+                    * 3;
+                // data and img may share resolution (water path).
+                let (r, g, b) = if img.width == w && img.height == h {
+                    (enc(img.data[pi]), enc(img.data[pi + 1]), enc(img.data[pi + 2]))
+                } else {
+                    let s = sample_enc_rgb(img, jx, jy, w, h);
+                    (s[0], s[1], s[2])
+                };
+                luma_sum += 0.299 * r + 0.587 * g + 0.114 * b;
+                for (dx, dy) in [(-1i32, 0), (1, 0), (0, -1), (0, 1)] {
+                    let nx = jx as i32 + dx;
+                    let ny = jy as i32 + dy;
+                    if nx < 0 || ny < 0 || nx as usize >= w || ny as usize >= h {
+                        continue;
+                    }
+                    let k = ny as usize * w + nx as usize;
+                    if labels[k] == 0 && data[k] >= T {
+                        labels[k] = id;
+                        stack.push(k);
+                    }
+                }
+            }
+            stats.push((id, area, luma_sum, x0, x1, y0, y1));
+        }
+    }
+    let frame = (w * h) as f32;
+    let mut drop: std::collections::HashSet<u32> = std::collections::HashSet::new();
+    for (id, area, luma_sum, x0, x1, y0, y1) in stats {
+        let bw = (x1 + 1).saturating_sub(x0).max(1) as f32;
+        let bh = (y1 + 1).saturating_sub(y0).max(1) as f32;
+        let fill = area / (bw * bh);
+        let mean_luma = luma_sum / area.max(1.0);
+        let frac = area / frame;
+        if mean_luma > 0.68 && fill > 0.42 && (0.008..=0.18).contains(&frac) && bh <= bw * 1.2 {
+            drop.insert(id);
+        }
+    }
+    if drop.is_empty() {
+        return;
+    }
+    for i in 0..data.len() {
+        if drop.contains(&labels[i]) {
+            data[i] = 0.0;
+        }
     }
 }
 
@@ -4371,6 +5016,158 @@ mod tests {
         let face = extract_face_mask(&subject, &img);
         let cov = face.data.iter().filter(|v| **v > 0.12).count() as f32 / (w * h) as f32;
         assert!(cov < 0.005, "no-skin face should stay empty: {cov}");
+    }
+
+    /// Puffin / eagle: white head + dark circular eye on a compact subject.
+    #[test]
+    fn eyes_mask_finds_dark_dot_on_white_head() {
+        let (w, h) = (96usize, 72usize);
+        let mut rgb = vec![0.0f32; w * h * 3];
+        let mut sub = vec![0.0f32; w * h];
+        for y in 0..h {
+            for x in 0..w {
+                let i = (y * w + x) * 3;
+                rgb[i] = 0.04;
+                rgb[i + 1] = 0.07;
+                rgb[i + 2] = 0.10;
+            }
+        }
+        // White facial disc
+        let (cx, cy) = (48.0f32, 28.0f32);
+        for y in 12..46 {
+            for x in 28..68 {
+                let dx = (x as f32 - cx) / 16.0;
+                let dy = (y as f32 - cy) / 14.0;
+                if dx * dx + dy * dy > 1.0 {
+                    continue;
+                }
+                let i = (y * w + x) * 3;
+                rgb[i] = 0.86;
+                rgb[i + 1] = 0.84;
+                rgb[i + 2] = 0.80;
+                sub[y * w + x] = 0.95;
+            }
+        }
+        // Dark eye
+        for y in 24..32 {
+            for x in 40..48 {
+                let dx = (x as f32 - 44.0) / 3.2;
+                let dy = (y as f32 - 28.0) / 3.2;
+                if dx * dx + dy * dy > 1.0 {
+                    continue;
+                }
+                let i = (y * w + x) * 3;
+                rgb[i] = 0.04;
+                rgb[i + 1] = 0.04;
+                rgb[i + 2] = 0.05;
+            }
+        }
+        let img = RgbF32Buf {
+            width: w,
+            height: h,
+            data: rgb,
+        };
+        let subject = Mask01 {
+            width: w,
+            height: h,
+            data: sub,
+        };
+        let eyes = extract_eyes_mask(&subject, &img);
+        let mut eye_mass = 0.0f32;
+        for y in 24..33 {
+            for x in 40..49 {
+                eye_mass += eyes.data[y * w + x];
+            }
+        }
+        assert!(eye_mass > 1.5, "puffin eye should light up: {eye_mass}");
+        let face = extract_face_mask(&subject, &img);
+        let mut face_mass = 0.0f32;
+        for y in 16..40 {
+            for x in 32..64 {
+                face_mass += face.data[y * w + x];
+            }
+        }
+        assert!(face_mass > 8.0, "white head around the eye should be a face: {face_mass}");
+    }
+
+    #[test]
+    fn water_mask_keeps_dark_grey_lower() {
+        let (w, h) = (64usize, 64usize);
+        let mut rgb = vec![0.0f32; w * h * 3];
+        for y in 0..h {
+            for x in 0..w {
+                let i = (y * w + x) * 3;
+                if y < 22 {
+                    rgb[i] = 0.62;
+                    rgb[i + 1] = 0.68;
+                    rgb[i + 2] = 0.74;
+                } else {
+                    rgb[i] = 0.16;
+                    rgb[i + 1] = 0.18;
+                    rgb[i + 2] = 0.19;
+                }
+            }
+        }
+        let img = RgbF32Buf {
+            width: w,
+            height: h,
+            data: rgb,
+        };
+        let m = extract_water_mask(&img);
+        let mut lo = 0.0f32;
+        let mut hi = 0.0f32;
+        for y in 0..16 {
+            for x in 0..w {
+                hi += m.data[y * w + x];
+            }
+        }
+        for y in 40..h {
+            for x in 0..w {
+                lo += m.data[y * w + x];
+            }
+        }
+        assert!(lo > hi * 2.0, "grey lake {lo} should beat pale sky {hi}");
+        assert!(lo > 80.0, "grey glacial water should be detected: {lo}");
+    }
+
+    #[test]
+    fn water_mask_keeps_white_falls_on_pool() {
+        let (w, h) = (48usize, 64usize);
+        let mut rgb = vec![0.0f32; w * h * 3];
+        for y in 0..h {
+            for x in 0..w {
+                let i = (y * w + x) * 3;
+                rgb[i] = 0.12;
+                rgb[i + 1] = 0.28;
+                rgb[i + 2] = 0.16; // moss
+            }
+        }
+        for y in 36..64 {
+            for x in 8..40 {
+                let i = (y * w + x) * 3;
+                rgb[i] = 0.06;
+                rgb[i + 1] = 0.16;
+                rgb[i + 2] = 0.22; // pool
+            }
+        }
+        for y in 8..40 {
+            for x in 18..30 {
+                let i = (y * w + x) * 3;
+                rgb[i] = 0.92;
+                rgb[i + 1] = 0.93;
+                rgb[i + 2] = 0.94; // falls
+            }
+        }
+        let img = RgbF32Buf {
+            width: w,
+            height: h,
+            data: rgb,
+        };
+        let m = extract_water_mask(&img);
+        let pool = m.data[50 * w + 24];
+        let fall = m.data[24 * w + 24];
+        assert!(pool > 0.15, "pool should be water: {pool}");
+        assert!(fall > 0.08, "falls touching the pool should grow in: {fall}");
     }
 
     /// Bright core + compact darker region attached below (coat, two-tone

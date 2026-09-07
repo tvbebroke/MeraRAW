@@ -51,7 +51,7 @@ pub const MODULE_ORDER: &[&str] = &[
     "tone_curve",    // 7 (P3)
     "lut",           // 8a: 3D look LUT (opacity param; cube path in meta)
     // 8: sharpen (detail module, second pass)
-    "effects", // 9: grain / vignette / clarity
+    "effects", // 9: dehaze / grain / vignette / clarity
 ];
 
 /// HSL mixer bands (schema §3.6). Must stay in lockstep with ColorSettings.svelte.
@@ -622,13 +622,22 @@ fn build_registry() -> BTreeMap<&'static str, ParamSpec> {
             1.0,
             "Input",
         ),
-        // ---- slot 9: effects (grain / vignette / clarity) ----
+        // ---- slot 9: effects (dehaze / grain / vignette / clarity) ----
         f32_spec(
             "effects.clarity",
             0.0,
             100.0,
             0.0,
             "Clarity",
+            1.0,
+            "Effects",
+        ),
+        f32_spec(
+            "effects.dehaze",
+            -100.0,
+            100.0,
+            0.0,
+            "Dehaze",
             1.0,
             "Effects",
         ),
