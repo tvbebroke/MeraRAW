@@ -358,6 +358,51 @@ pub(super) fn load_preset(name: &str) -> Result<crate::doc::PartialDoc, CoreErro
     load_preset_file(name).map(|f| f.into_partial())
 }
 
+/// Drop every previous catalog preset, then apply `partial`. Looks (`lut`) stay
+/// unless the incoming preset itself sets a LUT.
+pub(super) fn replace_named_preset(
+    doc: &mut crate::doc::EditDoc,
+    name: &str,
+    partial: crate::doc::PartialDoc,
+) -> Result<(), CoreError> {
+    let incoming_lut = partial.modules.contains_key("lut");
+    for m in PRESET_SAVE_MODULES {
+        if *m == "lut" && !incoming_lut {
+            continue;
+        }
+        ops::apply_op(
+            doc,
+            &Op::ResetModule {
+                module: (*m).to_string(),
+            },
+        )?;
+    }
+    ops::apply_op(doc, &Op::ApplyPreset { preset: partial })?;
+    doc.meta.preset_id = Some(name.to_string());
+    Ok(())
+}
+
+impl Engine {
+    pub(super) fn apply_named_preset(&mut self, name: &str) -> Result<DocDelta, CoreError> {
+        let name = validate_preset_name(name)?.to_string();
+        let partial = load_preset(&name)?;
+        let c = self.current.as_mut().ok_or(CoreError::NoImage)?;
+        let before = c.doc().clone();
+        replace_named_preset(c.doc_mut(), &name, partial)?;
+        c.doc_mut().touch();
+        let label = format!("preset {name}");
+        c.history.record(before, label.clone());
+        c.doc_dirty = true;
+        let delta = c.delta(label, None, None);
+        if let Some(g) = &mut self.graph {
+            g.invalidate_all();
+        }
+        self.schedule_render();
+        self.schedule_settle();
+        Ok(delta)
+    }
+}
+
 const MAX_PRESET_BYTES: u64 = 1024 * 1024;
 
 pub(super) fn load_preset_file(name: &str) -> Result<crate::doc::PresetFile, CoreError> {
@@ -441,5 +486,50 @@ mod tests {
         assert!(validate_preset_name("My Look").is_ok());
         assert!(validate_preset_name("a/b").is_err());
         assert!(validate_preset_name("").is_err());
+    }
+
+    #[test]
+    fn named_preset_replaces_previous_instead_of_stacking() {
+        use crate::doc::{EditDoc, ParamValue, PartialDoc};
+        use std::collections::BTreeMap;
+
+        let mut grain = BTreeMap::new();
+        grain.insert("grain_amount".into(), ParamValue::F32(35.0));
+        let mut a = BTreeMap::new();
+        a.insert("effects".into(), grain);
+
+        let mut contrast = BTreeMap::new();
+        contrast.insert("contrast".into(), ParamValue::F32(20.0));
+        let mut b = BTreeMap::new();
+        b.insert("tone_curve".into(), contrast);
+
+        let mut doc = EditDoc::new("/x.ARW");
+        replace_named_preset(
+            &mut doc,
+            "vintage",
+            PartialDoc { modules: a },
+        )
+        .unwrap();
+        assert_eq!(
+            doc.get("effects", "grain_amount"),
+            Some(&ParamValue::F32(35.0))
+        );
+
+        replace_named_preset(
+            &mut doc,
+            "punch",
+            PartialDoc { modules: b },
+        )
+        .unwrap();
+        assert_eq!(doc.meta.preset_id.as_deref(), Some("punch"));
+        assert_eq!(
+            doc.get("tone_curve", "contrast"),
+            Some(&ParamValue::F32(20.0))
+        );
+        assert!(
+            doc.get("effects", "grain_amount").is_none(),
+            "previous preset grain must not stack: {:?}",
+            doc.get("effects", "grain_amount")
+        );
     }
 }

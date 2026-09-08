@@ -109,6 +109,9 @@ pub struct DocMeta {
     /// Bundled look id when the active cube is generated (`bundled:<id>`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub look_id: Option<String>,
+    /// Last catalog preset applied to this doc. Named applies replace, not stack.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub preset_id: Option<String>,
     /// Demosaic algorithm name (e.g. "rcd", "amaze", "rawler"). None = engine
     /// default. Changing it re-decodes the RAW; persisted in the sidecar.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -481,6 +484,7 @@ mod tests {
                 profile_file: Some("Adobe Standard.dcp".into()),
                 lut_file: Some("/looks/film.cube".into()),
                 look_id: None,
+                preset_id: None,
                 demosaic: Some("rcd".into()),
                 keywords: vec!["studio".into()],
             },

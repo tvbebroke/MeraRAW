@@ -30,7 +30,7 @@ mod export;
 mod render;
 mod retouch_ops;
 
-use doc_ops::{list_preset_catalog, list_presets, load_preset};
+use doc_ops::{list_preset_catalog, list_presets};
 
 // Small enough to feel immediate on a slider drag, large enough to coalesce
 // op storms. Once scheduled, the deadline is not pushed back by later ops;
@@ -1356,10 +1356,7 @@ impl Engine {
                 let _ = reply.send(list_preset_catalog());
             }
             EngineMsg::ApplyPresetByName { name, reply } => {
-                let result = (|| {
-                    let partial = load_preset(&name)?;
-                    self.do_apply_op(Op::ApplyPreset { preset: partial }, false)
-                })();
+                let result = self.apply_named_preset(&name);
                 if let Ok(delta) = &result {
                     self.emit(EngineEvent::DocUpdated {
                         delta: serde_json::to_value(delta).unwrap_or_default(),

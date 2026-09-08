@@ -120,6 +120,7 @@ impl Engine {
                         &mut docs[0],
                         &crate::ops::Op::ApplyPreset { preset: partial },
                     );
+                    docs[0].meta.preset_id = Some(name);
                 }
             }
         }

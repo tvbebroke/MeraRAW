@@ -25,7 +25,9 @@
   ];
 
   let presets = $state<PresetCatalogEntry[]>([]);
-  let selected = $state("");
+  let selected = $derived(
+    String(($doc?.meta as { preset_id?: string } | undefined)?.preset_id ?? ""),
+  );
   let filter = $state("");
   let saveName = $state("");
   let saveStatus = $state("");
@@ -51,7 +53,6 @@
   );
 
   async function apply(id: string) {
-    selected = id;
     try {
       reconcile(await applyPreset(id));
     } catch {
@@ -121,6 +122,7 @@
   {/if}
 
   <input class="rail-input" placeholder="Filter presets…" bind:value={filter} />
+  <p class="rail-empty">One preset at a time. Applying another replaces the last.</p>
 
   {#if visible.length === 0}
     <p class="rail-empty">No presets found.</p>
