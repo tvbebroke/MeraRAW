@@ -31,7 +31,7 @@
     },
     "effects": {
       "grain_amount": 35,
-      "vignette_amount": -15
+      "vignette_amount": 15
     }
   }
 }

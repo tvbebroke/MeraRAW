@@ -1,7 +1,7 @@
 import { push, router } from "svelte-spa-router";
 import { leftRailCollapsed, isZenMode, imageBrowserCollapsed, photoDetailsCollapsed, commandPaletteOpen, rightPanelMode } from "../stores/editor";
 import { isSettingsOpen, isExportOpen, isBugReportOpen, classicLook, isShortcutsOpen } from "../stores/ui";
-import { applyEditFocus, leaveCropTool, showAiPanel, showMaskPanel } from "./editor/focus";
+import { applyEditFocus, cancelCropTool, leaveCropTool, showAiPanel, showMaskPanel } from "./editor/focus";
 import { applyCropParams } from "../crop/cropActions";
 import { cropWithDraft, flipCropOrientation } from "../crop/cropMath";
 import { cropDraft, markCropGesture, setCropDraft } from "../crop/cropSession";
@@ -159,7 +159,7 @@ export function handleGlobalShortcut(e: KeyboardEvent): void {
       return;
     }
     if (rightPanelMode.get() === "crop" || cropActive.get()) {
-      leaveCropTool();
+      cancelCropTool();
       return;
     }
     if (isEditorRoute()) {

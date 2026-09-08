@@ -22,7 +22,7 @@ import {
   type SectionId,
   type Tool,
 } from "../../stores/editor";
-import { flushCropDraft } from "../../crop/cropSession";
+import { abandonCropSession, flushCropDraft } from "../../crop/cropSession";
 
 export function applyTool(id: Tool) {
   if (id !== "crop" && cropActive.get()) {
@@ -127,4 +127,10 @@ export function leaveCropTool() {
   if (rightPanelMode.get() !== "crop" && !cropActive.get()) return;
   rightPanelMode.set("edit");
   applyTool("edit");
+}
+
+/** Esc: drop in-progress overlay edits instead of committing them. */
+export function cancelCropTool() {
+  abandonCropSession();
+  leaveCropTool();
 }

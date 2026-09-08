@@ -844,7 +844,11 @@ mod tests {
         .unwrap();
 
         let registry = ModelRegistry::with_dir(root.clone());
-        let ready = &registry.list()[0];
+        let ready = registry
+            .list()
+            .into_iter()
+            .find(|m| m.id == super::models::LEGACY_MODEL_ID)
+            .expect("legacy fixture id");
         assert!(
             ready.ready && !ready.stand_in,
             "fixture model should be ready"
@@ -868,7 +872,7 @@ mod tests {
         match mgr
             .enqueue(
                 "cafe0123",
-                DEFAULT_MODEL_ID,
+                super::models::LEGACY_MODEL_ID,
                 100.0,
                 JobSource::Buffer {
                     rgb,

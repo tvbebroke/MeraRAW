@@ -27,7 +27,7 @@
       "highlights_lum": -5
     },
     "effects": {
-      "vignette_amount": -20
+      "vignette_amount": 20
     }
   }
 }

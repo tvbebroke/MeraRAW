@@ -27,6 +27,8 @@ describe("DEFAULT_SECTIONS", () => {
     for (const id of used) {
       expect(SECTION_IDS, `unregistered CollapsibleSection id "${id}"`).toContain(id);
     }
-    expect([...used].sort()).toEqual([...SECTION_IDS].sort());
+    // Crop is a develop tab, not an accordion in the edit stack.
+    const accordionIds = SECTION_IDS.filter((id) => id !== "crop");
+    expect([...used].sort()).toEqual([...accordionIds].sort());
   });
 });

@@ -40,6 +40,7 @@
     {
       "id": "m-radial",
       "kind": "radial",
+      "enabled": true,
       "opacity": 80.0,
       "invert": false,
       "feather": 12.0,

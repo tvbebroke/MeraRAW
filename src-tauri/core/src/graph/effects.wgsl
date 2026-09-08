@@ -111,9 +111,10 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
   let a = textureLoad(src, coord, 0).a;
 
   // ---- dehaze: invert / apply Koschmieder veil (not midtone unsharp) ----
+  var haze = vec4<f32>(0.0);
   if (abs(u.dehaze) > 0.0) {
-    let est = estimate_dark_and_airlight(coord);
-    rgb = apply_dehaze(rgb, est.w, est.xyz, u.dehaze);
+    haze = estimate_dark_and_airlight(coord);
+    rgb = apply_dehaze(rgb, haze.w, haze.xyz, u.dehaze);
   }
 
   // ---- clarity: midtone-weighted unsharp on luma (linear) ----
@@ -129,9 +130,14 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
           vec2<i32>(0, 0),
           vec2<i32>(i32(u.width) - 1, i32(u.height) - 1),
         );
-        let s = textureLoad(src, q, 0).rgb;
+        var s = max(textureLoad(src, q, 0).rgb, vec3<f32>(0.0));
+        // High-pass must live in the same space as `rgb` or dehaze+clarity
+        // mixes pre-veil neighbors into a post-veil pixel.
+        if (abs(u.dehaze) > 0.0) {
+          s = apply_dehaze(s, haze.w, haze.xyz, u.dehaze);
+        }
         let w = exp(-f32(dx * dx + dy * dy) * inv2s);
-        acc += dot(max(s, vec3<f32>(0.0)), LUMA_W) * w;
+        acc += dot(s, LUMA_W) * w;
         wsum += w;
       }
     }

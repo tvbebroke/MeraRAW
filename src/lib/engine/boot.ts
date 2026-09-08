@@ -48,6 +48,7 @@ import { isExportOpen, isSettingsOpen } from "../../stores/ui";
 import { libraryRoute, setWorkspace, syncWorkspaceToOpenFile } from "../../stores/workspace";
 import { licenseStatus } from "../../stores/session";
 import { loadRegistry } from "./params";
+import { flushCropDraft } from "../../crop/cropSession";
 
 declare global {
   interface Window {
@@ -63,6 +64,7 @@ export async function openPath(
   docId?: string | null,
   previewUrl?: string | null,
 ): Promise<void> {
+  await flushCropDraft().catch(() => {});
   const sequence = ++openSequence;
   try {
     const name = path.split(/[/\\]/).pop() || path;

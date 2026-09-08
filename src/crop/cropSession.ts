@@ -26,8 +26,10 @@ export function setCropDraft(p: CropParams | null) {
   if (p) cropGesture = true;
 }
 
-export function shouldCommitCropSession(changed: boolean, gesture: boolean): boolean {
-  return changed || gesture;
+export function shouldCommitCropSession(changed: boolean, _gesture: boolean): boolean {
+  // Live panel tweaks already wrote the doc. A gesture with no net
+  // overlay/param change must not mint an empty undo step.
+  return changed;
 }
 
 lastOpenedPath.listen(() => {

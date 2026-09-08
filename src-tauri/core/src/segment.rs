@@ -2542,12 +2542,8 @@ pub fn extract_face_mask(subject: &Mask01, img: &RgbF32Buf) -> Mask01 {
     let mut data = vec![0.0f32; w * h];
 
     for face in crate::face_detect::detect_faces(img) {
-        if face.width() * face.height() > 0.22 {
-            // Huge boxes without skin are usually animals / torso false hits.
-            let skin_frac = face_box_skin_fraction(img, face);
-            if skin_frac < 0.12 {
-                continue;
-            }
+        if !face_box_usable(img, face) {
+            continue;
         }
         paint_detected_face(&mut data, w, h, face, subject, img);
     }
@@ -2654,6 +2650,14 @@ fn face_from_skin_heuristic(subject: &Mask01, img: &RgbF32Buf) -> Mask01 {
     }
 }
 
+fn face_box_usable(img: &RgbF32Buf, face: crate::face_detect::FaceBox) -> bool {
+    // Mid-size boxes (torsos, rocks) used to skip the skin gate at 22% area.
+    if face.width() * face.height() <= 0.08 {
+        return true;
+    }
+    face_box_skin_fraction(img, face) >= 0.12
+}
+
 fn face_box_skin_fraction(img: &RgbF32Buf, face: crate::face_detect::FaceBox) -> f32 {
     let (w, h) = (img.width.max(1), img.height.max(1));
     let x0 = (face.x0 * w as f32) as usize;
@@ -2714,13 +2718,16 @@ fn paint_detected_face(
             let skin = is_skin_rgb(r, g, b);
             let luma = 0.299 * r + 0.587 * g + 0.114 * b;
             let sub = subject.data.get(i).copied().unwrap_or(0.0);
+            if sub < 0.12 {
+                continue;
+            }
             let inside = (1.0 - d * 0.45).clamp(0.2, 1.0);
-            let boost = skin.max(0.35).max(if (0.12..=0.92).contains(&luma) {
-                0.45
+            let boost = skin.max(if (0.12..=0.92).contains(&luma) {
+                0.40
             } else {
-                0.2
+                0.18
             });
-            data[i] = data[i].max((inside * boost * (0.55 + 0.45 * sub.max(0.4))).clamp(0.0, 1.0));
+            data[i] = data[i].max((inside * boost * (0.4 + 0.6 * sub)).clamp(0.0, 1.0));
         }
     }
 }
@@ -2835,7 +2842,10 @@ pub fn extract_eyes_mask(subject: &Mask01, img: &RgbF32Buf) -> Mask01 {
     let (w, h) = (img.width, img.height);
     let mut data = vec![0.0f32; w * h];
     for face in crate::face_detect::detect_faces(img) {
-        paint_human_eye_pair(&mut data, w, h, face, img);
+        if !face_box_usable(img, face) {
+            continue;
+        }
+        paint_human_eye_pair(&mut data, w, h, face, img, subject);
     }
     for blob in find_eye_blobs(subject, img, w, h) {
         paint_ellipse(
@@ -3088,6 +3098,7 @@ fn paint_human_eye_pair(
     h: usize,
     face: crate::face_detect::FaceBox,
     img: &RgbF32Buf,
+    subject: &Mask01,
 ) {
     for &xf in &[0.30f32, 0.70] {
         let wx0 = ((face.x0 + face.width() * (xf - 0.14)) * w as f32).max(0.0) as usize;
@@ -3126,6 +3137,9 @@ fn paint_human_eye_pair(
             }
         }
         if best < 0.12 {
+            continue;
+        }
+        if subject_at(subject, bx as usize, by as usize, w, h) < 0.12 {
             continue;
         }
         let rx = (face.width() * w as f32 * 0.09).max(1.6);
