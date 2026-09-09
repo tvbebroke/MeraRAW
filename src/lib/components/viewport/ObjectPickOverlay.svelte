@@ -21,9 +21,7 @@
       ? "Finding subjects…"
       : error
         ? error
-        : $instancePickKind === "people"
-          ? "Click each person — Esc when done"
-          : $instancePickKind === "subject"
+        : $instancePickKind === "subject"
             ? "Click each subject — Esc when done"
             : "Click a dotted outline — Esc when done",
   );

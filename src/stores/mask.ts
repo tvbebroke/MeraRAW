@@ -29,7 +29,7 @@ export const maskPendingIds = atom<Set<string>>(new Set());
 export const maskErrors = atom<Map<string, string>>(new Map());
 
 /** Click-to-select instance mode: next outline taps create masks of this kind. */
-export type InstancePickKind = "object" | "subject" | "people";
+export type InstancePickKind = "object" | "subject";
 export const objectPickActive = atom(false);
 export const instancePickKind = atom<InstancePickKind>("object");
 

@@ -359,19 +359,6 @@
     showMaskPanel();
   }
 
-  function startPeoplePick() {
-    stopGeomPlacement();
-    startInstancePick("people");
-    showMaskPanel();
-  }
-
-  function startColorPick() {
-    stopInstancePick();
-    stopGeomPlacement();
-    colorPickActive.set(true);
-    showMaskPanel();
-  }
-
   /** Linear/Radial always create a new mask via drag-to-place (avoids freezing AI masks). */
   function startLinearTool() {
     startGeomPlacement("linear");
@@ -535,8 +522,6 @@
     <p class="pick-banner">
       {#if $instancePickKind === "subject"}
         Click each subject outline to add it — Esc when done.
-      {:else if $instancePickKind === "people"}
-        Click each person outline to add them — Esc when done.
       {:else}
         Click a dotted outline to mask that object — Esc when done.
       {/if}
@@ -579,21 +564,6 @@
         <button type="button" class="tool-btn" onclick={startObjectPick}>
           <span class="ico">◉</span> Object · click
         </button>
-        <button type="button" class="tool-btn" onclick={startPeoplePick}>
-          <span class="ico">☺</span> People · click
-        </button>
-        <button type="button" class="tool-btn" onclick={() => void (active ? addComponent("face") : addMask("face"))}>
-          <span class="ico">☺</span> Face
-        </button>
-        <button type="button" class="tool-btn" onclick={() => void (active ? addComponent("eyes") : addMask("eyes"))}>
-          <span class="ico">◎</span> Eyes
-        </button>
-        <button type="button" class="tool-btn" onclick={() => void (active ? addComponent("depth") : addMask("depth"))}>
-          <span class="ico">⇅</span> Depth
-        </button>
-        <button type="button" class="tool-btn" onclick={() => void (active ? addComponent("parametric") : addMask("parametric"))}>
-          <span class="ico">◐</span> Luminance
-        </button>
       </div>
     {/if}
   </div>
@@ -631,29 +601,6 @@
           onclick={startRadialTool}
         >
           <span class="ico">◯</span> Radial
-        </button>
-      </div>
-    {/if}
-  </div>
-
-  <div class="tool-section">
-    <button
-      type="button"
-      class="section-head"
-      onclick={() => maskToolGroup.set($maskToolGroup === "range" ? null : "range")}
-    >
-      <span>Range</span>
-      <span class="chev" class:open={$maskToolGroup === "range"}>›</span>
-    </button>
-    {#if $maskToolGroup === "range"}
-      <div class="tool-grid">
-        <button
-          type="button"
-          class="tool-btn wide"
-          class:on={$colorPickActive}
-          onclick={startColorPick}
-        >
-          <span class="ico">◎</span> Sample color from image
         </button>
       </div>
     {/if}

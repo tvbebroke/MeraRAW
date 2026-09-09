@@ -154,7 +154,7 @@
   async function createInstanceMask(x: number, y: number) {
     const kind = instancePickKind.get();
     const model =
-      kind === "people" ? "people_v1" : kind === "subject" ? "subject_v1" : "object_v1";
+      kind === "subject" ? "subject_v1" : "object_v1";
     const source = {
       type: "segmented",
       model,
@@ -822,7 +822,7 @@
         if (objectPickActive.get()) {
           const p = toImageCoords(e);
           if (p) void createInstanceMask(p[0], p[1]);
-          // Stay in pick mode so multiple subjects/people can be selected.
+          // Stay in pick mode so multiple subjects can be selected.
         } else if (colorPickActive.get()) {
           const p = toImageCoords(e);
           if (p) void applyColorSample(p[0], p[1]);
