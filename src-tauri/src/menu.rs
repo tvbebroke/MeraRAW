@@ -93,21 +93,21 @@ pub fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
             app,
             "zoom-in",
             "Zoom In",
-            false,
+            true,
             Some("CmdOrCtrl+="),
         )?)
         .item(&MenuItem::with_id(
             app,
             "zoom-out",
             "Zoom Out",
-            false,
+            true,
             Some("CmdOrCtrl+-"),
         )?)
         .item(&MenuItem::with_id(
             app,
             "zoom-fit",
             "Fit",
-            false,
+            true,
             Some("CmdOrCtrl+0"),
         )?)
         .separator()
@@ -213,6 +213,21 @@ pub fn handle_menu_event(app: &AppHandle, event: MenuEvent) {
         "settings" => {
             if let Err(e) = app.emit(events::SETTINGS_REQUESTED, ()) {
                 tracing::error!(error = %e, "emit settings-requested failed");
+            }
+        }
+        "zoom-in" => {
+            if let Err(e) = app.emit(events::VIEW_ZOOM_IN, ()) {
+                tracing::error!(error = %e, "emit view-zoom-in failed");
+            }
+        }
+        "zoom-out" => {
+            if let Err(e) = app.emit(events::VIEW_ZOOM_OUT, ()) {
+                tracing::error!(error = %e, "emit view-zoom-out failed");
+            }
+        }
+        "zoom-fit" => {
+            if let Err(e) = app.emit(events::VIEW_ZOOM_FIT, ()) {
+                tracing::error!(error = %e, "emit view-zoom-fit failed");
             }
         }
         "toggle-devtools" =>

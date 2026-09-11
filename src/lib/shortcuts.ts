@@ -5,7 +5,7 @@ import { applyEditFocus, cancelCropTool, leaveCropTool, showAiPanel, showMaskPan
 import { applyCropParams } from "../crop/cropActions";
 import { cropWithDraft, flipCropOrientation } from "../crop/cropMath";
 import { cropDraft, markCropGesture, setCropDraft } from "../crop/cropSession";
-import { cropActive, imageDims, imageMeta, selectedMask, viewportTool, brushRadius } from "../stores/app";
+import { cropActive, imageDims, imageMeta, selectedMask, sendViewCmd, viewportTool, brushRadius } from "../stores/app";
 import { doc, reconcile } from "../stores/doc";
 import { activePhoto, libraryItems, openPhoto, gridKey } from "../stores/browse";
 import { colorPickActive, deselectMask, geomPlacementKind, objectPickActive, stopGeomPlacement, stopInstancePick, endMaskAdjust } from "../stores/mask";
@@ -132,6 +132,29 @@ export function handleGlobalShortcut(e: KeyboardEvent): void {
     if (shift && key === "v") {
       e.preventDefault();
       void pasteGrade();
+      return;
+    }
+
+    // ⌘= / ⌘+ — Zoom in · ⌘- — Zoom out · ⌘0 — Fit
+    if (
+      isEditorRoute() &&
+      (key === "=" || key === "+" || e.code === "Equal" || e.code === "NumpadAdd")
+    ) {
+      e.preventDefault();
+      sendViewCmd("zoomIn");
+      return;
+    }
+    if (
+      isEditorRoute() &&
+      (key === "-" || key === "_" || e.code === "Minus" || e.code === "NumpadSubtract")
+    ) {
+      e.preventDefault();
+      sendViewCmd("zoomOut");
+      return;
+    }
+    if (isEditorRoute() && key === "0") {
+      e.preventDefault();
+      sendViewCmd("fit");
       return;
     }
 
@@ -386,6 +409,9 @@ export const shortcutLabels = {
   filmstrip: "B",
   zenMode: "T",
   zoom: "Z",
+  zoomIn: `${MOD}=`,
+  zoomOut: `${MOD}-`,
+  zoomFit: `${MOD}0`,
   compare: "\\",
   lookPrev: "[",
   lookNext: "]",

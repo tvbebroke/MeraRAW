@@ -41,6 +41,9 @@
       title: "Image Adjustment & Modals",
       items: [
         { label: "Toggle Zoom 1:1 / Fit", key: shortcutLabels.zoom },
+        { label: "Zoom In", key: shortcutLabels.zoomIn },
+        { label: "Zoom Out", key: shortcutLabels.zoomOut },
+        { label: "Zoom to Fit", key: shortcutLabels.zoomFit },
         { label: "Toggle Before/After Compare", key: shortcutLabels.compare },
         { label: "Open Export Modal", key: shortcutLabels.export },
         { label: "Open Settings Modal", key: shortcutLabels.settings },

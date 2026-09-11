@@ -23,6 +23,9 @@ import {
   onPreviewReady,
   onSettingsRequested,
   onExportRequested,
+  onViewZoomIn,
+  onViewZoomOut,
+  onViewZoomFit,
   onPhotoWorkspace,
   onVideoWorkspace,
 } from "../../ipc/events";
@@ -40,6 +43,7 @@ import {
   openingPreviewHint,
   openingPreviewUrl,
   selectedMask,
+  sendViewCmd,
   statusMessage,
 } from "../../stores/app";
 import { clearDoc, reconcile, setDoc } from "../../stores/doc";
@@ -176,6 +180,9 @@ export function initEngineBridge(): () => void {
     }),
     onExportRequested(() => isExportOpen.set(true)),
     onSettingsRequested(() => isSettingsOpen.set(true)),
+    onViewZoomIn(() => sendViewCmd("zoomIn")),
+    onViewZoomOut(() => sendViewCmd("zoomOut")),
+    onViewZoomFit(() => sendViewCmd("fit")),
     onPhotoWorkspace(() => setWorkspace("photo")),
     onVideoWorkspace(() => setWorkspace("video")),
   ];

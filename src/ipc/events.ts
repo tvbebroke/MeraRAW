@@ -23,6 +23,9 @@ export const EVENTS = {
   exportRequested: "export-requested",
   importRequested: "import-requested",
   settingsRequested: "settings-requested",
+  viewZoomIn: "view-zoom-in",
+  viewZoomOut: "view-zoom-out",
+  viewZoomFit: "view-zoom-fit",
   photoWorkspace: "photo-workspace",
   videoWorkspace: "video-workspace",
   assistantProgress: "assistant-progress",
@@ -180,6 +183,18 @@ export function onExportRequested(cb: () => void): Promise<UnlistenFn> {
 
 export function onSettingsRequested(cb: () => void): Promise<UnlistenFn> {
   return listen<null>(EVENTS.settingsRequested, () => cb());
+}
+
+export function onViewZoomIn(cb: () => void): Promise<UnlistenFn> {
+  return listen<null>(EVENTS.viewZoomIn, () => cb());
+}
+
+export function onViewZoomOut(cb: () => void): Promise<UnlistenFn> {
+  return listen<null>(EVENTS.viewZoomOut, () => cb());
+}
+
+export function onViewZoomFit(cb: () => void): Promise<UnlistenFn> {
+  return listen<null>(EVENTS.viewZoomFit, () => cb());
 }
 
 export function onPhotoWorkspace(cb: () => void): Promise<UnlistenFn> {
