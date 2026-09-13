@@ -265,6 +265,9 @@ pub struct PresetCatalogEntry {
     pub label: String,
     #[serde(default)]
     pub tags: Vec<String>,
+    /// Develop modules used to paint the preset list snapshot.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub modules: ModuleParams,
 }
 
 impl PresetFile {

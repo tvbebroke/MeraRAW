@@ -444,6 +444,7 @@ pub(super) fn list_preset_catalog() -> Vec<crate::doc::PresetCatalogEntry> {
                 }
                 let label;
                 let tags;
+                let modules;
                 match std::fs::read_to_string(&p)
                     .ok()
                     .and_then(|t| serde_json::from_str::<crate::doc::PresetFile>(&t).ok())
@@ -451,16 +452,19 @@ pub(super) fn list_preset_catalog() -> Vec<crate::doc::PresetCatalogEntry> {
                     Some(file) => {
                         label = file.label.unwrap_or_else(|| humanize_preset_id(id));
                         tags = file.tags;
+                        modules = file.modules;
                     }
                     None => {
                         label = humanize_preset_id(id);
                         tags = Vec::new();
+                        modules = Default::default();
                     }
                 }
                 entries.push(crate::doc::PresetCatalogEntry {
                     id: id.to_string(),
                     label,
                     tags,
+                    modules,
                 });
             }
         }

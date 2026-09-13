@@ -16,6 +16,8 @@ export type DecodeState = "idle" | "preview" | "ready" | "error";
 export const decodeState = atom<DecodeState>("idle");
 /** Cached catalog image shown instantly while the RAW engine opens a photo. */
 export const openingPreviewUrl = atom<string | null>(null);
+/** Ungraded catalog thumb for preset list snapshots. Stays after the opening preview clears. */
+export const presetSnapshotUrl = atom<string | null>(null);
 /** Catalog size (+ optional EXIF label) so a sideways thumb can stand up
  *  before `open_image` metadata arrives. */
 export const openingPreviewHint = atom<{

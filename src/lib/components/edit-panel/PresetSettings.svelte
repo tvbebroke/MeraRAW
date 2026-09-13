@@ -8,7 +8,9 @@
     type PresetCatalogEntry,
   } from "../../../ipc/commands";
   import { reconcile, doc } from "../../../stores/doc";
+  import { presetSnapshotUrl } from "../../../stores/app";
   import { gradeClipboard } from "../../grade";
+  import PresetThumb from "./PresetThumb.svelte";
 
   const SAVE_MODULES = [
     "exposure",
@@ -134,8 +136,13 @@
         class:on={selected === preset.id}
         onclick={() => void apply(preset.id)}
       >
-        <span>{preset.label}</span>
-        <span class="tag">{preset.tags[0] ?? ""}</span>
+        <PresetThumb id={preset.id} modules={preset.modules} photoUrl={$presetSnapshotUrl} />
+        <span class="meta">
+          <span class="name">{preset.label}</span>
+          {#if preset.tags[0]}
+            <span class="tag">{preset.tags[0]}</span>
+          {/if}
+        </span>
       </button>
     {/each}
   {/if}
@@ -152,11 +159,10 @@
   .item {
     display: flex;
     align-items: center;
-    justify-content: space-between;
     gap: var(--space-2);
     width: 100%;
-    min-height: 28px;
-    padding: 0 var(--space-2);
+    min-height: 58px;
+    padding: 4px var(--space-2);
     margin-bottom: var(--space-1);
     border: 1px solid var(--color-border);
     border-radius: 6px;
@@ -171,5 +177,12 @@
     background: var(--color-accent-soft);
   }
   .item:hover { background: var(--color-active); }
-  .tag { color: var(--color-subtle); }
+  .meta {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tag { color: var(--color-subtle); font-size: 11px; }
 </style>

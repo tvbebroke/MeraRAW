@@ -42,6 +42,7 @@ import {
   lastOpenedDocId,
   openingPreviewHint,
   openingPreviewUrl,
+  presetSnapshotUrl,
   selectedMask,
   sendViewCmd,
   statusMessage,
@@ -75,6 +76,7 @@ export async function openPath(
     statusMessage.set(`opening ${name}…`);
     decodeState.set("preview");
     openingPreviewUrl.set(previewUrl ?? null);
+    presetSnapshotUrl.set(previewUrl ?? null);
     imageMeta.set(null);
     imageDims.set(null);
     // Grid clicks set a hint first. Finder / IPC opens have no catalog size.

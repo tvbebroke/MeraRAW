@@ -395,6 +395,7 @@ export interface PresetCatalogEntry {
   id: string;
   label: string;
   tags: string[];
+  modules?: Record<string, Record<string, unknown>>;
 }
 
 /** Preset style categories (searchable in Presets panel). */
