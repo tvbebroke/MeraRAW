@@ -7,9 +7,22 @@ src-tauri/gen/schemas/
 *.log
 *.mrt.json.tmp
 .DS_Store
+
+# Environment and secrets
 .env
 .env.local
+.env.*.local
+*.key
+*.pem
+!src-tauri/license-public.pem
 scripts/license-private.pem
+*.p12
+*.pfx
+*.cert
+*.crt
+!public/**/*.crt
+
+# Local development
 meraraw-derivatives/
 .preset-import-tmp/
 .preset-fetch-tmp/
@@ -26,5 +39,16 @@ dist-release/
 src-tauri/rust_out
 .self-eval-scores.jsonl
 RELEASE-HANDOFF.md
+
 # Large ONNX — fetch via scripts/download-sky-model.sh before release builds
 src-tauri/core/models/skyseg.onnx
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+Thumbs.db

@@ -3,7 +3,7 @@ name = "zerawler"
 version = "0.1.0"
 edition = "2021"
 description = "Sidecar RAW engine — delegates demosaicing to external reference binaries (RawTherapee CLI, LibRaw dcraw_emu) across a process boundary"
-license = "LicenseRef-proprietary"
+license = "Apache-2.0"
 publish = false
 
 # The zerawler crate itself contains no GPL code: it only spawns external

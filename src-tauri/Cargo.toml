@@ -3,6 +3,7 @@ name = "meratech-editor"
 version = "0.1.8"
 edition = "2021"
 description = "MeraRAW RAW Editor"
+license = "Apache-2.0"
 
 [workspace]
 members = ["core", "resize"]

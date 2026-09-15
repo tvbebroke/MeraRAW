@@ -3,7 +3,7 @@ name = "merawler"
 version = "0.1.0"
 edition = "2021"
 description = "Custom RAW demosaic engine (RCD, LMMSE, AMaZE, IGV, DDFAPD) for MeraRAW"
-license = "LicenseRef-proprietary"
+license = "Apache-2.0"
 publish = false
 
 [features]
