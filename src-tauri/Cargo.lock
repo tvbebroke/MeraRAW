@@ -2715,6 +2715,7 @@ dependencies = [
  "tauri",
  "tauri-build",
  "tauri-plugin-dialog",
+ "tauri-plugin-wayland-nvidia-quirk",
  "tauri-plugin-window-state",
  "thiserror 2.0.18",
  "tokio",
@@ -4974,6 +4975,16 @@ dependencies = [
  "thiserror 2.0.18",
  "toml 1.1.2+spec-1.1.0",
  "url",
+]
+
+[[package]]
+name = "tauri-plugin-wayland-nvidia-quirk"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "523f6620fd0b6e87f25f7d2cde69be388ae5d1bcaf1696877e64ce3da8fa1483"
+dependencies = [
+ "gtk",
+ "tauri",
 ]
 
 [[package]]

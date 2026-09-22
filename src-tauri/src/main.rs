@@ -368,6 +368,7 @@ fn main() {
     let engine = meratech_core::engine::spawn_with_events(Some(event_tx));
 
     tauri::Builder::default()
+        .plugin(tauri_plugin_wayland_nvidia_quirk::init())
         .plugin(tauri_plugin_dialog::init())
         // Never restore/save decorations — the Svelte TitleBar draws its own
         // traffic lights (`decorations: false` in tauri.conf.json). Persisting
